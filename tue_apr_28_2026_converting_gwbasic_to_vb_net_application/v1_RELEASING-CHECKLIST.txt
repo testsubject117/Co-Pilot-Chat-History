@@ -1,0 +1,100 @@
+AMiOffice Release Checklist (no-git workflow)
+Date: ____________
+Prepared by: ____________
+
+VERSIONING POLICY (SemVer-ish)
+- Patch (bugfix):        1.0.0 -> 1.0.1      (AssemblyVersion stays the same)
+- Minor (new features):  1.0.0 -> 1.1.0      (AssemblyVersion stays the same)
+- Major (breaking):      1.x   -> 2.0.0      (AssemblyVersion -> 2.0.0.0)
+
+In AMiOffice.vbproj:
+- Version = X.Y.Z
+- AssemblyVersion = A.0.0.0 (A changes only on major)
+- FileVersion = $(Version).$(BuildNumber) (auto changes on Publish)
+- InformationalVersion = $(Version) (Build $(BuildNumber))
+
+------------------------------------------------------------
+1) PRE-FLIGHT
+[ ] Confirm app runs locally (Debug/Release build succeeds)
+[ ] Confirm data files present on dev machine OR test with missing-file behavior
+[ ] Close AMiOffice on the workstation(s) you will update (avoid locked EXE)
+
+------------------------------------------------------------
+2) SET VERSION (manual)
+Open AMiOffice.vbproj and update:
+
+Patch release:
+[ ] Change <Version> X.Y.Z -> X.Y.(Z+1)
+[ ] Do NOT change <AssemblyVersion>
+
+Minor release:
+[ ] Change <Version> X.Y.Z -> X.(Y+1).0
+[ ] Do NOT change <AssemblyVersion>
+
+Major release:
+[ ] Change <Version> X.Y.Z -> (X+1).0.0
+[ ] Change <AssemblyVersion> old -> (X+1).0.0.0
+
+Notes:
+- Do not set Version to 4 parts; keep it X.Y.Z.
+- AssemblyVersion should remain A.0.0.0 between majors.
+
+------------------------------------------------------------
+3) BUILD + PUBLISH (increments BuildNumber)
+[ ] Build Release
+[ ] Publish (this increments build-counter.txt)
+[ ] Record BuildNumber after publish: ____________
+
+Expected results:
+- Product version: X.Y.Z
+- File version:    X.Y.Z.<BuildNumber>
+- Informational:   X.Y.Z (Build <BuildNumber>)
+
+------------------------------------------------------------
+4) VERIFY PUBLISHED EXE BEFORE DEPLOY
+Locate published AMiOffice.exe and check:
+[ ] Right-click EXE -> Properties -> Details
+    - Product version: ____________
+    - File version:    ____________
+[ ] Launch the published EXE locally
+[ ] Quick sanity test: open main screens and ensure no crash on startup
+
+------------------------------------------------------------
+5) DEPLOY TO WORKSTATION(S)
+[ ] Copy AMiOffice.exe (and any required supporting files) to target workstation path
+[ ] Launch on workstation
+[ ] Confirm the "About" screen (or version display) matches X.Y.Z (Build N)
+
+Workstations updated:
+- [ ] PC name: ____________  Time: ______  Verified: (initials) ____
+- [ ] PC name: ____________  Time: ______  Verified: (initials) ____
+- [ ] PC name: ____________  Time: ______  Verified: (initials) ____
+
+------------------------------------------------------------
+6) SMOKE TESTS ON WORKSTATION (fast)
+[ ] Find by Invoice # works
+[ ] Find by Check # works
+[ ] Ledger screens load
+
+Optional resilience checks (only if you need to validate error handling):
+[ ] Rename CHECK.INV temporarily -> app shows friendly missing-file message
+[ ] Rename LEDGER.CUR temporarily -> app shows friendly missing-file message
+[ ] Rename OTHER.CHK temporarily -> app shows friendly missing-file message
+(restore files immediately after)
+
+------------------------------------------------------------
+7) ARCHIVE / BACKUP (since there is no git)
+[ ] Copy the published output folder to an archive location:
+    Archive path: ________________________________
+    Folder name suggestion: AMiOffice_X.Y.Z_BuildN_YYYY-MM-DD
+[ ] Optionally also zip the entire source folder used for this release.
+
+------------------------------------------------------------
+8) RELEASE NOTES (1-2 lines)
+Version: X.Y.Z (Build N)
+Date deployed: ____________
+Changes:
+- 1)
+- 2)
+
+END

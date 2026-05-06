@@ -1,0 +1,5 @@
+EnsureDataDirExists()
+EnsureLegacyFilesExist()
+
+BuildUi()
+BuildTable()
