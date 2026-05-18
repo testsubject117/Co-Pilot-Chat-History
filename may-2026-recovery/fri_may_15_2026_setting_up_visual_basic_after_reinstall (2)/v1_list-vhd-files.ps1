@@ -1,0 +1,1 @@
+Get-ChildItem -Path $vhdfolder -File | Where-Object { $_.Extension -in '.vhd','.vhdx','.avhdx' } | Select-Object Name, Length, Extension

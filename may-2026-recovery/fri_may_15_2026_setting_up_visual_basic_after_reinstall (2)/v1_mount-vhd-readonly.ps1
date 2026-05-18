@@ -1,0 +1,1 @@
+Mount-VHD -Path "C:\Path\To\Disk.vhd" -ReadOnly

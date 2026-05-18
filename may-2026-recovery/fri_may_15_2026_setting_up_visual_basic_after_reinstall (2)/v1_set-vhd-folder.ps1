@@ -1,0 +1,1 @@
+$vhdfolder = 'P:\Recovered_12_20_58\Local Disk(C)\ProgramData\Microsoft\Windows\Virtual Hard Disks'

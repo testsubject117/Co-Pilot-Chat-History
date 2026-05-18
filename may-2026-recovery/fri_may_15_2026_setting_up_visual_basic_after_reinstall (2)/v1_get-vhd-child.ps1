@@ -1,0 +1,1 @@
+Get-VHD -Path "Q:\HyperV_Recovery_Working\AM_Invoice_VM\AM Invoice Clone For Code Testing DOS Drive_4CBE5C0A-E276-454D-9BF4-7FE7D9CE15A1.avhdx" | Format-List *

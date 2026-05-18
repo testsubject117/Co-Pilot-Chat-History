@@ -1,0 +1,1 @@
+Get-Item "repos\amioffice\amioffice\bin\debug\net10.0-windows\amioffice.exe" | Select-Object Length, CreationTime, LastWriteTime

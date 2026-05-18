@@ -1,0 +1,1 @@
+Dismount-VHD -Path "D:\Recovered\MyDisk.vhdx"

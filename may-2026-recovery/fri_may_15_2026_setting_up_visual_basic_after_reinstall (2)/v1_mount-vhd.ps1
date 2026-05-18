@@ -1,0 +1,1 @@
+Mount-VHD -Path "D:\Recovered\MyDisk.vhdx" -ReadOnly

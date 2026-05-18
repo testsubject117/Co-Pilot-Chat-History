@@ -1,0 +1,1 @@
+Dim realNamePath As String = "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\Data\REALNAME.DAT"

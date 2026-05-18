@@ -1,0 +1,1 @@
+Get-ChildItem -Path 'S:\Users\CapnKirk\source\repos' -Force -ErrorAction SilentlyContinue

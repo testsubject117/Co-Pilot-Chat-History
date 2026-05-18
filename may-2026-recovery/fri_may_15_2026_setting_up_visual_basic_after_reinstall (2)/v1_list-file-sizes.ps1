@@ -1,0 +1,1 @@
+Get-ChildItem -Path $vhdfolder -File | Where-Object { $_.Extension -in '.vhdx','.avhdx' } | Select-Object Name, @{Name='SizeGB';Expression={[math]::Round($_.Length / 1GB, 2)}}

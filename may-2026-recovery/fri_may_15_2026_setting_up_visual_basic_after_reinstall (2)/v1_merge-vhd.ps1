@@ -1,0 +1,1 @@
+Merge-VHD -Path "Q:\HyperV_Recovery_Working\AM_Invoice_VM\<child>.avhdx" -DestinationPath "Q:\HyperV_Recovery_Working\AM_Invoice_VM\<parent>.avhdx"

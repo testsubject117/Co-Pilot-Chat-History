@@ -1,0 +1,1 @@
+Get-VHD -Path "D:\Recovered\MyDisk.vhdx"

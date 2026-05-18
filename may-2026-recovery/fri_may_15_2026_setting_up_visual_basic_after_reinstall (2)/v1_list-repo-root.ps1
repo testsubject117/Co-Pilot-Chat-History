@@ -1,0 +1,1 @@
+Get-ChildItem "C:\Users\CapnKirk\source\repos"

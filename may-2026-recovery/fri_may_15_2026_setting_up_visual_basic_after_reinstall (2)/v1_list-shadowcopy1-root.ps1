@@ -1,0 +1,1 @@
+Get-ChildItem 'S:\ShadowCopy1' -Force -ErrorAction SilentlyContinue

@@ -1,0 +1,1 @@
+Dim realNamePath As String = "\\invoice\MainMenu\Data\REALNAME.DAT"

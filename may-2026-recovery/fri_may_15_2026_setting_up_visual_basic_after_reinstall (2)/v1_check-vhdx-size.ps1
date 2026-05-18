@@ -1,0 +1,1 @@
+Get-Item "D:\VHDTest\AM Invoice Clone For Code Testing DOS Drive.vhdx" | Select-Object FullName, Length

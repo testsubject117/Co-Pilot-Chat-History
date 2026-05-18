@@ -1,0 +1,1 @@
+Get-ChildItem 'S:\ShadowCopy4' -Force

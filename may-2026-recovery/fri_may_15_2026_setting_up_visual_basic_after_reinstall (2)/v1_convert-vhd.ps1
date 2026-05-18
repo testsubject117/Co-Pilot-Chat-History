@@ -1,0 +1,1 @@
+Convert-VHD -Path "D:\Recovered\BadDisk.vhdx" -DestinationPath "D:\Recovered\ConvertedDisk.vhdx" -VHDType Dynamic

@@ -1,0 +1,1 @@
+Get-VHD -Path "D:\VHDTest\AM Invoice Clone For Code Testing DOS Drive_4CBE5C0A-E276-454D-9BF4-7FE7D9CE15A1.avhdx" | Format-List *
