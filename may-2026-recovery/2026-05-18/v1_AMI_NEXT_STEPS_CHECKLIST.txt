@@ -1,0 +1,183 @@
+AMi Next Steps Checklist
+Date: 2026-05-18
+
+Project context
+- DOS repo: testsubject117/AMiDataStore
+- VB repo: testsubject117/AmiWinForms
+- Current resume point:
+  - AMiOffice/CompanyInfo.vb
+  - AMiOffice/CompanyLookupService.vb
+  - AMiOffice/FormAddChecks.vb
+
+Primary project rule
+Preserve BOTH:
+1. original DOS behavior/workflow semantics
+2. the exact same WinForms DOS-style implementation pattern already established in the repo
+
+UI/style must match:
+- FormMainMenu.vb
+- FormLedgerMenu.vb
+- related DOS-style forms/base classes already in the project
+
+Do NOT introduce:
+- modern business-form styling
+- mismatched fonts/colors/buttons/layouts
+- modernized prompt wording unless necessary
+- workflows that depart from DOS behavior without a clear reason
+
+--------------------------------------------------
+PHASE 1 - LOCK DOWN UI / STYLE PARITY
+--------------------------------------------------
+
+[ ] Compare FormAddChecks against FormMainMenu.vb
+[ ] Compare FormAddChecks against FormLedgerMenu.vb
+[ ] Compare FormAddChecks against DosMenuFormBase.vb
+[ ] Compare FormAddChecks against FormSalesEmployeesChecksMenu.vb
+
+[ ] Verify background colors match established DOS-style forms
+[ ] Verify fonts match established DOS-style forms
+[ ] Verify button sizes/styles/captions match established DOS-style forms
+[ ] Verify spacing/alignment/layout rhythm matches existing forms
+[ ] Verify keyboard-first behavior matches existing forms
+[ ] Verify Enter/Escape/owner-return behavior matches existing forms
+[ ] Verify prompt wording/tone matches existing app style
+
+Goal of Phase 1
+- FormAddChecks should visibly and behaviorally feel like it belongs beside FormMainMenu and the Checks menu without looking newly introduced.
+
+--------------------------------------------------
+PHASE 2 - CONFIRM DOS-FAITHFUL ADD CHECKS FLOW
+--------------------------------------------------
+
+[ ] Reconfirm that Add Checks is the canonical accounting entry path from DOS
+[ ] Keep Sales Employee wizard secondary unless evidence proves otherwise
+[ ] Identify DOS prompt/order for Add Checks flow
+[ ] Align FormAddChecks field order with DOS flow as closely as practical
+[ ] Align validation prompts/messages with DOS intent and tone
+[ ] Avoid modernizing the workflow into a generic wizard/business form
+
+Goal of Phase 2
+- FormAddChecks should become the DOS-faithful Add Checks path, not a modern replacement.
+
+--------------------------------------------------
+PHASE 3 - COMPLETE COMPANY LOOKUP BEHAVIOR
+--------------------------------------------------
+
+[ ] Review CompanyInfo.vb structure against DOS needs
+[ ] Review CompanyLookupService.vb behavior against REALNAME.DAT semantics
+[ ] Confirm company code normalization matches DOS expectations
+[ ] Confirm PRC filename derivation is DOS-faithful
+[ ] Confirm whether lookup should validate:
+    [ ] REALNAME.DAT only
+    [ ] PRC filename existence
+    [ ] both
+[ ] Preserve DOS-like abbreviation rules
+[ ] Preserve DOS-like lookup/prompt behavior
+
+Goal of Phase 3
+- Company lookup should behave like DOS-era company selection/validation, not a modern search UX.
+
+--------------------------------------------------
+PHASE 4 - WIRE ADD CHECKS INTO THE CHECKS MENU
+--------------------------------------------------
+
+[ ] Replace Add Checks stub in FormLedgerMenu with FormAddChecks launch
+[ ] Preserve existing owner/child form navigation pattern
+[ ] Preserve current menu hotkey behavior
+[ ] Preserve DOS-style return/cancel flow
+
+Goal of Phase 4
+- Menu option 1/Add Checks should open the new DOS-style Add Checks form cleanly and consistently.
+
+--------------------------------------------------
+PHASE 5 - DEFINE WRITE-SIDE ACCOUNTING SEMANTICS BEFORE CODING
+--------------------------------------------------
+
+[ ] Document exact Add Checks transaction behavior from DOS
+[ ] Define how selected invoices change in INVOICE.CHK
+[ ] Define when invoice flags become P or remain J
+[ ] Define how ledger credit rows are written to LEDGER.CUR
+[ ] Define how check-to-invoice links are appended to CHECK.INV
+[ ] Define handling for partial/inexact allocations if DOS supported them
+[ ] Define failure behavior / rollback expectations
+[ ] Define whether OTHER.CHK is involved in this flow or stays separate
+
+Goal of Phase 5
+- Write behavior must be explicitly DOS-faithful before implementation starts.
+
+--------------------------------------------------
+PHASE 6 - IMPLEMENT WRITER PIPELINE
+--------------------------------------------------
+
+[ ] Add/plan writer support for INVOICE.CHK
+[ ] Add/plan writer support for LEDGER.CUR
+[ ] Add/plan writer support for CHECK.INV
+[ ] Keep file update ordering consistent and safe
+[ ] Preserve DOS status semantics:
+    - J unpaid
+    - P paid
+    - C corrected cert
+    - V void
+    - E erased
+[ ] Keep file formats compatible with existing DOS-era data
+[ ] Verify read-side forms still interpret new writes correctly
+
+Goal of Phase 6
+- Achieve first true write-side accounting parity milestone.
+
+--------------------------------------------------
+PHASE 7 - FOLLOW-ON ACCOUNTING PARITY
+--------------------------------------------------
+
+[ ] Implement Delete Checks
+[ ] Implement Add OTHER Checks
+[ ] Implement Delete OTHER Checks
+[ ] Recheck “Doesn’t Balance” report against new write behavior
+[ ] Recheck find-by-check / find-by-invoice flows against new writes
+[ ] Recheck company totals / ledger views after write support
+
+Goal of Phase 7
+- Extend parity beyond first Add Checks success into broader checks accounting maintenance.
+
+--------------------------------------------------
+PHASE 8 - SALES EMPLOYEE PATH DECISION
+--------------------------------------------------
+
+[ ] Reassess FormSalesEmployeeCheckWizard after Add Checks is working
+[ ] Decide whether wizard remains:
+    [ ] reporting/support only
+    [ ] partially integrated helper
+    [ ] broader transaction flow
+[ ] Keep EMPNAME.DAT behavior DOS-faithful
+[ ] Avoid promoting Sales Employee wizard to canonical path unless DOS evidence supports it
+
+Goal of Phase 8
+- Keep Sales Employee features aligned with DOS role and avoid architecture drift.
+
+--------------------------------------------------
+CURRENT KNOWN STATUS
+--------------------------------------------------
+
+AMiDataStore
+- local and GitHub main are in sync
+- DOS architecture reviewed
+- key accounting file relationships identified
+
+AmiWinForms
+- local and GitHub master are in sync
+- latest pushed commit:
+  cb8271f - Add company lookup and Add Checks form files
+
+Current interpretation
+- Read/report parity is already fairly strong
+- Add Checks groundwork is now the main resume point
+- Biggest missing gap is write-side accounting parity
+- UI/style parity with existing DOS-style WinForms shell is a hard requirement
+
+--------------------------------------------------
+COPY/PASTE COPILOT REMINDER
+--------------------------------------------------
+
+This AMi project is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same existing WinForms DOS-style implementation pattern already established in the repo. All new work must match FormMainMenu and the CHECKS/cash receipts menu in backgrounds, fonts, buttons, layout rhythm, hotkey/menu presentation, keyboard-first behavior, prompt wording, and navigation style. Do not modernize the UI unnecessarily. Current resume point is CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The biggest remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.
+
+End of checklist.

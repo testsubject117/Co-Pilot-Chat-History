@@ -1,0 +1,202 @@
+AMi Project Handoff / Copilot Context
+Date: 2026-05-18
+
+Repositories
+- DOS source repo: testsubject117/AMiDataStore
+- VB.NET WinForms port repo: testsubject117/AmiWinForms
+
+Project goal
+- Port the legacy DOS GW-BASIC AMi application to VB.NET WinForms.
+- Preserve DOS behavior and workflow semantics as closely as possible.
+- Preserve the existing WinForms DOS-style implementation pattern already established in the repo.
+- No unnecessary modernization of UI flow, wording, styling, or control layout.
+
+Critical UI requirement
+ALL new work must preserve BOTH:
+1. the original DOS feel
+2. the exact same WinForms DOS-style implementation pattern already established in the repo
+
+This means new or modified forms must match the style and implementation approach of:
+- FormMainMenu.vb
+- the CHECKS / cash receipts menu (FormLedgerMenu.vb)
+- related DOS-style forms/base classes already in the repo
+
+Specifically preserve:
+- backgrounds
+- fonts
+- button styles
+- layout rhythm
+- menu/hotkey style
+- keyboard-first behavior
+- owner/child navigation behavior
+- existing message/prompt tone
+
+Do NOT introduce:
+- modern business-form styling
+- designer-default inconsistent controls
+- modernized workflow text
+- UI patterns that visually clash with FormMainMenu / Checks menu
+
+What was established today
+1. AMiDataStore local repo path confirmed:
+   C:\Users\capnkirk\source\repos\AMiDataStore
+
+2. AmiWinForms local repo path confirmed:
+   C:\Users\capnkirk\source\repos\AMiWinForms
+
+3. Git status was checked for both repos.
+
+AMiDataStore state
+- branch: main
+- local and origin/main are in sync
+- working tree clean
+- no uncommitted changes
+- no local-only commits
+- no remote-only commits on main
+
+AmiWinForms state before sync
+- branch: master
+- local and origin/master committed history were in sync
+- but these 3 files existed only locally as untracked files:
+  - AMiOffice/CompanyInfo.vb
+  - AMiOffice/CompanyLookupService.vb
+  - AMiOffice/FormAddChecks.vb
+
+AmiWinForms action completed today
+- Those 3 files were added, committed, and pushed.
+- Latest visible commit on GitHub now:
+  cb8271f - "Add company lookup and Add Checks form files"
+
+Current AmiWinForms state
+- branch: master
+- working tree clean
+- local and origin/master are fully synced
+- latest committed GitHub-visible work includes:
+  - CompanyInfo.vb
+  - CompanyLookupService.vb
+  - FormAddChecks.vb
+
+Deep review findings: DOS repo (AMiDataStore)
+The DOS app is a hub-and-spoke GW-BASIC system launched from DOS scripts and routed primarily by MAINM.ASC.
+Main menu routes include:
+- A SHOPCARD
+- B Invoice generator
+- C LEDGER / checks / cash receipts
+- D SALES
+- E LOGBOOK
+- F PLIST / PRC management
+- G BOOT / maintenance
+- K BILL / cash disbursements / check writing
+- M QUOTE
+- N PHONE
+- P ENTIRE / invoice inquiry-editor
+
+The DOS app is held together mainly by shared files, not in-memory APIs.
+
+Critical DOS files and semantics
+- INVOICE.CHK = master invoice status/index file
+  statuses include:
+  - J unpaid
+  - P paid
+  - C corrected cert
+  - V void
+  - E erased
+- LEDGER.CUR = mixed debit/credit ledger stream
+- CHECK.INV = check-to-invoice linkage
+- OTHER.CHK = other/non-invoice checks
+- EMPNAME.DAT = sales employee/customer mapping
+- REALNAME.DAT + PRC\*.PRC = company/procedure pricing and lookup
+- JOURNAL.CUR = sales journal stream
+- LOGBOOK.yy = year-based detailed logbook
+- INVOICE.NUM / MONTH.INV / LASTINVO.ICE = invoice counters/boundaries/history
+
+Important DOS accounting behavior
+- Invoice creation updates multiple files
+- Receiving customer payment check updates:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+- Delete/void flows also rebalance/reset linked file state
+- The original accounting system depends on coordinated synchronized flat-file updates
+
+Deep review findings: AmiWinForms repo
+WinForms port currently has strong read/report parity, including readers and forms for:
+- LEDGER.CUR
+- CHECK.INV
+- INVOICE.CHK
+- OTHER.CHK
+- ledger views/reports
+- company totals
+- find by check/invoice
+- doesn't balance report
+- EMPNAME editor
+
+Recent/latest implementation point
+Newest concrete work is:
+- CompanyInfo.vb
+- CompanyLookupService.vb
+- FormAddChecks.vb
+
+Current partial implementations
+- Sales Employee checks menu exists
+- Sales Employee wizard exists
+- EMPNAME editor exists
+- Add Checks groundwork exists
+- company lookup groundwork exists
+
+Current missing core parity
+The biggest remaining gap is write-side accounting parity:
+- Add Checks is not fully wired/implemented
+- Delete Checks is not fully implemented
+- Add OTHER Checks is not fully implemented
+- Delete OTHER Checks is not fully implemented
+- no fully realized writer pipeline yet for:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+  - OTHER.CHK
+
+Interpretation / current resume point
+The correct resume point appears to be the new Add Checks groundwork:
+- CompanyInfo.vb
+- CompanyLookupService.vb
+- FormAddChecks.vb
+
+This aligns with:
+- the latest pushed code
+- DOS architecture
+- Friday checklists / interrupted work direction
+
+Recommended direction
+Treat FormAddChecks as the canonical DOS-faithful Add Checks path.
+Do NOT replace it with a modernized workflow.
+Sales Employee wizard should remain secondary unless old notes prove it should become the main accounting flow.
+
+Next recommended development steps
+1. Keep FormAddChecks visually and behaviorally aligned with existing DOS-style WinForms forms.
+2. Compare FormAddChecks directly against:
+   - FormMainMenu.vb
+   - FormLedgerMenu.vb
+   - DosMenuFormBase.vb
+   - FormSalesEmployeesChecksMenu.vb
+3. Wire the Add Checks menu item to FormAddChecks.
+4. Confirm prompt order and wording match DOS expectations as closely as possible.
+5. Finalize DOS-faithful company lookup behavior using:
+   - REALNAME.DAT
+   - PRC file naming semantics
+6. Design and implement the write-side transaction pipeline for:
+   - INVOICE.CHK status updates
+   - LEDGER.CUR append/update behavior
+   - CHECK.INV linkage writes
+7. After Add Checks works end-to-end, handle:
+   - Delete Checks
+   - Add OTHER Checks
+   - Delete OTHER Checks
+8. Keep Sales Employee wizard separate unless future evidence says otherwise.
+
+Copilot quick-paste instruction block
+Use this in future Copilot chats:
+
+This AMi project is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same WinForms DOS-style implementation pattern already established in the repo. All new UI/work must visually and behaviorally match FormMainMenu and the CHECKS / cash receipts menu, including backgrounds, fonts, buttons, layout style, hotkey/menu presentation, keyboard-first behavior, prompt tone, and navigation patterns. Do not modernize the UI or workflow unnecessarily. Current resume point is the Add Checks groundwork in CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The main remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.
+
+End of handoff.
