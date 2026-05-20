@@ -1,0 +1,2000 @@
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Customer lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))    ' Customer txt
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Check lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))    ' Check txt
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Year lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))    ' Year cmb
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Month lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))    ' Month cmb
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Refresh btn
+
+        Dim lblCustomer As New Label() With {.Text = "Customer:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblCheck As New Label() With {.Text = "Check #:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblYear As New Label() With {.Text = "Year:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblMonth As New Label() With {.Text = "Month:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCheck.Dock = DockStyle.Fill
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+
+        ' Row 0: filters
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        ' Row 1: total
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        ' main check grid
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+
+        ' invoice details panel (bottom)
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.Fixed3D
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Drawing.Font(Font.FontFamily, 9.0F, Drawing.FontStyle.Bold)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Drawing.SystemColors.ControlDark
+        lblInvoiceTitle.ForeColor = Drawing.SystemColors.ControlLightLight
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        ' Wire up events
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+
+        ' Add to form; order determines docking priority
+        Controls.Add(dgv)        ' Fill  (added first)
+        Controls.Add(pnlInvoice) ' Bottom
+        Controls.Add(topPanel)   ' Top   (added last)
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("") ' all
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("") ' all
+        ' We don't know min/max upfront; just provide a reasonable range + all.
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        ' Clear current view so we never display stale data if the file is missing/unreadable.
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2) ' DOS compared last 2 digits
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    ' Invoice details
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                    ' Best-effort; proceed with the empty index built so far.
+                End Try
+
+                ' Guard against disposal race: IsDisposed check then Invoke,
+                ' catching ObjectDisposedException should the form close between the two.
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      ' Refresh panel if a row is already selected.
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                    ' Form was closed while the background task was running; ignore.
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+
+```
+
+## Copilot
+
+The problem is that **`FormLedgerView` is still built around legacy file data (`LEDGER.CUR`) and interactive filter controls**, not the DOS prompt-driven flow or the new runtime `CheckRepository`.
+
+## Direct answer
+To make **View Checks** behave correctly for your current Checks-menu completion pass, we should:
+
+1. **pass the DOS prompt values into `FormLedgerView`**
+2. **make `FormLedgerView` show filtered check results immediately**
+3. **use `CheckRepository` for runtime-added checks**
+4. temporarily **drop the modern top filter bar** so it feels closer to DOS
+
+Right now it is doing none of that:
+- it ignores the three prompt values from `FormLedgerMenu`
+- it reads only `LEDGER.CUR`
+- it uses a modern filter toolbar
+- it will not see checks you added through the new Add Check flow
+
+That is exactly why `PSIBEARI` is not showing correctly.
+
+---
+
+## Best next move
+I’m going to give you a **replacement `FormLedgerView.vb`** that is aligned with your current repository-based Checks flow.
+
+### This version will:
+- accept:
+  - customer
+  - check number
+  - year
+- load from `CheckRepository`
+- immediately show matching results
+- display a simple grid and total
+- be consistent with the Add/Delete work you just finished
+
+### This version will **not yet** do:
+- legacy `LEDGER.CUR` reading
+- invoice details panel
+- hybrid merge of repo + legacy data
+
+That’s intentional — right now your priority is to finish the Checks menu coherently.
+
+---
+
+# Step 1: update `FormLedgerMenu.vb`
+In `OpenViewChecksPromptFlow()`, replace this:
+
+```vbnet
+Using f As New FormLedgerView()
+    f.ShowDialog(Me)
+End Using
+```
+
+with this:
+
+```vbnet
+Using f As New FormLedgerView(cust, chk, yr)
+    f.ShowDialog(Me)
+End Using
+```
+
+---
+
+# Step 2: replace entire `FormLedgerView.vb`
+Replace the whole file with this:
+
+```vbnet name=FormLedgerView.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+    Inherits Form
+
+    Private ReadOnly _customerFilter As String
+    Private ReadOnly _checkFilter As String
+    Private ReadOnly _yearFilter As String
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblFilterLine As New Label()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+        MyBase.New()
+
+        _customerFilter = If(customerFilter, "").Trim()
+        _checkFilter = If(checkFilter, "").Trim()
+        _yearFilter = If(yearFilter, "").Trim()
+
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "View Checks"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** View Checks *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblFilterLine.AutoSize = False
+        lblFilterLine.ForeColor = Color.White
+        lblFilterLine.BackColor = Color.Black
+        lblFilterLine.SetBounds(24, 70, 920, 28)
+
+        dgv.SetBounds(24, 110, 920, 420)
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.Gray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.MultiSelect = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.RowHeadersVisible = False
+        dgv.AutoGenerateColumns = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Navy
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Customer",
+            .DataPropertyName = "CustomerName",
+            .Width = 220
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Check #",
+            .DataPropertyName = "CheckNumber",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Reference",
+            .DataPropertyName = "Reference",
+            .Width = 140
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Date",
+            .DataPropertyName = "CheckDate",
+            .Width = 130
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Amount",
+            .DataPropertyName = "AmountDisplay",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Invoices",
+            .DataPropertyName = "InvoicesDisplay",
+            .Width = 170,
+            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        })
+
+        lblTotal.AutoSize = False
+        lblTotal.ForeColor = Color.White
+        lblTotal.BackColor = Color.Black
+        lblTotal.SetBounds(24, 545, 500, 28)
+
+        btnClose.Text = "Close"
+        btnClose.SetBounds(834, 545, 110, 34)
+        AddHandler btnClose.Click, Sub() Me.Close()
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblFilterLine)
+        Me.Controls.Add(dgv)
+        Me.Controls.Add(lblTotal)
+        Me.Controls.Add(btnClose)
+
+        AddHandler Me.Load, AddressOf FormLedgerView_Load
+    End Sub
+
+    Private Sub FormLedgerView_Load(sender As Object, e As EventArgs)
+        LoadFilteredChecks()
+    End Sub
+
+    Private Sub LoadFilteredChecks()
+        Dim allChecks = CheckRepository.GetAll()
+
+        Dim q = allChecks.AsEnumerable()
+
+        If _customerFilter <> "" Then
+            q = q.Where(Function(x) x.CustomerName IsNot Nothing AndAlso
+                                    x.CustomerName.IndexOf(_customerFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _checkFilter <> "" Then
+            q = q.Where(Function(x) x.CheckNumber IsNot Nothing AndAlso
+                                    x.CheckNumber.IndexOf(_checkFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _yearFilter <> "" Then
+            q = q.Where(Function(x) YearMatches(x.CheckDate, _yearFilter))
+        End If
+
+        Dim rows = q.
+            Select(Function(x) New LedgerViewRow With {
+                .CustomerName = x.CustomerName,
+                .CheckNumber = x.CheckNumber,
+                .Reference = x.Reference,
+                .CheckDate = x.CheckDate,
+                .AmountValue = x.Amount,
+                .AmountDisplay = x.Amount.ToString("0.00"),
+                .InvoicesDisplay = If(x.PaidInvoices IsNot Nothing AndAlso x.PaidInvoices.Count > 0,
+                                      String.Join(", ", x.PaidInvoices),
+                                      "")
+            }).
+            OrderBy(Function(x) x.CustomerName).
+            ThenBy(Function(x) x.CheckNumber).
+            ToList()
+
+        dgv.DataSource = rows
+
+        Dim total = rows.Sum(Function(x) x.AmountValue)
+        lblTotal.Text = "Total Amount: $" & total.ToString("0.00")
+
+        Dim custDisplay As String = If(_customerFilter = "", "ALL", _customerFilter)
+        Dim chkDisplay As String = If(_checkFilter = "", "ALL", _checkFilter)
+        Dim yearDisplay As String = If(_yearFilter = "", "ALL", _yearFilter)
+
+        lblFilterLine.Text = "Customer: " & custDisplay & "   Check #: " & chkDisplay & "   Year: " & yearDisplay
+
+        If rows.Count = 0 Then
+            MessageBox.Show("No checks found for the selected criteria.",
+                            "View Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Function YearMatches(dateText As String, requestedYear As String) As Boolean
+        If String.IsNullOrWhiteSpace(requestedYear) Then Return True
+        If String.IsNullOrWhiteSpace(dateText) Then Return False
+
+        Dim normalizedRequested = requestedYear.Trim()
+
+        If normalizedRequested.Length = 2 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase)
+        End If
+
+        If normalizedRequested.Length = 4 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase) OrElse
+                   dateText.Trim().EndsWith(normalizedRequested.Substring(2), StringComparison.OrdinalIgnoreCase)
+        End If
+
+        Return dateText.IndexOf(normalizedRequested, StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Class LedgerViewRow
+        Public Property CustomerName As String
+        Public Property CheckNumber As String
+        Public Property Reference As String
+        Public Property CheckDate As String
+        Public Property AmountValue As Decimal
+        Public Property AmountDisplay As String
+        Public Property InvoicesDisplay As String
+    End Class
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+End Class
+```
+
+---
+
+## Why this fixes your current issue
+This version fixes the exact mismatch you described:
+
+- if you added `PSIBEARI` through **Add Checks**
+- and then use **View Checks**
+- and enter `PSIBEARI`
+- it will actually search the same repository used by Add/Delete
+
+So now those features become consistent.
+
+---
+
+## Important note
+This still does **not** fully recreate the inline DOS same-screen prompt.  
+It fixes the data path and removes the old modern filter-toolbar view.
+
+If you want true DOS closeness after this, the next refinement would be:
+- replace the popup prompt sequence with a dedicated DOS-style prompt screen/form
+
+But I’d first get this working end-to-end.
+
+---
+
+## What to do now
+1. update `FormLedgerMenu.vb` constructor call
+2. replace `FormLedgerView.vb`
+3. build
+4. test:
+   - add `PSIBEARI`
+   - view checks for `PSIBEARI`
+   - confirm it appears
+   - try blank customer for all customers
+   - try check number filter
+   - try year filter
+
+---
+
+## Question for you
+After you test this, tell me:
+
+**Do you want me next to make the View Checks prompts DOS-style on the same black screen instead of popup dialogs?**
+
+## @testsubject117
+
+how should I test this
+
+## Copilot
+
+Test it in this exact order.
+
+## 1. Build first
+- save all files
+- **Build**
+- make sure there are **0 errors**
+
+---
+
+## 2. Basic View Checks test
+Run the app and go to:
+
+- **Checks**
+- press **1** to add a check
+
+Enter something like:
+- Company: `PSIBEARI`
+- Amount: `.20`
+- Lowest invoice: `-1`
+- press `C`
+- Check #: `7778`
+- Date: press **Enter** or type today
+- Reference: `12345678`
+- Final confirm: `Y`
+
+Then:
+
+- go back to **Checks**
+- press **3** for **View Checks**
+
+When prompted, enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should see:
+- one row for `PSIBEARI`
+- check `7778`
+- reference `12345678`
+- amount `.20` shown as `0.20`
+- total amount = `0.20`
+
+---
+
+## 3. All customers test
+Open **View Checks** again.
+
+Enter:
+- Customer name: press **Enter**
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should see all checks currently in the runtime repository for this session.
+
+If you only added one, then you should only see that one.
+
+---
+
+## 4. Check number filter test
+Open **View Checks** again.
+
+Enter:
+- Customer name: press **Enter**
+- Check Number: `7778`
+- Year: press **Enter**
+
+### Expected result
+You should see only check `7778`.
+
+---
+
+## 5. Year filter test
+Open **View Checks** again.
+
+Enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: `2026`
+
+### Expected result
+You should still see the row if the date ends in 2026.
+
+If you accepted today’s default date, it should match.
+
+---
+
+## 6. Not found test
+Open **View Checks** again.
+
+Enter:
+- Customer name: `NOTREAL`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should get:
+- a “No checks found” message
+- then an empty grid or no matching rows
+
+---
+
+## 7. Delete consistency test
+Now test that View Checks matches Delete Checks.
+
+### First
+Confirm `PSIBEARI / 7778` appears in **View Checks**
+
+### Then
+Go to:
+- **Delete Checks**
+- delete `7778`
+
+### Then
+Go back to:
+- **View Checks**
+
+Enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+`7778` should no longer appear.
+
+---
+
+## 8. ESC/Close test
+While in the View Checks screen:
+- press **Esc**
+
+### Expected result
+It should close and return to the Checks menu.
+
+Also test the **Close** button.
+
+---
+
+## 9. What to tell me back
+After testing, tell me these exact things:
+
+1. **Did PSIBEARI appear in View Checks?**
+2. **Did blank customer show all checks?**
+3. **Did check number filtering work?**
+4. **Did year filtering work?**
+5. **After deleting 7778, did View Checks stop showing it?**
+6. **Does the screen feel closer to DOS, or still too modern?**
+
+## Short version
+Minimum test:
+1. add `PSIBEARI / 7778`
+2. view checks for `PSIBEARI`
+3. confirm it appears
+4. delete `7778`
+5. view checks again
+6. confirm it’s gone
+
+After you run that, tell me what happened.
+
+## @testsubject117
+
+if I enter, enter, enter it should show all customers, all checks, all years, it doesn't, it still is showing the results of the search for the psibeari check
+
+## Copilot
+
+That means the prompt flow is probably still passing the **previous values**, or the view form is being reused with stale filter state.
+
+## Direct answer
+**Blank / Enter / Enter should absolutely mean ALL / ALL / ALL.**  
+If it still shows the old `PSIBEARI`-filtered result, that’s a bug.
+
+## Most likely cause
+One of these is happening:
+
+1. the prompt dialog is returning the old text instead of blank
+2. `FormLedgerMenu` is not passing the blank values correctly
+3. `FormLedgerView` is not being rebuilt with fresh constructor values
+4. the old `FormLedgerView.vb` code is still running instead of the replacement
+
+---
+
+## Fastest way to diagnose
+I want to verify the exact `OpenViewChecksPromptFlow()` code currently in your `FormLedgerMenu.vb`.
+
+Please paste just that method as it exists right now.
+
+It should look roughly like this:
+
+```vbnet
+Private Sub OpenViewChecksPromptFlow()
+    Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+    If cust Is Nothing Then Return
+
+    Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+    If chk Is Nothing Then Return
+
+    Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+    If yr Is Nothing Then Return
+
+    Using f As New FormLedgerView(cust, chk, yr)
+        f.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+If yours still says:
+
+```vbnet
+Using f As New FormLedgerView()
+```
+
+then that’s the problem.
+
+---
+
+## One more thing to verify
+Also make sure your new `FormLedgerView.vb` constructor is actually this:
+
+```vbnet
+Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+```
+
+If Visual Studio is still using the old no-argument version, then the old logic may still be compiled or the file replacement didn’t fully stick.
+
+---
+
+## Expected behavior
+These inputs:
+
+- customer: **blank**
+- check: **blank**
+- year: **blank**
+
+should produce:
+
+- `_customerFilter = ""`
+- `_checkFilter = ""`
+- `_yearFilter = ""`
+
+and therefore **no filtering at all**.
+
+So if it still shows only `PSIBEARI`, something stale is being retained.
+
+---
+
+## Short answer
+Yes — **Enter, Enter, Enter should show all**.  
+Please paste your current `OpenViewChecksPromptFlow()` method from `FormLedgerMenu.vb`, because that’s the most likely place the bug is coming from.
+
+## @testsubject117
+
+but yes this looks more like dos and much better. here's a screenshot of the results after enter, enter, enter: 
+
+## Copilot
+
+That screenshot actually shows **correct behavior**, not a bug.
+
+## Direct answer
+If you pressed **Enter, Enter, Enter**, the screen should show:
+
+- **all customers**
+- **all checks**
+- **all years**
+
+And in your screenshot, it is showing:
+
+- `Customer: ALL`
+- `Check #: ALL`
+- `Year: ALL`
+
+with one row:
+
+- `PSIBEARI`
+- `7779`
+- `12345678`
+- `05-19-2026`
+- `0.30`
+
+So if that is the **only check currently in `CheckRepository` for this app run**, then this is exactly right.
+
+---
+
+## Why it may have felt wrong
+I think the confusion is this:
+
+You expected **ALL** to mean:
+- lots of historical checks from the old system
+
+But right now **ALL** only means:
+- all checks currently stored in the runtime in-memory repository
+
+And since the current repository only contains checks added during this running session, seeing just one `PSIBEARI` row is expected if that’s the only one currently added.
+
+---
+
+## So this part is working
+From the screenshot, I’d say:
+
+### View Checks now correctly:
+- accepts blank filters
+- displays `ALL / ALL / ALL`
+- shows repository-backed results
+- looks much closer to DOS
+- shows a total
+- displays the current session’s checks
+
+That’s a win.
+
+---
+
+## Very important distinction
+Current behavior is:
+
+### “All” in the current implementation
+All checks in:
+- `CheckRepository`
+
+### Not yet:
+All checks in:
+- legacy `LEDGER.CUR`
+- or any DOS-era persisted source
+
+So the result is internally correct, but the dataset is still limited by today’s temporary architecture.
+
+---
+
+## My assessment of View Checks now
+### Improved:
+- much closer visually to DOS
+- prompt-to-results flow makes more sense
+- customer search now appears consistent with Add/Delete repository behavior
+
+### Still not final-final:
+- no persistent legacy file integration
+- no inline same-screen DOS prompt yet
+- still a modern grid rather than exact DOS list layout
+- still repository-only
+
+But for menu completion, it sounds like **functional correctness is now much better**.
+
+---
+
+## Next thing I’d test
+To confirm fully:
+
+### Test A
+Add another check, for example:
+- customer: `ACME`
+- check number: `8888`
+- amount: `.50`
+
+Then View Checks with:
+- Enter
+- Enter
+- Enter
+
+### Expected
+You should now see:
+- `PSIBEARI`
+- `ACME`
+
+and total should be:
+- `$0.80`
+
+If that happens, then “ALL” is definitely working correctly.
+
+---
+
+## Short answer
+Your screenshot shows that **ALL / ALL / ALL is working correctly** for the current in-memory repository.  
+It’s only showing `PSIBEARI` because that appears to be the only current check in the repository for this app session.
+
+## My question for you
+Do you want to keep refining **View Checks** now for more DOS closeness, or move on to the next unfinished Checks menu item — probably **(6) Add OTHER Checks**?
+
+## @testsubject117
+
+ah, ok, so it's not using the old database like it was before. it was previously finding legitimate customer checks that were already entered
+
+## Copilot
+
+Exactly.
+
+## Direct answer
+Yes — **it is no longer using the old legacy data source** for View Checks.
+
+Right now, View Checks is using only:
+
+- **`CheckRepository`**
+
+which contains only checks added during the **current app session**.
+
+So it will **not** show the previously existing legitimate customer checks from the old database/files.
+
+---
+
+## What changed
+Before, `FormLedgerView.vb` was reading legacy data from:
+
+- `LEDGER.CUR`
+
+using:
+
+```vbnet
+_all.AddRange(LedgerCurReader.ReadAll(path))
+```
+
+That old version could show real historical checks already in the legacy files.
+
+But it had these problems:
+- it was disconnected from your new Add/Delete flow
+- it didn’t use `CheckRepository`
+- it wasn’t matching the current temporary architecture
+- it wasn’t giving you consistent behavior with `PSIBEARI`
+
+So we replaced it with a repository-backed version to make the current Checks menu coherent.
+
+---
+
+## So now you have a tradeoff
+### Current version
+**Pros**
+- consistent with Add/Delete
+- `PSIBEARI` works
+- simpler
+- closer to DOS visually
+
+**Cons**
+- does not show historical legacy checks
+- only shows runtime-added checks
+
+### Old version
+**Pros**
+- showed real legacy checks from old data files
+
+**Cons**
+- inconsistent with Add/Delete
+- more modern UI
+- probably not using the DOS prompt flow correctly
+- not aligned with your current temporary repository approach
+
+---
+
+## Best next step
+The real solution is probably **not** “old version” or “new version” alone.
+
+It’s likely this:
+
+## Hybrid View Checks
+Make View Checks show:
+1. checks from the **legacy source** (`LEDGER.CUR`)
+2. plus checks from the **runtime repository** (`CheckRepository`)
+
+That would give you:
+- historical checks still visible
+- newly added checks also visible
+- better functional continuity while you continue porting
+
+---
+
+## Recommended direction
+For finishing the Checks menu, I recommend:
+
+### Option A — hybrid now
+Update View Checks so it merges:
+- legacy checks
+- runtime-added checks
+
+This is probably the most practical.
+
+### Option B — repo only for now
+Keep current behavior and finish the rest of the menu quickly.
+
+This is simpler, but you lose visibility into old data.
+
+---
+
+## My recommendation
+Given what you just said — that it was previously finding legitimate already-entered customer checks — I think **hybrid is the right answer**.
+
+That way:
+- old real data still appears
+- new runtime-added checks also appear
+- Delete/Add behavior still makes sense for what was added this session
+
+---
+
+## Important note
+If we do hybrid, we’ll want to think through duplicates:
+- if a check exists in legacy data and also in `CheckRepository`, which wins?
+
+Usually I’d say:
+- repository record wins for same check number/customer combination in the current session
+
+---
+
+## Short answer
+Correct — the current View Checks is no longer reading the old database/file source.  
+It is only using the new in-memory repository, which is why it no longer finds older legitimate checks.
+
+## My question
+Do you want me to make **View Checks hybrid next** so it shows:
+- old legacy checks **and**
+- newly added runtime checks?
+
+## @testsubject117
+
+is there a way to just use the ledger.cur file like we were? if we move forward with 2 files, one for old and one for new, it doesn't seem clean, and having to fight between 2 files over which one should keep duplicate data and which should not, doesn't sound like a good solution, remember, we're trying to match dos behavior, look and feel as much as possible
+
+## Copilot
+
+Yes — **and I think that is the right direction**.
+
+## Direct answer
+If your goal is to match DOS behavior as closely as possible, then **we should use `LEDGER.CUR` as the single source of truth** for checks, just like the old system did.
+
+I agree with you:
+- a split between **legacy file + in-memory repository** is not clean
+- duplicate reconciliation is messy
+- it moves you away from DOS truth
+
+So the better architecture is:
+
+- **Add Checks** writes to `LEDGER.CUR`
+- **Delete Checks** removes from `LEDGER.CUR`
+- **View Checks** reads from `LEDGER.CUR`
+- **Find a Check #**, **Find an Invoice #**, totals, etc. also read from the same legacy-backed source where appropriate
+
+That is much more DOS-faithful.
+
+---
+
+## What this means
+The runtime `CheckRepository` was useful as a temporary bridge to prove flow and complete UI behavior quickly.
+
+But now that you’re aiming for:
+- DOS-true behavior
+- full Checks menu completion
+- clean architecture
+
+we should move away from it.
+
+---
+
+## Good news
+You already had a `FormLedgerView.vb` that read from `LEDGER.CUR`, so that tells us:
+
+- the file path is already known
+- there is already a reader:
+  - `LedgerCurReader.ReadAll(path)`
+- there is already a model:
+  - `LedgerEntry`
+
+So this is not theoretical — your project already knows how to read `LEDGER.CUR`.
+
+---
+
+## The real next question
+The question is no longer “should we use `LEDGER.CUR`?”
+
+I think the answer is **yes**.
+
+The real question is:
+
+## Do you already have write/update support for `LEDGER.CUR`?
+We need to know whether the project already contains code for:
+- adding a ledger record
+- updating/replacing records
+- deleting/removing/purging a check record
+
+If yes, we should use that.
+If not, we need to build it.
+
+---
+
+## Best next step
+We should inspect the existing ledger file support in your codebase.
+
+Specifically, we need to find:
+1. `LedgerCurReader`
+2. any `LedgerCurWriter`, `LedgerWriter`, `LedgerEditor`, or similar
+3. any code that appends to or rewrites `LEDGER.CUR`
+4. any delete logic tied to checks
+
+---
+
+## Recommendation
+At this point, the correct move is:
+
+### revert the temporary repository approach for check storage
+and
+### wire the check screens to `LEDGER.CUR`
+
+That will give you:
+- one authoritative source
+- DOS-like behavior
+- cleaner long-term logic
+- consistent search/view/delete/add behavior
+
+---
+
+## Important note
+That probably means we should eventually remove or stop using:
+- `CheckRepository.vb`
+
+But I would not delete it yet until the `LEDGER.CUR` path is fully restored and working.
+
+---
+
+## Short answer
+Yes — and I think you’re right.  
+Using **`LEDGER.CUR` as the single source of truth** is cleaner and more DOS-faithful than keeping old data in one place and new data in another.
+
+## Next step
+Please let me inspect the ledger file support so we can wire everything back to `LEDGER.CUR`.
+
+Paste whichever of these you have:
+- `LedgerCurReader.vb`
+- `LedgerEntry.vb`
+- any file with names like:
+  - `LedgerCurWriter`
+  - `LedgerWriter`
+  - `LedgerEditor`
+  - `LedgerCurFile`
+  - `LedgerService`
+
+If you’re not sure what exists, search for:
+- `Class LedgerCurReader`
+- `ReadAll(`
+- `LedgerCur`
+- `LEDGER.CUR`
+
+and paste the results.
+
+## @testsubject117
+
+ok, just to make sure, please clarify for me, is the data we want for view checks the data that lives in ledger.cur or am I wrong about that?
+
+## Copilot
+
+Yes — **based on everything you’ve shown, `View Checks` should be reading from `LEDGER.CUR`**.
+
+## Direct answer
+You are **not wrong**.
+
+The data for **View Checks** appears to be the check ledger data stored in:
+
+- **`LEDGER.CUR`**
+
+That’s also supported by the code you pasted earlier, because your original `FormLedgerView.vb` was explicitly loading:
+
+```vbnet
+Dim path = LegacyDataPaths.LedgerCur
+_all.AddRange(LedgerCurReader.ReadAll(path))
+```
+
+So the project already treats `LEDGER.CUR` as the source for that screen.
+
+---
+
+## Why I’m confident
+From your existing code:
+
+### `FormLedgerView.vb`
+It had:
+- customer filter
+- check number filter
+- year/month filter
+- amount total
+- check grid
+
+And it loaded from:
+
+- `LegacyDataPaths.LedgerCur`
+
+That strongly indicates that **ledger entries/check records for View Checks live in `LEDGER.CUR`**.
+
+---
+
+## Important nuance
+That does **not automatically mean** every related detail also lives entirely in `LEDGER.CUR`.
+
+From the code you showed:
+- main check list came from `LEDGER.CUR`
+- invoice details came from:
+  - `CHECK.INV`
+  - and `INVOICE.CHK`-style data via `InvoiceChkReader`
+
+So likely:
+
+### Main check list / View Checks screen
+- **`LEDGER.CUR`**
+
+### Extra invoice linkage/details
+- **`CHECK.INV`**
+- **invoice-related files**
+
+---
+
+## So the short practical answer is
+For **View Checks**, yes:
+- the main rows you want are in **`LEDGER.CUR`**
+
+For deeper linked invoice details:
+- there may be supporting files too
+
+---
+
+## DOS-faithful interpretation
+If DOS “View Checks” showed legitimate existing customer checks, and your old WinForms version found them by reading `LEDGER.CUR`, then that strongly suggests:
+
+- **`LEDGER.CUR` is the right main source of truth for View Checks**
+
+So your instinct is correct.
+
+---
+
+## Bottom line
+### Yes:
+`View Checks` should use **`LEDGER.CUR`** for the main check data.
+
+### Probably also:
+Some related functions may use other files for invoice associations/details.
+
+---
+
+## Short answer
+Yes — for the **main View Checks list**, `LEDGER.CUR` is almost certainly the correct DOS-backed data source.
+
+If you want, next send me:
+- `LedgerCurReader.vb`
+- `LedgerEntry.vb`
+
+and I’ll help you move the Checks screens back toward the proper `LEDGER.CUR`-based architecture.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes — this confirms it.
+
+## Direct answer
+**`LEDGER.CUR` is the main data source for View Checks.**
+
+Your reader makes that very clear.
+
+Each check entry in `LEDGER.CUR` is being parsed as a **6-line record**:
+
+1. `Customer`
+2. `DateText`
+3. `CheckNumber`
+4. `InvoiceDiffText`
+5. `Amount`
+6. `Reference`
+
+So for **View Checks**, the main rows absolutely belong to `LEDGER.CUR`.
+
+---
+
+## What this tells us
+Your current legacy structure for a check record is:
+
+```text
+"Customer"
+"Date"
+"CheckNumber"
+"InvoiceDiffText"
+Amount
+"Reference"
+```
+
+And your existing `LedgerCurReader.ReadAll(path)` already turns that into:
+
+- `Customer`
+- `DateText`
+- `CheckNumber`
+- `InvoiceDiffText`
+- `Amount`
+- `Reference`
+
+That means:
+- View Checks should read from `LEDGER.CUR`
+- Add Checks should eventually append/write a 6-line record to `LEDGER.CUR`
+- Delete Checks should eventually remove the matching 6-line record from `LEDGER.CUR`
+
+That is the clean DOS-faithful direction.
+
+---
+
+## Very important implication
+This means the temporary `CheckRepository` was only a stopgap.
+
+If you want DOS truth, then the real architecture should be:
+
+- **View Checks** → `LEDGER.CUR`
+- **Find a Check #** → likely `LEDGER.CUR`
+- **Company totals** → likely `LEDGER.CUR`
+- **Add Checks** → write to `LEDGER.CUR`
+- **Delete Checks** → remove from `LEDGER.CUR`
+
+That gives you one source of truth.
+
+---
+
+## My recommendation now
+We should pivot back to `LEDGER.CUR` and stop building more check features around `CheckRepository`.
+
+### Specifically:
+1. restore **View Checks** to use `LEDGER.CUR`
+2. make it keep the newer DOS-closer layout if possible
+3. then change **Add Checks** to write a new 6-line record into `LEDGER.CUR`
+4. then change **Delete Checks** to remove the matching 6-line record from `LEDGER.CUR`
+
+That will make the whole menu cleaner and much closer to DOS.
+
+---
+
+## What we need next
+To do that safely, the next thing we need is the path info and any existing write helpers.
+
+Please paste:
+
+- `LegacyDataPaths.vb`
+
+And if they exist, search for any of these and paste them:
+- `WriteAll(`
+- `AppendAllLines(`
+- `StreamWriter(`
+- `LEDGER.CUR`
+- `LedgerCur`
+- `CheckInvReader`
+- `InvoiceChkReader`
+
+But the single most important next file is:
+
+- **`LegacyDataPaths.vb`**
+
+because we need to know exactly where `LEDGER.CUR` lives.
+
+---
+
+## Short answer
+Yes — this confirms you were right.  
+**View Checks should use `LEDGER.CUR`** for its main data.  
+The file format is already understood by your project via `LedgerCurReader`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes — this is the same file again, and it still confirms the same thing:
+
+## Direct answer
+**`LEDGER.CUR` is the correct main source for View Checks.**
+
+This code clearly parses **check records** from that file.
+
+---
+
+## What I need next
+To move from “confirmed” to “fixing it,” I now need the **path definition** for the file.
+
+Please paste:
+
+```text
+LegacyDataPaths.vb
+```
+
+That’s the next most important file.
+
+---
+
+## Why I need that file
+Your old View Checks code used:
+
+```vbnet
+Dim path = LegacyDataPaths.LedgerCur
+```
+
+So to wire Add/Delete/View back to the real DOS-backed data, I need to know:
+
+- where `LEDGER.CUR` lives
+- whether there are related paths nearby
+- whether the app is already set up to read/write those files in one place
+
+---
+
+## After that
+Once you paste `LegacyDataPaths.vb`, I can help you:
+
+1. restore **View Checks** to `LEDGER.CUR`
+2. keep the improved DOS-like presentation
+3. then move **Add Checks** and **Delete Checks** off `CheckRepository` and onto `LEDGER.CUR`
+
+---
+
+## Short answer
+Yes — this confirms the source again.  
+Now please paste **`LegacyDataPaths.vb`** next.
+
+## @testsubject117
+
+```
+' LegacyDataPaths.vb  (Add as Class, NOT a form)
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+
+Public NotInheritable Class LegacyDataPaths
+    Private Sub New()
+    End Sub
+
+    Public Shared ReadOnly Property BaseDataDir As String = "\\invoice\MainMenu\Data"
+
+    Public Shared ReadOnly Property LedgerCur As String =
+        Path.Combine(BaseDataDir, "LEDGER.CUR")
+    Public Shared ReadOnly Property CheckInv As String = Path.Combine(BaseDataDir, "CHECK.INV")
+    Public Shared ReadOnly Property InvoiceChk As String = Path.Combine(BaseDataDir, "INVOICE.CHK")
+    Public Shared ReadOnly Property OtherChk As String = Path.Combine(BaseDataDir, "OTHER.CHK")
+    Public Shared ReadOnly Property EmpNameDat As String = Path.Combine(BaseDataDir, "EMPNAME.DAT")
+End Class
+```
+
+## Copilot
+
+Yes — perfect. Now we have what we need.
+
+## Direct answer
+This confirms the real file path for checks is:
+
+```text
+\\invoice\MainMenu\Data\LEDGER.CUR
+```
+
+So if you want DOS-faithful behavior, the right move is:
+
+- **View Checks** reads from `LEDGER.CUR`
+- **Add Checks** writes to `LEDGER.CUR`
+- **Delete Checks** removes from `LEDGER.CUR`
+
+That is much cleaner than keeping `CheckRepository` as a separate source of truth.
+
+---
+
+## What we know now
+From your files:
+
+### `LegacyDataPaths`
+- `LedgerCur = \\invoice\MainMenu\Data\LEDGER.CUR`
+
+### `LedgerCurReader`
+Each ledger record is 6 lines:
+1. customer
+2. date
+3. check number
+4. invoice diff text
+5. amount
+6. reference
+
+That gives us enough to read the file reliably.
+
+---
+
+## Recommendation
+We should now **pivot away from `CheckRepository`** for regular checks and go back to `LEDGER.CUR`.
+
+But to do that safely, we need a writer.
+
+## Next step
+We need to create a small helper for:
+- reading all ledger records
+- writing all ledger records back
+- appending one ledger record
+
+That will let us:
+- restore View Checks to `LEDGER.CUR`
+- make Add Checks append
+- make Delete Checks remove + rewrite
+
+---
+
+# What I recommend we do next
+## Step 1
+Create a new file named:
+
+```text
+LedgerCurWriter.vb
+```
+
+with helper methods for:
+- formatting a `LedgerEntry`
+- writing all entries back to `LEDGER.CUR`
+
+## Step 2
+Change `FormLedgerView.vb` back to `LEDGER.CUR`, but keep the newer DOS-like screen style
+
+## Step 3
+Change `FormAddChecks.vb` so final `Y` appends a real record to `LEDGER.CUR`
+
+## Step 4
+Change `FormDeleteCheck.vb` so it removes the matching record from `LEDGER.CUR`
+
+---
+
+## If you want, here is the next code to paste
+### Create a new file: `LedgerCurWriter.vb`
+
+```vbnet name=LedgerCurWriter.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+## Then after that
+I can give you the next **real `LEDGER.CUR`-backed** replacements for:
+
+- `FormLedgerView.vb`
+- `FormAddChecks.vb`
+- `FormDeleteCheck.vb`
+
+---
+
+## Important caution
+This will start writing to the real network file:
+
+```text
+\\invoice\MainMenu\Data\LEDGER.CUR
+```
+
+So before we do that, I want to make sure you are comfortable with that.
+
+## Question
+Do you want the next step to be:
+1. **real write/delete against the live `LEDGER.CUR` file**, or
+2. first create the writer helper and inspect one or two real records before enabling writes?
+
+## @testsubject117
+
+do you need LedgerEntry?
+
+## Copilot
+
+Yes — but you already gave it to me.
+
+## Direct answer
+I **do need `LedgerEntry`**, and it was included in the code you pasted earlier.
+
+This part is `LedgerEntry`:
+
+```vbnet
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+So we already have it.
+
+---
+
+## What that means
+We now already have the pieces needed to start working with `LEDGER.CUR`:
+
+- `LegacyDataPaths`
+- `LedgerCurReader`
+- `LedgerEntry`
+
+The next missing piece is just:
+- **`LedgerCurWriter`** for writing/appending/removing records
+
+---
+
+## Short answer
+Yes — I need `LedgerEntry`, but you already provided it, so we’re good there.
+
+## @testsubject117
+
+is ledgercurwriter a class or form?
+
+## Copilot
+
+A **class**, not a form.
+
+## Direct answer
+Create **`LedgerCurWriter.vb`** as a normal **class/code file**.
+
+It should **not** be:
+- a Windows Form
+- a UserControl
+- a Component
+
+Just a regular VB class file, like `LegacyDataPaths.vb`.
+
+---
+
+## In Visual Studio
+Do this:
+
+- right-click project
+- **Add**
+- **Class...**
+- name it:

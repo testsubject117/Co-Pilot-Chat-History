@@ -1,0 +1,1258 @@
+3930 FOR X=1 TO CT:HOLD=INT(HOLD(X)-75000!):LOCK#3,HOLD:GET#3,HOLD:LSET FLAG$="J"
+3940 PUT#3,HOLD:UNLOCK#3,HOLD:NEXT:PRINT CNUM$;" found & reseting invoices to Un-Paid..."
+3950 CLOSE 3
+```
+
+That matches other legacy code where `"J"` is used as the normal journal/open state and `"C"` is credit/zero amount. For example, invoice update scripts set `Q$="J"` by default and only switch to `"C"` when amount is zero. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+So the correct delete behavior is:
+
+- find the matching `CHECK.INV` block
+- for each invoice in that block
+- open `INVOICE.CHK`
+- seek to the record
+- set `FLAG` to `"J"`
+- leave the other fields unchanged
+
+I also found several relevant legacy files in `testsubject117/AMiDataStore`, including `CHECK.BAS`, `INVOICE.BAS`, `INVCHK.BAS`, `INVFIX.BAS`, `LEGENTER.ASC`, and `LL.L`. The code-search results are limited and may be incomplete, but `LL.L` is enough to answer this specific question. For broader browsing, you can inspect the repo in GitHub’s code search UI for `INVOICE.CHK` and `FLAG$`, and the repo contents UI for the root listing. 
+
+## What to change now
+You need two pieces:
+
+### 1. Add an `INVOICE.CHK` writer/updater
+Create a new file like this:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class InvoiceChkWriter
+    Private Sub New()
+    End Sub
+
+    Private Const RecordSize As Integer = 26
+    Private Const InvoiceBase As Long = 75000L
+
+    Public Shared Sub SetFlag(path As String, invoiceNumber As Long, flag As String)
+        If String.IsNullOrEmpty(path) Then Return
+        If Not File.Exists(path) Then Return
+
+        Dim filNum As Long = invoiceNumber - InvoiceBase
+        If filNum < 1 Then Return
+
+        Dim recordOffset As Long = (filNum - 1) * RecordSize
+
+        Using fs As New FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+            If recordOffset + RecordSize > fs.Length Then
+                Return
+            End If
+
+            fs.Seek(recordOffset, SeekOrigin.Begin)
+
+            Dim buf(RecordSize - 1) As Byte
+            Dim bytesRead As Integer = fs.Read(buf, 0, RecordSize)
+            If bytesRead < RecordSize Then
+                Return
+            End If
+
+            Dim flagByte As Byte = 0
+            If Not String.IsNullOrEmpty(flag) Then
+                flagByte = CByte(AscW(flag.Substring(0, 1)))
+            End If
+
+            buf(25) = flagByte
+
+            fs.Seek(recordOffset, SeekOrigin.Begin)
+            fs.Write(buf, 0, buf.Length)
+            fs.Flush()
+        End Using
+    End Sub
+End Class
+```
+
+### 2. Update delete flow to reset linked invoices first
+In `FormDeleteCheck.vb`, change `DeleteCheck(info)` to:
+
+```vbnet
+Private Sub DeleteCheck(info As LedgerEntry)
+    ResetInvoicesToUnpaid(info)
+    DeleteFromLedger(info)
+    DeleteFromCheckInv(info)
+    Thread.Sleep(750)
+End Sub
+```
+
+Then add this method:
+
+```vbnet
+Private Sub ResetInvoicesToUnpaid(info As LedgerEntry)
+    Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+    Dim i As Integer
+
+    For i = 0 To blocks.Count - 1
+        If CheckInvMatchesLedgerEntry(blocks(i), info) Then
+            Dim j As Integer
+
+            For j = 0 To blocks(i).Invoices.Count - 1
+                Dim invoiceText As String = blocks(i).Invoices(j)
+                Dim invoiceNumber As Long
+
+                If Long.TryParse(invoiceText, invoiceNumber) Then
+                    InvoiceChkWriter.SetFlag(LegacyDataPaths.InvoiceChk, invoiceNumber, "J")
+                End If
+            Next
+
+            Exit For
+        End If
+    Next
+End Sub
+```
+
+This assumes you already have `LegacyDataPaths.InvoiceChk`. If not, add it pointing to `INVOICE.CHK`.
+
+## Why this is the right implementation
+Because the original delete routine does **not** zero amounts or blank company codes during delete; it only changes the invoice status flag back to `"J"` in `INVOICE.CHK`. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+If you want, I can now generate the **full final contents** of:
+- `InvoiceChkWriter.vb`
+- and the updated `FormDeleteCheck.vb`
+
+so you can paste them directly.
+
+## @testsubject117
+
+```
+1. Add an INVOICE.CHK writer/updater
+Create a new file like this:
+
+Visual Basic .NET
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class InvoiceChkWriter
+    Private Sub New()
+    End Sub
+
+    Private Const RecordSize As Integer = 26
+    Private Const InvoiceBase As Long = 75000L
+
+    Public Shared Sub SetFlag(path As String, invoiceNumber As Long, flag As String)
+        If String.IsNullOrEmpty(path) Then Return
+        If Not File.Exists(path) Then Return
+
+        Dim filNum As Long = invoiceNumber - InvoiceBase
+        If filNum < 1 Then Return
+
+        Dim recordOffset As Long = (filNum - 1) * RecordSize
+
+        Using fs As New FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)
+            If recordOffset + RecordSize > fs.Length Then
+                Return
+            End If
+
+            fs.Seek(recordOffset, SeekOrigin.Begin)
+
+            Dim buf(RecordSize - 1) As Byte
+            Dim bytesRead As Integer = fs.Read(buf, 0, RecordSize)
+            If bytesRead < RecordSize Then
+                Return
+            End If
+
+            Dim flagByte As Byte = 0
+            If Not String.IsNullOrEmpty(flag) Then
+                flagByte = CByte(AscW(flag.Substring(0, 1)))
+            End If
+
+            buf(25) = flagByte
+
+            fs.Seek(recordOffset, SeekOrigin.Begin)
+            fs.Write(buf, 0, buf.Length)
+            fs.Flush()
+        End Using
+    End Sub
+End Class
+```
+what do I call this file?: 
+
+## Copilot
+
+Call it:
+
+```text
+InvoiceChkWriter.vb
+```
+
+Put that exact class in a new file named `InvoiceChkWriter.vb`.
+
+## Short answer
+- **File name:** `InvoiceChkWriter.vb`
+- **Class inside:** `InvoiceChkWriter`
+
+If you want, next I can give you the **exact full updated `FormDeleteCheck.vb`** with the `INVOICE.CHK` reset wired in.
+
+## @testsubject117
+
+running app, how do I test
+
+## Copilot
+
+Test by deleting a check that you know has linked invoices.
+
+## Do this
+1. Start the app
+2. Open **Delete Check**
+3. Enter a check number that exists and is tied to invoices
+4. If multiple matches appear, use **N** to cycle to the one you want
+5. Press **Y** to delete it
+
+## Then verify 3 things
+
+### 1. Check is gone from `LEDGER.CUR`
+Use your existing View Checks screen and confirm that check no longer appears.
+
+### 2. Check block is gone from `CHECK.INV`
+If you have a screen or diagnostic that reads `CHECK.INV`, confirm that block is removed.
+
+### 3. Linked invoices were reset in `INVOICE.CHK`
+This is the big one.
+
+For each invoice that belonged to the deleted check:
+- open whatever screen reads invoice status
+- or use your `InvoiceChkReader`
+- confirm the invoice’s `Flag` is now:
+
+```text
+J
+```
+
+That is the legacy behavior.
+
+---
+
+## Best test case
+Use a check where you already know:
+- the check number
+- the linked invoice numbers
+- the invoices currently show as paid/assigned
+
+Then after delete:
+- invoice flags should be `J`
+
+---
+
+## If you don’t have a UI to view invoice flag
+Add a temporary message box or small test helper that calls:
+
+```vbnet
+Dim rec = InvoiceChkReader.ReadRecord(LegacyDataPaths.InvoiceChk, invoiceNumber)
+MessageBox.Show("Invoice=" & rec.InvoiceNumber.ToString() &
+                Environment.NewLine & "Amount=" & rec.Amount.ToString() &
+                Environment.NewLine & "Company=" & rec.CompanyCode &
+                Environment.NewLine & "Flag=" & rec.Flag)
+```
+
+Run it:
+- before delete
+- after delete
+
+Expected:
+- **before**: probably not `J`
+- **after**: `J`
+
+---
+
+## Simplest real-world test
+If you know the `.07` PSLBARI check has invoice links:
+1. delete that check
+2. inspect its invoices
+3. confirm flags changed to `J`
+
+---
+
+## What to tell me after
+Tell me one of these:
+- “check deleted and invoice flags changed to J”
+- “check deleted but invoices did not change”
+- “compile error”
+- “runtime error”
+
+If you want, I can also generate a tiny temporary **test button/helper form** to inspect one invoice number quickly.
+
+## @testsubject117
+
+SO HERE'S what I did. I deleted check no 2300607.92 for PSIBEARI for $14,775. in a previous test and search, I found the following: (screenshot attached of search results for psibeari) that lists invoices that are marked as paid by this check. after I deleted, I checked the check.inv file and the reference to that check is gone. if I do a find invoice # (Button (0) on the checks menu) these are the results. 
+
+## Copilot
+
+The delete did **not** reset `INVOICE.CHK` for those invoices.
+
+## Why that’s the conclusion
+Your screenshot shows the deleted check’s linked invoices still displaying **Status = Paid**. If the legacy reset had run, those invoice records should now show status `"J"` instead of paid. The old GW-BASIC delete routine explicitly changed only the flag byte to `"J"` for each invoice listed in the matching `CHECK.INV` block. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+## Most likely cause
+Your app is probably not actually calling the new reset code yet, or it can’t find the matching `CHECK.INV` block before deletion.
+
+Given your result that:
+- the `CHECK.INV` reference is gone, and
+- the invoices stayed paid,
+
+the two strongest possibilities are:
+
+1. `ResetInvoicesToUnpaid(info)` was **not added** to `DeleteCheck(...)`, or
+2. it was added, but `CheckInvMatchesLedgerEntry(block, info)` failed to match the correct block, so no invoices were updated.
+
+## Fastest check
+Open `FormDeleteCheck.vb` and confirm `DeleteCheck` looks like this exactly:
+
+```vbnet
+Private Sub DeleteCheck(info As LedgerEntry)
+    ResetInvoicesToUnpaid(info)
+    DeleteFromLedger(info)
+    DeleteFromCheckInv(info)
+    Thread.Sleep(750)
+End Sub
+```
+
+If `ResetInvoicesToUnpaid(info)` is missing, that’s the bug.
+
+## Second thing to verify
+Confirm this method exists in the same file:
+
+```vbnet
+Private Sub ResetInvoicesToUnpaid(info As LedgerEntry)
+    Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+    Dim i As Integer
+
+    For i = 0 To blocks.Count - 1
+        If CheckInvMatchesLedgerEntry(blocks(i), info) Then
+            Dim j As Integer
+
+            For j = 0 To blocks(i).Invoices.Count - 1
+                Dim invoiceText As String = blocks(i).Invoices(j)
+                Dim invoiceNumber As Long
+
+                If Long.TryParse(invoiceText, invoiceNumber) Then
+                    InvoiceChkWriter.SetFlag(LegacyDataPaths.InvoiceChk, invoiceNumber, "J")
+                End If
+            Next
+
+            Exit For
+        End If
+    Next
+End Sub
+```
+
+## Likely matching issue
+Your legacy code matched only on:
+- customer
+- check number
+
+Specifically:
+
+```basic
+IF CNUM$=C1$ AND N2$=N0$ THEN ...
+```
+
+It did **not** require salesman/reference/date/amount to match. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+But your current VB helper probably does this stricter match:
+
+- customer
+- date
+- check number
+- salesman/reference
+- amount
+
+That is too strict for the reset lookup.
+
+So even if the delete removes the block later, the reset step may fail to find it first.
+
+## Fix
+Use a looser match for the invoice-reset step: just customer + check number.
+
+Add this helper to `FormDeleteCheck.vb`:
+
+```vbnet
+Private Function CheckInvMatchesForInvoiceReset(block As CheckInvBlock, info As LedgerEntry) As Boolean
+    If block Is Nothing OrElse info Is Nothing Then
+        Return False
+    End If
+
+    If Not String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+        Return False
+    End If
+
+    If Not String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+        Return False
+    End If
+
+    Return True
+End Function
+```
+
+Then change `ResetInvoicesToUnpaid` to use that function:
+
+```vbnet
+Private Sub ResetInvoicesToUnpaid(info As LedgerEntry)
+    Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+    Dim i As Integer
+
+    For i = 0 To blocks.Count - 1
+        If CheckInvMatchesForInvoiceReset(blocks(i), info) Then
+            Dim j As Integer
+
+            For j = 0 To blocks(i).Invoices.Count - 1
+                Dim invoiceText As String = blocks(i).Invoices(j)
+                Dim invoiceNumber As Long
+
+                If Long.TryParse(invoiceText, invoiceNumber) Then
+                    InvoiceChkWriter.SetFlag(LegacyDataPaths.InvoiceChk, invoiceNumber, "J")
+                End If
+            Next
+
+            Exit For
+        End If
+    Next
+End Sub
+```
+
+## Why this is the right fix
+Because it matches the legacy delete logic instead of your stricter modern comparison. The old system found the `CHECK.INV` block using only customer and check number before resetting invoice flags. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+## What to do next
+If you want the fastest path, I can generate the **full final `FormDeleteCheck.vb`** with:
+- `ResetInvoicesToUnpaid(info)` wired in
+- the looser legacy-style match
+- your current duplicate cycling behavior preserved
+
+That’s the next concrete fix.
+
+## @testsubject117
+
+when I search by invoice # I get this: and what I notice is that I just created fake check # 7782 today, however it's showing invoice 724700 was paid by check #7782 for .07
+
+## Copilot
+
+That means your new fake check `7782` has corrupted `CHECK.INV` matching or parsing for invoice lookup.
+
+## Direct answer
+Invoice `724700` should not suddenly belong to the fake `.07` check unless one of these is true:
+
+1. your add-check logic wrote a bad `CHECK.INV` block, or
+2. your `CheckInvReader` is mis-parsing invoice lists, especially large blocks, or
+3. the invoice-find screen is picking the wrong matching block because it searches too loosely.
+
+Given the screen says:
+
+- Check `7782`
+- Amount `$0.07`
+- Invoices on that check: `1519`
+
+that is a major red flag.
+
+A fake `.07` test check should not have **1519 invoices** unless the parser lost block boundaries and swallowed a huge part of the file.
+
+## Most likely issue
+The current `CheckInvReader.ReadAll()` logic is probably too permissive:
+
+- it detects a block header by `line.StartsWith("""")`
+- then reads invoice lines until either:
+  - invoice count reached, or
+  - next header line appears
+
+If the count in a header is malformed, or if some invoice lines are formatted unexpectedly, it can absorb a giant chunk of the file into one block.
+
+That would explain exactly what you’re seeing:
+- invoice `724700` now appears under check `7782`
+- the fake check reports `1519` invoices
+- delete/reset behavior is now unreliable because the wrong block is being matched
+
+## What this tells us
+We need to stop using the current `CHECK.INV` interpretation as trustworthy for invoice reset until we tighten it.
+
+## Practical conclusion
+Right now:
+- `LEDGER.CUR` handling looks mostly fixed
+- `CHECK.INV` handling is still not safe enough
+
+## Next move
+We should debug and harden the **Find by Invoice / CHECK.INV** side before trusting invoice reset.
+
+### specifically:
+I want to inspect:
+1. the code for the **Find by Invoice #** form
+2. the code that writes `CHECK.INV`
+3. possibly add a diagnostic that shows the parsed header for check `7782`
+
+## What to send next
+Please paste whichever file drives this screen:
+
+### likely file names
+- `FormFindByInvoice.vb`
+- `FormCheckInvFind.vb`
+- or whatever handles **Button (0)** / “Find by Invoice # (CHECK.INV)”
+
+Also paste:
+- `CheckInvWriter.vb`
+
+Because the new fake check having `1519` invoices strongly suggests the write or parse format is wrong.
+
+## Short version
+This is the important clue:
+
+> check `7782` showing invoice `724700` and `1519 invoices`
+
+That is almost certainly a `CHECK.INV` parsing/writing bug, not an `INVOICE.CHK` bug.
+
+## Next
+Paste:
+1. the **Find by Invoice #** form/code
+2. `CheckInvWriter.vb`
+
+That’s the correct next step.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly btnFind As New Button()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly lblResult As New Label()
+
+    Private _all As List(Of CheckInvBlock) = New List(Of CheckInvBlock)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 750
+        Height = 320
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 45, .Padding = New Padding(10)}
+        top.Controls.Add(New Label() With {.Text = "Invoice #:", .AutoSize = True, .Padding = New Padding(0, 10, 0, 0)})
+
+        txtInvoice.Width = 170
+        top.Controls.Add(txtInvoice)
+
+        btnFind.Text = "Find"
+        top.Controls.Add(btnFind)
+
+        btnRefresh.Text = "Refresh"
+        top.Controls.Add(btnRefresh)
+
+        lblResult.Dock = DockStyle.Fill
+        lblResult.Padding = New Padding(10)
+        lblResult.Text = "Loading CHECK.INV..."
+
+        Controls.Add(lblResult)
+        Controls.Add(top)
+
+        AddHandler btnFind.Click, Sub() DoFind()
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+            End Sub
+
+        AddHandler txtInvoice.KeyDown,
+            Sub(sender, args)
+                If args.KeyCode = Keys.Enter Then
+                    args.SuppressKeyPress = True
+                    DoFind()
+                End If
+            End Sub
+
+        LoadData()
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                lblResult.Text =
+                    "CHECK.INV was not found at:" & Environment.NewLine &
+                    path
+
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            lblResult.Text = $"Loaded {_all.Count:N0} check records from CHECK.INV."
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            lblResult.Text =
+                "Unable to read CHECK.INV from:" & Environment.NewLine &
+                path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub DoFind()
+        Dim invNo = txtInvoice.Text.Trim()
+        If invNo = "" Then Return
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            lblResult.Text = $"No match for invoice #{invNo}."
+            Return
+        End If
+
+        lblResult.Text =
+            $"Invoice {invNo} was paid by:" & Environment.NewLine &
+            $"Customer: {hit.CustomerCode}" & Environment.NewLine &
+            $"Check #:  {hit.CheckNumber}" & Environment.NewLine &
+            $"Date:     {hit.DateText}" & Environment.NewLine &
+            $"Amount:   {hit.Amount:C}" & Environment.NewLine &
+            $"Invoices on that check: {hit.InvoiceCount}"
+    End Sub
+
+End Class
+```
+FormFindByInvoiceNumber: 
+
+## Copilot
+
+The find form is fine. The bad result is coming from `CHECK.INV` data or parsing, not this UI.
+
+## Why
+This form just:
+- loads all `CheckInvBlock`s
+- returns the **first block** whose `Invoices` list contains the invoice number
+
+That means if `724700` appears inside the parsed `Invoices` list for fake check `7782`, this screen will truthfully show that bad association.
+
+The key line is:
+
+```vbnet
+Dim hit = _all.FirstOrDefault(
+    Function(b) b.Invoices IsNot Nothing AndAlso
+                b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+)
+```
+
+So the problem is upstream:
+- either `CheckInvWriter.vb`
+- or `CheckInvReader.vb`
+- or both
+
+## Most important clue again
+Your fake check `7782` showing:
+
+- invoice `724700`
+- `Invoices on that check: 1519`
+
+strongly suggests the parsed block for `7782` is swallowing a huge run of invoice lines.
+
+That is not a display bug.
+
+## What I need next
+Paste:
+
+```text
+CheckInvWriter.vb
+```
+
+That is now the highest-value file.
+
+## Likely outcome
+I expect we’ll find one of these problems in the writer:
+
+1. invoice count written incorrectly
+2. header line format inconsistent with reader assumptions
+3. invoice numbers written in a way that causes the next block boundary to be lost
+4. append behavior causing malformed block separation
+
+## Short answer
+`FormFindByInvoiceNumber.vb` is not the bug.  
+The bug is almost certainly in **`CheckInvWriter.vb`** or remaining `CHECK.INV` parsing assumptions.
+
+## Next file to paste
+**`CheckInvWriter.vb`**
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, records As IEnumerable(Of CheckInvBlock))
+        Dim lines As New List(Of String)()
+
+        For Each record As CheckInvBlock In records
+            lines.Add(BuildHeaderLine(record))
+
+            If record.Invoices IsNot Nothing Then
+                For Each invoice As String In record.Invoices
+                    lines.Add(If(invoice, "").Trim())
+                Next
+            End If
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, record As CheckInvBlock)
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            sw.WriteLine(BuildHeaderLine(record))
+
+            If record.Invoices IsNot Nothing Then
+                For Each invoice As String In record.Invoices
+                    sw.WriteLine(If(invoice, "").Trim())
+                Next
+            End If
+        End Using
+    End Sub
+
+    Private Shared Function BuildHeaderLine(record As CheckInvBlock) As String
+        Dim invoiceCount As Integer = 0
+        If record.Invoices IsNot Nothing Then
+            invoiceCount = record.Invoices.Count
+        End If
+
+        Return String.Join(",",
+            Quote(record.CustomerCode),
+            Quote(record.CheckNumber),
+            Quote(record.SalesmanCode),
+            Quote(record.DateText),
+            record.Amount.ToString(CultureInfo.InvariantCulture),
+            invoiceCount.ToString(CultureInfo.InvariantCulture))
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", """""")
+        Return """" & value & """"
+    End Function
+End Class
+
+```
+
+## Copilot
+
+Found it.
+
+## Direct answer
+`CheckInvWriter.vb` is almost certainly the source of the corruption.
+
+### The bug
+Your writer is writing invoice numbers as **plain trimmed text lines**:
+
+```vbnet
+For Each invoice As String In record.Invoices
+    lines.Add(If(invoice, "").Trim())
+Next
+```
+
+But the legacy `CHECK.INV` file appears to be treated as **GW-BASIC `WRITE#` output**. That means invoice lines may need to be written in the same `WRITE#`-style format the old code used, not just raw lines.
+
+More importantly, your current reader is permissive enough that malformed or unexpected invoice lines can bleed across block boundaries. When combined with plain-text append/write, that’s how you end up with a tiny fake check owning invoice `724700` and claiming `1519` invoices.
+
+---
+
+# What’s wrong structurally
+The old BASIC code wrote records like:
+
+```basic
+WRITE#1,N2$;CNUM$;RF$;DT$;CHKAMT;CT
+FOR X=1 TO CT:WRITE#1,INT(HOLD(X)):NEXT
+```
+
+That means **every invoice number line was also written with `WRITE#` semantics**, not as arbitrary trimmed text. The legacy reader expects a “CSV-ish” BASIC format. Your current writer only fully respects that for the header, not for the invoice lines. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+---
+
+## Best fix
+Write each invoice line in explicit BASIC-style format too.
+
+For numeric invoice lines, the safest equivalent is:
+
+```text
+724700
+```
+
+But to stay consistent with `WRITE#`, and avoid weird whitespace/format issues, we should normalize aggressively and only emit valid invoice numbers, one per line.
+
+Also, we should ensure:
+- no blank invoice lines get written
+- header count equals actual valid invoice count written
+
+Right now, if `record.Invoices` contains blanks, garbage, or inherited data, the count and content can drift.
+
+---
+
+# Replace `CheckInvWriter.vb` with this
+This version:
+- filters invoice lines to valid numeric invoice tokens only
+- writes a correct count based on filtered invoices
+- writes clean one-per-line invoice numbers
+- avoids blank garbage lines
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, records As IEnumerable(Of CheckInvBlock))
+        Dim lines As New List(Of String)()
+
+        For Each record As CheckInvBlock In records
+            Dim invoices As List(Of String) = NormalizeInvoices(record)
+
+            lines.Add(BuildHeaderLine(record, invoices.Count))
+
+            Dim i As Integer
+            For i = 0 To invoices.Count - 1
+                lines.Add(invoices(i))
+            Next
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, record As CheckInvBlock)
+        Dim invoices As List(Of String) = NormalizeInvoices(record)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            sw.WriteLine(BuildHeaderLine(record, invoices.Count))
+
+            Dim i As Integer
+            For i = 0 To invoices.Count - 1
+                sw.WriteLine(invoices(i))
+            Next
+        End Using
+    End Sub
+
+    Private Shared Function NormalizeInvoices(record As CheckInvBlock) As List(Of String)
+        Dim result As New List(Of String)()
+
+        If record Is Nothing OrElse record.Invoices Is Nothing Then
+            Return result
+        End If
+
+        Dim i As Integer
+        For i = 0 To record.Invoices.Count - 1
+            Dim raw As String = If(record.Invoices(i), "").Replace(ChrW(26), "").Trim()
+
+            If raw = "" Then
+                Continue For
+            End If
+
+            Dim n As Long
+            If Long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, n) OrElse
+               Long.TryParse(raw, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then
+                result.Add(n.ToString(CultureInfo.InvariantCulture))
+            End If
+        Next
+
+        Return result
+    End Function
+
+    Private Shared Function BuildHeaderLine(record As CheckInvBlock, invoiceCount As Integer) As String
+        Return String.Join(",",
+            Quote(If(record.CustomerCode, "")),
+            Quote(If(record.CheckNumber, "")),
+            Quote(If(record.SalesmanCode, "")),
+            Quote(If(record.DateText, "")),
+            record.Amount.ToString(CultureInfo.InvariantCulture),
+            invoiceCount.ToString(CultureInfo.InvariantCulture))
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", """""")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+# Why this matters
+Your fake test check likely got written with a huge or dirty inherited `Invoices` list, or with invoice data that wasn’t normalized before write. Then the reader accepted that block as legitimate and the invoice-find screen exposed it.
+
+This new version prevents that by:
+- only writing numeric invoice lines
+- recomputing the count from what is actually written
+
+---
+
+# One more important thing
+If fake check `7782` is already in `CHECK.INV`, the file may already be polluted.
+
+So after replacing `CheckInvWriter.vb`, you should:
+
+## safest test sequence
+1. **delete fake test check `7782`**
+2. rebuild
+3. recreate a small fake check
+4. search by one known invoice number that should **not** belong to it
+5. confirm it no longer hijacks old invoices
+
+If `7782` cannot be cleanly deleted because of bad block parsing, then we may need a one-time cleanup or tighter reader logic next.
+
+---
+
+## Also still needed for invoice reset
+After this, we still need the looser legacy match in delete:
+- match `CHECK.INV` block by **customer + check number**
+- not all fields
+
+Because the legacy GW-BASIC delete used only those two fields. citefc7a4fc2af045364b6d717e3031e74cd9266f82c
+
+---
+
+## Short answer
+Call that fixed file still:
+
+```text
+CheckInvWriter.vb
+```
+
+But replace the contents with the version above.
+
+## Next recommended order
+1. replace `CheckInvWriter.vb`
+2. rebuild
+3. remove/retest fake `7782`
+4. then I’ll help you patch `FormDeleteCheck.vb` for proper `INVOICE.CHK` reset matching
+
+## @testsubject117
+
+I had created copies of check.inv and ledger.cur, I can just delete the ones with the fake check info and put the originals back in place then make backup copies of them again
+
+## Copilot
+
+Yes — **do that**.
+
+## Direct answer
+That is the best move right now.
+
+Because `CHECK.INV` has been polluted by the fake test data, restoring clean copies is safer than trying to repair a possibly malformed file in place.
+
+---
+
+## Recommended sequence
+1. **close the app**
+2. replace:
+   - `CHECK.INV`
+   - `LEDGER.CUR`
+   
+   with your clean backup copies
+3. keep another backup of those clean restored files
+4. replace `CheckInvWriter.vb` with the fixed version
+5. rebuild
+6. retest with a small controlled check
+
+---
+
+## Why this is the right choice
+Once `CHECK.INV` parsing/writing gets off, weird associations like:
+- invoice `724700`
+- paid by fake check `7782`
+- `1519 invoices`
+
+mean the file can’t be trusted for debugging.
+
+So restoring known-good data removes contamination from previous bad test writes.
+
+---
+
+## After restore, test like this
+Use a very controlled case:
+
+### test 1
+- search invoice `724700`
+- confirm it maps back to the correct real check, not `7782`
+
+### test 2
+- create one small fake check with a very limited invoice list
+- verify `Find by Invoice #` shows only the intended invoices
+
+### test 3
+- delete that fake check
+- verify:
+  - check removed from `LEDGER.CUR`
+  - block removed from `CHECK.INV`
+  - invoice flags in `INVOICE.CHK` reset to `J`
+
+---
+
+## One caution
+After restoring the files, do **not** keep using the old `CheckInvWriter.vb`.  
+Restore first, but still update the code before creating new test checks again.
+
+---
+
+## Short answer
+Yes — restore the original `CHECK.INV` and `LEDGER.CUR` from backup first. That’s the cleanest reset point.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This screenshot shows the **Find by Invoice # (CHECK.INV)** window after searching for invoice **724700**.
+
+## What it says
+Invoice **724700** is currently associated with:
+
+- **Customer:** `PSIBEARI`
+- **Check #:** `230060792`
+- **Date:** `04-14-2025`
+- **Amount:** `$14,775.70`
+- **Invoices on that check:** `33`
+
+## Why that matters
+This looks **correct and clean** compared to the earlier corrupted result that showed invoice `724700` tied to fake check `7782` with `1519` invoices.
+
+So this screenshot strongly suggests:
+- your restored `CHECK.INV` is back to a valid state
+- invoice `724700` is again linked to the real PSIBEARI check
+- the fake test contamination is gone
+
+## Short conclusion
+This is a **good result**.  
+`724700` now maps back to the expected real check instead of the fake one.
+
+## @testsubject117
+
+ok. we need stop here for a while or for the day. Here's what I need from you: 
+
+## Copilot
+
+Sure — what do you need me to prepare before we stop?
+
+## @testsubject117
+
+```
+Please create a complete AMi project end-of-day wrap-up for today’s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+Core requirements:
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of today’s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where We’re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly. Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+```
+
+## Copilot
+
+I can do that, but I need one constraint called out plainly: I only have the messages visible in this chat, and there’s no actual AMi project discussion content in the visible history beyond your request for an end-of-day wrap-up.
+
+So I should not invent forms, files, bugs, repo findings, or decisions that are not present.
+
+**Best next step:** paste the relevant notes/chat content from today, and I’ll turn it into the exact 16-section wrap-up in one pass.
+
+If you want, use this minimal dump format so I can produce the final handoff quickly:
+
+```markdown
+Repository / repos:
+- owner/repo:
+- owner/repo:
+
+Forms / screens discussed:
+- 
+- 
+
+Files / classes / methods:
+- 
+- 
+
+Bugs / findings:
+- 
+- 
+
+DOS behavior:
+- 
+
+VB / WinForms behavior:
+- 
+
+Work completed:
+- 
+
+Work partially completed:
+- 
+
+Open questions / blockers:
+- 
+
+Next likely tasks:
+- 
+```
+
+If you prefer, I can also do one of these immediately:
+
+1. **Strict template now** — I generate the 16-section document with explicit `Unknown / not captured in visible chat` placeholders.
+2. **Transform from notes** — you paste raw notes and I convert them into the final wrap-up.
+3. **Progressive reconstruction** — I ask for only the few highest-value missing inputs, then produce the wrap-up.
+
+If you want speed, choose **option 1** or paste the notes and I’ll produce the final document directly.

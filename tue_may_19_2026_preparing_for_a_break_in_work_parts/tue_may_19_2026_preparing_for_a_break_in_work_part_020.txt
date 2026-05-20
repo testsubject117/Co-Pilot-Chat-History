@@ -1,0 +1,2000 @@
+---
+
+## This matches your DOS screen really well
+Your test delete screen showed:
+
+- customer
+- check #
+- date
+- reference
+- amount
+- `Paid Invoice(s):` with nothing listed
+
+That blank invoice section may explain why you don’t see an obvious block in `CHECK.INV`.
+
+### Inference
+If the fake check had:
+- no actual invoice numbers attached
+
+then DOS may still:
+- store the check in a master check file
+- display it in Delete Check
+- and on delete, still run generic cleanup code that says:
+  - `Purging part of .INV file...`
+
+even if there’s little or nothing to purge.
+
+---
+
+## Most likely now
+The real storage path may be in another file such as:
+- `LEDGER.CUR`
+- `LEDGER.91`
+- `LEDGER.BAS`-driven data
+- `BILLSCHK.DAT`
+- `JOURNAL.CUR`
+- `OTHER.CHK`
+- or some other check index/data file
+
+`CHECK.INV` may just hold:
+- invoice associations
+- not the main check master record
+
+---
+
+## What this means for the VB work
+For the **Delete Check form UI**, we already have enough DOS behavior to implement it.
+
+For the **actual delete logic**, we still do **not yet know**:
+- the authoritative file to search by check number
+- where reference/date/customer are really coming from
+- which file is the true source of record
+
+So for now:
+
+### We can safely implement:
+- screen flow
+- prompt handling
+- Y/N behavior
+- return to Checks menu
+
+### But full real deletion still needs:
+- identification of the true check storage file(s)
+
+---
+
+## Best next diagnostic step
+Now that we know `CHECK.INV` probably isn’t the main lookup source, the smartest next test is:
+
+### Create a very unique check again
+Then look for these values in candidate files:
+- `7777`
+- `12345678`
+- `PSIBEARI`
+- `0.10`
+- `05-19-2026`
+
+Especially:
+- `12345678` may be easier to find than `7777`
+
+Because if the reference is unique, it may identify the real backing file.
+
+---
+
+## Short answer
+That means `CHECK.INV` is probably **not the main file Delete Checks uses to find the check**.  
+It may only hold invoice linkage or secondary data that gets cleaned up during delete.  
+So yes, useful finding — but now we still need the **real check storage file** if you want actual delete logic, not just the form behavior.
+
+## @testsubject117
+
+ok, I need to create the file FormDeleteCheck.vb is that a class or winform?
+
+## Copilot
+
+It should be a **WinForm**, not just a plain class.
+
+## Direct answer
+Create **`FormDeleteCheck.vb` as a Windows Form**.
+
+Because the code I sent expects:
+- form events like `Load`
+- UI controls like labels/textbox
+- keyboard handling on a form
+- `ShowDialog()`
+
+A plain class won’t work for that.
+
+---
+
+## What to create
+In Visual Studio:
+
+### Option 1
+- **Add > Windows Form**
+- name it:
+  - `FormDeleteCheck.vb`
+
+That is the correct choice.
+
+---
+
+## Why
+The code uses things like:
+
+- `Handles MyBase.Load`
+- `lblTitle.Text = ...`
+- `txtInput.Visible = True`
+- `ProcessCmdKey(...)`
+- `Me.Close()`
+
+Those only make sense on a **form**.
+
+---
+
+## So the structure should be
+You’ll end up with something like:
+
+- `FormDeleteCheck.vb`
+- `FormDeleteCheck.Designer.vb`
+- `FormDeleteCheck.resx`
+
+That is normal for a WinForms screen.
+
+---
+
+## After creating it
+You’ll need to add the controls referenced in the code:
+
+- `lblTitle`
+- `lblLine1`
+- `txtInput`
+- `lblCustomer`
+- `lblDate`
+- `lblCheckInfo`
+- `lblInvoices`
+- `lblAmount`
+- `lblPrompt`
+- `lblStatus1`
+- `lblStatus2`
+- `lblStatus3`
+
+---
+
+## Short answer
+Create it as a **Windows Form**.  
+Not a class library file, not a plain class — a real **WinForms form**.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30451	'lblTitle' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	32	
+Error (active)	BC30451	'lblLine1' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	33	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	34	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	35	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	36	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	37	
+Error (active)	BC30451	'lblCustomer' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	39	
+Error (active)	BC30451	'lblDate' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	40	
+Error (active)	BC30451	'lblCheckInfo' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	41	
+Error (active)	BC30451	'lblInvoices' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	42	
+Error (active)	BC30451	'lblAmount' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	43	
+Error (active)	BC30451	'lblPrompt' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	44	
+Error (active)	BC30451	'lblStatus1' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	45	
+Error (active)	BC30451	'lblStatus2' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	46	
+Error (active)	BC30451	'lblStatus3' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	47	
+Error (active)	BC30451	'lblTitle' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	54	
+Error (active)	BC30451	'lblLine1' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	55	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	57	
+Error (active)	BC30451	'lblCustomer' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	59	
+Error (active)	BC30451	'lblDate' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	60	
+Error (active)	BC30451	'lblCheckInfo' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	61	
+Error (active)	BC30451	'lblInvoices' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	62	
+Error (active)	BC30451	'lblAmount' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	63	
+Error (active)	BC30451	'lblPrompt' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	65	
+Error (active)	BC30451	'lblStatus1' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	66	
+Error (active)	BC30451	'lblStatus2' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	67	
+Error (active)	BC30451	'lblStatus3' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	68	
+Error (active)	BC30451	'lblStatus1' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	76	
+Error (active)	BC30451	'lblStatus2' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	77	
+Error (active)	BC30451	'lblStatus3' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	78	
+Error (active)	BC30506	Handles clause requires a WithEvents variable defined in the containing type or one of its base types.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	84	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	90	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb	102	
+
+
+## Copilot
+
+Yes — that error means **the controls don’t exist on the form yet**.
+
+## Direct answer
+`FormDeleteCheck.vb` is compiling, but Visual Studio can’t find:
+
+- `lblTitle`
+- `lblLine1`
+- `txtInput`
+- `lblCustomer`
+- etc.
+
+That’s because I gave you the **code-behind**, but not the actual **designer-created controls**.
+
+So now you have two options:
+
+---
+
+# Best option: add the controls in the Designer
+Open `FormDeleteCheck` in the WinForms Designer and add these controls with **exactly these names**:
+
+## Labels
+- `lblTitle`
+- `lblLine1`
+- `lblCustomer`
+- `lblDate`
+- `lblCheckInfo`
+- `lblInvoices`
+- `lblAmount`
+- `lblPrompt`
+- `lblStatus1`
+- `lblStatus2`
+- `lblStatus3`
+
+## TextBox
+- `txtInput`
+
+If the names match exactly, most of those errors will disappear.
+
+---
+
+# Why the `Handles` error is happening
+This one:
+
+- `BC30506 Handles clause requires a WithEvents variable`
+
+is happening because:
+
+```vb
+Private Sub txtInput_KeyDown(...) Handles txtInput.KeyDown
+```
+
+expects `txtInput` to exist as a form control created by the Designer.
+
+Until that textbox exists, VB can’t hook the event.
+
+---
+
+# Fastest fix
+If you want the quickest path, create the controls manually in the Designer:
+
+## Step-by-step
+1. Open `FormDeleteCheck` in **Design** view
+2. Drag 11 Labels and 1 TextBox onto the form
+3. Set each control’s **Name** property to the exact names above
+4. Save
+5. Rebuild
+
+That should clear most or all of these compile errors.
+
+---
+
+# Even easier: here’s a version that creates the controls in code
+If you don’t want to fight the Designer yet, replace your current file with this **self-contained WinForm version**.  
+This version creates all controls in code, so you do **not** need to add labels/textboxes manually first.
+
+```vbnet name=FormDeleteCheck.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As CheckDeleteInfo = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Private Class CheckDeleteInfo
+        Public Property CustomerName As String = ""
+        Public Property CheckNumber As String = ""
+        Public Property Reference As String = ""
+        Public Property CheckDate As String = ""
+        Public Property PaidInvoices As String = ""
+        Public Property Amount As Decimal
+    End Class
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 600, 25)
+        lblInvoices = CreateLabel(20, 200, 600, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 800, 25)
+        lblStatus1 = CreateLabel(20, 330, 800, 25)
+        lblStatus2 = CreateLabel(20, 360, 800, 25)
+        lblStatus3 = CreateLabel(20, 390, 800, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As CheckDeleteInfo)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.CustomerName
+        lblDate.Text = "Date: " & info.CheckDate
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Paid Invoice(s): " & info.PaidInvoices
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim found As CheckDeleteInfo = FindCheckByNumber(checkNo)
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheckAndResetInvoices(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Function FindCheckByNumber(checkNo As String) As CheckDeleteInfo
+        ' Temporary stub for testing
+        If checkNo = "7777" Then
+            Return New CheckDeleteInfo With {
+                .CustomerName = "PSIBEARI",
+                .CheckNumber = "7777",
+                .Reference = "12345678",
+                .CheckDate = "05-19-2026",
+                .PaidInvoices = "",
+                .Amount = 0.1D
+            }
+        End If
+
+        Return Nothing
+    End Function
+
+    Private Sub DeleteCheckAndResetInvoices(info As CheckDeleteInfo)
+        ' TODO: Replace with real delete logic
+        Threading.Thread.Sleep(750)
+    End Sub
+
+End Class
+```
+
+---
+
+# Recommendation
+For you, the **fastest fix** is probably to use the version above, because it avoids all the missing Designer control errors.
+
+---
+
+# Short answer
+Those errors mean the labels/textbox were never created.  
+Either:
+
+1. add them in the WinForms Designer with the exact names, **or**
+2. use the self-contained version above that creates all controls in code.
+
+If you want, next I can give you:
+- a **Designer-only setup checklist**, or
+- help you wire this form into your existing **Checks menu**.
+
+## @testsubject117
+
+ok, I did the easy one you sent, then I built then ran it. it works but when i click on delete checks I get the not implemented yet window
+
+## Copilot
+
+That means the **menu item is still calling the old placeholder code**.
+
+## Direct answer
+Your new `FormDeleteCheck` exists and runs, but the **Delete Checks menu option is not opening it yet**.
+
+Right now, when you click **Delete Checks**, the app is still hitting code that probably says something like:
+
+- `"Not implemented yet"`
+- `MessageBox.Show("Not implemented yet")`
+
+So we need to **change the menu click handler** to launch `FormDeleteCheck`.
+
+---
+
+## What to look for
+Search your project for:
+
+- `Not implemented yet`
+- `Delete Checks`
+- `Delete Check`
+- the menu button/control name
+- the click event for that menu option
+
+Very likely you’ll find something like:
+
+```vbnet
+MessageBox.Show("Not implemented yet")
+```
+
+inside the Delete Checks handler.
+
+---
+
+## What to replace it with
+Wherever the Delete Checks menu action currently goes, change it to:
+
+```vbnet
+Using frm As New FormDeleteCheck()
+    frm.ShowDialog(Me)
+End Using
+```
+
+If `Me` causes an issue because you’re not inside a form, use:
+
+```vbnet
+Using frm As New FormDeleteCheck()
+    frm.ShowDialog()
+End Using
+```
+
+---
+
+## Example
+If you currently have something like this:
+
+```vbnet
+Private Sub mnuDeleteChecks_Click(sender As Object, e As EventArgs) Handles mnuDeleteChecks.Click
+    MessageBox.Show("Not implemented yet")
+End Sub
+```
+
+change it to:
+
+```vbnet
+Private Sub mnuDeleteChecks_Click(sender As Object, e As EventArgs) Handles mnuDeleteChecks.Click
+    Using frm As New FormDeleteCheck()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## If your app uses a key/menu dispatcher
+Sometimes old-style menu forms don’t use button click events directly.  
+They use something like:
+
+```vbnet
+Select Case choice
+    Case "1"
+        ...
+    Case "2"
+        MessageBox.Show("Not implemented yet")
+End Select
+```
+
+If so, update case `2` to:
+
+```vbnet
+Case "2"
+    Using frm As New FormDeleteCheck()
+        frm.ShowDialog(Me)
+    End Using
+```
+
+---
+
+## What to do next
+Search the solution for:
+
+```vbnet
+Not implemented yet
+```
+
+That is probably the fastest way to find the exact place to edit.
+
+---
+
+## Short answer
+The form is fine — the problem is that the **Delete Checks menu is still wired to the old placeholder**.  
+Replace that placeholder with code that opens `FormDeleteCheck`.
+
+If you paste the current **Delete Checks click handler** or the relevant menu code, I can tell you the exact line to change.
+
+## @testsubject117
+
+please generate the entire file code so I can just replace it
+
+## Copilot
+
+Yes — but I need to be precise here:
+
+## Direct answer
+I **can** generate a full replacement file, **but only if you paste the current menu form file first**.
+
+Without seeing your actual file, I’d be guessing about:
+- the form/class name
+- control names
+- existing menu wiring
+- whether it uses buttons, keypresses, or a `Select Case`
+
+And if I guess wrong, you’ll end up with more compile errors.
+
+## Best next step
+Paste the code for the form that currently shows the **“not implemented yet”** message when you click **Delete Checks**.
+
+Ideally send:
+- the entire file for that checks menu form, or
+- at least the event handler / `Select Case` block for the checks menu
+
+Then I can give you a **drop-in replacement** you can paste directly.
+
+## If you want the fastest way to find it
+Search your project for:
+
+```vb
+Not implemented yet
+```
+
+Then paste the full file containing that line.
+
+## Short answer
+Yes — send me the current menu form file, and I’ll generate the full replacement so you can paste it in directly.
+
+## @testsubject117
+
+I think that's formmainmenu isn't it?
+
+## Copilot
+
+Maybe — **but don’t replace `FormMainMenu` blindly**.
+
+## Direct answer
+It **could** be `FormMainMenu`, but more likely it’s one of these:
+
+- `FormMainMenu`
+- a checks submenu form
+- a shared menu handler
+- a keyboard dispatcher inside another form
+
+So before replacing anything, confirm where **“Not implemented yet”** actually lives.
+
+## Fastest safe way to confirm
+In Visual Studio, use **Find in Files** and search for:
+
+```vb
+Not implemented yet
+```
+
+That will tell you the exact file and line.
+
+That is much safer than guessing it’s `FormMainMenu`.
+
+---
+
+## Why I’m being careful
+If you replace the wrong file, you could break:
+- the whole main menu
+- unrelated menu options
+- navigation that already works
+
+What we really want is to change only the code path for:
+
+- `Checks and Cash Receipts`
+- `Delete Checks`
+
+---
+
+## What to send me
+Once you find it, send me either:
+
+### Best
+- the **entire file** containing `Not implemented yet`
+
+### Or minimum
+- the method/event handler containing that message
+
+Then I can generate the exact replacement.
+
+---
+
+## Short answer
+It **might** be `FormMainMenu`, but don’t assume.  
+Search for **`Not implemented yet`** first, then send me that file and I’ll give you the full replacement code.
+
+## @testsubject117
+
+how do I use find in files
+
+## Copilot
+
+In Visual Studio:
+
+## Quickest way
+Press:
+
+```text
+Ctrl + Shift + F
+```
+
+That opens **Find in Files**.
+
+---
+
+## Then do this
+### 1. In “Find what”
+type:
+
+```text
+Not implemented yet
+```
+
+### 2. In “Look in”
+choose:
+- **Entire Solution**
+
+### 3. Click
+- **Find All**
+
+---
+
+## What happens next
+Visual Studio will open a results window showing:
+- file name
+- line number
+- matching text
+
+Then click the result and it will take you straight to the code.
+
+---
+
+## If keyboard shortcut doesn’t work
+Use the top menu:
+
+- **Edit**
+- **Find and Replace**
+- **Find in Files**
+
+---
+
+## What to send me
+Once you find the result, send me:
+- the file name
+- and ideally the code around that line
+
+or just paste the whole file if it’s not too huge.
+
+## Short answer
+Use **Ctrl+Shift+F**, search for:
+
+```vb
+Not implemented yet
+```
+
+set **Look in = Entire Solution**, then click **Find All**.
+
+## @testsubject117
+
+```
+Code	File	Line	Column	Kind
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\DosMenuFormBase.vb	309	26	
+                MessageBox.Show("Print list of invoices is not implemented yet.",	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	275	60	
+                MessageBox.Show("Discount flow is not implemented yet.",	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	310	51	
+                MessageBox.Show("Debit flow is not implemented yet.",	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	320	48	
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.vb	253	26	
+
+```
+
+## Copilot
+
+Yes — that helps a lot.
+
+## Direct answer
+The **Delete Checks** placeholder is probably coming from the shared menu framework in:
+
+- `DosMenuFormBase.vb` line 309
+
+and maybe also from:
+- `FormMainMenu.vb` line 253
+
+But the safest thing is **not** to replace either whole file yet.
+
+Instead, we should update the specific feature-routing logic that currently calls:
+
+```vb
+MessageBox.Show("Not implemented yet: " & feature, ...)
+```
+
+for the **Delete Checks** feature.
+
+---
+
+## Why
+That message is generic:
+- `"Not implemented yet: " & feature`
+
+So your app likely has a reusable method that says:
+- for recognized but unfinished features → show placeholder
+
+Meaning Delete Checks is probably just mapped to one of those unfinished feature names.
+
+---
+
+## What I need next
+Please open **`DosMenuFormBase.vb`** and paste:
+
+### around line 309
+Ideally about:
+- lines **280–330**
+
+And if possible also open **`FormMainMenu.vb`** and paste:
+- lines **230–270**
+
+That should show:
+- how feature names are routed
+- where Delete Checks is being dispatched
+- which file we actually need to edit
+
+---
+
+## Important
+I do **not** want you to replace all of `DosMenuFormBase.vb` or `FormMainMenu.vb` blindly, because those are likely core files used by many menus.
+
+I want to change only the branch for:
+- **Delete Checks**
+
+---
+
+## Short answer
+The placeholder is coming from shared routing code, most likely in `DosMenuFormBase.vb`.  
+Please paste the code around:
+
+- `DosMenuFormBase.vb` line 309
+- `FormMainMenu.vb` line 253
+
+Then I can give you the exact replacement code to paste.
+
+## @testsubject117
+
+```
+        End If
+
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then up = up.ToUpperInvariant()
+
+        Dim act As Action = Nothing
+        If _keyHandlers IsNot Nothing AndAlso _keyHandlers.TryGetValue(up, act) Then
+            act()
+        End If
+    End Sub
+
+    Protected Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        Dim verPrefix As String = ""
+        If ShowVersionInHeader AndAlso Not String.IsNullOrWhiteSpace(_displayVersion) Then
+            verPrefix = "   " & _displayVersion & "          "
+        End If
+
+        lblDateTime.Text = verPrefix &
+                           now.ToString("dddd") & "  " &
+                           now.ToString("MM-dd-yyyy") & "          " &
+                           now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Protected Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+DosMenuFormBase: 
+
+## Copilot
+
+Perfect — that confirms it.
+
+## Direct answer
+`DosMenuFormBase.vb` is **not** the file to replace.  
+That file just defines the shared helper:
+
+```vb
+Protected Sub NotYet(feature As String)
+    MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+End Sub
+```
+
+So the real fix is in the form that calls:
+
+```vb
+NotYet("Delete Checks")
+```
+
+We now need to find **where Delete Checks is mapped to `NotYet(...)`**.
+
+---
+
+## Next exact step
+Search the whole solution for:
+
+```vb
+NotYet(
+```
+
+and also search for:
+
+```vb
+Delete Checks
+```
+
+and also:
+
+```vb
+Delete Check
+```
+
+We’re looking for the actual menu branch that says something like:
+
+```vb
+RegisterKey("2", Sub() NotYet("Delete Checks"))
+```
+
+or
+
+```vb
+Case "2"
+    NotYet("Delete Checks")
+```
+
+or similar.
+
+---
+
+## Why not replace `DosMenuFormBase`
+Because it is a **base class** used by multiple forms.  
+If we changed that file blindly, we could affect all unfinished features everywhere.
+
+We only want to replace the specific **Delete Checks** action.
+
+---
+
+## Most likely pattern
+Since your menus appear DOS-style, I strongly suspect you’ll find something like one of these:
+
+```vbnet
+RegisterKey("2", Sub() NotYet("Delete Checks"))
+```
+
+or:
+
+```vbnet
+_keyHandlers("2") = Sub() NotYet("Delete Checks")
+```
+
+or:
+
+```vbnet
+Case "2"
+    NotYet("Delete Checks")
+```
+
+When you find that line, replace it with:
+
+```vbnet
+RegisterKey("2", Sub()
+                     Using frm As New FormDeleteCheck()
+                         frm.ShowDialog(Me)
+                     End Using
+                 End Sub)
+```
+
+or the equivalent for that file’s structure.
+
+---
+
+## What to do now
+Use **Find in Files** again:
+
+### Search 1
+```text
+NotYet(
+```
+
+### Search 2
+```text
+Delete Checks
+```
+
+### Search 3
+```text
+Delete Check
+```
+
+Then paste the code block that contains the Delete Checks handler.
+
+---
+
+## Short answer
+`DosMenuFormBase.vb` is only the shared helper.  
+We still need the actual form that calls `NotYet("Delete Checks")`.  
+Search for:
+
+- `NotYet(`
+- `Delete Checks`
+- `Delete Check`
+
+and paste that result.
+
+## @testsubject117
+
+```
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+            Case "2" : NotYet("Product Purchasing")
+            Case "3" : NotYet("Miscellaneous Menu")
+            Case "4" : NotYet("Add Entries to Log Book")
+            Case "6" : NotYet("Cadmium Cards")
+            Case "7" : NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+FormMainMenu:
+
+## Copilot
+
+Thanks — but that block is for the **main menu**, not the **Checks and Cash Receipts submenu**.
+
+## Direct answer
+Do **not** replace `FormMainMenu.vb` with Delete Checks code.
+
+That snippet shows top-level options like:
+- Product Purchasing
+- Miscellaneous Menu
+- Log Book
+- Cadmium Cards
+- PAYROLL
+
+So this is not where your **Delete Checks** menu option lives.
+
+---
+
+## What we learned
+Your app likely has:
+- `FormMainMenu` → top-level menu
+- another form for:
+  - **Checks and Cash Receipts**
+
+The Delete Checks placeholder will be in that submenu form, not in `FormMainMenu`.
+
+---
+
+## Next thing to search for
+Search for:
+
+```text
+Checks and Cash Receipts
+```
+
+and also:
+
+```text
+Add Checks
+```
+
+and also:
+
+```text
+FormAddChecks
+```
+
+and especially:
+
+```text
+NotYet("Delete
+```
+
+We want the form that handles the submenu where:
+- `1 = Add Check`
+- `2 = Delete Checks`
+- maybe `3 = View Checks`
+
+---
+
+## Very likely
+Since you already have `FormAddChecks.vb`, there is probably a sibling form such as:
+- `FormChecksAndCashReceipts.vb`
+- `FormChecksMenu.vb`
+- `FormCashReceipts.vb`
+
+or a submenu handler that opens `FormAddChecks`.
+
+---
+
+## What to send me
+Please search for:
+
+```text
+FormAddChecks
+```
+
+and paste the code where that form is launched.
+
+That will almost certainly bring us to the submenu file we need to edit.
+
+---
+
+## Short answer
+That `FormMainMenu` code is **not** the Delete Checks menu.  
+We need the **Checks submenu** file — probably the one that opens `FormAddChecks`.  
+Search for `FormAddChecks` and paste that code block.
+
+## @testsubject117
+
+Code	File	Line	Column	Kind
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.vb	70	38	
+
+
+## Copilot
+
+Good — that tells us **C** on the main menu opens the checks area, but not yet which file handles the submenu.
+
+## Direct answer
+Now we need to find where the **`C` key/menu action** is handled in `FormMainMenu.vb`.
+
+Please open `FormMainMenu.vb` and paste the code around the handler for `"C"` — ideally about **40–80 lines around where the key actions / Select Case are defined**.
+
+We’re looking for something like:
+
+```vb
+Case "C"
+    Using f As New SomeChecksForm()
+        f.ShowDialog(Me)
+    End Using
+```
+
+That `SomeChecksForm` is the file we need to edit to replace **Delete Checks**.
+
+---
+
+## What we need specifically
+Please paste the block containing:
+- the `Case "C"` branch, or
+- the code that wires button/key `C`
+
+Because once we know which form opens for **Checks and Cash Receipts**, I can give you the exact full file change or exact lines to replace.
+
+---
+
+## Short answer
+Search result at line 70 only shows the button label.  
+Now paste the code where **`Case "C"`** is handled in `FormMainMenu.vb`.
+
+## @testsubject117
+
+Code	File	Line	Column	Kind
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	43	32	
+
+
+## Copilot
+
+That’s it — **`FormLedgerMenu.vb`** is almost certainly the submenu we need.
+
+## Direct answer
+Please paste the full contents of **`FormLedgerMenu.vb`** and I’ll generate the exact replacement code for the Delete Checks option.
+
+At minimum, I need the part showing:
+- option `1` for `FormAddChecks`
+- option `2` for `Delete Checks`
+
+because that’s where we’ll replace the `NotYet(...)` call with:
+
+```vb
+Using f As New FormDeleteCheck()
+    f.ShowDialog(Me)
+End Using
+```
+
+---
+
+## Why this is the right file
+The line you found:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+```
+
+strongly indicates this is the **Checks and Cash Receipts** menu.
+
+So option `2` in that same file is very likely:
+- Delete Checks
+- currently wired to `NotYet(...)`
+
+---
+
+## Short answer
+Great — we found the right file: **`FormLedgerMenu.vb`**.  
+Paste that file, and I’ll give you the full replacement code.
+
+## @testsubject117
+
+```
+Code	File	Line	Column	Kind
+Public Class FormAddChecks	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	8	14	
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	38	17	
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	258	17	
+                                                                          Using f As New FormAddChecks()	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	44	90	
+
+```
+
+## Copilot
+
+Perfect. We know the file now.
+
+## Direct answer
+Please open **`FormLedgerMenu.vb`** itself and paste its contents.  
+The search result alone isn’t enough to safely generate the whole replacement file.
+
+We need to see:
+- the class declaration
+- how it inherits from `DosMenuFormBase`
+- how menu buttons are added
+- where option `2` currently points
+
+Then I can give you a **paste-in full file** with Delete Checks wired up.
+
+---
+
+## Why I still need the file
+Right now we only know this line exists:
+
+```vb
+Using f As New FormAddChecks()
+```
+
+But I still need the surrounding code so I can preserve:
+- button layout
+- existing menu items
+- keyboard handlers
+- close/return behavior
+
+---
+
+## Exactly what to do
+Open:
+
+- `FormLedgerMenu.vb`
+
+Copy all of it and paste it here.
+
+If that’s annoying, at least paste roughly the first 120 lines.
+
+---
+
+## Short answer
+We found the right file: **`FormLedgerMenu.vb`**.  
+Now paste that file’s code, and I’ll generate the exact replacement for you.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+## Copilot
+
+Yes — now I can give you the full replacement.
+
+## Direct answer
+Replace your entire **`FormLedgerMenu.vb`** with the code below.
+
+This only changes one behavior:
+- **option 2 = Delete Checks** now opens `FormDeleteCheck`
+
+Everything else stays the same.
+
+```vbnet name=FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+
+        AddMenuButton(p, "2", "Delete Checks", Sub()
+                                                   Using f As New FormDeleteCheck()
+                                                       f.ShowDialog(Me)
+                                                   End Using
+                                               End Sub)
+
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .FlowDirection = FlowDirection.RightToLeft,
+                .AutoSize = True
+            }
+
+            Dim ok As New Button() With {
+                .Text = "OK",
+                .DialogResult = DialogResult.OK,
+                .AutoSize = True
+            }
+
+            Dim cancel As New Button() With {
+                .Text = "Cancel",
+                .DialogResult = DialogResult.Cancel,
+                .AutoSize = True
+            }
+
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+---
+
+## What changed
+This line:
+
+```vbnet
+AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+```
+
+became:
+
+```vbnet
+AddMenuButton(p, "2", "Delete Checks", Sub()
+                                           Using f As New FormDeleteCheck()
+                                               f.ShowDialog(Me)
+                                           End Using
+                                       End Sub)
+```
+
+That is the only functional change needed to hook the new form into the menu.
+
+---
+
+## After you paste it
+1. save the file
+2. rebuild
+3. run
+4. go to:
+   - `C` Checks and Cash Receipts
+   - `2` Delete Checks
+
+It should now open your `FormDeleteCheck`.
+
+---
+
+## Short answer
+Yes — replace the whole `FormLedgerMenu.vb` file with the code above, then rebuild.  
+That wires **Delete Checks** to your new form.
+
+## @testsubject117
+
+ok, and I built, ran the play button and tested and it works. it finds check #7777 and allows me to delete it, however after I tell it to delete, if I search again, it finds that fake check again. if I deleted it, shouldn't it no longer be found?
+
+## Copilot
+
+Yes — **if it were really deleting from storage, it should no longer be found**.
+
+## Direct answer
+Right now, your form is only doing a **fake/stub delete**, not a real one.
+
+That’s because in the code I gave you, these two parts were placeholders:
+
+```vbnet
+Private Function FindCheckByNumber(checkNo As String) As CheckDeleteInfo
+    If checkNo = "7777" Then
+        Return New CheckDeleteInfo With {
+            .CustomerName = "PSIBEARI",
+            .CheckNumber = "7777",
+            .Reference = "12345678",
+            .CheckDate = "05-19-2026",
+            .PaidInvoices = "",
+            .Amount = 0.1D
+        }
+    End If
+
+    Return Nothing
+End Function
+```
+
+and:
+
+```vbnet
+Private Sub DeleteCheckAndResetInvoices(info As CheckDeleteInfo)
+    Threading.Thread.Sleep(750)
+End Sub
+```
+
+So:
+- lookup always returns fake check `7777`
+- delete only pauses briefly
+- nothing is actually removed
+
+---
+
+## Why this is happening
+Your current implementation says:
+
+### Find
+“If the user types `7777`, pretend this check exists.”
+
+### Delete
+“Show delete messages, wait a little, then close.”
+
+So yes, after “deleting,” searching again still finds it because the hardcoded test data is still there.
+
+---
+
+## What has been completed so far
+You now have:
+- correct menu wiring
+- working Delete Check screen
+- DOS-style Y/N flow
+- status messages
+- return behavior
+
+That is **UI behavior parity**
+
+But not yet:
+- real file lookup
+- real record deletion
+- real invoice reset
+
+---
+
+## What needs to happen next
+We need to replace the stub logic with real logic:
+
+### Replace this:
+- hardcoded `7777` in `FindCheckByNumber`
+
+### With:
+- actual file search against the real check data source
+
+And replace this:
+- fake sleep in `DeleteCheckAndResetInvoices`
+
+### With:
+- actual remove/update of the underlying file(s)
+
+---
+
+## Big point
+This confirms what we already suspected:
+
+- the form is working
+- but we still do **not know the real backing file** for check lookup and delete
+
+So to make delete real, we need to identify:
+1. where Add Check stored your test check
+2. where Delete Check is supposed to remove it from
+
+---
+
+## Best next move
+Since the fake form works, the next step is to connect it to real data.
+
+To do that, I need to see how **Add Checks** currently saves a check.
+
+Because that code likely tells us:
+- what file is written
+- what record structure is used
+- what Delete Check should search/remove
+
+---
+
+## Please send next
+The most useful next file is:
+
+- **`FormAddChecks.vb`**
+
+Especially the parts that:
+- save/post a check
+- write to files
+- handle invoice links
+
+If the file is large, send:
+- the save/post methods
+- any file-write methods
+- code around where the final Enter/accept commits the check
+
+---
+
+## Short answer
+Yes — a real delete should make it disappear.  
+But your current form is still using a **hardcoded fake check** and a **fake delete**, so it will always find `7777` again until we replace the stub logic with real storage logic.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblLine6 As Label
+    Private lblLine7 As Label
+    Private lblLine8 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+    Private enteredDateText As String
+    Private enteredCheckReference As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.SetBounds(24, 80, 920, 28)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.SetBounds(24, 112, 920, 28)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.SetBounds(24, 144, 920, 28)
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.SetBounds(24, 176, 920, 28)
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.SetBounds(24, 208, 920, 28)
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+
+        lblLine6 = New Label()
+        lblLine6.AutoSize = False
+        lblLine6.SetBounds(24, 240, 920, 28)
+        lblLine6.ForeColor = Color.White
+        lblLine6.BackColor = Color.Black
+
+        lblLine7 = New Label()
+        lblLine7.AutoSize = False
+        lblLine7.SetBounds(24, 272, 920, 28)
+        lblLine7.ForeColor = Color.White
+        lblLine7.BackColor = Color.Black
+
+        lblLine8 = New Label()
+        lblLine8.AutoSize = False
+        lblLine8.SetBounds(24, 304, 920, 28)
+        lblLine8.ForeColor = Color.White
+        lblLine8.BackColor = Color.Black
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.SetBounds(24, 372, 920, 28)
