@@ -1,0 +1,2000 @@
+﻿                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+---
+
+## What to do
+1. Replace only `AMiOffice/FormLedgerMenu.vb`
+2. Leave `AMiOffice/FormSalesEmployeesChecksMenu.vb` unchanged
+3. Run:
+
+```powershell
+git status
+```
+
+You should then see just:
+
+- `modified: AMiOffice/FormLedgerMenu.vb`
+
+---
+
+## Then test
+In the app:
+- CHECKS â†’ `1` should open `FormAddChecks`
+- CHECKS â†’ `S` â†’ `B` should still return to CHECKS
+
+## Short answer
+You were right to stop and verify.  
+**Only change `FormLedgerMenu.vb`.**
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots are extremely useful. Hereâ€™s what they show:
+
+## Image 1
+A DOS screen titled:
+
+**`***** Add A Check *****`**
+
+It immediately prompts:
+
+**`Company Name [Q = Quit] ? ______`**
+
+### Meaning
+The Add Check flow begins with:
+- a plain DOS text screen
+- no menu shell
+- first prompt is **Company Name**
+- quit mechanism is explicitly **`Q = Quit`**
+
+This is important because it suggests the WinForms Add Checks flow should start with a **direct prompt-first workflow**, not a complex modern form.
+
+---
+
+## Image 2
+Another **Add A Check** screen showing progress after company selection:
+
+- `Company Name: FRONTIER`
+- `Check Amount ? 0.10`
+- explanatory line:
+  - `I need the 1st and last invoice numbers so I can automatically scan for Invoices`
+- then prompt:
+  - `Enter the LOWEST Invoice number to be paid [-1 = No Auto Scan]?`
+
+### Meaning
+This tells us the DOS flow after company selection is something like:
+
+1. ask for company name
+2. ask for check amount
+3. explain invoice auto-scan behavior
+4. ask for lowest invoice number
+5. presumably ask for highest invoice number next
+
+### Important design implication
+This is **not** just â€œvalidate company and stop.â€  
+Itâ€™s a sequential operator workflow for entering a real check.
+
+So `FormAddChecks.vb` in its current repo form is only **early groundwork**, not close to DOS parity yet.
+
+---
+
+## Image 3
+A DOS screen titled:
+
+**`***** Delete A Check *****`**
+
+Prompt:
+
+**`Check # [ENTER = Quit]?`**
+
+### Meaning
+Delete Check is also:
+- prompt-first
+- minimal
+- keyboard-only
+- explicit about quit behavior
+
+So if/when we build Delete Check later, it should also be a tight DOS prompt flow, not a large modern management UI.
+
+---
+
+## Image 4
+Another **Add A Check** screen, but this one has an explanatory banner:
+
+**`This is usually for over payments or checks that are Not paying for invoices`**
+
+Then again:
+
+**`Company Name [Q = Quit] ?`**
+
+### Meaning
+This appears to be a different Add Check mode or branch of the Add Check workflow â€” likely the **OTHER checks / non-invoice payment** path.
+
+That suggests DOS distinguishes between:
+- invoice-paying checks
+- checks not paying invoices / overpayments / OTHER checks
+
+And that matches the file-model weâ€™ve already recovered around:
+- `CHECK.INV`
+- `OTHER.CHK`
+
+---
+
+# Most important takeaways
+## 1. You were right to verify DOS behavior
+These screenshots strongly support preserving exact DOS flow rather than inventing behavior from existing WinForms forms.
+
+## 2. `Sales Employee's checks` option B should not be changed
+Your DOS verification already settled that.
+
+## 3. CHECKS option 1 absolutely should open an Add Check flow
+That part is correct.
+
+## 4. But current `FormAddChecks.vb` is probably not DOS-faithful enough yet
+Because DOS Add Check is clearly:
+- prompt-driven
+- sequential
+- minimal
+- text-oriented
+- not primarily a â€œcompany lookup screen with matches listâ€
+
+## 5. The first DOS prompt wording matters
+The first prompt should be conceptually close to:
+
+**`Company Name [Q = Quit] ?`**
+
+not merely:
+- â€œCompany Code:â€
+- or a modern validation form
+
+---
+
+# Best next conclusion
+So right now Iâ€™d say:
+
+## Safe immediate change
+- wire `FormLedgerMenu.vb` option `1` to open `FormAddChecks`
+
+## But with a warning
+- `FormAddChecks.vb` is still only a placeholder/groundwork version compared to true DOS flow
+- later we should redesign it toward:
+  - prompt-first
+  - sequential entry
+  - DOS wording
+  - company selection followed by amount/invoice prompts
+
+---
+
+## Short answer
+The screenshots show that DOS **Add A Check** is a sequential prompt-driven workflow starting with:
+
+**`Company Name [Q = Quit] ?`**
+
+and then continuing into:
+- check amount
+- invoice scan prompts
+- lowest/highest invoice handling
+
+So they confirm:
+- option `1` should lead into Add Check
+- Sales Employee option `B` should still just return to CHECKS
+- and `FormAddChecks` will need more DOS-faithful work later.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Image 5 shows a DOS screen for **deleting a non-invoice / OTHER-style check**.
+
+## Whatâ€™s on the screen
+Title:
+
+**`***** Delete A Check *****`**
+
+Then a highlighted explanatory line:
+
+**`This is usually for over payments or checks that are Not paying for invoices`**
+
+Then the prompt:
+
+**`Check # to Delete [Q=Quit]? _`**
+
+---
+
+## What it means
+This appears to be the **OTHER-check deletion path**, or at least the delete flow for checks that are:
+- overpayments
+- not paying invoices
+
+That lines up with the earlier Add Check screenshot that had the same explanatory banner.
+
+So DOS seems to distinguish between:
+
+### Standard invoice-paying checks
+- tied to invoice scanning / invoice numbers
+
+and
+
+### Non-invoice / overpayment / OTHER checks
+- explicitly labeled as checks not paying invoices
+- likely associated with `OTHER.CHK`
+
+---
+
+## Important behavior clue
+This screen uses:
+
+- direct prompt flow
+- minimal explanatory banner
+- explicit quit syntax:
+  - **`[Q=Quit]`**
+
+That reinforces the same DOS pattern weâ€™ve been seeing:
+- not a menu-within-a-menu experience
+- not a complex form
+- just a focused prompt screen
+
+---
+
+## Key takeaway for the port
+If/when you wire or build:
+- **Delete Checks**
+- **Delete OTHER Checks**
+
+the WinForms implementation should probably preserve this DOS pattern:
+- compact title
+- brief explanation when needed
+- single prompt
+- keyboard-first quit behavior
+
+---
+
+## Short answer
+Image 5 is a DOS **Delete A Check** screen for the **non-invoice / overpayment / OTHER-check case**, prompting:
+
+**`Check # to Delete [Q=Quit]?`**
+
+with a note that this path is for checks **not paying for invoices**.
+
+## @testsubject117
+
+ok, we good to move forward?
+
+## Copilot
+
+Yes â€” weâ€™re good to move forward.
+
+## What is now confirmed
+- your local repo is clean
+- CHECKS â†’ Sales Employeeâ€™s checks â†’ **B** should **only return to CHECKS**
+- CHECKS option **1** should lead into **Add A Check**
+- DOS Add Check is a prompt-driven flow beginning with:
+  - **`Company Name [Q = Quit] ?`**
+- DOS distinguishes normal invoice-paying checks from overpayment / non-invoice / OTHER checks
+
+## So the correct next move
+**Yes: update only `AMiOffice/FormLedgerMenu.vb`** so option `1` opens `FormAddChecks`.
+
+## Do not change right now
+- `FormSalesEmployeesChecksMenu.vb`
+- `FormAddChecks.vb`
+- Delete Check / OTHER Check behavior
+
+Those need later DOS-faithful work, but they are not the immediate wiring step.
+
+---
+
+# Full file to paste now
+Replace only:
+
+- `AMiOffice/FormLedgerMenu.vb`
+
+with this:
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+## After pasting
+Run:
+
+```powershell
+git status
+```
+
+Then test:
+- CHECKS â†’ `1`
+- CHECKS â†’ `S` â†’ `B`
+
+And tell me what happens.
+
+## @testsubject117
+
+I need the correct code for the entire FormSalesEmployeesChecksMenu.vb
+
+## Copilot
+
+Here is the correct full file for `FormSalesEmployeesChecksMenu.vb`, preserving the confirmed DOS behavior where option **B** closes the submenu and returns the user to the CHECKS menu.
+
+```vbnet name=AMiOffice/FormSalesEmployeesChecksMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.IO
+Imports System.Windows.Forms
+
+Public Class FormSalesEmployeesChecksMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        ' Match CHECKS menu sizing + layout
+        Me.Width = 1000
+        Me.Height = 720
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+        flpLeft.AutoScroll = False
+
+        ClearMenu()
+        SetMenuTitle("Sales Employee's checks")
+
+        ' (A) Open EMPNAME.DAT editor (DOS opened EDIT)
+        AddMenuButton(flpLeft, "A", "Modify/View Sales Employee List && their customers", Sub()
+                                                                                              Using f As New FormEmpNameEditor()
+                                                                                                  f.ShowDialog(Me)
+                                                                                              End Using
+                                                                                          End Sub)
+
+        ' (B) DOS behavior: close this submenu and return to the already-open CHECKS menu
+        AddMenuButton(flpLeft, "B", "Make a check for an Employee.", Sub()
+                                                                         Me.DialogResult = DialogResult.OK
+                                                                         Me.Close()
+
+                                                                         If Me.Owner IsNot Nothing Then
+                                                                             Me.Owner.Activate()
+                                                                             Me.Owner.BringToFront()
+                                                                         End If
+                                                                     End Sub)
+
+        ' No (Q); closing handled by base "(ESC) Close"
+    End Sub
+End Class
+```
+
+## Short answer
+That is the full correct `FormSalesEmployeesChecksMenu.vb` based on the DOS behavior you confirmed.
+
+## @testsubject117
+
+ok, confirmed it's now behaving like dos
+
+## Copilot
+
+Excellent â€” that means the CHECKS submenu behavior is now aligned with DOS.
+
+## Confirmed
+`FormSalesEmployeesChecksMenu.vb` is now correct:
+- option **A** opens the employee list editor
+- option **B** closes the submenu and returns to CHECKS
+- behavior matches DOS
+
+## Where we are now
+So at this point we have:
+
+- DOS behavior verified for Sales Employee submenu
+- repo previously cleaned and synced
+- menu-direction ambiguity resolved
+- CHECKS wiring work moving in the right direction
+
+## Next likely step
+The next thing to verify is whether:
+
+### CHECKS option `1`
+now correctly opens `FormAddChecks`
+
+If it does, then the immediate wiring task from Friday is basically in place.
+
+## What I want you to test next
+From the app:
+
+1. open **CHECKS**
+2. press **1**
+3. tell me:
+   - does `FormAddChecks` open?
+   - does it open modally on top of CHECKS?
+   - does ESC/Cancel return cleanly?
+   - does the current screen feel obviously wrong compared with the DOS screenshots?
+
+Because based on the screenshots, I expect:
+- wiring may be correct
+- but the current `FormAddChecks` UI may still need redesign toward DOS prompt flow
+
+## Short answer
+Good â€” Sales Employee submenu is now DOS-correct.  
+Next, verify CHECKS option **1** opens `FormAddChecks` correctly.
+
+## @testsubject117
+
+ok, but choice (A) on that menu is also wrong. it's currently opening a window that throws an error. file not found \\invoice\mainmenu\data\empname.dat. is empname.dat one of the original dos gwbasic files? if so, do I need to copy it to \\invoice\mainmenu\data?
+
+## Copilot
+
+Yes â€” `EMPNAME.DAT` appears to be one of the legacy DOS data files used by this workflow, and the current WinForms form is trying to open it from `\\invoice\MainMenu\Data\EMPNAME.DAT`. Based on what weâ€™ve already confirmed from the project continuity, `FormEmpNameEditor.vb` exists specifically to edit `EMPNAME.DAT`, and `LegacyDataPaths.vb` centralizes legacy file locations. So the error means the app canâ€™t find that file at the configured legacy data path.
+
+## What that means practically
+Most likely:
+- **yes**, this is an original DOS-era data file the app expects
+- **no**, the problem is not that the code is â€œwrongâ€ in general
+- the immediate issue is that your local environment does not currently have `EMPNAME.DAT` at the path the app expects
+
+## Before copying anything
+First confirm whether the file already exists somewhere else on your machine.
+
+In PowerShell, try:
+
+```powershell
+Get-ChildItem -Path C:\ -Filter EMPNAME.DAT -Recurse -ErrorAction SilentlyContinue
+```
+
+If thatâ€™s too broad, check likely locations first, such as your DOS data folders or extracted AMi data directories.
+
+## If you do have the real file
+Then yes, you likely need it available at:
+
+```text
+\\invoice\MainMenu\Data\EMPNAME.DAT
+```
+
+But on Windows, that UNC path usually means:
+- either a real network share named `invoice`
+- or some local share/subst setup that mimics the DOS environment
+
+So donâ€™t copy blindly until you confirm what `\\invoice\MainMenu\Data` maps to on your machine.
+
+## Check whether that path is reachable
+Run:
+
+```powershell
+Test-Path '\\invoice\MainMenu\Data'
+```
+
+and:
+
+```powershell
+dir '\\invoice\MainMenu\Data'
+```
+
+### If that path exists
+Then putting the real `EMPNAME.DAT` there is likely the right move.
+
+### If that path does not exist
+Then the real issue is environment/path configuration, not just a missing file.
+
+## Best next check
+Also inspect whether the repo already documents or centralizes this path in code. Since this is a repo-specific code question and accuracy matters, I should verify it from the repo before advising a permanent fix. From the recovered continuity, `LegacyDataPaths.vb` is likely the key place.
+
+## Short answer
+**Yes, `EMPNAME.DAT` is very likely a legacy DOS data file used by the original workflow.**  
+If `FormEmpNameEditor` expects it at `\\invoice\MainMenu\Data\EMPNAME.DAT`, then you probably do need the real file available there â€” **but first confirm whether that UNC path actually exists and how your environment maps legacy data paths.**
+
+If you want, next I can help you verify:
+1. where `EMPNAME.DAT` is expected in the code,
+2. whether `\\invoice\MainMenu\Data` is the intended canonical path,
+3. and the safest way to make your local environment match it.
+
+## @testsubject117
+
+ok, I think I remember this now. I just apparently didn't copy over the empname.dat file. Let me send you screenshots of what is currently happening in the vb app, and what actually happens in dos
+
+## Copilot
+
+Yes â€” send the screenshots.
+
+Thatâ€™s the right next step, because then we can compare:
+
+- what the VB app currently does
+- what the DOS app actually does
+- whether the current wiring is only partially correct
+- and whether `FormAddChecks` / employee-check flows need DOS-faithful adjustment
+
+## What to include if possible
+Please send screenshots of:
+
+1. **VB app**
+   - CHECKS menu
+   - Sales Employee submenu
+   - result of choosing **A**
+   - result of choosing **1** from CHECKS
+   - any error/dialog that appears
+
+2. **DOS app**
+   - corresponding CHECKS menu
+   - Sales Employee submenu
+   - what happens after **A**
+   - what happens after **1**
+   - any prompt sequence that follows
+
+## What Iâ€™ll compare
+Iâ€™ll look at:
+- exact wording
+- screen structure
+- whether the VB app is opening the wrong form
+- whether the DOS app is staying in menu flow vs going into direct prompts
+- whether we need to change wiring or redesign specific forms
+
+## Short answer
+Yes â€” send the screenshots, and Iâ€™ll compare the VB behavior against DOS behavior before we make the next code change.
+
+## @testsubject117
+
+this is what clicking on (A) does in the vb app, it opens a new window that shows a list, which is the top name of the employee and under that company codes of companies assigned to that employee: 
+
+## Copilot
+
+Got it. Image 6 shows the **current VB behavior for option (A)** very clearly.
+
+## What the VB app is doing now
+From **Sales Employee's checks**, choosing **(A)** opens a separate window titled:
+
+**`EMPNAME.DAT`**
+
+The window contains:
+- instructional text at top:
+  - â€œDOS rule: Enter the employee name, then customer names with a space in front of each.â€
+  - â€œThis editor will keep customer indentation valid when saving.â€
+- a large text editor/list area
+- contents like:
+  - `STEVE RAMIREZ`
+  - `ASILAERO`
+  - `JIMJAMES`
+  - `FIERRITOS`
+  - `DYNATROL`
+  - `DESIGNTE`
+- Save / Close buttons
+
+## Interpretation
+That means the VB app is currently treating option **A** as:
+
+> open a text-style editor for the raw `EMPNAME.DAT` structure
+
+And based on your earlier confirmation that once the file existed the error went away, this behavior is at least internally consistent with the current code.
+
+---
+
+## What this suggests
+This is probably a **reasonable interpretation** of DOS option A if DOS originally opened some kind of text-edit workflow on `EMPNAME.DAT`.
+
+But we still need to compare it against DOS, because the key question is not just:
+
+- â€œdoes it load the file?â€
+
+Itâ€™s:
+
+- â€œdoes this match what DOS actually did when you picked A?â€
+
+---
+
+## What Iâ€™m watching for when you send DOS
+We need to compare whether DOS option A:
+
+1. opens a full-screen text editor
+2. shells out to DOS EDIT or another editor
+3. shows a prompt-based maintenance flow instead
+4. just displays the data differently
+
+If DOS simply launched an editor on `EMPNAME.DAT`, then the VB behavior may already be **functionally correct**, even if not visually identical.
+
+---
+
+## Provisional conclusion
+So far, based on Image 6 alone:
+
+- option **A** in VB is **not obviously wrong**
+- it appears to be a practical editor for the underlying `EMPNAME.DAT` file
+- the previous error was likely just because the file was missing from the expected legacy data location
+
+But we still need the DOS comparison to know whether this is:
+- DOS-faithful enough
+- or only a convenient approximation
+
+## Short answer
+Image 6 shows that VB option **A** opens an `EMPNAME.DAT` editor listing employee names and their assigned company codes, with Save/Close controls.  
+That looks plausible, but we still need the DOS screenshot to confirm whether this matches original behavior closely enough.
+
+## @testsubject117
+
+heres the screenshot of the sales employees checks window in dos:
+
+## Copilot
+
+This is very helpful. Image 7 clarifies the DOS submenu itself.
+
+## What the DOS screen shows
+Title:
+
+**`Sales Employee's checks`**
+
+Menu options:
+- **(A)** Modify/View Sales Employee List & their customers
+- **(B)** Make a check for an Employee.
+- **(Q)** Quit to main menu
+
+And beneath the menu it displays an instruction line:
+
+**`Enter the employees mame and his customers names with a space in front of each?`**
+
+Thereâ€™s also a typo in DOS:
+- `mame` instead of `name`
+
+---
+
+## What this tells us
+### 1. The submenu text in VB is broadly correct
+The WinForms menu labels are already closely aligned with DOS.
+
+### 2. DOS provides guidance directly on the submenu screen
+That bottom instructional text is part of the DOS menu itself, not just inside the editor.
+
+So if we want closer parity later, `FormSalesEmployeesChecksMenu` should probably display that instructional line somewhere on the form.
+
+### 3. Option A is indeed about editing/viewing the employee/customer list
+The DOS wording strongly supports the idea that `EMPNAME.DAT` is the underlying file for this.
+
+So your current VB behavior for option A:
+- opening an `EMPNAME.DAT` editor
+- showing employee name followed by customer/company entries
+
+looks conceptually correct.
+
+### 4. DOS option Q wording differs from current VB close behavior
+DOS says:
+- **`(Q) Quit to main menu`**
+
+But your current WinForms shell uses:
+- ESC Close behavior from the base menu
+
+That may be acceptable under the current WinForms menu framework, but strictly speaking it is not text-identical to DOS.
+
+---
+
+## Important nuance
+There are really two separate questions here:
+
+### Is option A wired to the right function?
+**Probably yes.**
+
+### Is the Sales Employee submenu visually/behaviorally DOS-perfect?
+**Not yet fully**, because DOS also shows the instruction line on the menu screen, and explicitly has `(Q) Quit to main menu`.
+
+---
+
+## My current conclusion
+Based on Image 6 + Image 7:
+
+- `EMPNAME.DAT` is almost certainly the correct legacy file
+- opening an editor for it is a sensible and likely correct WinForms interpretation of DOS option A
+- the previous file-not-found problem was environmental, not necessarily code logic
+- the submenu itself could later be improved by adding the DOS instruction text to the form
+
+---
+
+## One especially interesting detail
+DOS says:
+
+**`Quit to main menu`**
+
+But earlier you confirmed that option **B** returns to CHECKS.
+
+That suggests:
+- **B** returns to CHECKS
+- **Q** may leave the Sales Employee submenu more broadly
+
+If your current submenu is opened from CHECKS modally, ESC close likely returns to CHECKS, not to the applicationâ€™s true main menu. So there may still be a small navigation nuance to revisit later if you want exact parity.
+
+---
+
+## Short answer
+Image 7 confirms that DOS option **A** is indeed about maintaining the employee/customer list, and the instruction text matches what the VB editor is trying to enforce.  
+So **yes, `EMPNAME.DAT` is the right legacy file and opening an editor for it is conceptually correct.**  
+The remaining parity gap is mostly in submenu presentation and exact navigation wording, not the core purpose of option A.
+
+## @testsubject117
+
+wait, sorry, that screenshot was that menu after you hit A
+
+## Copilot
+
+Ah â€” that changes the interpretation.
+
+## Direct answer
+If Image 7 is **what DOS shows after pressing A**, then the current VB behavior is **not DOS-faithful**.
+
+Because DOS option **A** is not immediately opening a separate editor window with Save/Close buttons and loaded text content. Instead, after pressing **A**, DOS appears to show a text-mode screen that contains:
+
+- the same menu choices
+- a `(Q) Quit to main menu` option
+- and the instruction line:
+  - **`Enter the employees mame and his customers names with a space in front of each?`**
+
+So the DOS flow after `A` is more like a dedicated text-mode maintenance screen, not a modern modal editor popup.
+
+---
+
+## What that means
+### Current VB option A behavior
+- opens `FormEmpNameEditor`
+- separate child window
+- text box/editor
+- Save / Close buttons
+
+### Actual DOS option A behavior
+Appears to be:
+- remain in DOS full-screen style
+- show instructions inline on a screen
+- likely transition into a text-entry/edit experience in-place
+- not a modern detached document editor
+
+So if we are aiming for DOS fidelity, the current VB implementation for **A** is likely only a convenience implementation, not the correct reproduction.
+
+---
+
+## Important nuance
+We still donâ€™t yet know the **full** DOS behavior after that screen:
+- does it then let you directly type lines?
+- does it shell out to EDIT after this screen?
+- is this itself the editable screen?
+- is there another step after this prompt/instruction screen?
+
+But we do know enough to say:
+
+## The current VB option A is not matching DOS presentation/flow.
+
+---
+
+## Revised conclusion
+So now the accurate position is:
+
+### `EMPNAME.DAT`
+Yes, still very likely the correct DOS-era file.
+
+### Does it belong under `\\invoice\MainMenu\Data`?
+Yes, likely, if thatâ€™s where your port expects legacy shared data.
+
+### Is current option A behavior correct?
+**Functionally maybe, DOS-faithfully probably not.**
+
+---
+
+## Best next move
+We should not assume the current `FormEmpNameEditor` is the final answer.
+
+Instead, Iâ€™d treat it as:
+- a useful temporary editor
+- but not yet the final DOS-style implementation
+
+So for now:
+- itâ€™s okay if it unblocks data maintenance
+- but it should probably be revisited later for DOS parity
+
+---
+
+## What Iâ€™d like next
+If you have more DOS screenshots after pressing **A**, especially showing:
+- whether text becomes editable directly
+- whether thereâ€™s a cursor in the list
+- whether another screen appears
+- what quitting/saving looks like
+
+that will tell us whether we need:
+- a DOS-style full-screen editor form
+- or whether the current popup editor is acceptable behaviorally
+
+## Short answer
+Thanks â€” that correction matters.  
+If Image 7 is **after pressing A**, then the current VB `(A)` implementation is **not matching DOS flow/presentation**, even though it may still be editing the right underlying file.
+
+## @testsubject117
+
+ok, from that screen, I typed a space, then Steve Ramirez and hit enter. this is the screen that appeared: 
+
+## Copilot
+
+Perfect â€” that explains the DOS behavior.
+
+## Direct answer
+DOS option **A** does **not** use a custom in-app maintenance screen. It effectively launches the **MS-DOS Editor** on `EMPNAME.DAT`.
+
+Image 8 shows exactly that:
+- window title/file: `EMPNAME.DAT`
+- classic **MS-DOS Editor**
+- contents of the employee/customer assignment file
+- user can edit raw lines directly
+
+So the current VB implementation that opens an editor for `EMPNAME.DAT` is actually **conceptually correct**.
+
+---
+
+## What the DOS flow appears to be
+From your screenshots:
+
+1. user is on Sales Employeeâ€™s checks flow
+2. presses **A**
+3. DOS shows an instructional screen/message
+4. then opens `EMPNAME.DAT` in **MS-DOS Editor**
+5. user edits raw text file directly
+
+So the real DOS behavior is:
+
+- **A = edit the raw file**
+- not a custom wizard
+- not a structured form-entry UI
+
+---
+
+## What that means for the VB app
+Your current VB option **A**:
+- opens a dedicated `EMPNAME.DAT` editor window
+- shows the file contents
+- provides Save/Close
+- explains indentation rules
+
+That is actually a pretty reasonable WinForms replacement for DOS EDIT.
+
+### In other words:
+It may not look exactly like DOS Editor, but it is behaviorally aligned:
+- open the backing file
+- let the user edit the raw contents
+- save changes back
+
+---
+
+## So the earlier error was just environmental
+The file-not-found issue was almost certainly because:
+- `EMPNAME.DAT` was missing from the expected legacy data location
+
+not because option A was fundamentally wired wrong.
+
+---
+
+## Updated conclusion
+### Option A
+**Keep it.**
+Itâ€™s valid.
+
+### `EMPNAME.DAT`
+Yes, it is definitely a real legacy DOS data file used by this feature.
+
+### Need to copy it to `\\invoice\MainMenu\Data`?
+**Yes, if that is the path your WinForms port is using for legacy shared data.**
+
+That appears to have been the missing piece.
+
+---
+
+## One subtle difference still remaining
+DOS appears to show an instructional screen before or around launching the editor.
+
+VB currently shows the instruction text inside the editor window itself.
+
+Thatâ€™s not exact visual parity, but functionally itâ€™s close and probably acceptable unless you want pixel-level DOS reproduction.
+
+---
+
+## Short answer
+Image 8 confirms it: **DOS option A launches `EMPNAME.DAT` in MS-DOS Editor.**  
+So your VB app opening an editor for `EMPNAME.DAT` is actually the right behavior in principle; the earlier problem was just that the file was missing.
+
+## @testsubject117
+
+ok, so does sales employees checks seem to be setup and working?
+
+## Copilot
+
+Yes â€” **Sales Employeeâ€™s checks now appears to be set up and working correctly in principle.**
+
+## Whatâ€™s now confirmed
+### Option A
+- uses `EMPNAME.DAT`
+- DOS ultimately opens that file in MS-DOS Editor
+- VB opens an editor for that same file
+- once `EMPNAME.DAT` exists at the expected path, this is behaving appropriately
+
+### Option B
+- DOS behavior is to drop back to the CHECKS menu
+- your VB implementation now does that
+- you already confirmed it matches DOS
+
+---
+
+## Overall verdict
+**Yes â€” this submenu is now basically correct.**
+
+That means `FormSalesEmployeesChecksMenu.vb` is in good shape for the current migration stage.
+
+---
+
+## Small caveat
+There may still be minor DOS-parity polish you could choose to do later, such as:
+- showing the DOS instructional text more like the original screen
+- possibly matching `(Q) Quit to main menu` wording more closely
+- refining visual flow
+
+But those are **polish/parity improvements**, not evidence that the submenu is broken.
+
+---
+
+## Practical conclusion
+I would consider **Sales Employeeâ€™s checks**:
+
+- **functionally working**
+- **correctly wired**
+- **using the right legacy file**
+- **close enough to DOS behavior to move on**
+
+---
+
+## Short answer
+**Yes â€” Sales Employeeâ€™s checks seems to be set up and working now.**  
+Option **A** is editing the correct legacy file, and option **B** now matches DOS return behavior.
+
+## @testsubject117
+
+ok, what next?
+
+## Copilot
+
+Next: **finish CHECKS option `1` properly.**
+
+## Recommended next step
+Now that **Sales Employeeâ€™s checks** looks good, the next thing to tackle is:
+
+### CHECKS â†’ `1` â†’ **Add Checks to ledger & cash receipts**
+
+Because your DOS screenshots already showed that this flow is **not** just a lookup form. It begins with:
+
+- `***** Add A Check *****`
+- `Company Name [Q = Quit] ?`
+
+and then continues into:
+- check amount
+- invoice scan guidance
+- lowest invoice number
+- likely highest invoice number after that
+
+---
+
+## So what should happen now
+There are really **two levels** of next step:
+
+### Option A â€” immediate wiring check
+Verify whether CHECKS option `1` is already wired to open `FormAddChecks`.
+
+If not, fix that first.
+
+### Option B â€” DOS parity work
+After wiring is confirmed, redesign `FormAddChecks` so it behaves more like the DOS flow:
+- prompt-first
+- sequential
+- keyboard-centric
+- starts with **Company Name [Q = Quit] ?**
+- handles invoice-paying check flow
+- later likely supports the non-invoice / OTHER path too
+
+---
+
+## My recommendation
+The best next move is:
+
+## 1. Ensure `FormLedgerMenu.vb` option `1` opens `FormAddChecks`
+If you havenâ€™t already finalized that file, do that first.
+
+## 2. Then compare current `FormAddChecks` behavior against DOS
+We already know thereâ€™s likely a gap.
+
+The current WinForms version, based on the earlier diff, looked more like:
+- validate company code
+- show status
+- possible matches list
+
+But DOS does:
+- direct prompt for company name
+- then immediately continue the transaction flow
+
+So `FormAddChecks` is probably the next real feature to reshape.
+
+---
+
+## Concrete answer
+### What next?
+**Work on `FormAddChecks.vb`.**
+
+Specifically:
+1. verify CHECKS menu item `1` opens it
+2. compare the current WinForms screen to DOS
+3. refactor it toward the DOS prompt flow
+
+---
+
+## If you want the cleanest path
+Iâ€™d suggest this sequence:
+
+1. confirm `FormLedgerMenu.vb` current contents
+2. confirm option `1` opens `FormAddChecks`
+3. show me what `FormAddChecks` currently looks like in the VB app
+4. then we define the DOS-faithful version of that screen/flow before coding it
+
+---
+
+## Short answer
+**Next up is Add Checks.**  
+Sales Employeeâ€™s checks seems good enough to move on, so the next focus should be making CHECKS option `1` behave like DOS.
+
+## @testsubject117
+
+confirm FormLedgerMenu.vb current contents
+
+## Copilot
+
+Yes â€” please paste the current contents of `AMiOffice/FormLedgerMenu.vb`, and Iâ€™ll confirm whether option `1` is wired correctly.
+
+If you want to grab it quickly in PowerShell:
+
+```powershell
+Get-Content .\AMiOffice\FormLedgerMenu.vb
+```
+
+If itâ€™s long, paste it anyway â€” Iâ€™ll check the whole thing.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+## Copilot
+
+Confirmed: `FormLedgerMenu.vb` is currently correct for the work we intended.
+
+## Key confirmation
+Option **`1`** is wired to open `FormAddChecks`:
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                  Using f As New FormAddChecks()
+                                                                      f.ShowDialog(Me)
+                                                                  End Using
+                                                              End Sub)
+```
+
+So the CHECKS menu now does the right top-level thing:
+- **1** opens Add Checks
+- **S** opens Sales Employeeâ€™s checks
+- Sales Employee submenu behavior was separately verified
+
+---
+
+## Overall status of this file
+`FormLedgerMenu.vb` looks good as a wiring layer.
+
+### Specifically:
+- `1` â†’ `FormAddChecks`
+- `2` â†’ still placeholder
+- `3` â†’ prompt flow then `FormLedgerView`
+- `5` â†’ `FormLedgerCompanyTotals`
+- `6` / `7` â†’ still placeholders
+- `8` â†’ `FormOtherChecksView`
+- `9` â†’ `FormFindByCheckNumber`
+- `0` â†’ `FormFindByInvoiceNumber`
+- `A` â†’ `FormLedgerDoesntBalance`
+- `S` â†’ `FormSalesEmployeesChecksMenu`
+
+That is a sensible current state.
+
+---
+
+## What next
+The next task is no longer `FormLedgerMenu.vb`.
+
+The next task is now clearly:
+
+## `FormAddChecks.vb`
+because:
+- the menu wiring is in place
+- DOS screenshots showed the Add Check flow is prompt-based
+- we need to see whether the current WinForms implementation matches DOS closely enough
+
+---
+
+## Short answer
+Yes â€” `FormLedgerMenu.vb` is confirmed correct right now.  
+The next file to focus on is **`FormAddChecks.vb`**.
+
+## @testsubject117
+
+ok, what now?
+
+## Copilot
+
+Now: **test and inspect `FormAddChecks`**.
+
+## Next step
+From the app, go to:
+
+- **CHECKS**
+- press **`1`**
+
+Then tell me what the current WinForms `FormAddChecks` actually does.
+
+## What I need from you
+Ideally send either:
+- a screenshot of the `FormAddChecks` window, or
+- paste the current `FormAddChecks.vb` code
+
+## Why this is next
+Because we already know:
+- menu wiring is correct
+- DOS Add Check starts with:
+  - **`Company Name [Q = Quit] ?`**
+- then continues through a sequential entry flow
+
+So now we need to compare:
+- what WinForms currently shows
+vs
+- what DOS actually did
+
+## Most likely outcome
+I expect one of two things:
+
+### If current `FormAddChecks` is very rough
+We redesign it toward DOS prompt flow.
+
+### If itâ€™s already close enough
+We make only targeted fixes.
+
+---
+
+## Best immediate move
+Send me either:
+1. a screenshot of the current `FormAddChecks` screen in VB, or
+2. the full contents of `FormAddChecks.vb`
+
+## Short answer
+**Next up is `FormAddChecks`.**  
+Open CHECKS â†’ `1` and show me what happens.
+
+## @testsubject117
+
+so this currently doesn't appear to match the dos flow. when hitting (1) in DOS I get a screen that shows ***** Add a check **** then Company Name [Q = Quit] ? ______, but look how the vb app currently opens choice (1): 
+
+## Copilot
+
+Yes â€” that does **not** match the DOS flow.
+
+## Direct answer
+Current VB `FormAddChecks` is the wrong shape for DOS parity.
+
+### DOS does:
+- `***** Add A Check *****`
+- `Company Name [Q = Quit] ? _____`
+
+### Current VB does:
+- title: **ADD CHECKS TO CASH RECEIPTS**
+- asks for **Company Code**
+- requires **Validate**
+- shows **Status**
+- shows **Possible Matches**
+- uses a modern lookup-style workflow
+
+That is clearly different from the DOS prompt-driven transaction flow.
+
+---
+
+## What this means
+`FormLedgerMenu.vb` is fine.
+
+The problem is now specifically:
+
+## `FormAddChecks.vb` needs to be redesigned
+
+because the current implementation appears to be:
+- a validation/search helper
+- not the actual DOS Add Check entry flow
+
+---
+
+## DOS-faithful direction for `FormAddChecks`
+Based on your screenshots, the WinForms form should move toward something like:
+
+### initial state
+- title/header similar to:
+  - `***** Add A Check *****`
+- first prompt:
+  - **`Company Name [Q = Quit] ?`**
+- one input field
+- keyboard-first flow
+- no â€œValidateâ€ button
+- no â€œPossible Matchesâ€ pane
+- no large status box
+
+### then next steps
+After company entry:
+- show selected company
+- ask:
+  - **`Check Amount ?`**
+- show explanatory text:
+  - needing first/last invoice numbers for auto scan
+- ask:
+  - **lowest invoice number**
+  - then likely highest invoice number
+
+So the DOS interaction is really a **step-by-step wizard/prompt screen**, not a search dashboard.
+
+---
+
+## Recommendation
+### Keep:
+- menu wiring from `FormLedgerMenu.vb`
+
+### Replace/rework:
+- `FormAddChecks.vb`
+
+---
+
+## Best next move
+I need the actual current code for `FormAddChecks.vb`.
+
+Please paste the full contents of:
+
+- `AMiOffice/FormAddChecks.vb`
+
+Then I can tell you whether:
+- it should be minimally edited
+- or whether it should be replaced outright with a DOS-style sequential prompt form
+
+## Short answer
+Youâ€™re right: **current `FormAddChecks` does not match DOS.**  
+The next task is to rewrite `FormAddChecks.vb` toward the DOS prompt flow.
+
+## @testsubject117
+
+yes, in DOS I just entered PSIBEARI for company name and hit enter, it now jumps to Check Amount? as a test I input .10 and hit enter. it now goes to a screen that says "I need the 1st and last invoice numbers so I can automatically scan for invoices. Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?
+
+## Copilot
+
+Perfect â€” that confirms the DOS flow very clearly.
+
+## Confirmed DOS sequence
+For **CHECKS â†’ 1**, DOS currently does:
+
+1. **`***** Add A Check *****`**
+2. **`Company Name [Q = Quit] ?`**
+3. user enters company name, e.g. `PSIBEARI`
+4. next prompt:
+   - **`Check Amount ?`**
+5. user enters amount, e.g. `.10`
+6. next screen/prompt:
+   - **`I need the 1st and last invoice numbers so I can automatically scan for invoices.`**
+   - **`Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?`**
+
+That means this is unquestionably a **sequential prompt workflow**.
+
+---
+
+## So now we know the exact problem
+The current VB `FormAddChecks` is wrong in structure because it assumes:
+- company code validation
+- possible match list
+- explicit validate action
+
+But DOS does:
+- freeform company name entry
+- immediate progression on Enter
+- then amount
+- then invoice-range prompts
+
+---
+
+## What should happen next
+We should now rebuild `FormAddChecks.vb` to match this flow.
+
+## Target behavior for the first version
+At minimum, the new WinForms version should support:
+
+### Step 1
+Prompt:
+- **Company Name [Q = Quit] ?**
+
+### Step 2
+Prompt:
+- **Check Amount ?**
+
+### Step 3
+Display:
+- **I need the 1st and last invoice numbers so I can automatically scan for invoices.**
+
+Prompt:
+- **Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?**
+
+### Step 4
+Likely next:
+- ask for the **highest** invoice number
+
+---
+
+## Important note
+We do **not** yet have to implement the whole business logic perfectly in one jump.
+
+A good next milestone would be:
+- make the screen flow match DOS
+- preserve entered values
+- support Enter-driven progression
+- support quit/cancel behavior
+- then hook up invoice scanning logic after the UI flow is correct
+
+---
+
+## What I need next
+Please paste the full current contents of:
+
+- `AMiOffice/FormAddChecks.vb`
+
+Once I see that, I can tell you whether to:
+- surgically replace the existing logic, or
+- fully replace the file with a DOS-style prompt form
+
+## Short answer
+Great â€” that confirms the DOS Add Check flow is a strict prompt sequence:
+**Company Name â†’ Check Amount â†’ Lowest Invoice prompt**.  
+So the next task is definitely to rewrite `FormAddChecks.vb` around that flow.
+
+## @testsubject117
+
+oh, and also, I noticed that the dos screen says Company Name, but the vb app says Company Code: on the add checks to receipts window
+
+## Copilot
+
+Yes â€” thatâ€™s another clear mismatch.
+
+## Direct answer
+The VB app should **not** say **`Company Code:`** there if the DOS screen says:
+
+**`Company Name [Q = Quit] ?`**
+
+That means the current form is wrong in both:
+
+- **labeling**
+- **interaction model**
+
+---
+
+## Why this matters
+This is not just cosmetic.
+
+### DOS expects:
+- operator enters a **company name**
+- likely freeform legacy company identifier/name text
+- immediate Enter-based progression
+
+### Current VB assumes:
+- operator enters a **company code**
+- then validates it
+- possibly selects from matches
+
+Thatâ€™s a different workflow entirely.
+
+---
+
+## So the current `FormAddChecks` has at least three parity problems
+1. wrong field label  
+   - `Company Code:` should be conceptually replaced by DOS-style company-name prompt
+
+2. wrong screen structure  
+   - modern search/validate form vs prompt flow
+
+3. wrong progression  
+   - DOS advances immediately from company name to check amount
+
+---
+
+## Practical conclusion
+When we redo `FormAddChecks.vb`, the first prompt should be built around:
+
+**`Company Name [Q = Quit] ?`**
+
+not:
+- `Company Code:`
+- not â€œPossible Matchesâ€
+- not â€œValidateâ€
+
+---
+
+## Short answer
+Correct â€” thatâ€™s another confirmed DOS mismatch.  
+`FormAddChecks` should prompt for **Company Name**, not **Company Code**.
+
+## @testsubject117
+
+ok, can we fix it to match the dos workflow?
+
+## Copilot
+
+Yes â€” we can fix it.
+
+Please paste the full current contents of `AMiOffice/FormAddChecks.vb`, and Iâ€™ll give you the correct full replacement file to make it follow the DOS workflow:
+
+- `***** Add A Check *****`
+- `Company Name [Q = Quit] ?`
+- `Check Amount ?`
+- invoice auto-scan explanation
+- `Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?`
+
+Once I see the file, I can produce a clean full-file replacement instead of guessing around the existing structure.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Collections.Generic
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblPrompt As Label
+    Private txtCompanyCode As TextBox
+    Private btnValidate As Button
+    Private btnContinue As Button
+    Private btnCancel As Button
+    Private lblStatusCaption As Label
+    Private lblStatus As Label
+    Private lblMatches As Label
+    Private lstMatches As ListBox
+
+    Private _lookup As CompanyLookupService
+    Private _selectedCompany As CompanyInfo
+
+    Public ReadOnly Property SelectedCompany As CompanyInfo
+        Get
+            Return _selectedCompany
+        End Get
+    End Property
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Try
+            Dim realNamePath As String = "\\invoice\MainMenu\Data\REALNAME.DAT"
+
+            _lookup = New CompanyLookupService(realNamePath)
+            _lookup.LoadData()
+
+            lblStatus.Text = "Enter company code."
+            txtCompanyCode.Focus()
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load company data." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            "Add Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+            lblStatus.Text = "Company data could not be loaded."
+            btnValidate.Enabled = False
+            btnContinue.Enabled = False
+        End Try
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add Checks"
+        Me.StartPosition = FormStartPosition.CenterScreen
+        Me.Size = New Size(760, 520)
+        Me.MinimumSize = New Size(760, 520)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.Lime
+        Me.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "ADD CHECKS TO CASH RECEIPTS"
+        lblTitle.TextAlign = ContentAlignment.MiddleCenter
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Bold)
+        lblTitle.ForeColor = Color.Yellow
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(40, 20, 660, 35)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = "Company Code:"
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.Lime
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(60, 90, 140, 28)
+
+        txtCompanyCode = New TextBox()
+        txtCompanyCode.CharacterCasing = CharacterCasing.Upper
+        txtCompanyCode.BorderStyle = BorderStyle.FixedSingle
+        txtCompanyCode.Font = New Font("Consolas", 12.0!, FontStyle.Bold)
+        txtCompanyCode.SetBounds(210, 90, 180, 28)
+        txtCompanyCode.MaxLength = 8
+
+        btnValidate = New Button()
+        btnValidate.Text = "Validate"
+        btnValidate.SetBounds(420, 88, 110, 32)
+        AddHandler btnValidate.Click, AddressOf btnValidate_Click
+
+        btnContinue = New Button()
+        btnContinue.Text = "Continue"
+        btnContinue.SetBounds(540, 88, 110, 32)
+        btnContinue.Enabled = False
+        AddHandler btnContinue.Click, AddressOf btnContinue_Click
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(540, 430, 110, 32)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        lblStatusCaption = New Label()
+        lblStatusCaption.AutoSize = False
+        lblStatusCaption.Text = "Status:"
+        lblStatusCaption.TextAlign = ContentAlignment.MiddleLeft
+        lblStatusCaption.ForeColor = Color.Aqua
+        lblStatusCaption.BackColor = Color.Black
+        lblStatusCaption.SetBounds(60, 145, 80, 28)
+
+        lblStatus = New Label()
+        lblStatus.AutoSize = False
+        lblStatus.Text = ""
+        lblStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblStatus.ForeColor = Color.White
+        lblStatus.BackColor = Color.Black
+        lblStatus.BorderStyle = BorderStyle.FixedSingle
+        lblStatus.SetBounds(140, 145, 510, 28)
+
+        lblMatches = New Label()
+        lblMatches.AutoSize = False
+        lblMatches.Text = "Possible Matches:"
+        lblMatches.TextAlign = ContentAlignment.MiddleLeft
+        lblMatches.ForeColor = Color.Aqua
+        lblMatches.BackColor = Color.Black
+        lblMatches.SetBounds(60, 200, 180, 28)
+
+        lstMatches = New ListBox()
+        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        lstMatches.HorizontalScrollbar = True
+        lstMatches.SetBounds(60, 230, 590, 180)
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtCompanyCode)
+        Me.Controls.Add(btnValidate)
+        Me.Controls.Add(btnContinue)
+        Me.Controls.Add(btnCancel)
+        Me.Controls.Add(lblStatusCaption)
+        Me.Controls.Add(lblStatus)
+        Me.Controls.Add(lblMatches)
+        Me.Controls.Add(lstMatches)
+    End Sub
+
+    Private Sub btnValidate_Click(sender As Object, e As EventArgs)
+        ValidateCompany()
+    End Sub
+
+    Private Sub btnContinue_Click(sender As Object, e As EventArgs)
+        If _selectedCompany Is Nothing Then
+            MessageBox.Show("Please validate a company first.",
+                            "Add Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Exit Sub
+        End If
+
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        _selectedCompany = Nothing
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        If lstMatches.SelectedItem Is Nothing Then Exit Sub
+
+        Dim selectedText As String = lstMatches.SelectedItem.ToString()
+        If selectedText Is Nothing Then Exit Sub
+
+        Dim parts() As String = selectedText.Split("-"c)
+        If parts.Length > 0 Then
+            txtCompanyCode.Text = parts(0).Trim()
+            ValidateCompany()
+        End If
+    End Sub
+
+    Private Sub ValidateCompany()
+        If _lookup Is Nothing Then Exit Sub
+
+        lstMatches.Items.Clear()
