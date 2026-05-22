@@ -1,0 +1,136 @@
+﻿  - [ ] `(0) Find an Invoice #`
+  - [ ] `(A) Find checks that don't balance`
+- [ ] Reconfirm that Copy Row / Export CSV / Filter still work cleanly on `(A)`
+
+# 8. Highest Priority Next Steps
+1. Fix the post-compute **â€œComputing...â€** status cleanup in `FormLedgerDoesntBalance`
+2. Restore the lost **build counter** text-file increment mechanism
+3. Standardize the **CHECKS** title font to match Main Menu / Checks Menu exactly
+4. Ask users what DOS `(A)` was expected to do
+5. Decide whether `(A)` remains a VB enhancement or eventually gets a parity redesign
+6. Lock down/document the publish workflow in the rebuilt environment
+
+# 9. Known Risks / Blockers / Questions
+- DOS VM currently appears to do nothing for `(A)`, so parity target is uncertain
+- User expectation for `(A)` still needs confirmation
+- Current VB behavior may be better than DOS ever was, but that may or may not be desirable depending on stakeholder priorities
+- Title font is still inconsistent across DOS-styled screens
+- Build/versioning continuity is at risk until the build counter is restored
+- The rebuilt development environment may still be missing prior publish/version automation pieces
+- If deployment later targets unmanaged workstations, runtime packaging choices may still need further testing
+
+# 10. Future Chat Reload Pack
+Project: AMi modernization/continuation work across AMiWinForms with legacy DOS behavior as baseline; AMiDataStore/file-reader dependencies underpin many workflows. Core rule: VB should match DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decide otherwise.
+
+Todayâ€™s main file: `FormLedgerDoesntBalance.vb` for Checks menu item `(A) Find checks that don't balance`. Logic already existed and was kept. Important methods/classes reviewed: `RunReportAsync()`, `ComputeRows(...)`, `ApplyFilterAndBind()`, `dgv_RowPrePaint`, `BuildKey(...)`, `BalanceRow`, `FilterMode`, `ProgressInfo`. Logic reads `LEDGER.CUR`, `CHECK.INV`, `INVOICE.CHK` through `LedgerCurReader`, `CheckInvReader`, `InvoiceChkReader`, and uses `LegacyDataPaths.*`. Business rule preserved: `Tolerance = 1D`.
+
+Todayâ€™s decisions:
+- keep current VB logic for `(A)` even though DOS VM currently appears to do nothing, because user confirmation is pending and the VB screen is useful
+- restyle the form instead of redesigning the workflow today
+
+Work done:
+- dark DOS-like header/theme added
+- upper-left yellow `CHECKS`
+- upper-right clock
+- silver buttons
+- dark grid
+- `(ESC) Close`
+- Esc key closes form
+- two-line progress area for `Computing rows...` + count
+- regular-weight grid body text
+- lighter pale yellow and soft milky pink result row colors
+- fixed ambiguous timer issue using `System.Windows.Forms.Timer`
+
+Known remaining issues:
+- after results load, part of old `Computing...` status still remains; clean that up tomorrow
+- top-left title font still does not exactly match Main Menu / Checks Menu Castellar/Castella-style font
+- restore build counter text-file increment system lost after crash/rebuild
+- ask users whether DOS `(A)` ever really worked / what expected behavior is
+
+Publishing:
+- operator wants copy-to-workstation standalone executable
+- do not use ClickOnce
+- use Folder publish
+- current build was published and tested on VM and looks good
+
+# 11. Shorthand Operator Notes
+- [ ] Fix lingering `Computing...` status after report finishes
+- [ ] Restore build counter text-file setup
+- [ ] Match top-left title font to Main Menu / Checks Menu
+- [ ] Ask users whether DOS `(A)` ever actually worked
+- [ ] Keep current yellow/pink colors â€” approved
+- [ ] Current VM build looks good
+- [ ] Publish path = Folder publish, not ClickOnce
+
+# 12. Roadmap: Past -> Present -> Next
+## Where we were
+The Checks workflow modernization was already mostly in place, but `(A) Find checks that don't balance` still looked visually out of place compared to the rest of the DOS-inspired application.
+
+## What changed today
+- `FormLedgerDoesntBalance` was visually restyled
+- progress display was improved
+- timer ambiguity bug was fixed
+- body text boldness was corrected
+- row colors were tuned and finalized
+- publish guidance was clarified
+- build was published and tested on the VM
+
+## Where we are now
+The current build is in a strong publishable state. `(A)` is useful, visually acceptable, and integrated enough to ship, with only minor polish and validation items remaining.
+
+## What comes next
+- clean post-compute status text
+- restore build counter
+- standardize title font
+- validate DOS/user expectation for `(A)`
+
+## What success looks like
+- all active Checks screens look and behave consistently
+- title/header styling is unified
+- build/versioning automation is restored
+- DOS parity decisions for `(A)` are confirmed rather than guessed
+- future releases can be published repeatably from the rebuilt environment
+
+# 13. First Thing Tomorrow
+- [ ] Reopen `FormLedgerDoesntBalance.vb`
+- [ ] Fix the lingering/truncated post-compute `Computing...` status behavior
+- [ ] Restore the build-counter text-file increment mechanism
+- [ ] Pull the exact title-font code from Main Menu / Checks Menu and apply it here
+- [ ] Ask users what DOS `(A)` was expected to do
+- [ ] Decide whether `(A)` remains a useful VB enhancement or becomes a future parity rewrite
+
+
+===== END IMPORTED EXPORT =====
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
