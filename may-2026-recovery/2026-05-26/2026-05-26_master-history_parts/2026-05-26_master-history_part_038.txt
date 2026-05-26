@@ -1,0 +1,2000 @@
+﻿                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+                If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
+            End If
+
+            If seen >= 200 Then Exit For
+        Next
+
+        Return $"Lines scanned: {seen}" & Environment.NewLine &
+           $"Header lines (start with quote): {headers}" & Environment.NewLine &
+           $"Non-header lines: {invLines}" & Environment.NewLine &
+           $"Non-header lines containing commas: {invLinesWithCommas}" & Environment.NewLine &
+           $"Non-header lines containing quotes: {invLinesThatLookQuoted}"
+    End Function
+    Private Shared Function ParseHeader(line As String) As CheckInvBlock
+        ' Example:
+        ' "NATAIRCR","8508","4","01-03-1995",196.75,4
+        Dim parts As List(Of String) = SplitBasicWriteLine(line)
+
+        Dim b As New CheckInvBlock() With {
+            .CustomerCode = GetPart(parts, 0),
+            .CheckNumber = GetPart(parts, 1),
+            .SalesmanCode = GetPart(parts, 2),
+            .DateText = GetPart(parts, 3),
+            .Amount = ParseDecimal(GetPart(parts, 4)),
+            .InvoiceCount = ParseInt(GetPart(parts, 5)),
+            .Invoices = New List(Of String)()
+        }
+
+        Return b
+    End Function
+
+    Private Shared Function CleanLine(s As String) As String
+        If s Is Nothing Then Return ""
+        Return s.Replace(ChrW(26), "").Trim()
+    End Function
+
+    Private Shared Function NormalizeInvoiceToken(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t = s.Replace(ChrW(26), "").Trim()
+
+        ' Some legacy files may quote invoice numbers even on "invoice lines"
+        ' SplitBasicWriteLine already unquotes, but for safety:
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2).Trim()
+        End If
+
+        ' Optional normalization that often matches legacy: collapse internal spaces
+        ' (keep it conservative to avoid changing real invoice formats)
+        t = t.Replace(vbTab, " ")
+        While t.Contains("  ", StringComparison.Ordinal)
+            t = t.Replace("  ", " ")
+        End While
+
+        Return t
+    End Function
+
+    Private Shared Function GetPart(parts As List(Of String), idx As Integer) As String
+        If parts Is Nothing OrElse idx < 0 OrElse idx >= parts.Count Then Return ""
+        Return If(parts(idx), "").Trim()
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+
+    Private Shared Function ParseInt(s As String) As Integer
+        If s Is Nothing Then Return 0
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim n As Integer
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, n) Then Return n
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then Return n
+        Return 0
+    End Function
+
+    ' Robust parser for GW-BASIC WRITE# "CSV-ish" lines:
+    ' - quoted strings allowed
+    ' - embedded quotes written as "" inside quoted strings
+    ' - numeric fields unquoted
+    Private Shared Function SplitBasicWriteLine(line As String) As List(Of String)
+        Dim result As New List(Of String)()
+        If line Is Nothing Then Return result
+
+        Dim sb As New StringBuilder()
+        Dim inQuotes As Boolean = False
+        Dim i As Integer = 0
+
+        While i < line.Length
+            Dim ch As Char = line(i)
+
+            If inQuotes Then
+                If ch = """"c Then
+                    ' Doubled quote => literal quote
+                    If i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 2
+                        Continue While
+                    Else
+                        inQuotes = False
+                        i += 1
+                        Continue While
+                    End If
+                Else
+                    sb.Append(ch)
+                    i += 1
+                    Continue While
+                End If
+            Else
+                If ch = """"c Then
+                    inQuotes = True
+                    i += 1
+                    Continue While
+                End If
+
+                If ch = ","c Then
+                    result.Add(sb.ToString().Trim())
+                    sb.Clear()
+                    i += 1
+                    Continue While
+                End If
+
+                sb.Append(ch)
+                i += 1
+            End If
+        End While
+
+        result.Add(sb.ToString().Trim())
+        Return result
+    End Function
+End Class
+
+Public Class CheckInvBlock
+    Public Property CustomerCode As String
+    Public Property CheckNumber As String
+    Public Property SalesmanCode As String
+    Public Property DateText As String
+    Public Property Amount As Decimal
+    Public Property InvoiceCount As Integer
+    Public Property Invoices As List(Of String)
+End Class
+```
+CheckInvReader.vb: 
+
+## Copilot
+
+Keep your existing `CheckInvReader.vb` â€” it already does the job.
+
+## Direct answer
+You **should not replace** this file with the simpler reader I suggested earlier.
+
+Your existing `CheckInvReader.vb` is actually **better** for this project because it already handles:
+
+- GW-BASIC `WRITE#`-style header parsing
+- multi-value invoice lines
+- quoted/unquoted values
+- defensive malformed-data handling
+- variable-length records
+
+Thatâ€™s useful for legacy files like `CHECK.INV`.
+
+---
+
+## What this means
+You currently have:
+
+- `CheckInvReader`
+- `CheckInvBlock`
+
+and you also created:
+
+- `CheckInvRecord`
+
+So right now you likely have **two data models for the same concept**.
+
+### That is not ideal.
+You should standardize on **one**.
+
+---
+
+## Best choice
+Use your **existing** model already built around the real reader:
+
+- keep `CheckInvReader`
+- keep `CheckInvBlock`
+- **delete `CheckInvRecord.vb`**
+
+Because:
+- `CheckInvReader.ReadAll()` returns `List(Of CheckInvBlock)`
+- that means `CheckInvBlock` is already the active model
+- creating `CheckInvRecord` just duplicates the concept unnecessarily
+
+---
+
+## So do this now
+### Delete:
+- `CheckInvRecord.vb`
+
+### Keep:
+- `CheckInvReader.vb`
+- `CheckInvBlock` inside that file for now
+
+---
+
+## Small note on naming
+Your old file uses:
+- `CustomerCode`
+- `SalesmanCode`
+- `Invoices As List(Of String)`
+
+Thatâ€™s okay for now, even if we later rename/refactor it.
+
+The important thing is to avoid maintaining two competing record classes.
+
+---
+
+## Next thing I need
+Now paste:
+
+- **`LegacyDataPaths.vb`**
+
+Then Iâ€™ll give you the exact next step for wiring in `CHECK.INV`.
+
+And after that, Iâ€™ll help you create a matching **`CheckInvWriter.vb`** that fits your existing `CheckInvBlock` model.
+
+## @testsubject117
+
+```
+' LegacyDataPaths.vb  (Add as Class, NOT a form)
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+
+Public NotInheritable Class LegacyDataPaths
+    Private Sub New()
+    End Sub
+
+    Public Shared ReadOnly Property BaseDataDir As String = "\\invoice\MainMenu\Data"
+
+    Public Shared ReadOnly Property LedgerCur As String =
+        Path.Combine(BaseDataDir, "LEDGER.CUR")
+    Public Shared ReadOnly Property CheckInv As String = Path.Combine(BaseDataDir, "CHECK.INV")
+    Public Shared ReadOnly Property InvoiceChk As String = Path.Combine(BaseDataDir, "INVOICE.CHK")
+    Public Shared ReadOnly Property OtherChk As String = Path.Combine(BaseDataDir, "OTHER.CHK")
+    Public Shared ReadOnly Property EmpNameDat As String = Path.Combine(BaseDataDir, "EMPNAME.DAT")
+End Class
+```
+
+## Copilot
+
+Perfect â€” `LegacyDataPaths.vb` is fine, and you already have the important paths:
+
+- `LedgerCur`
+- `CheckInv`
+- `InvoiceChk`
+
+## Direct answer
+Your next step should be to add a **`CheckInvWriter.vb`** that matches your existing `CheckInvReader.vb` / `CheckInvBlock` model.
+
+Use this as a new **Class** file:
+
+```vbnet name=CheckInvWriter.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, records As IEnumerable(Of CheckInvBlock))
+        Dim lines As New List(Of String)()
+
+        For Each record As CheckInvBlock In records
+            lines.Add(BuildHeaderLine(record))
+
+            If record.Invoices IsNot Nothing Then
+                For Each invoice As String In record.Invoices
+                    lines.Add(If(invoice, "").Trim())
+                Next
+            End If
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, record As CheckInvBlock)
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            sw.WriteLine(BuildHeaderLine(record))
+
+            If record.Invoices IsNot Nothing Then
+                For Each invoice As String In record.Invoices
+                    sw.WriteLine(If(invoice, "").Trim())
+                Next
+            End If
+        End Using
+    End Sub
+
+    Private Shared Function BuildHeaderLine(record As CheckInvBlock) As String
+        Dim invoiceCount As Integer = 0
+        If record.Invoices IsNot Nothing Then
+            invoiceCount = record.Invoices.Count
+        End If
+
+        Return String.Join(",",
+            Quote(record.CustomerCode),
+            Quote(record.CheckNumber),
+            Quote(record.SalesmanCode),
+            Quote(record.DateText),
+            record.Amount.ToString(CultureInfo.InvariantCulture),
+            invoiceCount.ToString(CultureInfo.InvariantCulture))
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", """""")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+## Important cleanup
+Since your existing reader already uses `CheckInvBlock`, I recommend:
+
+### delete:
+- `CheckInvRecord.vb`
+
+That avoids duplicate models.
+
+---
+
+## After you add `CheckInvWriter.vb`
+The next thing we should do is update **`FormAddChecks.vb`** so when a check is saved, it also appends a `CHECK.INV` record.
+
+Because right now:
+- `LEDGER.CUR` is updated
+- `CHECK.INV` is not yet updated
+
+---
+
+## Before I give that patch
+I need to know one thing:
+
+### Does your current `FormAddChecks.vb` still only collect:
+- lowest invoice
+- highest invoice
+- but not actually build/store the invoice list?
+
+From the version you pasted earlier, that looked true.
+
+If so, the first practical version of `CHECK.INV` writing will probably be:
+
+- if user enters `-1`, write a record with **0 invoices**
+- if user enters low/high, create a simple invoice range list for now
+
+That may not be perfect DOS behavior yet, but it gives you the file linkage structure.
+
+---
+
+## Next message
+Paste your **current `FormAddChecks.vb`** again, and Iâ€™ll give you the exact edit to make it write `CHECK.INV` too.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblLine6 As Label
+    Private lblLine7 As Label
+    Private lblLine8 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+    Private enteredDateText As String
+    Private enteredCheckReference As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.SetBounds(24, 80, 920, 28)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.SetBounds(24, 112, 920, 28)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.SetBounds(24, 144, 920, 28)
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.SetBounds(24, 176, 920, 28)
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.SetBounds(24, 208, 920, 28)
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+
+        lblLine6 = New Label()
+        lblLine6.AutoSize = False
+        lblLine6.SetBounds(24, 240, 920, 28)
+        lblLine6.ForeColor = Color.White
+        lblLine6.BackColor = Color.Black
+
+        lblLine7 = New Label()
+        lblLine7.AutoSize = False
+        lblLine7.SetBounds(24, 272, 920, 28)
+        lblLine7.ForeColor = Color.White
+        lblLine7.BackColor = Color.Black
+
+        lblLine8 = New Label()
+        lblLine8.AutoSize = False
+        lblLine8.SetBounds(24, 304, 920, 28)
+        lblLine8.ForeColor = Color.White
+        lblLine8.BackColor = Color.Black
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.SetBounds(24, 372, 920, 28)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 407, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(820, 540, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblLine6)
+        Me.Controls.Add(lblLine7)
+        Me.Controls.Add(lblLine8)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+        lblLine6.Text = ""
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub ShowInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub HideInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub PopulateReviewLines()
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+        lblLine6.Text = "(Q) Quit to Main Menu"
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub PopulateEntrySummaryLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        lblLine8.Text = "Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ? " & enteredDateText
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        ShowInputPrompt("Company Name [Q = Quit] ?")
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        ShowInputPrompt("Check Amount ?")
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        ShowInputPrompt("Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?")
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        ShowInputPrompt("Enter the HIGHEST invoice number to be paid ?")
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+        PopulateReviewLines()
+        HideInputPrompt("")
+    End Sub
+
+    Private Sub ShowCheckNumberPrompt()
+        currentStep = 6
+        ClearLines()
+        PopulateReviewLines()
+        ShowInputPrompt("Check # (Top Right)?")
+    End Sub
+
+    Private Sub ShowDatePrompt()
+        currentStep = 7
+        ClearLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        ShowInputPrompt("Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ?")
+    End Sub
+
+    Private Sub ShowCheckReferencePrompt()
+        currentStep = 8
+        ClearLines()
+        PopulateEntrySummaryLines()
+        ShowInputPrompt("Check Reference (numbers on bottom right of check) ?")
+    End Sub
+
+    Private Sub ShowEverythingCorrectPrompt()
+        currentStep = 9
+        ClearLines()
+        PopulateEntrySummaryLines()
+        lblPrompt.Text = "Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]"
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub FinishFlow()
+        SaveCheckToLedgerCur()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub SaveCheckToLedgerCur()
+        Dim amountValue As Decimal = 0D
+        Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+
+        Dim entry As New LedgerEntry()
+        entry.Customer = enteredCompany
+        entry.DateText = enteredDateText
+        entry.CheckNumber = enteredCheckNumber
+        entry.InvoiceDiffText = "0"
+        entry.Amount = amountValue
+        entry.Reference = enteredCheckReference
+
+        LedgerCurWriter.Append(LegacyDataPaths.LedgerCur, entry)
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If e.KeyCode = Keys.C Then
+                ShowCheckNumberPrompt()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.P Then
+                MessageBox.Show("Print list of invoices is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.Q Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If currentStep = 9 Then
+            If e.KeyCode = Keys.Y Then
+                FinishFlow()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.N Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D1 OrElse e.KeyCode = Keys.NumPad1 Then
+                MessageBox.Show("Discount flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D2 OrElse e.KeyCode = Keys.NumPad2 Then
+                MessageBox.Show("Debit flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            ShowDatePrompt()
+            Return
+        End If
+
+        If currentStep = 7 Then
+            If value = "" Then
+                enteredDateText = DateTime.Now.ToString("MM-dd-yyyy")
+            Else
+                enteredDateText = value
+            End If
+
+            ShowCheckReferencePrompt()
+            Return
+        End If
+
+        If currentStep = 8 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckReference = value
+            ShowEverythingCorrectPrompt()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this is enough to wire in `CHECK.INV` now.
+
+## Direct answer
+Update `FormAddChecks.vb` so that when you save a check, it writes to **both**:
+
+- `LEDGER.CUR`
+- `CHECK.INV`
+
+Since your current UI only captures:
+- lowest invoice
+- highest invoice
+- or `-1`
+
+the most practical first step is:
+
+- if lowest invoice = `-1` â†’ write **0 invoices**
+- otherwise build a simple inclusive invoice range from lowest to highest
+
+That wonâ€™t yet be full DOS â€œauto-scanâ€ behavior, but it restores the basic cross-reference file.
+
+---
+
+# Replace your current `FormAddChecks.vb` with this
+```vbnet name=FormAddChecks.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblLine6 As Label
+    Private lblLine7 As Label
+    Private lblLine8 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+    Private enteredDateText As String
+    Private enteredCheckReference As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.SetBounds(24, 80, 920, 28)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.SetBounds(24, 112, 920, 28)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.SetBounds(24, 144, 920, 28)
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.SetBounds(24, 176, 920, 28)
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.SetBounds(24, 208, 920, 28)
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+
+        lblLine6 = New Label()
+        lblLine6.AutoSize = False
+        lblLine6.SetBounds(24, 240, 920, 28)
+        lblLine6.ForeColor = Color.White
+        lblLine6.BackColor = Color.Black
+
+        lblLine7 = New Label()
+        lblLine7.AutoSize = False
+        lblLine7.SetBounds(24, 272, 920, 28)
+        lblLine7.ForeColor = Color.White
+        lblLine7.BackColor = Color.Black
+
+        lblLine8 = New Label()
+        lblLine8.AutoSize = False
+        lblLine8.SetBounds(24, 304, 920, 28)
+        lblLine8.ForeColor = Color.White
+        lblLine8.BackColor = Color.Black
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.SetBounds(24, 372, 920, 28)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 407, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(820, 540, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblLine6)
+        Me.Controls.Add(lblLine7)
+        Me.Controls.Add(lblLine8)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+        lblLine6.Text = ""
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub ShowInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub HideInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub PopulateReviewLines()
+        Dim invoiceCount As Integer = BuildInvoiceList().Count
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { " & invoiceCount.ToString() & " Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+        lblLine6.Text = "(Q) Quit to Main Menu"
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub PopulateEntrySummaryLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        lblLine8.Text = "Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ? " & enteredDateText
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        ShowInputPrompt("Company Name [Q = Quit] ?")
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        ShowInputPrompt("Check Amount ?")
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        ShowInputPrompt("Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?")
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        ShowInputPrompt("Enter the HIGHEST invoice number to be paid ?")
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+        PopulateReviewLines()
+        HideInputPrompt("")
+    End Sub
+
+    Private Sub ShowCheckNumberPrompt()
+        currentStep = 6
+        ClearLines()
+        PopulateReviewLines()
+        ShowInputPrompt("Check # (Top Right)?")
+    End Sub
+
+    Private Sub ShowDatePrompt()
+        currentStep = 7
+        ClearLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        ShowInputPrompt("Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ?")
+    End Sub
+
+    Private Sub ShowCheckReferencePrompt()
+        currentStep = 8
+        ClearLines()
+        PopulateEntrySummaryLines()
+        ShowInputPrompt("Check Reference (numbers on bottom right of check) ?")
+    End Sub
+
+    Private Sub ShowEverythingCorrectPrompt()
+        currentStep = 9
+        ClearLines()
+        PopulateEntrySummaryLines()
+        lblPrompt.Text = "Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]"
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub FinishFlow()
+        SaveCheck()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub SaveCheck()
+        Dim amountValue As Decimal = 0D
+        Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+
+        Dim entry As New LedgerEntry()
+        entry.Customer = enteredCompany
+        entry.DateText = enteredDateText
+        entry.CheckNumber = enteredCheckNumber
+        entry.InvoiceDiffText = "0"
+        entry.Amount = amountValue
+        entry.Reference = enteredCheckReference
+
+        LedgerCurWriter.Append(LegacyDataPaths.LedgerCur, entry)
+
+        Dim block As New CheckInvBlock()
+        block.CustomerCode = enteredCompany
+        block.CheckNumber = enteredCheckNumber
+        block.SalesmanCode = enteredCheckReference
+        block.DateText = enteredDateText
+        block.Amount = amountValue
+        block.Invoices = BuildInvoiceList()
+        block.InvoiceCount = block.Invoices.Count
+
+        CheckInvWriter.Append(LegacyDataPaths.CheckInv, block)
+    End Sub
+
+    Private Function BuildInvoiceList() As List(Of String)
+        Dim results As New List(Of String)()
+
+        If enteredLowestInvoice Is Nothing Then
+            Return results
+        End If
+
+        If enteredLowestInvoice.Trim() = "-1" Then
+            Return results
+        End If
+
+        Dim lowValue As Integer
+        If Not Integer.TryParse(enteredLowestInvoice.Trim(), lowValue) Then
+            Return results
+        End If
+
+        Dim highValue As Integer = lowValue
+        If enteredHighestInvoice IsNot Nothing AndAlso enteredHighestInvoice.Trim() <> "" Then
+            Integer.TryParse(enteredHighestInvoice.Trim(), highValue)
+        End If
+
+        If highValue < lowValue Then
+            Dim temp As Integer = lowValue
+            lowValue = highValue
+            highValue = temp
+        End If
+
+        For i As Integer = lowValue To highValue
+            results.Add(i.ToString(CultureInfo.InvariantCulture))
+        Next
+
+        Return results
+    End Function
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If e.KeyCode = Keys.C Then
+                ShowCheckNumberPrompt()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.P Then
+                MessageBox.Show("Print list of invoices is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.Q Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If currentStep = 9 Then
+            If e.KeyCode = Keys.Y Then
+                FinishFlow()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.N Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D1 OrElse e.KeyCode = Keys.NumPad1 Then
+                MessageBox.Show("Discount flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D2 OrElse e.KeyCode = Keys.NumPad2 Then
+                MessageBox.Show("Debit flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                enteredHighestInvoice = ""
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            ShowDatePrompt()
+            Return
+        End If
+
+        If currentStep = 7 Then
+            If value = "" Then
+                enteredDateText = DateTime.Now.ToString("MM-dd-yyyy")
+            Else
+                enteredDateText = value
+            End If
+
+            ShowCheckReferencePrompt()
+            Return
+        End If
+
+        If currentStep = 8 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckReference = value
+            ShowEverythingCorrectPrompt()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+---
+
+## What this change does
+### When you add a check now:
+it will:
+1. append to `LEDGER.CUR`
+2. append a matching block to `CHECK.INV`
+
+### Example behavior
+If you enter:
+- lowest invoice = `100`
+- highest invoice = `102`
+
+then `CHECK.INV` will store invoices:
+- `100`
+- `101`
+- `102`
+
+If you enter:
+- `-1`
+
+then it stores:
+- zero linked invoices
+
+---
+
+## Important note
+This is a **first-pass restoration**, not full DOS parity yet.
+
+Why?
+Because the old program likely:
+- scanned actual invoice records
+- validated which invoices were open
+- updated `INVOICE.CHK`
+- computed differences
+
+This patch does **not** yet do that.
+
+But it **does** restore the missing `CHECK.INV` linkage file.
+
+---
+
+## Next test
+After replacing the file:
+
+1. build
+2. add a fake check with a small range like:
+   - lowest = `100`
+   - highest = `102`
+3. confirm:
+   - it still appears in `LEDGER.CUR`
+   - a new block appears in `CHECK.INV`
+
+---
+
+## After that
+Once you confirm `CHECK.INV` is being written correctly, the next step is:
+
+**update `FormDeleteCheck.vb` so delete also removes the matching `CHECK.INV` block**
+
+If you want, send `FormDeleteCheck.vb` next and Iâ€™ll patch that one too.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated As List(Of LedgerEntry) = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+        Thread.Sleep(750)
+    End Sub
+End Class
+```
+confirmed, it's writing to both ledger.cur and check.inv.   
+
+## Copilot
+
+Great â€” next step is to make delete remove the matching `CHECK.INV` block too.
+
+## Direct answer
+Your current `FormDeleteCheck.vb` only rewrites `LEDGER.CUR`.
+
+We should now update it so delete also:
+- removes the matching `CHECK.INV` record
+
+That will restore the second half of the legacy delete flow.
+
+---
+
+## Replace your current `FormDeleteCheck.vb` with this
+```vbnet name=FormDeleteCheck.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated As List(Of LedgerEntry) = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+
+        Dim updated As List(Of CheckInvBlock) = blocks.
+            Where(Function(x) Not CheckInvMatchesLedgerEntry(x, info)).
+            ToList()
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing Then Return False
+
+        Return String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+               block.Amount = info.Amount
+    End Function
+End Class
+```
+
+---
+
+## What this changes
+Now when you delete a check, it will:
+1. remove it from `LEDGER.CUR`
+2. remove the matching block from `CHECK.INV`
+
+So your add/delete flow will stay consistent across both files.
+
+---
+
+## What is still not implemented
+This still does **not yet** do the final legacy step:
+
+- reset linked invoices in `INVOICE.CHK` to unpaid
+
+That is the last big piece.
+
+---
+
+## Next test
+After replacing this file:
+
+1. build
+2. add a fake check with invoice range
+3. confirm it appears in:
+   - `LEDGER.CUR`
+   - `CHECK.INV`
+4. delete it
+5. confirm it disappears from:
+   - `LEDGER.CUR`
+   - `CHECK.INV`
+
+If that works, then the next step is `INVOICE.CHK`.
+
+## @testsubject117
+
+ok, I entered check #7782. I've verified it was written to ledger.cur and check.inv, however when i go to delete it now, I enter delete checks, enter the check # 7782 and it comes back with customer astromat check 7782 amount $335. this is not the correct check. the check I entered 7782 is actually for .07
+
+## Copilot
+
+That means the delete screen is finding the **first matching check number in `LEDGER.CUR`**, not necessarily the one you just added.
+
+## Direct answer
+Your current delete lookup is too loose.
+
+Right now it does this:
+
+- read all ledger entries
+- find the **first** entry where `CheckNumber = 7782`
+
+So if `LEDGER.CUR` already contains an older check `7782` for `ASTROMAT`, thatâ€™s the one it shows.
+
+Your newly added `.07` check also has number `7782`, but it appears later in the file and is being ignored.
+
+---
+
+## Why this is happening
+In your current `FormDeleteCheck.vb`, this line is the problem conceptually:
+
+```vbnet
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+That means:
+- first match wins
+- duplicates are not handled
+
+And in a legacy system like this, **check numbers are apparently not globally unique**.
+
+---
+
+## What should happen instead
+For now, the safest behavior is:
+
+### if multiple checks share the same check number
+the delete screen should show the **most recent matching one**, not the first one.
+
+Why?
+Because:
+- your newly added test check was appended
+- append means it is probably the **last** matching record
+- that makes testing and normal recent-entry correction much more reliable
+
+---
+
+## Fast fix
+Change the lookup from:
+- first matching check
+
+to:
+- **last matching check**
+
+---
+
+## Make this one change in `FormDeleteCheck.vb`
