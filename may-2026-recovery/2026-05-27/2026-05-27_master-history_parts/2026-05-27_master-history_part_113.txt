@@ -1,0 +1,2000 @@
+﻿
+### 5. Reopen Visual Studio
+
+### 6. Build again
+
+---
+
+## Why I think this is it
+Your latest Roslyn crash is not in codegen anymore â€” it is in **VB command-line/global import parsing**. That strongly points at this `<Import Include="..."/>` section.
+
+The form code you pasted looks valid.
+
+---
+
+## Secondary observation
+You also have:
+
+```xml
+<Compile Remove="FormMiscMenu.Designer.vb" />
+<EmbeddedResource Remove="FormMiscMenu.resx" />
+```
+
+That is okay **if** you want `FormMiscMenu` to be code-only, which I think is the right approach here.
+
+So that part is actually fine.
+
+---
+
+## Best cleaned-up plan
+For `FormMiscMenu`, keep:
+- `FormMiscMenu.vb`
+
+Remove from compile:
+- `FormMiscMenu.Designer.vb`
+- `FormMiscMenu.resx`
+
+And remove the project global-import block above.
+
+---
+
+## If build still crashes after that
+Then next suspect is the SDK / compiler itself, especially since you're on:
+
+- `.NET SDK 10.0.300`
+
+If needed, the fallback would be:
+- try building under an earlier SDK if installed
+- or pin SDK with `global.json`
+
+But first remove the `<Import Include=...>` block, because your stack trace points right at it.
+
+## Exact edit summary
+### Remove:
+```xml
+<ItemGroup>
+  <Import Include="System" />
+  <Import Include="System.Windows.Forms" />
+  <Import Include="System.Drawing" />
+</ItemGroup>
+```
+
+### Keep:
+```xml
+<Compile Remove="FormMiscMenu.Designer.vb" />
+<EmbeddedResource Remove="FormMiscMenu.resx" />
+```
+
+## Short answer
+Yes â€” the project file likely contains the problem, and the most suspicious part is the **VB global imports block**.
+
+If you want, after you edit it, paste the updated `.vbproj` or tell me whether the build gets past the crash.
+
+## @testsubject117
+
+give me the new code to replace the project file please
+
+## Copilot
+
+Yes â€” replace your project file with this version:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Default fallback only; GenerateBuildInfo should replace this -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+    <Compile Remove="FormMiscMenu.Designer.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="FormMiscMenu.resx" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(BuildCounterFile)" Overwrite="true" Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## What changed
+I removed only this block:
+
+```xml
+<ItemGroup>
+  <Import Include="System" />
+  <Import Include="System.Windows.Forms" />
+  <Import Include="System.Drawing" />
+</ItemGroup>
+```
+
+## After you save it
+Do this next:
+
+1. close Visual Studio
+2. delete:
+   - `.vs`
+   - `bin`
+   - `obj`
+3. reopen Visual Studio
+4. rebuild
+
+## Short answer
+This is your same project file, minus the likely-bad VB global imports section.
+
+If you want, after the rebuild, tell me whether:
+- it builds cleanly
+- or it still throws the Roslyn fatal error.
+
+## @testsubject117
+
+yeah it built cleanly, but the misc menu isn't there now
+
+## Copilot
+
+Good â€” the build problem is fixed.
+
+The Misc menu likely â€œisnâ€™t thereâ€ because the project file currently excludes the designer/resx, and the main menu may not yet be wired back to open `FormMiscMenu`.
+
+## Direct fix
+You want two things true:
+
+1. main menu option **3** must open `FormMiscMenu`
+2. `FormMiscMenu.vb` must still be included in the project
+
+Your `.vbproj` is currently only removing:
+- `FormMiscMenu.Designer.vb`
+- `FormMiscMenu.resx`
+
+That is okay.
+
+So the most likely issue now is in **`FormMainMenu.vb`**.
+
+## Check this exact code
+Find the `Select Case` handling menu keys and make sure it says:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+If it still says:
+
+```vbnet
+Case "3" : NotYet("Miscellaneous Menu")
+```
+
+then the submenu wonâ€™t appear.
+
+---
+
+## Also verify the button text still exists
+Somewhere in the main menu build code, make sure you still have:
+
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+```
+
+If that line was removed, the button itself wonâ€™t show.
+
+So there are really two places to check:
+
+### 1. menu display
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+```
+
+### 2. menu action
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+---
+
+## Why this happened
+While isolating the compiler crash, we talked about temporarily reverting `3` back to `NotYet(...)`.  
+That probably got left in place.
+
+## Short answer
+The project now builds, so the remaining issue is probably just that `FormMainMenu.vb` still isnâ€™t wired back up.
+
+### Check for these:
+- `AddMenuButton(flpRight, "3", "Miscellaneous Menu")`
+- `Case "3" -> open FormMiscMenu`
+
+If you want, paste your `FormMainMenu.vb` and Iâ€™ll tell you exactly what line to change.
+
+## @testsubject117
+
+the formmainmenu.vb does contain the correct code to enable the misc menu button. the formmiscmenu.vb is part of the project again now, but I'm getting not yet implemented when i click on (3)
+
+## Copilot
+
+Then the click is reaching the **wrong handler**.
+
+If clicking `(3)` still shows **Not Yet Implemented**, but `FormMainMenu.vb` already has:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+then one of these is true:
+
+1. there is **another handler** for menu keys/buttons still mapped to `3`
+2. the visible buttonâ€™s click action was created earlier and still points to `NotYet("Miscellaneous Menu")`
+3. the main menu button-building code is wiring the button directly to `NotYet(...)` instead of using `HandleMenuKey`
+
+## Most likely cause
+Your menu buttons are probably added with something like:
+
+```vbnet
+AddMenuButton(..., "3", "Miscellaneous Menu", Sub() NotYet("Miscellaneous Menu"))
+```
+
+So:
+- keyboard `3` may use `HandleMenuKey`
+- but clicking the visible button may use the delegate attached when the button was created
+
+That would explain why clicking still gives Not Yet Implemented.
+
+---
+
+## What to check
+In `FormMainMenu.vb`, find the code that builds the buttons â€” likely in something like:
+- `BuildMainMenu()`
+- `OnLoad()`
+- or similar
+
+Look specifically for the line for button `3`.
+
+### If you find this:
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu", Sub() NotYet("Miscellaneous Menu"))
+```
+
+change it to:
+
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu", Sub() HandleMenuKey("3"))
+```
+
+or, even better if supported:
+
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu", AddressOf OpenMiscMenu)
+```
+
+with:
+
+```vbnet
+Private Sub OpenMiscMenu()
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## Best fix
+Use a dedicated method.
+
+### Add this to `FormMainMenu.vb`:
+```vbnet
+Private Sub OpenMiscMenu()
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+### Then make the button creation line:
+```vbnet
+AddMenuButton(flpRight, "3", "Miscellaneous Menu", AddressOf OpenMiscMenu)
+```
+
+And keep:
+
+```vbnet
+Case "3"
+    OpenMiscMenu()
+```
+
+That way both:
+- keyboard `3`
+- clicking the button
+
+do the same thing.
+
+---
+
+## Short answer
+The **button click delegate** is probably still wired to `NotYet(...)`, even though the keyboard handler was changed.
+
+### Find and fix the button creation line for `3`.
+
+Most likely change:
+```vbnet
+AddMenuButton(... "3", "Miscellaneous Menu", Sub() NotYet("Miscellaneous Menu"))
+```
+
+to:
+```vbnet
+AddMenuButton(... "3", "Miscellaneous Menu", AddressOf OpenMiscMenu)
+```
+
+If you want, paste the `BuildMainMenu()` part of `FormMainMenu.vb` and Iâ€™ll give you the exact replacement.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        Select Case up
+            Case "A" : NotYet("Shop Card Generator")
+            Case "B" : NotYet("Invoice Generator")
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "D" : NotYet("View Sales Journal (SALES)")
+            Case "E" : NotYet("View Log Book (LOGBOOK)")
+            Case "F" : NotYet("Price List Program (plist)")
+            Case "G" : NotYet("Print/Void Invoices (BOOT)")
+            Case "H" : NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J" : NotYet("Print Out Customers Actual Names (spool real names)")
+            Case "K" : NotYet("Cash Disbursements (BILL)")
+            Case "L" : NotYet("Business Expenses Account (password)")
+            Case "M" : NotYet("Quotation Form Generator (QUOTE)")
+            Case "N" : NotYet("Rolodex (PHONE)")
+
+            Case "O" : NotYet("Copy Spec Index")
+            Case "P" : NotYet("Entire Ledger Viewing (ENTIRE)")
+            Case "Q" : NotYet("Word Processor")
+            Case "R" : NotYet("Find Word Processor Text")
+
+            Case "T" : NotYet("Change Date or Time")
+            Case "X" : NotYet("Typewriter Mode")
+            Case "Y" : NotYet("Ed Dean's Personal Backup")
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+            Case "2" : NotYet("Product Purchasing")
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "4" : NotYet("Add Entries to Log Book")
+            Case "6" : NotYet("Cadmium Cards")
+            Case "7" : NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+here's the code for formmainmenu.vb: 
+
+## Copilot
+
+`FormMainMenu.vb` looks correct. So if `(3)` still shows **Not Yet Implemented**, then the **FormMiscMenu itself is opening**, and one of its placeholder buttons is being clicked immediately after open â€” or more likely, **youâ€™re seeing the placeholder submenu item behavior and interpreting it as the main menu action**.
+
+To make sure, hereâ€™s the correct `FormMiscMenu.vb` you should have. When `(3)` opens it, the new screen title will clearly say placeholder, and only **its internal Aâ€“F buttons** will show â€œNot Yet Implementedâ€ when clicked.
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A - Not Yet Implemented", AddressOf ShowPlaceholderA)
+        AddMenuButton(flpLeft, "B", "Placeholder Item B - Not Yet Implemented", AddressOf ShowPlaceholderB)
+        AddMenuButton(flpLeft, "C", "Placeholder Item C - Not Yet Implemented", AddressOf ShowPlaceholderC)
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D - Not Yet Implemented", AddressOf ShowPlaceholderD)
+        AddMenuButton(flpRight, "E", "Placeholder Item E - Not Yet Implemented", AddressOf ShowPlaceholderE)
+        AddMenuButton(flpRight, "F", "Placeholder Item F - Not Yet Implemented", AddressOf ShowPlaceholderF)
+    End Sub
+
+    Private Sub ShowPlaceholderA()
+        NotYet("Placeholder Item A")
+    End Sub
+
+    Private Sub ShowPlaceholderB()
+        NotYet("Placeholder Item B")
+    End Sub
+
+    Private Sub ShowPlaceholderC()
+        NotYet("Placeholder Item C")
+    End Sub
+
+    Private Sub ShowPlaceholderD()
+        NotYet("Placeholder Item D")
+    End Sub
+
+    Private Sub ShowPlaceholderE()
+        NotYet("Placeholder Item E")
+    End Sub
+
+    Private Sub ShowPlaceholderF()
+        NotYet("Placeholder Item F")
+    End Sub
+End Class
+```
+
+## Important distinction
+Expected behavior should now be:
+
+- click **`(3) Miscellaneous Menu`** on main menu  
+  â†’ opens a **new placeholder submenu form**
+
+- then click **A/B/C/D/E/F inside that submenu**  
+  â†’ shows **Not Yet Implemented**
+
+That is the behavior you asked for.
+
+## If clicking `(3)` does not open a new form at all
+Then we need to verify `FormMiscMenu` is actually the one being instantiated and that it inherits `DosMenuFormBase` correctly.
+
+## Quick proof test
+Temporarily change this line in `FormMiscMenu.vb`:
+
+```vbnet
+SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+```
+
+to something unmistakable like:
+
+```vbnet
+SetMenuTitle("TEST PLACEHOLDER MENU")
+```
+
+If clicking `(3)` opens a screen titled **TEST PLACEHOLDER MENU**, then it is working correctly.
+
+## Short answer
+`FormMainMenu.vb` is wired correctly.  
+So the intended result now is:
+
+- `(3)` opens `FormMiscMenu`
+- buttons inside `FormMiscMenu` show `Not Yet Implemented`
+
+If you want, next I can help you verify whether `FormMiscMenu` is actually opening by adding one unmistakable visual change.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbol.GetCustomAttributesToEmit(Microsoft.CodeAnalysis.VisualBasic.Emit.PEModuleBuilder)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.VisitTypeDefinitionNoMembers(Microsoft.Cci.ITypeDefinition)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.Visit(Microsoft.Cci.ITypeDefinition)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataVisitor.Visit(System.Collections.Generic.IEnumerable`1<Microsoft.Cci.INamedTypeDefinition>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexer.Visit(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.CreateIndices()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.BuildMetadataAndIL(Microsoft.Cci.PdbWriter, System.Reflection.Metadata.BlobBuilder, Microsoft.Cci.PooledBlobBuilder ByRef, Microsoft.Cci.PooledBlobBuilder ByRef, System.Reflection.Metadata.Blob ByRef, System.Reflection.Metadata.Blob ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.PeWriter.WritePeToStream(Microsoft.CodeAnalysis.Emit.EmitContext, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializePeToStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Microsoft.CodeAnalysis.RebuildData, Boolean, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializeToPeStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, EmitStreamProvider, EmitStreamProvider, EmitStreamProvider, Microsoft.CodeAnalysis.RebuildData, System.Func`2<Microsoft.DiaSymReader.ISymWriterMetadataProvider,Microsoft.DiaSymReader.SymUnmanagedWriter>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.Emit.EmitOptions, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.CompileAndEmit(Microsoft.CodeAnalysis.TouchedFileLogger, Microsoft.CodeAnalysis.Compilation ByRef, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.ISourceGenerator>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AdditionalText>, Microsoft.CodeAnalysis.AnalyzerConfigSet, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AnalyzerConfigOptionsResult>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.EmbeddedText>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken, System.Threading.CancellationTokenSource ByRef, Microsoft.CodeAnalysis.Diagnostics.AnalyzerDriver ByRef, System.Nullable`1<Microsoft.CodeAnalysis.GeneratorDriverTimingInfo> ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.RunCore(System.IO.TextWriter, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.Run(System.IO.TextWriter, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.ConsoleUtil.RunWithUtf8Output[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`2<System.IO.TextWriter,Int32>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This is almost certainly a **Roslyn/VB compiler bug triggered by the new form type**, not a normal syntax error.
+
+Since the project built cleanly once the global imports were removed, and now crashes again when `FormMiscMenu` is back, the safest path is:
+
+## Direct recommendation
+**Do not add `FormMiscMenu` as a separate new form class right now.**  
+Instead, make option **`3`** show a simple placeholder message box for now, or reuse an already-working form pattern later.
+
+But since you specifically want `(3)` to **open a new screen**, the best workaround is:
+
+## Safer workaround
+Use an **existing working form class pattern** rather than a brand-new inherited form that seems to trigger the compiler.
+
+### Best next step
+Copy the structure of a known-working form like:
+- `FormPersonalCalendar`
+- `FormMileageTracking`
+- `FormLedgerMenu`
+
+and minimally adapt it.
+
+That suggests the crash may be caused by something specific in how `FormMiscMenu` was created or inherited.
+
+---
+
+## Fastest no-crash fallback
+For now, change `Case "3"` to open a simple dialog form you already know compiles, or temporarily:
+
+```vbnet
+Case "3"
+    MessageBox.Show("Miscellaneous Menu placeholder for future menu.",
+                    "Miscellaneous Menu",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information)
+```
+
+That is not your ideal final UX, but it avoids getting blocked by the compiler.
+
+---
+
+## If you still want a real separate screen
+Then the most reliable next move is to **base it on an existing working file pair** from your project.
+
+### Please paste one working form file, preferably:
+- `FormLedgerMenu.vb`
+or
+- `FormMileageTracking.vb`
+
+and if it has one:
+- its `.Designer.vb`
+
+Then I can reshape the placeholder menu to match the exact pattern your project/compiler already tolerates.
+
+## Why
+Right now the compiler crash is during metadata emission / custom attributes. That often means:
+- a weird generated attribute
+- partial/designer mismatch
+- inherited form metadata edge case
+- or SDK-specific VB bug
+
+Using a known-good form pattern is the best workaround.
+
+## Short answer
+The new `FormMiscMenu` class is likely triggering a **VB compiler bug** in this SDK.
+
+### Best immediate move:
+If you want to keep momentum, temporarily change `(3)` to a placeholder message box.
+
+### Best real fix:
+Paste a known-good existing form like `FormLedgerMenu.vb`, and Iâ€™ll convert it into a safe placeholder Misc Menu using the same pattern.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Private Enum ViewChecksPromptStep
+        None = 0
+        Customer = 1
+        CheckNumber = 2
+        Year = 3
+    End Enum
+
+    Private ReadOnly pnlPromptHost As New Panel()
+    Private ReadOnly pnlPromptSeparator As New Panel()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtPrompt As New TextBox()
+
+    Private _viewChecksPromptStep As ViewChecksPromptStep = ViewChecksPromptStep.None
+    Private _viewChecksCustomer As String = ""
+    Private _viewChecksCheckNumber As String = ""
+    Private _viewChecksYear As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+        TightenChecksMenuButtons()
+        BuildInlinePromptUi()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub()
+                                                   Using f As New FormDeleteCheck()
+                                                       f.ShowDialog(Me)
+                                                   End Using
+                                               End Sub)
+        AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub()
+                                                      Using f As New FormAddOtherCheck()
+                                                          f.ShowDialog(Me)
+                                                      End Using
+                                                  End Sub)
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub()
+                                                         Using f As New FormDeleteOtherCheck()
+                                                             f.ShowDialog(Me)
+                                                         End Using
+                                                     End Sub)
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub TightenChecksMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+    Private Sub BuildInlinePromptUi()
+        pnlPromptHost.Visible = False
+        pnlPromptHost.Dock = DockStyle.Bottom
+        pnlPromptHost.Height = 96
+        pnlPromptHost.BackColor = Color.FromArgb(32, 32, 32)
+        pnlPromptHost.Padding = New Padding(12, 8, 12, 10)
+
+        pnlPromptSeparator.Dock = DockStyle.Top
+        pnlPromptSeparator.Height = 2
+        pnlPromptSeparator.BackColor = Color.Silver
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Dock = DockStyle.Top
+        lblPrompt.Height = 28
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = pnlPromptHost.BackColor
+        lblPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblPrompt.Padding = New Padding(0, 8, 0, 0)
+
+        txtPrompt.Dock = DockStyle.Top
+        txtPrompt.Height = 30
+        txtPrompt.BorderStyle = BorderStyle.FixedSingle
+        txtPrompt.BackColor = Color.Black
+        txtPrompt.ForeColor = Color.White
+        txtPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtPrompt.MaxLength = 100
+        txtPrompt.Margin = New Padding(0, 6, 0, 0)
+
+        AddHandler txtPrompt.KeyDown, AddressOf OnPromptTextBoxKeyDown
+
+        pnlPromptHost.Controls.Add(txtPrompt)
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptHost.Controls.Add(pnlPromptSeparator)
+
+        Controls.Add(pnlPromptHost)
+        pnlPromptHost.BringToFront()
+    End Sub
+
+    Private Sub BeginViewChecksPromptFlow()
+        _viewChecksCustomer = ""
+        _viewChecksCheckNumber = ""
+        _viewChecksYear = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.Customer
+
+        ShowPrompt("Enter customer name [Enter = all customers] ?", "")
+    End Sub
+
+    Private Sub ShowPrompt(promptText As String, currentValue As String)
+        lblPrompt.Text = promptText
+        txtPrompt.Text = currentValue
+        pnlPromptHost.Visible = True
+        txtPrompt.SelectionStart = txtPrompt.TextLength
+        txtPrompt.SelectionLength = 0
+        txtPrompt.Focus()
+    End Sub
+
+    Private Sub HidePrompt()
+        pnlPromptHost.Visible = False
+        lblPrompt.Text = ""
+        txtPrompt.Text = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.None
+        Me.Focus()
+    End Sub
+
+    Private Sub OnPromptTextBoxKeyDown(sender As Object, e As KeyEventArgs)
+        If _viewChecksPromptStep = ViewChecksPromptStep.None Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            e.Handled = True
+            HidePrompt()
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then
+            Return
+        End If
+
+        e.SuppressKeyPress = True
+        e.Handled = True
+
+        Dim value As String = txtPrompt.Text.Trim()
+
+        Select Case _viewChecksPromptStep
+            Case ViewChecksPromptStep.Customer
+                _viewChecksCustomer = value
+                _viewChecksPromptStep = ViewChecksPromptStep.CheckNumber
+                ShowPrompt("Enter Check Number [Enter = All Checks] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.CheckNumber
+                _viewChecksCheckNumber = value
+                _viewChecksPromptStep = ViewChecksPromptStep.Year
+                ShowPrompt("Enter Year [Enter = All Years] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.Year
+                _viewChecksYear = value
+                HidePrompt()
+                OpenLedgerViewWithPromptValues()
+                Return
+        End Select
+    End Sub
+
+    Private Sub OpenLedgerViewWithPromptValues()
+        Using f As New FormLedgerView()
+            f.InitialCustomerFilter = _viewChecksCustomer
+            f.InitialCheckFilter = _viewChecksCheckNumber
+            f.InitialYearFilter = NormalizeYearFilter(_viewChecksYear)
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function NormalizeYearFilter(value As String) As String
+        Dim s As String = If(value, "").Trim()
+
+        If s = "" Then
+            Return ""
+        End If
+
+        Dim yearNum As Integer
+        If Integer.TryParse(s, yearNum) Then
+            If s.Length <= 2 Then
+                If yearNum <= 79 Then
+                    Return (2000 + yearNum).ToString()
+                Else
+                    Return (1900 + yearNum).ToString()
+                End If
+            End If
+
+            If s.Length = 4 Then
+                Return s
+            End If
+        End If
+
+        Return s
+    End Function
+
+End Class
+```
+
+## Copilot
+
+Great â€” use the **same pattern as `FormLedgerMenu`**. Hereâ€™s a safer `FormMiscMenu.vb` rewritten to match it closely.
+
+Replace your current `FormMiscMenu.vb` with this:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+        TightenMiscMenuButtons()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "A", "Placeholder Item A - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item A")
+                                                                           End Sub)
+        AddMenuButton(p, "B", "Placeholder Item B - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item B")
+                                                                           End Sub)
+        AddMenuButton(p, "C", "Placeholder Item C - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item C")
+                                                                           End Sub)
+        AddMenuButton(p, "D", "Placeholder Item D - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item D")
+                                                                           End Sub)
+        AddMenuButton(p, "E", "Placeholder Item E - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item E")
+                                                                           End Sub)
+        AddMenuButton(p, "F", "Placeholder Item F - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item F")
+                                                                           End Sub)
+    End Sub
+
+    Private Sub TightenMiscMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+End Class
+```
+
+## Why this version is better
+It matches your working `FormLedgerMenu` pattern:
+
+- `Partial Public Class`
+- `Inherits DosMenuFormBase`
+- same `Imports`
+- same one-column layout style
+- same inline `Sub() ... End Sub` button handlers
+- same button tightening pattern
+
+That makes it much more likely to compile cleanly in your project.
+
+## Important
+Keep these project-file lines so this stays code-only:
+
+```xml
+<Compile Remove="FormMiscMenu.Designer.vb" />
+<EmbeddedResource Remove="FormMiscMenu.resx" />
+```
+
+## Expected behavior
+Now:
+
+- click `(3)` from main menu
+- new form opens titled:
+  **MISCELLANEOUS MENU - PLACEHOLDER**
+- click Aâ€“F
+- each one shows:
+  **Not implemented yet: Placeholder Item X**
+
+## If compiler still crashes
+Then the crash is likely tied to the *existence* of this specific class name/file, and the next thing Iâ€™d test is renaming the class and file to something like:
+
+- `FormMiscPlaceholder.vb`
+- class `FormMiscPlaceholder`
+
+and then in `FormMainMenu.vb`:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscPlaceholder()
+        f.ShowDialog(Me)
+    End Using
+```
+
+## Short answer
+Use the code above exactly â€” it matches a working form pattern already proven in your project.
+
+## @testsubject117
+
+ok, it's working now. but can you abbreviate in the menu itself. instead of Miscellaneous Menu - Placeholder can you change it to Misc. Menu (For Future Use)?
+
+## Copilot
+
+Yes â€” change this line in `FormMiscMenu.vb`:
+
+```vbnet
+SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+```
+
+to:
+
+```vbnet
+SetMenuTitle("MISC. MENU (FOR FUTURE USE)")
+```
+
+## So that section becomes
+```vbnet
+Protected Overrides Sub OnLoad(e As EventArgs)
+    MyBase.OnLoad(e)
+
+    SetMenuTitle("MISC. MENU (FOR FUTURE USE)")
+
+    ShowVersionInHeader = False
+    UpdateHeaderClock()
+```
+
+## Expected result
+When users open `(3)`, the submenu title will display:
+
+**MISC. MENU (FOR FUTURE USE)**
+
+That should be much cleaner.
+
+If you want, I can also shorten the button labels next so they donâ€™t keep repeating â€œPlaceholder Item ... - Not Yet Implemented.â€
+
+## @testsubject117
+
+can I have code for the entire file?
+
+## Copilot
+
+Yes â€” here is the full updated `FormMiscMenu.vb` with the title changed to **Misc. Menu (For Future Use)**:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISC. MENU (FOR FUTURE USE)")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+        TightenMiscMenuButtons()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "A", "Placeholder Item A - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item A")
+                                                                           End Sub)
+        AddMenuButton(p, "B", "Placeholder Item B - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item B")
+                                                                           End Sub)
+        AddMenuButton(p, "C", "Placeholder Item C - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item C")
+                                                                           End Sub)
+        AddMenuButton(p, "D", "Placeholder Item D - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item D")
+                                                                           End Sub)
+        AddMenuButton(p, "E", "Placeholder Item E - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item E")
+                                                                           End Sub)
+        AddMenuButton(p, "F", "Placeholder Item F - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item F")
+                                                                           End Sub)
+    End Sub
+
+    Private Sub TightenMiscMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+End Class
+```
+
+If you want, next I can give you a **cleaned-up version with shorter button text** too.
+
+## @testsubject117
+
+can (For Future Use) be made smaller and have it move so it's below Misc. Menu?
+
+## Copilot
+
+Yes â€” but **not just by changing `FormMiscMenu.vb` alone**.
+
+That title is being drawn by your shared base form, `DosMenuFormBase`, via `SetMenuTitle(...)`. So if you want:
+
+- `MISC. MENU`
+- with **`(For Future Use)`** underneath
+- and the second line in a **smaller font**
+
+then the change needs to happen in the **title-rendering logic in `DosMenuFormBase`**.
+
+## Best approach
+Keep `FormMiscMenu.vb` simple and pass a two-line title idea, but teach the base form to render:
+
+- first line = normal title font
+- second line = smaller subtitle font
+
+## Most likely current setup
+You probably have something like:
+- a label for the menu title
+- `SetMenuTitle(text As String)` sets `lblMenuTitle.Text = text`
+
+If so, just putting a line break in the string may move the text down, but it **wonâ€™t make the second line smaller** unless you add separate subtitle support.
+
+---
+
+## Recommended solution
+Add a subtitle capability to `DosMenuFormBase`, such as:
+
+- `SetMenuTitle("MISC. MENU")`
+- `SetMenuSubtitle("(For Future Use)")`
+
+Then the base form shows:
+- main title large
+- subtitle smaller below it
+
+## If you want a quick temporary test
+You can try this in `FormMiscMenu.vb`:
+
+```vbnet
+SetMenuTitle("MISC. MENU" & Environment.NewLine & "(For Future Use)")
+```
+
+### But:
+- it may or may not display correctly
+- it will likely use the **same font size** for both lines
+- alignment may not look great
+
+So it is only a quick experiment, not the best final solution.
+
+---
+
+## Best next step
+Please paste the relevant part of **`DosMenuFormBase.vb`**, especially:
+- the title label declaration
+- `SetMenuTitle(...)`
+- any title layout code
+
+Then I can give you the **exact code** to make:
+
+- `MISC. MENU`
+- subtitle `(For Future Use)`
+- smaller subtitle font
+- proper spacing underneath
+
+## Short answer
+Yes, it can absolutely be done â€” but the right place to do it is **`DosMenuFormBase`**, not just `FormMiscMenu.vb`.
+
+## @testsubject117
+
+lets not go through all that. instead just change it to say: Misc. Menu (Future Use)
+
+## Copilot
+
+Yes â€” easiest fix is just to change the title text.
+
+Use this full file:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISC. MENU (FUTURE USE)")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+        TightenMiscMenuButtons()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "A", "Placeholder Item A - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item A")
+                                                                           End Sub)
+        AddMenuButton(p, "B", "Placeholder Item B - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item B")
+                                                                           End Sub)
+        AddMenuButton(p, "C", "Placeholder Item C - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item C")
+                                                                           End Sub)
+        AddMenuButton(p, "D", "Placeholder Item D - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item D")
+                                                                           End Sub)
+        AddMenuButton(p, "E", "Placeholder Item E - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item E")
+                                                                           End Sub)
+        AddMenuButton(p, "F", "Placeholder Item F - Not Yet Implemented", Sub()
+                                                                               NotYet("Placeholder Item F")
+                                                                           End Sub)
+    End Sub
+
+    Private Sub TightenMiscMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+End Class
+```
+
+Only real change:
+```vbnet
+SetMenuTitle("MISC. MENU (FUTURE USE)")
+```
+
+If you want, next I can also shorten the six button captions so they look cleaner.
+
+## @testsubject117
+
+ok, we're good there for now on that one. what buttons are left from the list of 1 - 5 that we haven't addressed yet?
+
+## Copilot
+
+From our original **top 5**, hereâ€™s where things stand:
+
+## Already addressed
+1. **`3` Miscellaneous Menu**  
+   -> addressed as a **working placeholder menu**
+
+2. **`H` Quick Message Flashing**  
+   -> investigated, but **intentionally skipped for now**
+
+## Still left from the original 1â€“5
+3. **`N` Rolodex**
+4. **`F` Price List Program**
+5. **`A` Shop Card Generator**
+
+## So the remaining real work items are
+- **N â€” Rolodex**
+- **F â€” Price List Program**
+- **A â€” Shop Card Generator**
+
+## Recommended next one
+The best next candidate is still:
+
+**`N â€” Rolodex`**
+
+because itâ€™s likely:
+- more self-contained
+- more concrete
+- less risky than Shop Card Generator
+
+## Short answer
+Left from the original 1â€“5:
+
+- **N**
+- **F**
+- **A**
+
+If you want, we can move straight to **N â€” Rolodex** next.
+
+## @testsubject117
+
+is rolodex difficult?
+
+## Copilot
+
+Probably **moderate**, not the easiest and not the hardest.
+
+## Short answer
+**Rolodex is likely easier than `A` Shop Card Generator, but harder than the Misc placeholder menu.**
+
+## Why
+A Rolodex feature usually means some combination of:
+
+- customer/vendor/contact records
+- searching
+- adding/editing/deleting entries
+- maybe printing
+- maybe legacy file import
+- maybe indexed lookup by company or person
+
+So difficulty depends on what â€œRolodexâ€ means in your DOS app.
+
+## Likely effort levels
+### If it is just:
+- list contacts
+- search by name
+- edit a few fields
+
+then itâ€™s **pretty manageable**.
+
+### If it also includes:
+- legacy flat-file parsing
+- sort/index behavior matching DOS
+- printouts
+- code lookups
+- backup/restore integration
+- obscure keyboard workflow expectations
+
+then it becomes **medium** difficulty.
+
+## Compared to the others
+### Easier than:
+- **A â€” Shop Card Generator**
+  - likely more workflow-heavy
+  - probably more business logic
+
+### Maybe similar to or slightly harder than:
+- **F â€” Price List Program**
+  - depending on how complicated pricing rules are
+
+## My honest estimate
+Without seeing the files yet:
+
+- **N â€” Rolodex** = **medium**
+- **F â€” Price List Program** = **medium**
+- **A â€” Shop Card Generator** = **medium-high to high**
+
+## Recommendation
+If you want the **least risky next step**, Iâ€™d still start by **inspecting what data/files already exist for Rolodex**.
+
+That usually tells you quickly whether itâ€™s:
+- simple CRUD
+- or a legacy-behavior rabbit hole
+
+## Short answer
+No, I would not call Rolodex â€œvery difficult.â€  
+Iâ€™d call it **moderately difficult** â€” and probably still a reasonable next target.
+
+If you want, I can help you think through whether **Rolodex** or **Price List Program** is the better next pick based on likely complexity.
+
+## @testsubject117
+
+AFTER LOOKING at the dos layout for the rolodex, it seems pretty convoluted, lets earmark that for tomorrow.
+
+## Copilot
+
+Makes sense â€” **skip Rolodex for today**.
+
+## Updated status
+Weâ€™re setting aside:
+
+- **N â€” Rolodex** -> **tomorrow**
+- **3 â€” Miscellaneous Menu** -> done as placeholder
+- **H â€” Quick Message Flashing** -> skipped for now
+
+## That leaves the next candidates as:
+- **F â€” Price List Program**
+- **A â€” Shop Card Generator**
+
+## Best next pick for today
+Iâ€™d recommend:
+
+**F â€” Price List Program**
+
+## Why
+Compared with Rolodex and Shop Card Generator, Price List is often:
+- more structured
+- more data-driven
+- easier to scope
+- easier to validate against legacy behavior
+
+Shop Card Generator sounds more workflow-heavy and likely more complex.
+
+## Short answer
+Good call.
+
+### Earmarked for tomorrow:
+- **N â€” Rolodex**
+
+### Best next item for today:
+- **F â€” Price List Program**
+
+If you want, we can now focus on **F**.
+
+## @testsubject117
+
+trying to publish get this: The expression "[System.Int32]::Parse('32') + 1" cannot be evaluated. 
+
+## Copilot
+
+That error is from your `.vbproj` MSBuild expression during publish.  
+The safest fix is to stop using `Int32.Parse(...)` there and use an MSBuild property-function conversion that wonâ€™t choke during publish.
+
+Replace your entire project file with this version:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Default fallback only; GenerateBuildInfo should replace this -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+    <Compile Remove="FormMiscMenu.Designer.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="FormMiscMenu.resx" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <CurrentBuildNumber>%(BuildCounterLines.Identity)</CurrentBuildNumber>
+      <CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(BuildCounterFile)" Overwrite="true" Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## What changed
+This line:
+
+```xml
+<BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+```
+
+was replaced with:
+
+```xml
+<CurrentBuildNumber>%(BuildCounterLines.Identity)</CurrentBuildNumber>
+<CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+<BuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</BuildNumber>
+```
+
+## Why
+`Publish` is more sensitive about property-expression evaluation.  

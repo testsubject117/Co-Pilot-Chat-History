@@ -1,0 +1,2000 @@
+﻿        lblMatches.Text = "Possible Matches:"
+        lblMatches.TextAlign = ContentAlignment.MiddleLeft
+        lblMatches.ForeColor = Color.Aqua
+        lblMatches.BackColor = Color.Black
+        lblMatches.SetBounds(60, 200, 180, 28)
+
+        lstMatches = New ListBox()
+        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        lstMatches.HorizontalScrollbar = True
+        lstMatches.SetBounds(60, 230, 590, 180)
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtCompanyCode)
+        Me.Controls.Add(btnValidate)
+        Me.Controls.Add(btnContinue)
+        Me.Controls.Add(btnCancel)
+        Me.Controls.Add(lblStatusCaption)
+        Me.Controls.Add(lblStatus)
+        Me.Controls.Add(lblMatches)
+        Me.Controls.Add(lstMatches)
+    End Sub
+
+    Private Sub btnValidate_Click(sender As Object, e As EventArgs)
+        ValidateCompany()
+    End Sub
+
+    Private Sub btnContinue_Click(sender As Object, e As EventArgs)
+        If _selectedCompany Is Nothing Then
+            MessageBox.Show("Please validate a company first.",
+                            "Add Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Exit Sub
+        End If
+
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        _selectedCompany = Nothing
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        If lstMatches.SelectedItem Is Nothing Then Exit Sub
+
+        Dim selectedText As String = lstMatches.SelectedItem.ToString()
+        If selectedText Is Nothing Then Exit Sub
+
+        Dim parts() As String = selectedText.Split("-"c)
+        If parts.Length > 0 Then
+            txtCompanyCode.Text = parts(0).Trim()
+            ValidateCompany()
+        End If
+    End Sub
+
+    Private Sub ValidateCompany()
+        If _lookup Is Nothing Then Exit Sub
+
+        lstMatches.Items.Clear()
+        btnContinue.Enabled = False
+        _selectedCompany = Nothing
+
+        Dim enteredCode As String = txtCompanyCode.Text.Trim().ToUpperInvariant()
+
+        If enteredCode = "" Then
+            lblStatus.Text = "Company code is required."
+            txtCompanyCode.Focus()
+            Exit Sub
+        End If
+
+        If enteredCode.Length > 8 Then
+            enteredCode = enteredCode.Substring(0, 8)
+            txtCompanyCode.Text = enteredCode
+        End If
+
+        Dim exact As CompanyInfo = _lookup.FindExact(enteredCode)
+
+        If exact IsNot Nothing Then
+            _selectedCompany = exact
+            lblStatus.Text = exact.CompanyCode & " - " & exact.CompanyName
+            btnContinue.Enabled = True
+            Exit Sub
+        End If
+
+        lblStatus.Text = "Company code not found."
+
+        Dim matches As List(Of CompanyInfo) = _lookup.FindByPrefix(enteredCode)
+
+        If matches.Count = 0 AndAlso enteredCode.Length > 0 Then
+            matches = _lookup.FindByFirstLetter(enteredCode.Substring(0, 1))
+        End If
+
+        For Each item As CompanyInfo In matches
+            lstMatches.Items.Add(item.CompanyCode & " - " & item.CompanyName)
+        Next
+
+        If matches.Count > 0 Then
+            lblStatus.Text = "Company not found. Select a match or enter another code."
+        End If
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+        ElseIf e.KeyCode = Keys.F5 Then
+            btnValidate.PerformClick()
+            e.Handled = True
+        ElseIf e.KeyCode = Keys.Enter Then
+            If txtCompanyCode.Focused Then
+                btnValidate.PerformClick()
+                e.Handled = True
+            End If
+        End If
+    End Sub
+
+End Class
+
+```
+
+## Copilot
+
+Yes â€” and based on the DOS behavior you confirmed, this file should be replaced. The current implementation is built around a company-code lookup workflow, which is the wrong model.
+
+Below is a **full replacement** for `AMiOffice/FormAddChecks.vb` that changes it into a simple DOS-style sequential prompt form for the first confirmed part of the flow:
+
+- `***** Add A Check *****`
+- `Company Name [Q = Quit] ?`
+- `Check Amount ?`
+- invoice auto-scan explanation
+- `Enter the LOWEST Invoice number to be paid [-1 = No Auto Scan]?`
+
+This version is intentionally focused on **matching DOS interaction flow first**, not completing downstream posting logic yet.
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private Enum AddCheckStep
+        CompanyName = 0
+        CheckAmount = 1
+        LowestInvoice = 2
+        HighestInvoice = 3
+        Complete = 4
+    End Enum
+
+    Private _step As AddCheckStep = AddCheckStep.CompanyName
+
+    Private _companyName As String = ""
+    Private _checkAmountText As String = ""
+    Private _lowestInvoiceText As String = ""
+    Private _highestInvoiceText As String = ""
+
+    Public ReadOnly Property CompanyName As String
+        Get
+            Return _companyName
+        End Get
+    End Property
+
+    Public ReadOnly Property CheckAmountText As String
+        Get
+            Return _checkAmountText
+        End Get
+    End Property
+
+    Public ReadOnly Property LowestInvoiceText As String
+        Get
+            Return _lowestInvoiceText
+        End Get
+    End Property
+
+    Public ReadOnly Property HighestInvoiceText As String
+        Get
+            Return _highestInvoiceText
+        End Get
+    End Property
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(780, 420)
+        Me.MinimumSize = New Size(780, 420)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 700, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.Text = ""
+        lblLine1.TextAlign = ContentAlignment.MiddleLeft
+        lblLine1.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+        lblLine1.SetBounds(24, 80, 720, 28)
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.Text = ""
+        lblLine2.TextAlign = ContentAlignment.MiddleLeft
+        lblLine2.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+        lblLine2.SetBounds(24, 112, 720, 28)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = ""
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(24, 170, 720, 28)
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 205, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(620, 320, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        _step = AddCheckStep.CompanyName
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblPrompt.Text = "Company Name [Q = Quit] ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowCheckAmountPrompt()
+        _step = AddCheckStep.CheckAmount
+        lblLine1.Text = "Company Name: " & _companyName
+        lblLine2.Text = ""
+        lblPrompt.Text = "Check Amount ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        _step = AddCheckStep.LowestInvoice
+        lblLine1.Text = "Company Name: " & _companyName
+        lblLine2.Text = "Check Amount ? " & _checkAmountText
+        lblPrompt.Text = "Enter the LOWEST Invoice number to be paid [-1 = No Auto Scan]?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        _step = AddCheckStep.HighestInvoice
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for Invoices"
+        lblLine2.Text = "Lowest Invoice: " & _lowestInvoiceText
+        lblPrompt.Text = "Enter the HIGHEST Invoice number to be paid ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub CompleteFlow()
+        _step = AddCheckStep.Complete
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessCurrentStep()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessCurrentStep()
+        Dim value As String = txtInput.Text.Trim()
+
+        Select Case _step
+            Case AddCheckStep.CompanyName
+                If String.Equals(value, "Q", StringComparison.OrdinalIgnoreCase) Then
+                    btnCancel.PerformClick()
+                    Return
+                End If
+
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _companyName = value
+                ShowCheckAmountPrompt()
+
+            Case AddCheckStep.CheckAmount
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                Dim amount As Decimal
+                If Not Decimal.TryParse(value, NumberStyles.AllowDecimalPoint Or NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, amount) Then
+                    MessageBox.Show("Please enter a valid check amount.",
+                                    "Add A Check",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information)
+                    txtInput.Focus()
+                    txtInput.SelectAll()
+                    Return
+                End If
+
+                _checkAmountText = value
+
+                lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for Invoices"
+                lblLine2.Text = ""
+                ShowLowestInvoicePrompt()
+
+            Case AddCheckStep.LowestInvoice
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _lowestInvoiceText = value
+
+                If value = "-1" Then
+                    CompleteFlow()
+                    Return
+                End If
+
+                ShowHighestInvoicePrompt()
+
+            Case AddCheckStep.HighestInvoice
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _highestInvoiceText = value
+                CompleteFlow()
+        End Select
+    End Sub
+
+End Class
+```
+
+## What this fixes
+This replacement removes the DOS-incompatible pieces:
+- `Company Code:`
+- `Validate`
+- `Continue`
+- `Status`
+- `Possible Matches`
+- company lookup/match list workflow
+
+And replaces them with a prompt-driven sequence matching the DOS flow you described.
+
+## What it does now
+- first prompt is **Company Name [Q = Quit] ?**
+- Enter advances to **Check Amount ?**
+- Enter advances to the invoice auto-scan explanation and **LOWEST Invoice** prompt
+- entering `-1` completes the flow immediately
+- otherwise it asks for **HIGHEST Invoice**
+- ESC or Cancel closes the form
+
+## One note
+I included the likely next prompt for **highest invoice number** because your DOS screenshot strongly implies that comes next, but if you want, we can adjust the wording once you confirm the exact DOS text for that screen.
+
+## Next step
+Replace `AMiOffice/FormAddChecks.vb` with that file, build, and test:
+
+- CHECKS â†’ `1`
+- enter a company name like `PSIBEARI`
+- enter `.10`
+- verify the LOWEST invoice prompt appears
+
+Then tell me:
+1. whether it builds cleanly
+2. whether the screen flow now feels much closer to DOS
+3. what DOS says on the next screen after LOWEST invoice, if you want exact wording parity there too
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindExpressionCore(Microsoft.CodeAnalysis.VisualBasic.Syntax.ExpressionSyntax, Boolean, Boolean, Boolean, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindExpression(Microsoft.CodeAnalysis.VisualBasic.Syntax.ExpressionSyntax, Boolean, Boolean, Boolean, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindAttributeArguments(Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.Syntax.ArgumentListSyntax, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindAttribute(Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax, Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.GetAttribute(Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax, Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.GetAttributes(System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Binder>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol>, Microsoft.CodeAnalysis.VisualBasic.Symbols.VisualBasicAttributeData[], Microsoft.CodeAnalysis.VisualBasic.Symbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbol.LoadAndValidateAttributes(Microsoft.CodeAnalysis.Collections.OneOrMany`1<Microsoft.CodeAnalysis.SyntaxList`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeListSyntax>>, Microsoft.CodeAnalysis.CustomAttributesBag`1<Microsoft.CodeAnalysis.VisualBasic.Symbols.VisualBasicAttributeData> ByRef, Microsoft.CodeAnalysis.VisualBasic.Symbols.AttributeLocation)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceAssemblySymbol.EnsureAttributesAreBound()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceAssemblySymbol.GetAttributes()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceModuleSymbol.GetAllDeclarationErrors(Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag, System.Threading.CancellationToken, Boolean ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilation.GetDiagnosticsWithoutFiltering(Microsoft.CodeAnalysis.CompilationStage, Boolean, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilation.GetDiagnostics(Microsoft.CodeAnalysis.CompilationStage, Boolean, Microsoft.CodeAnalysis.DiagnosticBag, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.CompileAndEmit(Microsoft.CodeAnalysis.TouchedFileLogger, Microsoft.CodeAnalysis.Compilation ByRef, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.ISourceGenerator>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AdditionalText>, Microsoft.CodeAnalysis.AnalyzerConfigSet, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AnalyzerConfigOptionsResult>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.EmbeddedText>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken, System.Threading.CancellationTokenSource ByRef, Microsoft.CodeAnalysis.Diagnostics.AnalyzerDriver ByRef, System.Nullable`1<Microsoft.CodeAnalysis.GeneratorDriverTimingInfo> ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.RunCore(System.IO.TextWriter, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.Run(System.IO.TextWriter, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.ConsoleUtil.RunWithUtf8Output[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`2<System.IO.TextWriter,Int32>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Warning (active)	BC40003	property 'CompanyName' shadows an overloadable member declared in the base class 'Control'.  If you want to overload the base method, this method must be declared 'Overloads'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb	34	
+
+
+## Copilot
+
+Yes â€” the likely culprit is the `CompanyName` property name.
+
+That warning is not just cosmetic here; in VB/WinForms, naming a property `CompanyName` on a `Form` can collide with inherited members and sometimes trigger weird compiler behavior, especially with newer Roslyn builds and designer-generated metadata. The stack trace also smells like a compiler crash rather than a normal code error.
+
+## Fix
+Rename the custom property from:
+
+- `CompanyName`
+
+to something safer, like:
+
+- `EnteredCompanyName`
+
+Also rename the backing field if you want to keep things clean.
+
+Below is a **revised full file** for `AMiOffice/FormAddChecks.vb` with that fix applied and a couple of other names made safer.
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private Enum AddCheckStep
+        CompanyNameStep = 0
+        CheckAmountStep = 1
+        LowestInvoiceStep = 2
+        HighestInvoiceStep = 3
+        CompleteStep = 4
+    End Enum
+
+    Private _step As AddCheckStep = AddCheckStep.CompanyNameStep
+
+    Private _enteredCompanyName As String = ""
+    Private _enteredCheckAmountText As String = ""
+    Private _enteredLowestInvoiceText As String = ""
+    Private _enteredHighestInvoiceText As String = ""
+
+    Public ReadOnly Property EnteredCompanyName As String
+        Get
+            Return _enteredCompanyName
+        End Get
+    End Property
+
+    Public ReadOnly Property EnteredCheckAmountText As String
+        Get
+            Return _enteredCheckAmountText
+        End Get
+    End Property
+
+    Public ReadOnly Property EnteredLowestInvoiceText As String
+        Get
+            Return _enteredLowestInvoiceText
+        End Get
+    End Property
+
+    Public ReadOnly Property EnteredHighestInvoiceText As String
+        Get
+            Return _enteredHighestInvoiceText
+        End Get
+    End Property
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(780, 420)
+        Me.MinimumSize = New Size(780, 420)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 700, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.Text = ""
+        lblLine1.TextAlign = ContentAlignment.MiddleLeft
+        lblLine1.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+        lblLine1.SetBounds(24, 80, 720, 28)
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.Text = ""
+        lblLine2.TextAlign = ContentAlignment.MiddleLeft
+        lblLine2.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+        lblLine2.SetBounds(24, 112, 720, 28)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = ""
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(24, 170, 720, 28)
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 205, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(620, 320, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        _step = AddCheckStep.CompanyNameStep
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblPrompt.Text = "Company Name [Q = Quit] ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowCheckAmountPrompt()
+        _step = AddCheckStep.CheckAmountStep
+        lblLine1.Text = "Company Name: " & _enteredCompanyName
+        lblLine2.Text = ""
+        lblPrompt.Text = "Check Amount ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        _step = AddCheckStep.LowestInvoiceStep
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = ""
+        lblPrompt.Text = "Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        _step = AddCheckStep.HighestInvoiceStep
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & _enteredLowestInvoiceText
+        lblPrompt.Text = "Enter the HIGHEST invoice number to be paid ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub CompleteFlow()
+        _step = AddCheckStep.CompleteStep
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessCurrentStep()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessCurrentStep()
+        Dim value As String = txtInput.Text.Trim()
+
+        Select Case _step
+            Case AddCheckStep.CompanyNameStep
+                If String.Equals(value, "Q", StringComparison.OrdinalIgnoreCase) Then
+                    btnCancel.PerformClick()
+                    Return
+                End If
+
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _enteredCompanyName = value
+                ShowCheckAmountPrompt()
+
+            Case AddCheckStep.CheckAmountStep
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                Dim amount As Decimal
+                If Not Decimal.TryParse(value, NumberStyles.AllowDecimalPoint Or NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, amount) Then
+                    MessageBox.Show("Please enter a valid check amount.",
+                                    "Add A Check",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information)
+                    txtInput.Focus()
+                    txtInput.SelectAll()
+                    Return
+                End If
+
+                _enteredCheckAmountText = value
+                ShowLowestInvoicePrompt()
+
+            Case AddCheckStep.LowestInvoiceStep
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _enteredLowestInvoiceText = value
+
+                If value = "-1" Then
+                    CompleteFlow()
+                    Return
+                End If
+
+                ShowHighestInvoicePrompt()
+
+            Case AddCheckStep.HighestInvoiceStep
+                If value = "" Then
+                    txtInput.Focus()
+                    Return
+                End If
+
+                _enteredHighestInvoiceText = value
+                CompleteFlow()
+        End Select
+    End Sub
+
+End Class
+```
+
+## Why this should help
+The warning you showed was:
+
+- `property 'CompanyName' shadows an overloadable member declared in the base class 'Control'`
+
+So renaming that property removes the inheritance/name collision. That is the most obvious compiler-crash trigger in the replacement I gave you.
+
+## What to do now
+1. replace `FormAddChecks.vb` with the revised version above
+2. rebuild
+3. test CHECKS â†’ `1`
+
+If it still crashes after this, then the next step is to isolate whether the crash is from:
+- this file
+- a stale designer artifact
+- or a broader Roslyn/VB compiler issue in the project
+
+But Iâ€™d try this rename fix first.
+
+## Short answer
+Yes â€” the likely issue is the custom `CompanyName` property name.  
+Use the revised file above with `EnteredCompanyName` instead.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at System.Collections.Generic.HashSet`1[[Microsoft.CodeAnalysis.IReferenceOrISignature, Microsoft.CodeAnalysis, Version=5.6.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]].AddIfNotPresent(Microsoft.CodeAnalysis.IReferenceOrISignature, Int32 ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at System.Collections.Generic.HashSet`1[[Microsoft.CodeAnalysis.IReferenceOrISignature, Microsoft.CodeAnalysis, Version=5.6.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35]].Add(Microsoft.CodeAnalysis.IReferenceOrISignature)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.VisitTypeReference(Microsoft.Cci.ITypeReference)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.Visit(Microsoft.Cci.ITypeReference)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.VisitSignature(Microsoft.Cci.ISignature)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexerBase.Visit(Microsoft.Cci.IMethodReference)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataVisitor.Visit(Microsoft.Cci.ICustomAttribute)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataVisitor.Visit(System.Collections.Generic.IEnumerable`1<Microsoft.Cci.ICustomAttribute>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.ReferenceIndexer.Visit(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.CreateIndices()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.BuildMetadataAndIL(Microsoft.Cci.PdbWriter, System.Reflection.Metadata.BlobBuilder, Microsoft.Cci.PooledBlobBuilder ByRef, Microsoft.Cci.PooledBlobBuilder ByRef, System.Reflection.Metadata.Blob ByRef, System.Reflection.Metadata.Blob ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.PeWriter.WritePeToStream(Microsoft.CodeAnalysis.Emit.EmitContext, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializePeToStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Microsoft.CodeAnalysis.RebuildData, Boolean, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializeToPeStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, EmitStreamProvider, EmitStreamProvider, EmitStreamProvider, Microsoft.CodeAnalysis.RebuildData, System.Func`2<Microsoft.DiaSymReader.ISymWriterMetadataProvider,Microsoft.DiaSymReader.SymUnmanagedWriter>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.Emit.EmitOptions, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.CompileAndEmit(Microsoft.CodeAnalysis.TouchedFileLogger, Microsoft.CodeAnalysis.Compilation ByRef, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.ISourceGenerator>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AdditionalText>, Microsoft.CodeAnalysis.AnalyzerConfigSet, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AnalyzerConfigOptionsResult>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.EmbeddedText>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken, System.Threading.CancellationTokenSource ByRef, Microsoft.CodeAnalysis.Diagnostics.AnalyzerDriver ByRef, System.Nullable`1<Microsoft.CodeAnalysis.GeneratorDriverTimingInfo> ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.RunCore(System.IO.TextWriter, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.Run(System.IO.TextWriter, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.ConsoleUtil.RunWithUtf8Output[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`2<System.IO.TextWriter,Int32>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+Yes â€” this is now looking less like a normal code error and more like a **VB/Roslyn compiler crash** triggered by something in the file shape, metadata emission, or stale build state.
+
+## Direct recommendation
+Letâ€™s simplify aggressively and isolate the problem.
+
+Use this **minimal** replacement for `AMiOffice/FormAddChecks.vb`. It removes:
+- custom public properties
+- `Decimal.TryParse`
+- `CultureInfo`
+- the enum
+- anything fancy that could be provoking the compiler
+
+This keeps only the DOS-style prompt flow.
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(780, 420)
+        Me.MinimumSize = New Size(780, 420)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 700, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.Text = ""
+        lblLine1.TextAlign = ContentAlignment.MiddleLeft
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+        lblLine1.SetBounds(24, 80, 720, 28)
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.Text = ""
+        lblLine2.TextAlign = ContentAlignment.MiddleLeft
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+        lblLine2.SetBounds(24, 112, 720, 28)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = ""
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(24, 170, 720, 28)
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 205, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(620, 320, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblPrompt.Text = "Company Name [Q = Quit] ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        lblLine1.Text = "Company Name: " & enteredCompany
+        lblLine2.Text = ""
+        lblPrompt.Text = "Check Amount ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = ""
+        lblPrompt.Text = "Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        lblPrompt.Text = "Enter the HIGHEST invoice number to be paid ?"
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub FinishFlow()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                FinishFlow()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            FinishFlow()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+## Why this version
+This is a **compiler-isolation version**:
+- simpler types
+- fewer references
+- fewer symbols
+- no custom public properties
+- no enum metadata
+- no parsing APIs
+
+If this builds, then the crash was likely triggered by one of the extra constructs in the prior version.
+
+## If this still crashes
+Then the next most likely causes are:
+
+1. **stale bin/obj build artifacts**
+2. a hidden **`FormAddChecks.Designer.vb` conflict**
+3. duplicate partial definitions / old inherited controls
+4. a Roslyn/VB compiler bug with this project state
+
+## If it still fails, do these next
+Run from the repo root:
+
+```powershell
+dotnet clean
+```
+
+Then delete build artifacts:
+
+```powershell
+Remove-Item .\AMiOffice\bin -Recurse -Force
+Remove-Item .\AMiOffice\obj -Recurse -Force
+```
+
+Then rebuild.
+
+## Also check this
+Tell me whether these files exist:
+
+```text
+AMiOffice/FormAddChecks.Designer.vb
+AMiOffice/FormAddChecks.resx
+```
+
+Because if there is an old designer partial class still defining conflicting members, that could absolutely explain the compiler blow-up.
+
+## Short answer
+Use the minimal file above first.  
+If it still crashes, the issue is probably not the DOS-flow code itself, but stale build/designer state around `FormAddChecks`.
+
+## @testsubject117
+
+no, I only have formaddchecks.vb, no other files are located under amioffice with the name formaddchecks. yes it ran fine, and does look much more like the dos behavior now. i will continue testing and let you know what I find.
+
+## Copilot
+
+Perfect â€” that means the simplified replacement was the right move.
+
+## Current status
+`FormAddChecks.vb` is now:
+- building cleanly
+- opening correctly from CHECKS â†’ `1`
+- much closer to DOS workflow
+
+So this is a good checkpoint.
+
+## What to test next
+Please continue stepping through the DOS and VB flow side by side and note:
+
+1. exact wording differences
+2. what happens after:
+   - lowest invoice
+   - highest invoice
+3. whether DOS validates company names immediately
+4. whether DOS allows `-1` to skip straight ahead
+5. what the next screen/prompt is after invoice range entry
+6. whether there are totals, confirmation, save, or posting steps
+
+## Best way to report back
+The most helpful thing now is:
+- screenshots of each next DOS screen
+- plus what you typed to get there
+- plus what the VB app did at the same point
+
+Thatâ€™ll let us keep tightening `FormAddChecks` until it matches the original flow.
+
+## Important conclusion
+Weâ€™ve now confirmed:
+- `FormLedgerMenu.vb` wiring is good
+- `Sales Employeeâ€™s checks` is basically good
+- `FormAddChecks.vb` was the main mismatch
+- the simpler DOS-style rewrite was the correct direction
+
+## Short answer
+Great â€” keep testing.  
+When you find the next mismatch, send it and weâ€™ll adjust `FormAddChecks` step by step.
+
+## @testsubject117
+
+on the dos screen if I enter the lowest invoice number, then enter the highest invoice number then hit enter, i get this screen: 
+
+## Copilot
+
+Excellent â€” now we know the next DOS state after invoice range entry.
+
+## Confirmed next DOS screen
+After:
+- company name
+- check amount
+- lowest invoice number
+- highest invoice number
+
+DOS shows a **review/decision screen** with something like:
+
+- top totals line
+- separator
+- company/check summary:
+  - `PSIBEARI  REF:  Check Amount:$ 0.10  { 0 Invoices }`
+- difference line:
+  - `Difference Between Total of Invoices & Check Amount: 0`
+- menu options:
+  - **(C)** Check is Correct, add to the ledger
+  - **(P)** Print list of invoices
+  - **(Q)** Quit to Main Menu
+
+## What this means
+So `FormAddChecks` should not end immediately after the highest invoice prompt.
+
+Instead it should advance to a **confirmation menu state**.
+
+---
+
+## Updated target flow for VB
+### Step 1
+`Company Name [Q = Quit] ?`
+
+### Step 2
+`Check Amount ?`
+
+### Step 3
+`Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?`
+
+### Step 4
+`Enter the HIGHEST invoice number to be paid ?`
+
+### Step 5
+Show review screen with:
+- company name
+- check amount
+- invoice count
+- difference
+- choices:
+  - `C`
+  - `P`
+  - `Q`
+
+---
+
+## Important note
+We still do **not** know the full backend logic yet for:
+- invoice scan
+- invoice count
+- difference calculation
+- printing invoice list
+- ledger posting
+
+But UI-flow-wise, we now know the next screen that should exist.
+
+---
+
+## Best next implementation strategy
+For the next revision of `FormAddChecks`, Iâ€™d recommend:
+
+### first, add the review screen shell
+Even if the values are placeholder/minimal at first:
+- company name = entered company
+- check amount = entered amount
+- invoice count = maybe `0` until scan logic is wired
+- difference = maybe `0` or placeholder initially
+
+Then:
+- `C` can temporarily just close with OK
+- `P` can temporarily show â€œNot yet implementedâ€
+- `Q` closes/cancels
+
+That would at least match the DOS navigation shape.
+
+---
+
+## Short answer
+Great â€” DOS does **not** stop after highest invoice entry.  
+It moves to a **confirmation menu** with `(C)`, `(P)`, and `(Q)`.  
+So the next change to `FormAddChecks` should be adding that review/decision screen state.
+
+## @testsubject117
+
+ok, can you send me the updated code
+
+## Copilot
+
+Yes â€” hereâ€™s the updated `FormAddChecks.vb` with the next DOS step added.
+
+This version keeps the simplified form that already builds, and adds a **review/decision state** after highest invoice entry. It supports:
+
+- `Company Name [Q = Quit] ?`
+- `Check Amount ?`
+- `Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?`
+- `Enter the HIGHEST invoice number to be paid ?`
+- review screen with:
+  - company
+  - check amount
+  - invoice count placeholder
+  - difference placeholder
+  - `(C)`, `(P)`, `(Q)` options
+
+For now:
+- `C` = closes with `DialogResult.OK`
+- `P` = shows a placeholder message
+- `Q` = closes/cancels
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(820, 500)
+        Me.MinimumSize = New Size(820, 500)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 760, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.Text = ""
+        lblLine1.TextAlign = ContentAlignment.MiddleLeft
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+        lblLine1.SetBounds(24, 80, 760, 28)
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.Text = ""
+        lblLine2.TextAlign = ContentAlignment.MiddleLeft
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+        lblLine2.SetBounds(24, 112, 760, 28)
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.Text = ""
+        lblLine3.TextAlign = ContentAlignment.MiddleLeft
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+        lblLine3.SetBounds(24, 144, 760, 28)
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.Text = ""
+        lblLine4.TextAlign = ContentAlignment.MiddleLeft
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+        lblLine4.SetBounds(24, 176, 760, 28)
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.Text = ""
+        lblLine5.TextAlign = ContentAlignment.MiddleLeft
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+        lblLine5.SetBounds(24, 208, 760, 28)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = ""
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(24, 270, 760, 28)
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 305, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(660, 400, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        lblPrompt.Text = "Company Name [Q = Quit] ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        lblPrompt.Text = "Check Amount ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblPrompt.Text = "Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        lblPrompt.Text = "Enter the HIGHEST invoice number to be paid ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+
+        lblPrompt.Text = "(Q) Quit to Main Menu"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub FinishFlow()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            Select Case UCase(value)
+                Case "C"
+                    FinishFlow()
+                    Return
+
+                Case "P"
+                    MessageBox.Show("Print list of invoices is not implemented yet.",
+                                    "Add A Check",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information)
+                    txtInput.Text = ""
+                    txtInput.Focus()
+                    Return
+
+                Case "Q"
+                    btnCancel.PerformClick()
+                    Return
+
+                Case Else
+                    txtInput.SelectAll()
+                    txtInput.Focus()
+                    Return
+            End Select
+        End If
+    End Sub
+
+End Class
+```
+
+## What changed
+Compared to the last working simplified version, this adds:
+
+- `lblLine3`, `lblLine4`, `lblLine5`
+- a new `ShowReviewPrompt()` state
+- step 5 handling for:
+  - `C`
+  - `P`
+  - `Q`
+
+## One small note
+I kept the review values as placeholders where we donâ€™t yet have real invoice scanning logic:
+- `{ 0 Invoices }`
+- difference `0`
+
+Thatâ€™s intentional so the UI flow matches DOS first.
+
+## Next step
+Replace the file with this version and test:
+
+1. CHECKS â†’ `1`
+2. company
+3. amount
+4. lowest invoice
+5. highest invoice
+6. verify the `(C)/(P)/(Q)` review screen appears
+
+If you want, after that I can help tighten the formatting so the review screen looks even closer to the DOS layout in your screenshot.
+
+## @testsubject117
+
+i dos if I choose (C) check is correct, add to ledger, I get this screen: 
+
+## Copilot
+
+Got it â€” that means after `(C)` DOS does **not** immediately finish or post silently.
+
+## Confirmed next DOS step
+After selecting:
+
+- **(C) Check is Correct, add to the ledger**
+
+DOS stays on the same review screen and adds the next prompt:
+
+- **`Check # (Top Right)?`**
+
+So the current VB behavior where `C` just closes with OK is now known to be too early.
+
+---
+
+## What should change
+`FormAddChecks.vb` needs one more state after the review menu:
+
+### Step 6
+After entering `C`, prompt for:
+
+- **`Check # (Top Right)?`**
+
+while keeping the review information visible above it.
+
+---
+
+## Updated flow so far
+1. `Company Name [Q = Quit] ?`
+2. `Check Amount ?`
+3. `Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?`
+4. `Enter the HIGHEST invoice number to be paid ?`
+5. review menu:
+   - `(C) Check is Correct, add to the ledger`
+   - `(P) Print list of invoices`
+   - `(Q) Quit to Main Menu`
+6. after `C`:
+   - `Check # (Top Right)?`
+
+---
+
+## Here is the updated code
+This version adds the **Check #** step after `C`.
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(820, 500)
+        Me.MinimumSize = New Size(820, 500)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 760, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.Text = ""
+        lblLine1.TextAlign = ContentAlignment.MiddleLeft
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+        lblLine1.SetBounds(24, 80, 760, 28)
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.Text = ""
+        lblLine2.TextAlign = ContentAlignment.MiddleLeft
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+        lblLine2.SetBounds(24, 112, 760, 28)
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.Text = ""
+        lblLine3.TextAlign = ContentAlignment.MiddleLeft
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+        lblLine3.SetBounds(24, 144, 760, 28)
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.Text = ""
+        lblLine4.TextAlign = ContentAlignment.MiddleLeft
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+        lblLine4.SetBounds(24, 176, 760, 28)
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.Text = ""
+        lblLine5.TextAlign = ContentAlignment.MiddleLeft
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+        lblLine5.SetBounds(24, 208, 760, 28)
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = ""
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.SetBounds(24, 270, 760, 28)
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 305, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(660, 400, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        lblPrompt.Text = "Company Name [Q = Quit] ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        lblPrompt.Text = "Check Amount ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblPrompt.Text = "Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        lblPrompt.Text = "Enter the HIGHEST invoice number to be paid ?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+
+        lblPrompt.Text = "(Q) Quit to Main Menu"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub ShowCheckNumberPrompt()
+        currentStep = 6
+
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+
+        lblPrompt.Text = "Check # (Top Right)?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub FinishFlow()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            Select Case UCase(value)
+                Case "C"
+                    ShowCheckNumberPrompt()
+                    Return
+
+                Case "P"
+                    MessageBox.Show("Print list of invoices is not implemented yet.",
+                                    "Add A Check",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information)
+                    txtInput.Text = ""
+                    txtInput.Focus()
+                    Return
+
+                Case "Q"
+                    btnCancel.PerformClick()
+                    Return
+
+                Case Else
+                    txtInput.SelectAll()
+                    txtInput.Focus()
+                    Return
+            End Select
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            FinishFlow()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+## What changed
+The only behavioral change from the last version is:
+
+- `C` now goes to `ShowCheckNumberPrompt()`
+- new step `6`
+- prompt text:
