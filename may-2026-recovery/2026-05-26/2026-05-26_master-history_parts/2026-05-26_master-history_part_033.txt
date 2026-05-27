@@ -1,4 +1,8 @@
 ﻿
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
         ' One vertical column, indented left, fixed-width buttons
         StretchButtonsToPanelWidth = False
         ButtonFixedWidthPx = 620
@@ -1994,7 +1998,3 @@ Public NotInheritable Class CheckRepository
 
     Public Shared Sub AddOrReplace(record As CheckRecord)
         If record Is Nothing Then Return
-
-        Dim existing = _checks.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, record.CheckNumber, StringComparison.OrdinalIgnoreCase))
-        If existing IsNot Nothing Then
-            _checks.Remove(existing)

@@ -1,0 +1,2000 @@
+﻿then we should reuse that exact line everywhere.
+
+---
+
+# Important note
+Sometimes `Castellar` can render a little differently depending on:
+- size
+- bold vs regular
+- DPI scaling
+- whether AutoScale is affecting the form
+
+So the best match is not just the family name, but the **exact font construction line** from the menu that already looks right.
+
+---
+
+# Recommendation
+Yes â€” letâ€™s make this a tomorrow task:
+- identify the exact title font line from the good screen
+- replace all top-left DOS-style headers with that same shared font/style
+
+Thatâ€™s the right finishing pass.
+
+If you want tomorrow, I can help you turn that into a single reusable helper so you donâ€™t have to keep fixing titles screen by screen.
+
+## @testsubject117
+
+also, the yellow could be a little bit lighter, as well as the pink.
+
+## Copilot
+
+Absolutely â€” hereâ€™s the same full file with the row colors softened further.
+
+## What changed
+I only lightened the row colors again:
+
+- **No mapping yellow** is paler
+- **Pink delta rows** are softer and milkier
+
+## Full revised file
+```vb name=FormLedgerDoesntBalance.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Text
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Public Class FormLedgerDoesntBalance
+    Inherits System.Windows.Forms.Form
+
+    Private Const ScreenTitle As String = "Checks - Doesn't Balance"
+    Private Const Tolerance As Decimal = 1D ' DOS treated < 1 as OK
+
+    ' Row highlighting thresholds
+    Private Const LargeDeltaWarn As Decimal = 25D
+    Private Const LargeDeltaSevere As Decimal = 100D
+
+    Private cts As CancellationTokenSource
+
+    Private ReadOnly pnlHeader As New Panel()
+    Private ReadOnly lblHeaderTitle As New Label()
+    Private ReadOnly lblHeaderClock As New Label()
+    Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()
+
+    Private ReadOnly pnlCommands As New FlowLayoutPanel()
+    Private ReadOnly pnlStatus As New FlowLayoutPanel()
+
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly btnCancel As New Button()
+    Private ReadOnly btnCopyRow As New Button()
+    Private ReadOnly btnExportCsv As New Button()
+    Private ReadOnly btnClose As New Button()
+    Private ReadOnly cboFilter As New ComboBox()
+    Private ReadOnly lblFilter As New Label()
+    Private ReadOnly lblStatus As New Label()
+    Private ReadOnly lblStatusCount As New Label()
+
+    ' Keep the full results so we can filter/sort without re-running the report.
+    Private allRows As List(Of BalanceRow) = New List(Of BalanceRow)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1200
+        Height = 850
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.FromArgb(34, 34, 34)
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+
+        BuildUi()
+        UpdateClock()
+
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, Sub() UpdateClock()
+        tmrClock.Start()
+
+        FireAndForget(RunReportAsync())
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        If tmrClock IsNot Nothing Then
+            tmrClock.Stop()
+        End If
+
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        MyBase.OnFormClosed(e)
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub BuildUi()
+        SuspendLayout()
+
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Height = 100
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Padding = New Padding(18, 10, 18, 10)
+
+        lblHeaderTitle.AutoSize = False
+        lblHeaderTitle.Left = 18
+        lblHeaderTitle.Top = 8
+        lblHeaderTitle.Width = 420
+        lblHeaderTitle.Height = 70
+        lblHeaderTitle.BackColor = Color.Black
+        lblHeaderTitle.ForeColor = Color.Yellow
+        lblHeaderTitle.Font = New Font("Times New Roman", 34.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblHeaderTitle.Text = "CHECKS"
+        lblHeaderTitle.TextAlign = ContentAlignment.MiddleLeft
+
+        lblHeaderClock.AutoSize = False
+        lblHeaderClock.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        lblHeaderClock.Width = 420
+        lblHeaderClock.Height = 40
+        lblHeaderClock.Left = ClientSize.Width - lblHeaderClock.Width - 18
+        lblHeaderClock.Top = 22
+        lblHeaderClock.BackColor = Color.Black
+        lblHeaderClock.ForeColor = Color.Yellow
+        lblHeaderClock.Font = New Font("Segoe UI", 13.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblHeaderClock.TextAlign = ContentAlignment.MiddleRight
+
+        AddHandler pnlHeader.Resize,
+            Sub()
+                lblHeaderClock.Left = pnlHeader.ClientSize.Width - lblHeaderClock.Width - 18
+            End Sub
+
+        pnlHeader.Controls.Add(lblHeaderTitle)
+        pnlHeader.Controls.Add(lblHeaderClock)
+
+        pnlCommands.Dock = DockStyle.Top
+        pnlCommands.Height = 64
+        pnlCommands.Padding = New Padding(12, 10, 12, 8)
+        pnlCommands.FlowDirection = FlowDirection.LeftToRight
+        pnlCommands.WrapContents = False
+        pnlCommands.BackColor = Color.FromArgb(34, 34, 34)
+
+        StyleMenuButton(btnRefresh, "Refresh", 110)
+        StyleMenuButton(btnCancel, "Cancel", 110)
+        StyleMenuButton(btnCopyRow, "Copy Row", 120)
+        StyleMenuButton(btnExportCsv, "Export CSV", 130)
+        StyleMenuButton(btnClose, "(ESC) Close", 130)
+
+        btnCancel.Enabled = False
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+
+        AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+        AddHandler btnCopyRow.Click, AddressOf btnCopyRow_Click
+        AddHandler btnExportCsv.Click, AddressOf btnExportCsv_Click
+        AddHandler btnClose.Click, Sub() Close()
+
+        lblFilter.AutoSize = True
+        lblFilter.Padding = New Padding(10, 9, 0, 0)
+        lblFilter.ForeColor = Color.Gainsboro
+        lblFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblFilter.Text = "Filter:"
+
+        cboFilter.DropDownStyle = ComboBoxStyle.DropDownList
+        cboFilter.Width = 220
+        cboFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cboFilter.BackColor = Color.White
+        cboFilter.ForeColor = Color.Black
+        cboFilter.Items.Clear()
+        cboFilter.Items.Add(FilterMode.AllUnbalanced)
+        cboFilter.Items.Add(FilterMode.NoMapping)
+        cboFilter.Items.Add(FilterMode.DeltaOnly)
+        cboFilter.SelectedIndex = 0
+        AddHandler cboFilter.SelectedIndexChanged, AddressOf cboFilter_SelectedIndexChanged
+
+        lblStatus.AutoSize = True
+        lblStatus.Margin = New Padding(14, 2, 0, 0)
+        lblStatus.ForeColor = Color.Gainsboro
+        lblStatus.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblStatus.Text = ""
+
+        lblStatusCount.AutoSize = True
+        lblStatusCount.Margin = New Padding(14, 0, 0, 0)
+        lblStatusCount.ForeColor = Color.Gainsboro
+        lblStatusCount.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblStatusCount.Text = ""
+
+        pnlStatus.AutoSize = True
+        pnlStatus.FlowDirection = FlowDirection.TopDown
+        pnlStatus.WrapContents = False
+        pnlStatus.Margin = New Padding(10, 0, 0, 0)
+        pnlStatus.BackColor = Color.Transparent
+        pnlStatus.Controls.Add(lblStatus)
+        pnlStatus.Controls.Add(lblStatusCount)
+
+        pnlCommands.Controls.Add(btnRefresh)
+        pnlCommands.Controls.Add(btnCancel)
+        pnlCommands.Controls.Add(btnCopyRow)
+        pnlCommands.Controls.Add(btnExportCsv)
+        pnlCommands.Controls.Add(btnClose)
+        pnlCommands.Controls.Add(lblFilter)
+        pnlCommands.Controls.Add(cboFilter)
+        pnlCommands.Controls.Add(pnlStatus)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.AutoGenerateColumns = False
+        dgv.MultiSelect = False
+        dgv.BackgroundColor = Color.Black
+        dgv.BorderStyle = BorderStyle.None
+        dgv.GridColor = Color.DimGray
+        dgv.RowHeadersVisible = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+        dgv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+        dgv.ColumnHeadersHeight = 34
+        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        dgv.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(45, 85, 140)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(18, 18, 18)
+
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        AddHandler dgv.SelectionChanged, AddressOf dgv_SelectionChanged
+        AddHandler dgv.RowPrePaint, AddressOf dgv_RowPrePaint
+
+        dgv.Columns.Clear()
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Customer", .DataPropertyName = NameOf(BalanceRow.Customer), .Width = 140})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Date", .DataPropertyName = NameOf(BalanceRow.DateText), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check #", .DataPropertyName = NameOf(BalanceRow.CheckNumber), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check Amount", .DataPropertyName = NameOf(BalanceRow.CheckAmount), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Count", .DataPropertyName = NameOf(BalanceRow.InvoiceCount), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Sum", .DataPropertyName = NameOf(BalanceRow.InvoiceSum), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Delta", .DataPropertyName = NameOf(BalanceRow.Delta), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Note", .DataPropertyName = NameOf(BalanceRow.Note), .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill})
+
+        Controls.Add(dgv)
+        Controls.Add(pnlCommands)
+        Controls.Add(pnlHeader)
+
+        ResumeLayout()
+    End Sub
+
+    Private Sub StyleMenuButton(btn As Button, caption As String, width As Integer)
+        btn.Text = caption
+        btn.Width = width
+        btn.Height = 30
+        btn.Margin = New Padding(0, 0, 8, 0)
+        btn.FlatStyle = FlatStyle.Standard
+        btn.BackColor = Color.Silver
+        btn.ForeColor = Color.Black
+        btn.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.UseVisualStyleBackColor = True
+    End Sub
+
+    Private Sub UpdateClock()
+        lblHeaderClock.Text = DateTime.Now.ToString("dddd  MM-dd-yyyy      hh:mm:ss tt")
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        If cts IsNot Nothing Then cts.Cancel()
+    End Sub
+
+    Private Async Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        Await RunReportAsync()
+    End Sub
+
+    Private Sub btnCopyRow_Click(sender As Object, e As EventArgs)
+        Dim r As BalanceRow = TryCast(dgv.CurrentRow?.DataBoundItem, BalanceRow)
+        If r Is Nothing Then Return
+
+        Dim text As String =
+            r.Customer & vbTab &
+            r.DateText & vbTab &
+            r.CheckNumber & vbTab &
+            r.CheckAmount & vbTab &
+            r.InvoiceCount & vbTab &
+            r.InvoiceSum & vbTab &
+            r.Delta & vbTab &
+            r.Note
+
+        Clipboard.SetText(text)
+        lblStatus.Text = "Copied selected row to clipboard."
+        lblStatusCount.Text = ""
+    End Sub
+
+    Private Sub btnExportCsv_Click(sender As Object, e As EventArgs)
+        Dim rows As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+        If rows Is Nothing OrElse rows.Count = 0 Then
+            MessageBox.Show(Me, "There are no rows to export.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Title = "Export CSV"
+            sfd.Filter = "CSV (*.csv)|*.csv|All files (*.*)|*.*"
+            sfd.FileName = $"LedgerDoesntBalance_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            If sfd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+            Try
+                Dim sb As New StringBuilder()
+                sb.AppendLine("Customer,Date,CheckNumber,CheckAmount,InvoiceCount,InvoiceSum,Delta,Note")
+
+                For Each r In rows
+                    sb.AppendLine(
+                        Csv(r.Customer) & "," &
+                        Csv(r.DateText) & "," &
+                        Csv(r.CheckNumber) & "," &
+                        Csv(r.CheckAmount) & "," &
+                        Csv(r.InvoiceCount) & "," &
+                        Csv(r.InvoiceSum) & "," &
+                        Csv(r.Delta) & "," &
+                        Csv(r.Note)
+                    )
+                Next
+
+                IO.File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8)
+                lblStatus.Text = $"Exported {rows.Count:N0} row(s) to CSV."
+                lblStatusCount.Text = ""
+            Catch ex As Exception
+                MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Using
+    End Sub
+
+    Private Sub cboFilter_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilterAndBind()
+    End Sub
+
+    Private Sub dgv_SelectionChanged(sender As Object, e As EventArgs)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs)
+        Dim row As DataGridViewRow = dgv.Rows(e.RowIndex)
+        Dim data As BalanceRow = TryCast(row.DataBoundItem, BalanceRow)
+        If data Is Nothing Then Return
+
+        row.DefaultCellStyle.BackColor = dgv.DefaultCellStyle.BackColor
+        row.DefaultCellStyle.ForeColor = dgv.DefaultCellStyle.ForeColor
+        row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+        row.DefaultCellStyle.SelectionForeColor = Color.Black
+
+        If data.IsNoMapping Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(250, 245, 190)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(253, 249, 205)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+            row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+            Return
+        End If
+
+        Dim absDelta As Decimal = Math.Abs(data.DeltaValue)
+        If absDelta >= LargeDeltaSevere Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(249, 232, 236)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(252, 238, 241)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        ElseIf absDelta >= LargeDeltaWarn Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(252, 239, 242)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(254, 244, 246)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        End If
+    End Sub
+
+    Private Async Function RunReportAsync() As Task
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        cts = New CancellationTokenSource()
+        Dim token As CancellationToken = cts.Token
+
+        btnRefresh.Enabled = False
+        btnCancel.Enabled = True
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+        btnClose.Enabled = False
+        cboFilter.Enabled = False
+        lblStatus.Text = "Starting..."
+        lblStatusCount.Text = ""
+        dgv.DataSource = Nothing
+        allRows = New List(Of BalanceRow)()
+
+        Dim ledgerPath As String = LegacyDataPaths.LedgerCur
+        Dim checkInvPath As String = LegacyDataPaths.CheckInv
+        Dim invoiceChkPath As String = LegacyDataPaths.InvoiceChk
+
+        If Not IO.File.Exists(ledgerPath) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, ledgerPath)
+            lblStatus.Text = "Missing LEDGER.CUR"
+            lblStatusCount.Text = ""
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+            Return
+        End If
+
+        Dim progress As IProgress(Of ProgressInfo) =
+            New Progress(Of ProgressInfo)(
+                Sub(p As ProgressInfo)
+                    If token.IsCancellationRequested Then Return
+
+                    lblStatus.Text = p.Message
+
+                    If p.Total > 0 Then
+                        lblStatusCount.Text = $"{p.Current:N0}/{p.Total:N0}"
+                    Else
+                        lblStatusCount.Text = ""
+                    End If
+                End Sub
+            )
+
+        Try
+            Dim rows As List(Of BalanceRow) =
+                Await Task.Run(Function() ComputeRows(ledgerPath, checkInvPath, invoiceChkPath, token, progress), token)
+
+            If token.IsCancellationRequested Then
+                lblStatus.Text = "Cancelled"
+                lblStatusCount.Text = ""
+                Return
+            End If
+
+            allRows = rows
+            ApplyFilterAndBind()
+        Catch ex As OperationCanceledException
+            lblStatus.Text = "Cancelled"
+            lblStatusCount.Text = ""
+        Catch ex As Exception
+            lblStatus.Text = "Error running report"
+            lblStatusCount.Text = ""
+            MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+
+            Dim current As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+            btnExportCsv.Enabled = (current IsNot Nothing AndAlso current.Count > 0)
+        End Try
+    End Function
+
+    Private Sub ApplyFilterAndBind()
+        Dim mode As String = TryCast(cboFilter.SelectedItem, String)
+        If String.IsNullOrWhiteSpace(mode) Then mode = FilterMode.AllUnbalanced
+
+        Dim filtered As IEnumerable(Of BalanceRow) = allRows
+
+        Select Case mode
+            Case FilterMode.NoMapping
+                filtered = filtered.Where(Function(r) r.IsNoMapping)
+            Case FilterMode.DeltaOnly
+                filtered = filtered.Where(Function(r) Not r.IsNoMapping)
+            Case Else
+        End Select
+
+        Dim sorted As List(Of BalanceRow) =
+            filtered.OrderByDescending(Function(r) If(r.IsNoMapping, Decimal.MaxValue, Math.Abs(r.DeltaValue))).ToList()
+
+        dgv.DataSource = sorted
+
+        Dim noMap As Integer = allRows.Where(Function(r) r.IsNoMapping).Count()
+        Dim deltaRows As Integer = allRows.Where(Function(r) Not r.IsNoMapping).Count()
+        Dim showing As Integer = sorted.Count
+
+        lblStatus.Text = "Report complete"
+        lblStatusCount.Text = $"Showing: {showing:N0} | Total: {allRows.Count:N0} | No mapping: {noMap:N0} | Delta rows: {deltaRows:N0}"
+
+        btnExportCsv.Enabled = (showing > 0)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Shared Function ComputeRows(
+        ledgerPath As String,
+        checkInvPath As String,
+        invoiceChkPath As String,
+        token As CancellationToken,
+        progress As IProgress(Of ProgressInfo)
+    ) As List(Of BalanceRow)
+
+        token.ThrowIfCancellationRequested()
+        progress?.Report(New ProgressInfo("Loading ledger...", 0, 0))
+
+        Dim ledger As List(Of LedgerEntry) = LedgerCurReader.ReadAll(ledgerPath)
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Loading CHECK.INV...", 0, 0))
+
+        Dim invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+        If IO.File.Exists(checkInvPath) Then
+            Try
+                Dim blocks = CheckInvReader.ReadAll(checkInvPath)
+                Dim i As Integer = 0
+                For Each b In blocks
+                    token.ThrowIfCancellationRequested()
+                    i += 1
+                    If (i Mod 250) = 0 Then
+                        progress?.Report(New ProgressInfo("Indexing CHECK.INV...", i, blocks.Count))
+                    End If
+
+                    Dim key = BuildKey(b.CustomerCode, b.CheckNumber)
+                    Dim lst As List(Of Long) = Nothing
+                    If Not invIndex.TryGetValue(key, lst) Then
+                        lst = New List(Of Long)()
+                        invIndex(key) = lst
+                    End If
+
+                    If b.Invoices IsNot Nothing Then
+                        For Each s In b.Invoices
+                            Dim n As Long
+                            If Long.TryParse(If(s, "").Trim(), n) Then
+                                lst.Add(n)
+                            End If
+                        Next
+                    End If
+                Next
+            Catch
+            End Try
+        End If
+
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Computing rows...", 0, ledger.Count))
+
+        Dim amtCache As New Dictionary(Of Long, Decimal)()
+        Dim rows As New List(Of BalanceRow)()
+
+        Dim idx As Integer = 0
+        For Each e In ledger
+            token.ThrowIfCancellationRequested()
+
+            idx += 1
+            If (idx Mod 250) = 0 Then
+                progress?.Report(New ProgressInfo("Computing rows...", idx, ledger.Count))
+            End If
+
+            Dim key = BuildKey(e.Customer, e.CheckNumber)
+
+            Dim invNos As List(Of Long) = Nothing
+            Dim hasMapping As Boolean = invIndex.TryGetValue(key, invNos)
+
+            If Not hasMapping OrElse invNos Is Nothing OrElse invNos.Count = 0 Then
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = 0,
+                    .InvoiceSumValue = 0D,
+                    .DeltaValue = 0D,
+                    .Note = "No CHECK.INV mapping",
+                    .IsNoMapping = True
+                })
+                Continue For
+            End If
+
+            Dim sum As Decimal = 0D
+            Dim foundAny As Boolean = False
+
+            For Each invNo In invNos
+                token.ThrowIfCancellationRequested()
+
+                Dim a As Decimal = 0D
+                If amtCache.TryGetValue(invNo, a) Then
+                    sum += a
+                    foundAny = True
+                Else
+                    Dim rec = InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)
+                    If rec.IsFound Then
+                        a = rec.Amount
+                        amtCache(invNo) = a
+                        sum += a
+                        foundAny = True
+                    Else
+                        amtCache(invNo) = 0D
+                    End If
+                End If
+            Next
+
+            Dim delta As Decimal = sum - e.Amount
+            Dim unbalanced As Boolean = (Not foundAny) OrElse (Math.Abs(delta) >= Tolerance)
+
+            If unbalanced Then
+                Dim note As String = If(Not foundAny, "Invoices not found in INVOICE.CHK", "")
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = invNos.Count,
+                    .InvoiceSumValue = sum,
+                    .DeltaValue = delta,
+                    .Note = note,
+                    .IsNoMapping = False
+                })
+            End If
+        Next
+
+        progress?.Report(New ProgressInfo("Done.", ledger.Count, ledger.Count))
+        Return rows
+    End Function
+
+    Private Shared Sub FireAndForget(t As Task)
+        If t Is Nothing Then Return
+
+        t.ContinueWith(
+            Sub(completed As Task)
+                Dim ignored = completed.Exception
+            End Sub,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default
+        )
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrim(s As String) As String
+        Return If(s, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrimEnd(s As String) As String
+        Return If(s, "").TrimEnd()
+    End Function
+
+    Private Shared Function Csv(s As String) As String
+        Dim v As String = If(s, "")
+        Dim mustQuote As Boolean =
+            (v.Contains(","c) OrElse v.Contains(ControlChars.Quote) OrElse v.Contains(ControlChars.Cr) OrElse v.Contains(ControlChars.Lf))
+
+        If mustQuote Then
+            v = v.Replace("""", """""")
+            v = """" & v & """"
+        End If
+
+        Return v
+    End Function
+
+    Private NotInheritable Class FilterMode
+        Public Const AllUnbalanced As String = "All unbalanced"
+        Public Const NoMapping As String = "No CHECK.INV mapping"
+        Public Const DeltaOnly As String = "Delta rows (has mapping)"
+    End Class
+
+    Private NotInheritable Class ProgressInfo
+        Public ReadOnly Property Message As String
+        Public ReadOnly Property Current As Integer
+        Public ReadOnly Property Total As Integer
+
+        Public Sub New(message As String, current As Integer, total As Integer)
+            Me.Message = message
+            Me.Current = current
+            Me.Total = total
+        End Sub
+    End Class
+
+    Private Class BalanceRow
+        Public Property Customer As String
+        Public Property DateText As String
+        Public Property CheckNumber As String
+
+        Public Property CheckAmountValue As Decimal
+        Public Property InvoiceCountValue As Integer
+        Public Property InvoiceSumValue As Decimal
+        Public Property DeltaValue As Decimal
+
+        Public Property Note As String
+        Public Property IsNoMapping As Boolean
+
+        Public ReadOnly Property CheckAmount As String
+            Get
+                Return CheckAmountValue.ToString("C")
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceCount As String
+            Get
+                Return InvoiceCountValue.ToString()
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceSum As String
+            Get
+                Return If(IsNoMapping, "", InvoiceSumValue.ToString("C"))
+            End Get
+        End Property
+
+        Public ReadOnly Property Delta As String
+            Get
+                Return If(IsNoMapping, "", DeltaValue.ToString("C"))
+            End Get
+        End Property
+    End Class
+End Class
+```
+
+## New lighter colors
+- Yellow: `Color.FromArgb(250, 245, 190)`
+- Yellow selected: `Color.FromArgb(253, 249, 205)`
+- Pink severe: `Color.FromArgb(249, 232, 236)`
+- Pink warn: `Color.FromArgb(252, 239, 242)`
+
+If you want, tomorrow we can also standardize the **CHECKS title font** across all of these screens.
+
+## @testsubject117
+
+ok, as soon as I'm sure this is good to go I'm going to publish a build.
+
+## Copilot
+
+Sounds good â€” youâ€™re very close.
+
+## Before you publish
+Iâ€™d do one quick pass on just these:
+
+- open **Checks menu**
+- test **(5) View Company Totals**
+- test **(8) View OTHER Checks**
+- test **(9) Find a Check #**
+- test **(0) Find an Invoice #**
+- test **(A) Find checks that don't balance**
+
+And specifically confirm:
+- buttons look right
+- Esc closes where expected
+- no clipped text
+- result screens return correctly
+- colors feel OK
+- no missing-file popups happening unexpectedly
+
+## Especially for `(A)`
+Since that one is now intentionally a **styled VB utility screen**, just confirm:
+- progress text looks right
+- row colors are acceptable
+- copy/export still work
+- filter still works
+- no weird bold text remains
+
+## My recommendation
+If it passes that smoke test, publish it.
+
+You already know there are two possible future cleanup items:
+- standardize the **Castellar/Castella** title font everywhere
+- revisit whether `(A)` should eventually match DOS behavior more closely
+
+Neither one sounds like a blocker for this build if the users need the update now.
+
+## Bottom line
+If the latest pass looks stable, Iâ€™d be comfortable shipping it.  
+If you want, before you publish, I can help you make a **final release checklist** you can run through in 2 minutes.
+
+## @testsubject117
+
+note for tomorrow as well. I notice that where this screen says computing rows.... after it's done computing and displays the list with yellow and pink, the word computing is still partially there. it's ok to be there, but if the word stays it should change to something like "computations complete." or remove itself altogether. but we can review that tomorrow. please include that in the master list of items to do tomorrow, I will have you generate shortly. The yellow and pink now look fine. I'm going to publish.
+
+## Copilot
+
+Sounds good â€” publish it.
+
+## Noted for tomorrow
+Iâ€™ve got this added to the tomorrow list:
+
+- On **Checks - Doesn't Balance**
+  - after computation finishes, the status area still partially shows **â€œComputingâ€¦â€**
+  - change that to something cleaner like:
+    - **â€œComputations complete.â€**
+    - **â€œReport complete.â€**
+    - or clear it entirely
+
+You also said:
+
+- the **yellow and pink now look fine**
+- youâ€™re going to **publish this build now**
+
+## Also already noted for tomorrow
+From earlier, we should also include:
+
+- standardize the upper-left title font so it matches the **Castellar/Castella** style used on Main Menu / Checks Menu
+- review whether `(A) Find checks that don't balance` should stay as-is or be changed once users confirm expected DOS behavior
+
+## Bottom line
+You sound good to ship this build.
+
+When youâ€™re ready, send me:
+**â€œmake the master to-do list for tomorrowâ€**
+and Iâ€™ll format everything cleanly for you.
+
+## @testsubject117
+
+ok, since this is a new install of VB I need you to walk me through how to set this up correctly to publish how we were before. Right now I want to publish just a stand alone executable that can be copied to any workstation and run. I believe before we talked about it including .net 10, although I had to install .net 10 separately and manually on the virtual machine originally. if it's a huge hassle forget including .net.
+
+## Copilot
+
+Yes â€” for **â€œcopy to any workstation and runâ€**, the simplest fit is a **self-contained Windows publish**. That bundles the .NET runtime with your app, so the target PC does **not** need .NET 10 installed separately. Single-file publishing is supported via `PublishSingleFile`; self-contained deployment bundles the runtime; and single-file apps are runtime/architecture-specific, e.g. `win-x64`. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+## My recommendation
+Publish **self-contained + single-file + win-x64 + Release**.
+
+That gives you:
+- one `.exe` to copy,
+- no separate .NET install on each workstation,
+- easiest deployment for ad hoc workstation copies. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+If you decide you **donâ€™t** want to include .NET, then publish **framework-dependent** instead. That makes a smaller output, but every workstation must already have the matching .NET desktop runtime installed. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+---
+
+## Important expectation
+Even with â€œsingle-file,â€ some apps may still emit extra files unless native libraries are set to self-extract/include appropriately. Microsoft documents `PublishSingleFile`, and Microsoft Q&A specifically calls out `IncludeNativeLibrariesForSelfExtract=true` when people expect one EXE but still see extra files. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+So the safest â€œold wayâ€ target is:
+
+- `SelfContained = true`
+- `PublishSingleFile = true`
+- `RuntimeIdentifier = win-x64`
+- `IncludeNativeLibrariesForSelfExtract = true`
+
+---
+
+# Easiest way: Visual Studio publish profile
+
+## Option A: Use Visual Studio Publish UI
+1. Open your project in Visual Studio.
+2. In **Solution Explorer**, right-click the **startup WinForms project**.
+3. Click **Publish**.
+4. If prompted for a target, choose **Folder**.
+5. Pick a folder like:
+   `C:\Publish\AMiOffice`
+6. Click **Finish**.
+
+Then edit the publish settings:
+
+7. In the Publish screen, click **Show all settings** or **Edit**.
+8. Set:
+   - **Configuration** = `Release`
+   - **Target runtime** = `win-x64`
+   - **Deployment mode** = `Self-contained`
+   - **Produce single file** = `True`
+9. If there is a checkbox for trimming, leave it **off** for a WinForms line-of-business app.
+10. If there is a checkbox for ReadyToRun, you can leave it off unless you specifically want it.
+
+Then click **Publish**. Visual Studio supports folder publishing for .NET desktop apps, including self-contained vs framework-dependent settings. ([learn.microsoft.com](https://learn.microsoft.com/en-us/visualstudio/deployment/quickstart-deploy-using-clickonce-folder?view=visualstudio&utm_source=openai))
+
+---
+
+# Best way if you want it predictable: edit the project file
+If this is a new VB install and you want to stop guessing what Visual Studio remembered before, I recommend setting publish properties directly in the project file.
+
+Open your `.vbproj` and add a property group like this:
+
+```xml
+<PropertyGroup>
+  <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+  <SelfContained>true</SelfContained>
+  <PublishSingleFile>true</PublishSingleFile>
+  <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+</PropertyGroup>
+```
+
+These are the core properties Microsoft documents for single-file/self-contained publishing. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+## If your project already has publish settings
+Merge carefully rather than duplicating conflicting properties.
+
+---
+
+# Command-line publish: most reliable
+If you want the cleanest â€œdo exactly thisâ€ publish, use Developer PowerShell or a terminal in the project folder:
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish\win-x64
+```
+
+This uses the official `dotnet publish` flow with explicit self-contained and single-file settings. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+## What you should get
+Look in:
+
+```text
+.\publish\win-x64
+```
+
+You should see your app EXE there.  
+If everything cooperates, you may get just the EXE; if not, there may be a tiny number of companion files depending on app/native dependency behavior. Microsoftâ€™s own docs and Q&A explain that nuance. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+---
+
+# What I would do in your shoes
+For **todayâ€™s release**, I would:
+
+## Choice 1 â€” safest for users
+Publish **self-contained**.
+
+Use this command:
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish\win-x64
+```
+
+Then test the EXE on:
+- your dev machine,
+- one workstation or VM that does **not** have your dev environment.
+
+If it launches, youâ€™re done. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+## Choice 2 â€” smallest package, but riskier
+If bundling .NET turns into a hassle, use framework-dependent:
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o .\publish\win-x64-fdd
+```
+
+But then each workstation must have the correct .NET desktop runtime already installed. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+---
+
+# My advice on .NET 10
+Since you said you previously had to manually install .NET 10 on the VM, I would **not rely on that** for random workstations. For a copy-and-run deployment, self-contained is the better fit because it includes the runtime with the app. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/project-sdk/msbuild-props?utm_source=openai))
+
+So:
+- **If you want least user friction:** include .NET via self-contained.
+- **If you want smallest output and your environment is managed:** framework-dependent is OK.
+
+---
+
+# Things not to enable right now
+For a business WinForms app, I would avoid these for the publish youâ€™re doing today unless youâ€™ve already tested them:
+- trimming,
+- AOT-style experiments,
+- anything aggressive for size reduction.
+
+Single-file + self-contained is enough for now. Microsoftâ€™s single-file docs emphasize the core publish properties; trimming is a separate concern and can break reflection-heavy apps. ([learn.microsoft.com](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview?utm_source=openai))
+
+---
+
+# Quick step-by-step summary
+## If you want the simplest route
+1. Open terminal in the project folder.
+2. Run:
+
+```powershell
+dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o .\publish\win-x64
+```
+
+3. Go to `publish\win-x64`
+4. Copy the EXE to a test machine.
+5. Run it.
+
+---
+
+# If publish fails
+If you hit an error, send me:
+- the exact publish command you ran,
+- the full error text,
+- and ideally the relevant part of your `.vbproj`.
+
+Then I can walk you through the fix directly.
+
+If you want, next I can give you:
+1. the **exact `.vbproj` block** to paste, and  
+2. the **exact terminal commands** to run in order.
+
+## @testsubject117
+
+do I want to publish with clickonce?
+
+## Copilot
+
+No â€” **not for what you described**.
+
+You said you want:
+- a **standalone executable**
+- that can be **copied to any workstation and run**
+
+That is **not really a ClickOnce scenario**. ClickOnce is meant for **installing/updating** an app from a publish location like a folder share or website, with deployment manifests and versioned installs. Microsoftâ€™s ClickOnce docs describe it as a deployment/install/update mechanism for Windows desktop apps, not just â€œmake me one EXE I can copy around.â€ ([learn.microsoft.com](https://learn.microsoft.com/en-us/visualstudio/deployment/quickstart-deploy-using-clickonce-folder?view=visualstudio&utm_source=openai))
+
+## What you want instead
+Use a **Folder publish**, not ClickOnce:
+- **Release**
+- **win-x64**
+- **Self-contained**
+- **Single file**
+
+That matches your â€œcopy to any workstation and runâ€ goal much better, and self-contained publishing includes the .NET runtime so you donâ€™t have to preinstall it on every machine. ([learn.microsoft.com](https://learn.microsoft.com/en-us/visualstudio/deployment/quickstart-deploy-using-clickonce-folder?view=visualstudio&utm_source=openai))
+
+## Short rule of thumb
+- **ClickOnce** = install/update experience
+- **Folder publish** = copy files / copy EXE and run
+
+For your case, choose **Folder publish**. ([learn.microsoft.com](https://learn.microsoft.com/en-us/visualstudio/deployment/quickstart-deploy-using-clickonce-folder?view=visualstudio&utm_source=openai))
+
+## My recommendation
+When Visual Studio asks:
+- choose **Publish**
+- choose **Folder**
+- **do not choose ClickOnce**
+
+Then set it to:
+- **Self-contained**
+- **Target runtime: win-x64**
+- **Single file: On**
+
+That will get you closest to the old â€œportable executableâ€ style deployment. Self-contained single-file publishing is the .NET-supported approach for bundling app + runtime together. ([learn.microsoft.com](https://learn.microsoft.com/en-us/visualstudio/deployment/quickstart-deploy-using-clickonce-folder?view=visualstudio&utm_source=openai))
+
+If you want, next I can give you the **exact click-by-click Visual Studio settings** to use on the Publish screen.
+
+## @testsubject117
+
+```
+Please create a complete AMi project end-of-day wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+Core requirements:
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of todayâ€™s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly. Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+```
+hmmmm. we had setup a counter to up the build count by 1 by using a text file, but I guess we didn't set that back up again after the crash. Please also put that on the list for tomorrow. I published and tried on the virtual machine. it's looking really good. ok, lets pause for the day. What I need from you is: (and please add into the list of to do's for tomorrow, the addressing of the truncated computing....  and the build counter.
+
+## Copilot
+
+# 1. Executive Summary
+Todayâ€™s work focused on finishing the remaining Checks-menu modernization items in **AMiWinForms**, while preserving the core DOS workflow, look, and operator expectations as closely as practical. The session centered heavily on the final Checks menu item, **(A) Find checks that donâ€™t balance**, which was already functionally useful in VB but did not visually match the DOS-inspired UI used elsewhere in the application. The decision for today was explicitly **not** to rework the functional flow of `(A)` to match DOS exactly, because the DOS VM appears to currently do nothing when that item is selected and user confirmation is still pending. Instead, the agreed plan was to keep the existing useful VB implementation and restyle it so it fits the rest of the app. This preserves operator value now while deferring parity decisions until users clarify intended legacy behavior.
+
+The active code file provided and revised was **`FormLedgerDoesntBalance.vb`**. That form already contained the business logic to load `LEDGER.CUR`, use `CHECK.INV` mappings, optionally resolve invoice amounts via `INVOICE.CHK`, and produce a list of checks that either have no invoice mapping or whose invoice totals do not balance to the check amount. The core logic uses `Tolerance = 1D`, preserving the DOS rule that differences under one dollar are treated as acceptable. The logic also distinguishes between â€œNo CHECK.INV mappingâ€ rows and actual delta rows with invoice mappings but imbalanced totals. We kept that behavior intact.
+
+A major part of the work was re-skinning `FormLedgerDoesntBalance` to visually align with the existing DOS-like menu screens. The form was changed from a default WinForms look toward the appâ€™s established style: dark charcoal/black background, large upper-left yellow **CHECKS** header, upper-right yellow date/time display, silver command buttons, dark grid, and DOS-inspired contrast. The command bar now includes **Refresh**, **Cancel**, **Copy Row**, **Export CSV**, and **(ESC) Close**. Keyboard handling was added so **Esc closes the form**. A header timer was introduced to keep the date/time clock updated. The ambiguous `Timer` compiler error occurred because both `System.Windows.Forms` and `System.Threading` were imported; this was fixed by explicitly declaring the timer as `System.Windows.Forms.Timer`.
+
+The status/progress area for report generation also evolved during the session. Initially, the message such as **â€œComputing rows...â€** plus the rolling count was placed on one line, and that text was visibly truncated in the UI. This was improved by splitting the progress into a two-line status area using two labels: one for the status message (for example, `Computing rows...`) and one below it for rolling counts (for example, `28,500/51,350`). That solved the truncation problem during computation and looked better in practice. However, after the computation completes and rows are displayed, there is still a residual visual issue where part of the earlier computing text appears to persist in the status area. This is not blocking release, but it was explicitly noted for tomorrow: either change the post-compute message to something clean like **â€œReport completeâ€** or **â€œComputations completeâ€**, or clear the transient computing message entirely.
+
+Another refinement involved the results grid typography. After the first styling pass, the row text appeared too bold, which made the grid look heavy and odd. The solution was to make the **grid body regular-weight** while leaving the **column headers bold**. The row-prepaint logic had also been forcing some highlighted rows into bold; that was removed so highlighted rows remain regular-weight like the rest of the grid. This significantly improved readability and visual balance.
+
+Color tuning was also adjusted in stages. Initially, the no-invoice rows were too gold/yellow and the mismatch rows too saturated pink/red. After seeing real screenshots, those colors were progressively softened. The final accepted look uses a **lighter pale yellow** for rows with no invoice mapping and a **soft milky pink** for mismatch/delta rows. The user explicitly confirmed that the latest yellow and pink now look fine and are acceptable for release.
+
+We also discussed DOS parity implications of `(A) Find checks that donâ€™t balance`. The DOS VM appears to do nothing when `(A)` is selected, and it is currently unknown whether that menu item ever actually worked in the legacy environment or if it was effectively dead/incomplete. Because of that uncertainty, the deliberate decision was to keep the VB versionâ€™s useful current behavior rather than disabling it or trying to force a speculative DOS flow. This is one of the important explicit deviations from strict DOS parity for now, but only provisionally; it needs follow-up with users.
+
+Outside the form-specific work, we also discussed publishing/deployment because this was a new VB/Visual Studio setup after a crash/rebuild. The deployment goal was clarified as **a standalone executable that can be copied to any workstation and run**, not a ClickOnce installation workflow. Based on that, the recommendation was to use **Folder publish**, not ClickOnce, and preferably **self-contained + single-file + win-x64 + Release** so that the target workstation does not need a separate .NET runtime installation. The operator tested the published build on the VM and reported that it is **looking really good**. One forgotten infrastructure item surfaced at the end: previously there had been a **build counter** that incremented the build count by reading/writing a text file, but that was not restored after the crash. That now needs to be put back in place and was explicitly added to tomorrowâ€™s task list.
+
+In summary, today was a highly productive polish-and-release day. The Checks workflow is now substantially more consistent, `(A)` is visually integrated into the app while preserving its useful modernized behavior, and a publishable build has already been tested successfully on the VM. Tomorrow should focus on a small number of targeted cleanup items: the persistent/truncated â€œComputing...â€ status text behavior after completion, restoring the build counter increment mechanism, standardizing the Castellar/Castella title font across upper-left headers, and validating with users whether DOS `(A)` behavior was ever real or should remain a VB enhancement.
+
+# 2. What Was Accomplished Today
+- [x] Reviewed and finalized the remaining Checks-menu item **`(A) Find checks that don't balance`** as the last active menu-item styling task for this cycle.
+- [x] Confirmed that the current VB implementation for `(A)` is functionally useful even though DOS currently appears to do nothing when that option is selected.
+- [x] Explicitly decided to **keep the current VB business logic** for `(A)` for now rather than disabling it or forcing speculative DOS parity.
+- [x] Received and reviewed the full code for **`FormLedgerDoesntBalance.vb`**.
+- [x] Preserved the report-generation logic in `FormLedgerDoesntBalance`:
+  - [x] `LEDGER.CUR` loading
+  - [x] `CHECK.INV` mapping lookup
+  - [x] `INVOICE.CHK` invoice amount resolution
+  - [x] no-mapping detection
+  - [x] delta/unbalanced detection
+  - [x] DOS-like tolerance rule `Tolerance = 1D`
+- [x] Restyled `FormLedgerDoesntBalance` to visually match the DOS-inspired AMi Checks UI:
+  - [x] dark form background
+  - [x] black top header
+  - [x] large upper-left yellow **CHECKS** title
+  - [x] upper-right yellow clock/date
+  - [x] dark command bar
+  - [x] silver command buttons
+  - [x] dark `DataGridView`
+  - [x] `(ESC) Close` button
+- [x] Added **Esc key handling** to close the form.
+- [x] Added and wired a **header clock** using a WinForms timer.
+- [x] Fixed the VB compiler error caused by ambiguous `Timer` references by explicitly using **`System.Windows.Forms.Timer`**.
+- [x] Improved the progress/status area so **â€œComputing rows...â€** and the rolling counts are displayed on **two separate lines** instead of one truncated line.
+- [x] Confirmed that the first two-line status layout looked better during computation.
+- [x] Changed grid body text from bold to **regular-weight** for better readability.
+- [x] Kept headers bold while leaving body rows regular.
+- [x] Removed forced bold formatting from highlighted result rows.
+- [x] Tuned row highlight colors multiple times based on screenshot feedback.
+- [x] Finalized acceptable lighter row colors:
+  - [x] pale yellow for **No CHECK.INV mapping**
+  - [x] soft milky pink for delta/unbalanced rows
+- [x] Confirmed that latest yellow/pink row colors are acceptable.
+- [x] Discussed deployment strategy for the rebuilt VB environment.
+- [x] Determined that **ClickOnce is not appropriate** for the desired â€œcopy to any workstation and runâ€ deployment model.
+- [x] Recommended **Folder publish** with self-contained single-file Windows publish as the best fit for the operatorâ€™s current deployment needs.
+- [x] Published a build and tested it on the virtual machine.
+- [x] Confirmed operator assessment that the latest VM build is **looking really good**.
+- [x] Captured tomorrow follow-up items:
+  - [x] fix lingering/truncated â€œComputing...â€ post-completion status display
+  - [x] restore the **build counter** text-file increment mechanism
+  - [x] standardize title font to match Castellar/Castella used on Main Menu and Checks Menu
+  - [x] validate expected DOS behavior for `(A)` with users
+
+# 3. AMiWinForms Work Summary
+Todayâ€™s work in **AMiWinForms** focused almost entirely on the final Checks workflow item still needing visual parity work: **`FormLedgerDoesntBalance`**, which represents **`(A) Find checks that don't balance`** from the Checks menu.
+
+## Forms reviewed or changed
+- **`FormLedgerDoesntBalance.vb`**
+  - This was the only full source file provided and revised in detail during the session.
+  - The form was already functionally implemented but visually inconsistent with the DOS-inspired app style used on Main Menu / Checks Menu / other modernized report screens.
+
+## UI/workflow findings
+- The form had been built as a useful WinForms utility/report screen using a `DataGridView`, toolbar buttons, filtering, export, and copy-row support.
+- The logic was already considered likely correct enough for now; the issue was primarily **presentation**, not business behavior.
+- The screen originally looked too much like a standard Windows data-entry/report grid rather than part of the AMi DOS-modernized workflow.
+- The DOS VM currently appears to do nothing when `(A)` is chosen, making strict parity uncertain.
+- Because user validation is still pending, we intentionally chose to **retain the VB workflow** while styling it to look more DOS-consistent.
+
+## Event handling / business logic notes
+`FormLedgerDoesntBalance` includes:
+- asynchronous report generation via `RunReportAsync()`
+- cancellation support via `CancellationTokenSource`
+- progress reporting using `IProgress(Of ProgressInfo)`
+- row generation via `ComputeRows(...)`
+- copy/export commands
+- filter switching using `cboFilter_SelectedIndexChanged`
+- row highlighting using `dgv_RowPrePaint`
+- selection-state handling via `dgv_SelectionChanged`
+- Esc-to-close via `ProcessCmdKey`
+
+Important internal classes and constants in the form:
+- `BalanceRow`
+- `FilterMode`
+- `ProgressInfo`
+- `Tolerance = 1D`
+- `LargeDeltaWarn = 25D`
+- `LargeDeltaSevere = 100D`
+
+## Areas complete
+- Visual restyling of `FormLedgerDoesntBalance`
+- Two-line progress/status layout during computation
+- Esc-close behavior
+- acceptable final row highlight colors
+- regular-weight grid body font
+- publishable state for current build
+
+## Areas incomplete / follow-up
+- Title font in top-left header currently still does **not** match the Castellar/Castella styling used elsewhere.
+- After computation completes, the status area still partially preserves the earlier **â€œComputing...â€** text; this needs cleanup.
+- It remains uncertain whether the workflow of `(A)` should ultimately be kept as a useful VB enhancement or changed after user confirmation of legacy expectations.
+
+# 4. AMiDataStore Work Summary
+There was **no new direct AMiDataStore code modification** performed in this session, but the session still touched AMiDataStore-related understanding indirectly through the formâ€™s data access behavior and through the larger project framing.
+
+## Data access behavior reviewed
+The current `FormLedgerDoesntBalance` logic depends on legacy-style file readers and data access patterns that are part of the broader AMi data layer ecosystem:
+- `LedgerCurReader.ReadAll(ledgerPath)`
+- `CheckInvReader.ReadAll(checkInvPath)`
+- `InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)`
+- `LegacyDataPaths.LedgerCur`
+- `LegacyDataPaths.CheckInv`
+- `LegacyDataPaths.InvoiceChk`
+- `UiFileErrors.ShowMissingRequiredFile(...)`
+
+These dependencies matter because they represent the modern VB/WinForms applicationâ€™s bridge back to legacy DOS-era file structures and business workflows.
+
+## Dependencies identified
+The form depends on:
+- ledger records from **`LEDGER.CUR`**
+- check-to-invoice relationship data from **`CHECK.INV`**
+- invoice amount lookups from **`INVOICE.CHK`**
+
+The logic builds a composite key with:
+- `Customer`
+- `CheckNumber`
+
+using `BuildKey(code, checkNum)`.
+
+It then:
+1. loads all ledger entries,
+2. builds an in-memory index of check-to-invoice mappings,
+3. resolves invoice amounts, caching them in `amtCache`,
+4. identifies unbalanced or unmapped checks,
+5. presents those as result rows.
+
+## Repository interactions / implications
+Even though no AMiDataStore repo tools were used in this session, the analysis confirms that AMiWinForms is still tightly dependent on datastore-level correctness and legacy-file semantics. The formâ€™s output quality depends on:
+- correct `CHECK.INV` parsing,
+- correct invoice record resolution,
+- correct handling of missing `INVOICE.CHK` entries,
+- stable path resolution.
+
+## Why those findings matter
+This matters because `(A)` is not just a UI concern; its usefulness depends entirely on the fidelity of the file readers and mapping semantics. If users later challenge the output of the screen, debugging may need to move into AMiDataStore/file-reader territory. For now, the business rule path appears coherent enough that the form is worth shipping as a useful operator tool.
+
+# 5. DOS vs VB Parity Summary
+## What DOS currently does in the relevant workflow
+For the Checks workflow overall, DOS remains the baseline reference for:
+- menu navigation,
+- button/menu wording,
+- sequencing,
+- report style,
+- general black/yellow DOS-inspired presentation.
+
+For `(A) Find checks that don't balance`, the operator observed in the DOS VM that selecting `(A)` appears to **do nothing**. It is currently unknown whether:
+- the feature was broken in DOS,
+- incomplete in DOS,
+- dependent on data conditions not present in the VM,
+- or simply never used.
+
+## What VB already reproduces
+Across the Checks modernization work, the VB version now closely reproduces the DOS-inspired style in many areas:
+- familiar Checks visual framing
+- black/dark backgrounds
+- yellow upper-left title branding
+- DOS-like operator-facing navigation expectations
+- keyboard-friendly use patterns
+- report/list-style presentation decisions for several menu items already modernized previously
+
+For `(A)` specifically, VB currently reproduces the *spirit* of legacy operator troubleshooting even if DOS exact behavior is uncertain:
+- scans ledger/check/invoice relationships
+- identifies missing mappings
+- identifies invoice-sum mismatches
+- surfaces actionable exceptions to the user
+
+## What VB still needs to match
+For strict DOS parity, `(A)` remains unresolved because the DOS baseline is unclear. VB may still eventually need one of the following, depending on user feedback:
+- do nothing / disabled behavior if DOS truly never had meaningful output
+- text-report output instead of grid
+- different sequencing or pause behavior
+- different status wording
+- different title font and header treatment to match the rest of the app more exactly
+
+## What visual/behavioral patterns must remain familiar
+The user explicitly reinforced that VB should remain as close to DOS as practical unless a deliberate decision is made otherwise. The patterns that must remain familiar include:
+- upper-left title treatments
+- consistent menu styling
+- DOS-like color palette and layout
+- familiar navigation paths
+- no unnecessary modern UI behavior
+- preserving legacy workflows unless intentionally overridden
+
+## Known gaps, mismatches, or deviations
+- `(A)` currently uses a `DataGridView`-based utility/report UI, which DOS likely did not.
+- The top-left title font on `FormLedgerDoesntBalance` is close but not the same as the Castellar/Castella-style font used elsewhere.
+- Post-compute status messaging still needs cleanup.
+- DOS behavior for `(A)` is not yet validated with users.
+
+## Explicitly allowed differences
+Todayâ€™s explicit decision:
+- **Keep the existing useful VB logic and screen for `(A)` for now**, even if DOS currently appears to do nothing, because the VB version is valuable and user validation is pending.
+This is a deliberate temporary deviation from strict DOS parity.
+
+# 6. Forms / Workflow Status
+## Checks Menu overall
+- **Current state:** largely stabilized for this cycle
+- **What works:** multiple menu items previously updated and aligned more closely to DOS patterns
+- **What is missing:** a few polish items remain, especially title/font consistency and remaining parity validation
+- **What to do next:** continue final cleanup and user validation
+
+## `(5) View Company Totals`
+- **Current state:** previously completed/working in this cycle
+- **What works:** considered part of the cleaned-up Checks workflow set
+- **What is missing:** no new issues discussed today
+- **What to do next:** include in smoke test / regression pass
+
+## `(8) View OTHER Checks`
+- **Current state:** previously completed/working in this cycle
+- **What works:** considered part of the cleaned-up Checks workflow set
+- **What is missing:** no new issues discussed today
+- **What to do next:** include in smoke test / regression pass
+
+## `(9) Find a Check #`
+- **Current state:** previously completed/working in this cycle
+- **What works:** considered part of the cleaned-up Checks workflow set
+- **What is missing:** no new issues discussed today
+- **What to do next:** include in smoke test / regression pass
+
+## `(0) Find an Invoice #`
+- **Current state:** previously completed/working in this cycle
+- **What works:** considered part of the cleaned-up Checks workflow set
+- **What is missing:** no new issues discussed today
+- **What to do next:** include in smoke test / regression pass
+
+## `(A) Find checks that don't balance`
+- **Current state:** functionally useful and visually much improved; shipped candidate
+- **What works:**
+  - report generation
+  - filtering
+  - copying row data
+  - CSV export
+  - cancel/refresh
+  - Esc close
+  - two-line progress area during computation
+  - acceptable pale yellow / soft pink row highlighting
+- **What is missing:**
+  - title font standardization to match Main Menu / Checks Menu
+  - cleanup of lingering â€œComputing...â€ text after completion
+  - user validation on whether the DOS feature ever really existed/was used
+- **What to do next:**
+  - fix status cleanup text
+  - unify title font
+  - confirm with users how DOS `(A)` was expected to behave
+
+## Publishing workflow
+- **Current state:** working enough to release today
+- **What works:** operator successfully published and tested build in VM
+- **What is missing:** previous build-counter mechanism not yet restored
+- **What to do next:** re-establish build counter increment using text-file-based mechanism
+
+# 7. Key Technical Findings
+- `FormLedgerDoesntBalance` is already structurally robust and includes async loading, cancellation, progress updates, filtering, export, and row copy features.
+- Business-rule tolerance is explicitly defined as `Tolerance = 1D`, preserving a DOS-era â€œless than $1 difference is okayâ€ rule.
+- â€œNo mappingâ€ rows are produced when no `CHECK.INV` mapping exists for the `(Customer, CheckNumber)` key.
+- Delta rows are produced when invoice totals do not match the check amount or when referenced invoices cannot be found in `INVOICE.CHK`.
+- `ComputeRows(...)` uses a cached `amtCache` dictionary to avoid repeated invoice lookups for duplicate invoice numbers.
+- `BuildKey(code, checkNum)` trims and composes `Customer|CheckNumber`, which is the critical mapping assumption for relationship resolution.
+- The ambiguous `Timer` compile error happened because both `System.Windows.Forms` and `System.Threading` define `Timer`; explicit use of `System.Windows.Forms.Timer` fixes it.
+- The initial single-line progress display caused truncation; splitting status and counts into two stacked labels is a cleaner and more resilient layout.
+- The first two-line progress version was visually preferred by the operator.
+- Bold body text in the `DataGridView` made the result grid look too heavy; regular body font is preferable.
+- Highlight colors needed multiple tuning passes once real screenshots were visible; saturated gold/pink did not look right against the dark DOS-inspired styling.
+- Current accepted colors are softer and better aligned to the app aesthetic.
+- DOS VM behavior for `(A)` is currently unreliable as a baseline because it appears to do nothing.
+- Publishing goal is **standalone executable deployment**, so **Folder publish** is the right model, not ClickOnce.
+- Previous text-file-driven build counter was lost after the crash/rebuild and needs to be restored manually.
+
+# 8. Current Project State
+## Working
+- Checks workflow polish is in very good shape overall.
+- `FormLedgerDoesntBalance` is functional and visually integrated enough to ship.
+- Build was published and tested on the VM.
+- Latest row colors are accepted.
+- Two-line computation progress layout is accepted.
+- Body font issue was resolved.
+
+## Partially working
+- `(A)` DOS parity is only partially understood because DOS behavior appears absent.
+- Title font consistency across forms is not yet standardized.
+- Status cleanup after computation is still imperfect.
+
+## Not started / not restored
+- Build counter text-file increment mechanism has not yet been restored in the rebuilt environment.
+
+## Broken
+- Nothing newly broken was identified in todayâ€™s released workflow.
+- Only minor polish issue: lingering/truncated post-compute status text behavior.
+
+## Uncertain
+- Whether DOS `(A)` ever truly functioned or whether the VM behavior is representative.
+- Whether `(A)` should eventually remain a modern VB enhancement or be reduced to match DOS once users confirm expectations.
+
+# 9. Remaining Work
+## UI / forms
+- [ ] Standardize the upper-left title font across relevant forms so `CHECKS` matches Main Menu / Checks Menu exactly (Castellar/Castella-style font).
+- [ ] Clean up the post-computation status display in `FormLedgerDoesntBalance` so lingering â€œComputing...â€ text does not remain after results are shown.
+- [ ] Decide on final completion wording for `(A)` status area:
+  - [ ] `Report complete`
+  - [ ] `Computations complete`
+  - [ ] or clear status entirely after bind
+- [ ] Do a final visual pass on title/header consistency across DOS-styled forms.
+
+## Data / store
+- [ ] If users question `(A)` output, validate file-reader behavior for:
+  - [ ] `CHECK.INV`
+  - [ ] `INVOICE.CHK`
+  - [ ] key composition logic in `BuildKey(...)`
+- [ ] Reconfirm that missing invoice and no-mapping cases are being distinguished exactly as intended.
+
+## DOS parity
+- [ ] Ask users whether DOS `(A) Find checks that don't balance` ever actually worked and what they expected it to do.
+- [ ] Based on that answer, decide whether `(A)` should:
+  - [ ] remain as current VB utility enhancement
+  - [ ] be redesigned into a DOS-style text report
+  - [ ] or be disabled/no-op to match legacy behavior
+
+## Validation / business rules
+- [ ] Reconfirm that `Tolerance = 1D` matches actual expected business behavior in production.
+- [ ] Confirm whether the sorting priority (no mapping first, then biggest delta) is desired.
+
+## Testing
+- [ ] Run another smoke test over the key Checks items:
+  - [ ] `(5) View Company Totals`
+  - [ ] `(8) View OTHER Checks`
+  - [ ] `(9) Find a Check #`
+  - [ ] `(0) Find an Invoice #`
+  - [ ] `(A) Find checks that don't balance`
+- [ ] Verify on VM / workstation:
+  - [ ] publish output launches cleanly
+  - [ ] no runtime dependency surprises
+  - [ ] copy/export/filter on `(A)` still work
+  - [ ] Esc closes correctly
+
+## Cleanup / refactor
+- [ ] Restore the **build counter** mechanism that increments build number via text file.
+- [ ] Recreate any publish/profile settings lost in the crash/rebuild so future releases are easier.
+- [ ] Consider centralizing title font/header styling so all DOS-styled forms share one implementation.
+
+# 10. Highest Priority Next Steps
+1. Fix the **post-compute lingering/truncated â€œComputing...â€** status behavior in `FormLedgerDoesntBalance`.
+2. Restore the **build counter** text-file increment mechanism lost after the crash/rebuild.
+3. Standardize the **upper-left title font** so `CHECKS` uses the same Castellar/Castella-style font as Main Menu / Checks Menu.
+4. Ask users whether DOS `(A)` ever worked and what behavior they expect.
+5. Decide whether `(A)` remains a useful VB enhancement or needs a later parity redesign.
+6. Reconfirm publishing setup so future standalone releases are repeatable without guesswork.
+
+# 11. Risks / Blockers / Open Questions
+- DOS VM currently appears to do nothing for `(A) Find checks that don't balance`; this makes parity decisions uncertain.
+- User expectation for `(A)` is not yet validated.
+- The current VB implementation may be more useful than DOS ever was, but that could still conflict with strict parity goals depending on stakeholder preference.
+- Title font is still inconsistent across DOS-styled forms.
+- The build counter mechanism was not re-established after the crash, so release/version continuity may drift if not restored soon.
+- Publishing works now, but the environment was rebuilt; settings/process may still need formal re-documentation.
+- If some workstations do not match runtime expectations, deployment could still need refinement depending on whether self-contained publish is adopted consistently.
+
+# 12. AMi Future Chat Reload Pack
+AMi project = ongoing modernization/continuation of legacy DOS workflows in **AMiWinForms** with backing legacy-style data/file behavior tied to **AMiDataStore** conventions and readers. Core rule: VB should preserve DOS workflow, behavior, navigation, and visual familiarity as closely as practical unless we explicitly decide otherwise.
+
+Todayâ€™s main focus was the final Checks menu item: **`(A) Find checks that don't balance`**, implemented in **`FormLedgerDoesntBalance.vb`**. The form already had useful logic and was kept functionally intact. Logic reads `LEDGER.CUR`, builds check/invoice mapping from `CHECK.INV`, resolves invoice amounts from `INVOICE.CHK`, and produces rows for either **No CHECK.INV mapping** or invoice sum mismatches. Important internals: `RunReportAsync()`, `ComputeRows(...)`, `ApplyFilterAndBind()`, `dgv_RowPrePaint`, `BuildKey(...)`, `BalanceRow`, `FilterMode`, `ProgressInfo`, `Tolerance = 1D`, `LargeDeltaWarn = 25D`, `LargeDeltaSevere = 100D`.
+
+We explicitly decided **not** to redesign `(A)` into strict DOS parity today because the DOS VM currently appears to do nothing when `(A)` is selected. Need user confirmation tomorrow whether DOS ever actually did anything there. For now, current VB behavior is intentionally retained as a useful enhancement.
+
+UI work completed on `FormLedgerDoesntBalance`:
+- DOS-like dark header/theme
+- upper-left yellow `CHECKS`
+- upper-right clock
+- silver buttons: Refresh / Cancel / Copy Row / Export CSV / `(ESC) Close`
+- Esc closes form
+- two-line progress area during computation
+- regular-weight grid body text
+- soft pale yellow rows for no-mapping
+- soft milky pink rows for delta rows
+
+Important bug fixed today:
+- ambiguous `Timer` compile error fixed by explicitly using `System.Windows.Forms.Timer`.
+
+Known remaining issues for tomorrow:
+- after computation finishes, part of **â€œComputing...â€** still appears in status area; clean this up (`Report complete`, `Computations complete`, or clear it).
+- top-left `CHECKS` title font is still not the exact same Castellar/Castella-style font used on Main Menu and Checks Menu; standardize it.
+- restore the **build counter** text-file increment mechanism that existed before the crash/rebuild.
+- ask users whether DOS `(A)` ever truly worked / what behavior is expected.
+
+Publishing/deployment:
+- goal is standalone executable copied to any workstation
+- do **not** use ClickOnce for this
+- use **Folder publish**
+- likely self-contained + single-file + win-x64 is best for portable deployment
+- operator already published and tested latest build on VM and reported it looks really good
+
+Checks items previously considered working in this cycle and should remain part of smoke tests:
+- `(5) View Company Totals`
+- `(8) View OTHER Checks`
+- `(9) Find a Check #`
+- `(0) Find an Invoice #`
+- `(A) Find checks that don't balance`
+
+# 13. Operator Tactical Notes
+- [ ] Tomorrow: fix lingering **â€œComputing...â€** text after results load in `FormLedgerDoesntBalance`
+- [ ] Tomorrow: restore **build counter** text-file increment setup
+- [ ] Tomorrow: grab exact title-font code from Main Menu / Checks Menu and reuse it in `FormLedgerDoesntBalance`
+- [ ] Tomorrow: ask users whether DOS `(A)` ever did anything / what they expect
+- [ ] Keep current yellow/pink colors â€” operator approved them
+- [ ] Current build tested on VM and looks good
+- [ ] Deployment direction: **Folder publish**, **not ClickOnce**
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+## Previous baseline
+The Checks workflow modernization was already well underway, with multiple menu items cleaned up to better match DOS behavior and styling. The last significant active UI inconsistency in this cycle was `(A) Find checks that don't balance`, which existed as a functional VB tool but looked too much like a standard WinForms utility screen.
+
+## What changed today
+- `FormLedgerDoesntBalance` was restyled to fit the DOS-inspired app.
+- Two-line progress display was added to avoid truncated compute messages.
+- Ambiguous timer compile issue was fixed.
+- Grid body font was corrected from bold to regular.
+- Row colors were tuned several times and finalized.
+- Publish guidance was clarified for standalone deployment.
+- A new build was published and successfully tested in the VM.
+
+## Current state
+The app is in a strong near-release state for this slice of work. The Checks menu is largely coherent. `(A)` is visually acceptable, useful, and shipping-ready, though still slightly imperfect in status cleanup and title-font consistency.
+
+## Next milestone
+Small cleanup pass:
+- fix post-compute status text,
+- restore build counter,
+- standardize title font,
+- confirm DOS/user expectations for `(A)`.
+
+## Long-term target
+Consistent, production-stable modernization of AMiWinForms that preserves legacy DOS workflows, operator comfort, business behavior, and visual identity while leveraging modern VB/.NET maintainability and deployment.
+
+# 15. First Thing Tomorrow Morning
+- [ ] Reopen `FormLedgerDoesntBalance.vb`
+- [ ] Fix the lingering **â€œComputing...â€** status display after results finish loading
+- [ ] Restore the **build counter** text-file increment mechanism
+- [ ] Compare Main Menu / Checks Menu title font code and apply same font to this form
+- [ ] Ask/record user feedback about whether DOS `(A)` ever actually worked
+- [ ] Decide whether `(A)` remains as current VB utility or gets future parity redesign
+
+# 16. Fast Reload Shorthand Block
+AMi reload: today focused on final Checks item `(A) Find checks that don't balance` in `FormLedgerDoesntBalance.vb`. Kept existing VB logic (reads `LEDGER.CUR`, `CHECK.INV`, `INVOICE.CHK`; uses `Tolerance=1D`; builds no-mapping + delta rows) because DOS VM currently appears to do nothing for `(A)` and user validation is pending. Restyled form to DOS-like theme: dark header, yellow upper-left `CHECKS`, yellow clock, silver buttons, dark grid, Esc close, two-line compute status, regular grid body text, soft pale yellow for no mapping, soft milky pink for delta rows. Fixed ambiguous `Timer` issue by using `System.Windows.Forms.Timer`. Build published and tested on VM; operator says it looks really good. Tomorrow TODOs: fix lingering/truncated post-compute â€œComputing...â€ status text, restore text-file build counter increment setup, standardize top-left title font to same Castellar/Castella-style font used on Main Menu/Checks Menu, ask users whether DOS `(A)` ever really worked and what expected behavior should be.
+
+## @testsubject117
+
+```
+Please create a complete end-of-day project wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, specific, and detailed. Do not be vague. Include code work, repo review, debugging, planning, architecture findings, DOS behavior comparisons, UI/UX constraints, and next-step decisions.
+
+Important requirements:
+- Include exact forms, files, classes, methods, features, bugs, and workflows discussed today.
+- If AMiDataStore and/or AMiWinForms were reviewed, include what was learned from each.
+- Compare DOS behavior to the current VB implementation wherever relevant.
+- Preserve the requirement that the VB version should match DOS workflow, behavior, and look-and-feel as closely as practical unless explicitly decided otherwise.
+- Call out assumptions, unresolved questions, risks, blockers, and dependencies.
+- Make the output useful for:
+  1. me tomorrow morning,
+  2. future chat sessions,
+  3. roadmap tracking,
+  4. implementation handoff.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of what was discussed and accomplished today.
+
+# 2. Work Completed Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+# 3. Key Technical Findings
+Summarize important technical discoveries, code behavior, architecture insights, and implementation details learned today.
+
+# 4. Repo Review Summary
+Create separate subsections for:
+- AMiDataStore
+- AMiWinForms
+
+For each, include:
+- what was reviewed
+- what behavior or implementation was identified
+- why it mattered
+- how it affects next steps
+
+# 5. DOS vs VB Comparison Summary
+Summarize:
+- what DOS does
+- what VB already does
+- what VB still needs to do
+- what must stay visually/behaviorally consistent
+- any acceptable deviations we discussed
+
+# 6. Current Project State
+Summarize where the project stands right now:
+- working
+- partially working
+- not started
+- broken/uncertain
+
+# 7. Remaining Work / Open Items
+Create a grouped markdown checklist of remaining work.
+
+# 8. Highest Priority Next Steps
+List the most important next tasks in priority order.
+
+# 9. Known Risks / Blockers / Questions
+List unresolved issues, blockers, risks, missing information, and things that need confirmation.
+
+# 10. Future Chat Reload Pack
+Create a compact but high-value context block I can paste into a brand new chat to quickly restore working context.
+
+Include:
+- project identity
+- current goal
+- repo/branch context if discussed
+- key forms/files/components discussed
+- major constraints
+- DOS compatibility expectations
+- current status
+- immediate next coding targets
+
+# 11. Shorthand Operator Notes
+Create a shorter tactical checklist for me personally.
+This should be compact, fast to scan, and action-oriented.
+
+# 12. Roadmap: Past -> Present -> Next
+Include:
+- where we were
+- what changed today
+- where we are now
+- what comes next
+- what success looks like
+
+# 13. First Thing Tomorrow
+End with a short checklist of the exact first actions to take at the beginning of the next work session.
+
+Please make the result comprehensive, structured, reusable, and easy to scan.
+```
+in case that missed anything: 
+
+## Copilot
+
+# 1. Executive Summary
+Todayâ€™s work focused on closing out the remaining active Checks-menu polish item in the AMi modernization effort: **`(A) Find checks that don't balance`**, implemented in **`FormLedgerDoesntBalance.vb`** in **AMiWinForms**. The central decision was to keep the current VB logic for this feature, because it is already useful and appears to perform meaningful validation against legacy data files, even though the DOS VM currently appears to do nothing when `(A)` is selected. That DOS uncertainty means strict parity for this one item is still unresolved, so todayâ€™s work prioritized visual consistency and operator usability over speculative flow rewrites.
+
+The starting point was a fully functioning WinForms report screen that already loaded ledger/check/invoice data and identified imbalance cases. The file provided by the operator was **`FormLedgerDoesntBalance.vb`**, which contains the following major logic components:
+- **`RunReportAsync()`** for asynchronous report generation
+- **`ComputeRows(...)`** for building mismatch rows
+- **`ApplyFilterAndBind()`** for filter application and sorting
+- **`dgv_RowPrePaint`** for row highlighting
+- **`BuildKey(...)`**, **`SafeTrim(...)`**, **`SafeTrimEnd(...)`**, and **`Csv(...)`**
+- nested helper types:
+  - **`FilterMode`**
+  - **`ProgressInfo`**
+  - **`BalanceRow`**
+
+The business logic in that form was intentionally preserved. It reads:
+- **`LEDGER.CUR`** via `LedgerCurReader.ReadAll(...)`
+- **`CHECK.INV`** via `CheckInvReader.ReadAll(...)`
+- **`INVOICE.CHK`** via `InvoiceChkReader.ReadRecord(...)`
+
+using paths from:
+- **`LegacyDataPaths.LedgerCur`**
+- **`LegacyDataPaths.CheckInv`**
+- **`LegacyDataPaths.InvoiceChk`**
+
+It then builds a composite customer/check key using `BuildKey(code, checkNum)`, indexes invoice mappings, resolves invoice amounts, caches invoice amounts in `amtCache`, and identifies two major categories of exceptions:
+1. **No CHECK.INV mapping**
+2. **Mapped checks whose invoice totals do not balance to the check amount**, including cases where invoice references exist but invoice records cannot be found
+
+The tolerance rule stayed intact:
+- **`Tolerance = 1D`**
+which preserves the known DOS-era behavior that differences under one dollar are treated as acceptable.
+
+The primary implementation work today was a styling and usability pass on `FormLedgerDoesntBalance` so it would look more like the rest of the DOS-inspired application rather than like a generic Windows utility form. The screen was changed to include:
+- dark charcoal/black background
+- black top header area
+- upper-left large yellow **CHECKS** title
+- upper-right yellow date/time clock
+- silver toolbar buttons
+- darker `DataGridView`
+- `(ESC) Close` button and keyboard support
+- DOS-like visual treatment overall
+
+An explicit compile/debug issue came up when adding the clock: **`Timer`** was ambiguous because both `System.Windows.Forms` and `System.Threading` were imported. That was resolved by explicitly using:
+- **`System.Windows.Forms.Timer`**
+
+Another UI issue involved the progress display during report generation. Initially, the status line showed something like **â€œComputing rows... (28,500/51,350)â€** all on one line, which was visibly truncated. The fix was to split that into a **two-line status block**:
+- top line = status message, e.g. `Computing rows...`
+- bottom line = rolling numbers, e.g. `28,500/51,350`
+
+This version was preferred by the operator and looked better in practice. However, after computation completed and the grid displayed results, part of the old **â€œComputing...â€** message still appeared to remain in the status area. That is not blocking release, but it is explicitly on the list for tomorrow to either:
+- change to **â€œReport completeâ€** / **â€œComputations completeâ€**, or
+- clear the transient computation text entirely
+
+A visual refinement was also needed for the grid body text. The initial styled version left all result rows looking bold, which made the list too heavy. The grid body was updated to use **regular-weight** text while keeping **column headers bold**. Forced bold formatting on highlighted rows was also removed.
+
+Row highlight colors then went through several iterations based on actual screenshots. Originally:
+- the no-invoice rows looked too gold/saturated yellow
+- the mismatch rows looked too strong/pastel-pink-red
+
+These were softened multiple times until the operator approved the final look:
+- **lighter pale yellow** for rows with no invoice mapping
+- **soft milky pink** for rows with invoice deltas
+
+The operator ultimately confirmed that the latest yellow and pink look fine.
+
+Another important near-future cleanup item was identified: the upper-left **CHECKS** title font in this form is still only an approximation and does **not** match the exact **Castellar/Castella-style font** used on the Main Menu and Checks Menu. This needs to be standardized so all upper-left header titles across DOS-styled forms use the same exact font definition and size.
+
+Publishing and deployment were also discussed because this is a rebuilt Visual Studio/VB environment after a crash. The operator wanted to publish a build as a **standalone executable** that could be copied to workstations and run. We clarified that:
+- **ClickOnce is not appropriate** for that goal
+- **Folder publish** is the correct approach
+- ideally use **self-contained + single-file + win-x64 + Release** if minimizing workstation runtime dependencies is important
+
+The operator did publish a build and test it on the virtual machine, and reported that it is **looking really good**.
+
+At the end of the session, one additional infrastructure item surfaced: there had previously been a **build counter** that incremented a build number by reading/updating a text file, but that mechanism was apparently not restored after the crash/rebuild. That now needs to be reinstated. This was explicitly added to tomorrowâ€™s list, along with:
+- the status cleanup after computation
+- title font standardization
+- validating with users whether DOS `(A)` ever actually did anything
+
+Overall, today was a productive closeout/polish/release session. The current build is good enough to publish, the VM run looks good, and the remaining work is now a focused set of small cleanup items plus one open product question about DOS parity for `(A)`.
+
+# 2. Work Completed Today
+- [x] Reviewed the final active Checks-menu item: **`(A) Find checks that don't balance`**
+- [x] Confirmed that the current VB implementation of `(A)` is useful enough to keep for now
+- [x] Explicitly decided **not** to force speculative DOS behavior for `(A)` today because DOS VM currently appears to do nothing and user confirmation is pending
+- [x] Reviewed full source for **`FormLedgerDoesntBalance.vb`**
+- [x] Preserved the existing business logic in `FormLedgerDoesntBalance`
+- [x] Confirmed logic flow using:
+  - [x] `LedgerCurReader.ReadAll(...)`
+  - [x] `CheckInvReader.ReadAll(...)`
+  - [x] `InvoiceChkReader.ReadRecord(...)`
+  - [x] `LegacyDataPaths.LedgerCur`
+  - [x] `LegacyDataPaths.CheckInv`
+  - [x] `LegacyDataPaths.InvoiceChk`
+- [x] Preserved the existing tolerance rule:
+  - [x] `Tolerance = 1D`
+- [x] Restyled `FormLedgerDoesntBalance` to better match the DOS-inspired Checks UI
+- [x] Added DOS-style visual elements:
+  - [x] dark background
+  - [x] black header
+  - [x] upper-left yellow `CHECKS`
+  - [x] upper-right yellow date/time clock
+  - [x] silver command buttons
+  - [x] dark grid styling
+- [x] Added **`(ESC) Close`** button
+- [x] Added keyboard handling so **Esc closes the form**
+- [x] Added a live header clock using a WinForms timer
+- [x] Fixed ambiguous timer error by explicitly using **`System.Windows.Forms.Timer`**
+- [x] Improved progress display by splitting **status text** and **rolling counts** into two separate lines
+- [x] Confirmed that the operator preferred the first two-line status layout
+- [x] Changed result grid body font from bold to regular
+- [x] Kept column headers bold while body rows use regular text
+- [x] Removed forced bolding from highlighted rows
+- [x] Tuned yellow and pink row colors multiple times based on screenshots
+- [x] Finalized softer accepted colors:
+  - [x] light yellow for **No CHECK.INV mapping**
+  - [x] soft milky pink for delta rows
+- [x] Discussed deployment strategy for rebuilt environment
+- [x] Determined **not** to use ClickOnce for the desired copy-and-run deployment model
+- [x] Recommended **Folder publish** instead
+- [x] Published a build
+- [x] Tested the published build on the virtual machine
+- [x] Confirmed operator feedback that the build looks really good
+- [x] Captured tomorrow TODO items:
+  - [x] fix lingering/truncated post-compute **â€œComputing...â€** status text behavior
+  - [x] restore the build-counter text file mechanism
+  - [x] standardize the Castellar/Castella-style title font
+  - [x] validate DOS `(A)` behavior with users
+
+# 3. Key Technical Findings
+- **`FormLedgerDoesntBalance.vb`** is already a substantial functional implementation, not just a UI shell.
+- The core business logic is organized around:
+  - `RunReportAsync()`
+  - `ComputeRows(...)`
+  - `ApplyFilterAndBind()`
+  - `dgv_RowPrePaint`
+- The form distinguishes between:
+  - rows with **no CHECK.INV mapping**
+  - rows with **invoice mappings whose totals do not match the check amount**
+- `ComputeRows(...)` uses a cache:
+  - `Dim amtCache As New Dictionary(Of Long, Decimal)()`
+  to avoid repeatedly reading invoice records for duplicate invoice references.
+- The composite relationship key is built using:
+  - `BuildKey(code, checkNum) = trimmed customer code + "|" + trimmed check number`
+- Missing `CHECK.INV` data causes rows to be flagged as:
+  - `"No CHECK.INV mapping"`
+- Missing invoice records in `INVOICE.CHK` cause rows to be flagged via note text:
+  - `"Invoices not found in INVOICE.CHK"`
+- The logic currently considers a row unbalanced when:
+  - no mapped invoice amounts were found, or
+  - `Math.Abs(delta) >= Tolerance`
+- The DOS-era tolerance assumption remains baked into:
+  - `Private Const Tolerance As Decimal = 1D`
+- The initial one-line progress/status message was too wide for the command bar and got truncated.
+- Splitting progress into two labels was a cleaner design:
+  - status message on top
+  - counts below
+- The operator preferred the first split-label implementation visually.
+- Ambiguous timer issue occurred because of:
+  - `Imports System.Windows.Forms`
+  - `Imports System.Threading`
+  and both namespaces expose a `Timer`.
+- Correct fix was to explicitly declare:
+  - `Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()`
+- `DataGridView` body text looked too heavy when styled bold; regular body font is visually preferable.
+- Highlight colors had to be tuned in the context of the dark DOS-like theme; saturated gold/pink felt wrong.
+- The final accepted visual treatment uses much lighter, softer pastel highlighting.
+- Current title font in this form still uses an approximation and does not match the title font used on the Main Menu / Checks Menu.
+- The app was successfully published and tested on the VM.
+- The previous automated/incremental build-counter mechanism is missing after the crash/rebuild and needs restoration.
+
+# 4. Repo Review Summary
+## AMiDataStore
+### What was reviewed
+There was no direct new code navigation inside the AMiDataStore repo during this session, but the form logic reviewed in AMiWinForms exposed datastore-level dependencies and assumptions.
+
+### What behavior or implementation was identified
+The current Checks mismatch screen depends on legacy-file readers and data contracts consistent with the datastore layer:
+- `LedgerCurReader.ReadAll(...)`
+- `CheckInvReader.ReadAll(...)`
+- `InvoiceChkReader.ReadRecord(...)`
+- `LegacyDataPaths.*`
+
+These readers and paths are foundational to how the form generates exception rows.
+
+### Why it mattered
+This matters because the usefulness and correctness of `(A)` depend on data-access fidelity. If users later report incorrect mismatch detection, the issue may not be in the form UI at allâ€”it may be in reader behavior, file assumptions, path resolution, or key composition.
+
+### How it affects next steps
+If future validation reveals incorrect behavior in `(A)`, debugging may need to move into the datastore/file-reader layer. For now, the logic appears coherent enough to ship.
+
+## AMiWinForms
+### What was reviewed
+The primary file reviewed and revised was:
+- **`FormLedgerDoesntBalance.vb`**
+
+We also referenced the broader visual standards established by:
+- Main Menu
+- Checks Menu
+- other DOS-styled AMiWinForms forms previously modernized in this project cycle
+
+### What behavior or implementation was identified
+The form already included:
+- asynchronous report loading
+- cancel support
+- filter support
+- row copy
+- CSV export
+- row-color highlighting
+- exception-focused business logic
+
+The main gap was visual mismatch with the rest of the DOS-inspired application and a few status/presentation details.
+
+### Why it mattered
+This screen was the last active â€œodd-lookingâ€ item in the Checks workflow. Bringing it visually in line helps the entire Checks section feel coherent and more faithful to the DOS-modernized style.
+
+### How it affects next steps
+AMiWinForms next steps are now mostly cleanup:
+- standardize title font
+- clean post-compute status text
+- validate DOS `(A)` expectations with users
+- continue applying shared title/header styling where needed
+
+# 5. DOS vs VB Comparison Summary
+## What DOS does
+For the overall Checks workflow, DOS provides the baseline for:
+- navigation expectations
+- menu wording
+- sequencing
+- screen flow
+- black/yellow visual feel
+- operator familiarity
+
+For **`(A) Find checks that don't balance`**, current DOS VM behavior appears to be:
+- selecting `(A)` does nothing visible
+
+It is still unknown whether that reflects:
+- broken DOS functionality
+- unfinished DOS functionality
+- environmental/data conditions
+- or simply a feature users never used
+
+## What VB already does

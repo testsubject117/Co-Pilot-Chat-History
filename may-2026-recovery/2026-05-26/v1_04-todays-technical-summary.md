@@ -1,0 +1,229 @@
+# Today's Technical Summary
+
+## Session Date
+- 2026-05-27
+
+## Overall Goal
+- Continue bringing the Rolodex portion of the WinForms app closer to the DOS/GWBASIC application behavior.
+- Resolve compilation issues, complete the area-code workflow, and improve the result-viewing UX.
+
+## Major Outcomes
+- `FrmRolodexMenu.vb` was corrected so methods were properly inside the class.
+- `(G) Look up Area Codes` was converted from a Windows `InputBox` popup flow to an inline DOS-style prompt rendered inside the Rolodex screen.
+- Area-code searching was fixed by aligning parsing logic to the real CSV structure in the data file.
+- The result viewer was converted from hidden Enter-to-page behavior to a scrollable single-view text window with a visible scrollbar.
+- Area-code lookup is now considered working and acceptable.
+- Remaining priority work on this menu is now:
+  - `(E) Print Phone Book`
+  - `(F) Print Labels`
+
+## Detailed Chronology
+
+### 1. Full-file generation and compile issue
+- A full replacement version of `FrmRolodexMenu.vb` was generated.
+- Initial compile errors reported:
+  - `BC30001 Statement is not valid in a namespace`
+  - warnings related to invalid-global-code to `IWin32Window`
+- Root cause:
+  - method blocks such as `OpenAreaCodes()` and `OpenZipKey()` were outside the class structure.
+- Fix:
+  - replace the entire contents of `FrmRolodexMenu.vb` so all methods live inside:
+    - `Public Class FrmRolodexMenu`
+    - `End Class`
+- Result:
+  - build succeeded after replacement.
+
+### 2. Visual mismatch: Windows popup vs DOS look
+- After build/run, `(G)` used a normal Windows `InputBox`, which looked wrong versus the original DOS application.
+- User provided a screenshot showing the desired DOS-style inline look.
+- Decision:
+  - do not use `InputBox`
+  - do not use a separate popup form
+  - render the area-code prompt inline in the Rolodex screen itself
+- Implementation strategy:
+  - reuse `txtInline`
+  - add a new inline mode to the Rolodex menu
+  - handle keyboard input directly in `KeyPress` / `KeyDown`
+
+### 3. `RolodexMenuInlineMode.vb`
+- Full file generated for `RolodexMenuInlineMode.vb`.
+- New member added:
+  - `AreaCodes_Prompt`
+
+Final enum:
+- `None`
+- `PrintPhoneBook_CustomersOnly`
+- `PrintPhoneBook_HighQuality`
+- `PrintPhoneBook_FirstLetter`
+- `PrintLabels_CustomersOnly`
+- `PrintLabels_FirstLetter`
+- `ErrorCheck_Running`
+- `AreaCodes_Prompt`
+
+### 4. Inline DOS-style area-code flow
+- `FrmRolodexMenu.vb` was updated to:
+  - call `StartAreaCodeFlow()` when `G` is pressed
+  - render the prompt inside `txtInline`
+  - maintain `_areaCodeInput`
+  - use Backspace, Enter, and Escape in `KeyDown`
+  - capture alphanumeric input in `HandleInlineInput`
+- Prompt text was intentionally styled to match the DOS screenshot, including the DOS-like typo:
+  - `abreviation`
+- Final prompt form:
+  - `<<< LOOK UP AREA CODES >>>`
+  - explanatory lines
+  - `[A = All] [Q = Quit] ? _`
+
+### 5. First functional problem: no data found
+- After inline prompt implementation, entering `CA` or other values produced no results.
+- Initial suspicion:
+  - service expected a pipe-delimited file.
+- A temporary idea was proposed to convert the file to pipe-delimited format.
+- Before doing that, the user pasted the real contents of `areacodes.csv`.
+
+### 6. Real structure of `areacodes.csv`
+- Actual file contents confirmed:
+  - 3-column CSV
+  - header:
+    - `AreaCode,State,Location`
+- Example rows:
+  - `201,NJ,Northern New Jersey`
+  - `202,DC,Washington`
+  - `213,CA,Los Angeles`
+- Important conclusion:
+  - converting to a pipe-delimited 4-column DOS-style file was the wrong solution.
+  - the modern service needed to be changed to match the real file.
+
+### 7. `AreaCodeEntry.vb`
+- Generated replacement class matching actual data:
+  - `AreaCode`
+  - `State`
+  - `Location`
+
+Final class shape:
+- `Public Property AreaCode As String`
+- `Public Property State As String`
+- `Public Property Location As String`
+
+### 8. `RolodexAreaCodeService.vb`
+- Full replacement service generated to match the 3-column CSV.
+- Key behavior:
+  - `DataFileExists()` checks for the data file.
+  - `GetDataFilePath()` returns the file path.
+  - `LoadEntries()` parses:
+    - `AreaCode`
+    - `State`
+    - `Location`
+  - `Search(input)` supports:
+    - `A` for all rows
+    - 2-letter state code search
+    - numeric area-code prefix search
+  - `FormatGroupedResults(entries)` groups by state code.
+  - `GetAllPages()` creates chunks of formatted text for viewer consumption.
+- Important implementation note:
+  - location is reconstructed with:
+    - `String.Join(",", parts.Skip(2))`
+  - this preserves commas if they ever appear in the location field after the second column.
+
+### 9. Viewer issue: blue selected text
+- When area-code results opened in `FrmPagedTextViewer`, all text appeared highlighted in blue.
+- Root cause:
+  - textbox focus/selection state.
+- `FrmPagedTextViewer.vb` was updated to:
+  - clear selection
+  - set `TabStop = False`
+  - use `HideSelection = True`
+  - clear active control on show
+- This removed the blue-highlight appearance.
+
+### 10. Viewer issue: hidden paging not obvious
+- Another issue:
+  - `(G)` then `A` opened only the first page of results unless the user pressed Enter.
+  - because the viewer provided no instruction text, the paging was not user-friendly.
+- User requested replacing page-advance behavior with a visible scrollbar.
+- Decision:
+  - WinForms usability improvement was preferred here over hidden DOS-style paging.
+- `FrmPagedTextViewer.vb` was replaced again.
+
+### 11. Final `FrmPagedTextViewer.vb` behavior
+- The viewer now:
+  - accepts pages via `SetPages`
+  - combines them into one `_content` string
+  - displays that single combined string in a multiline read-only textbox
+  - uses a visible vertical scrollbar
+  - closes with `Esc`
+- Hidden Enter-to-continue paging was removed.
+- Result:
+  - users can scroll naturally through long result sets.
+
+## Final State at End of Session
+
+### Confirmed acceptable / working Rolodex menu items
+- `(A)` Add a Person
+- `(B)` Delete a Person
+- `(C)` Look up a Person
+- `(D)` Modify a Person
+- `(G)` Look up Area Codes
+- `(H)` Look up Zip Codes
+- `(I)` Test Entire Rolodex for Errors
+- `(Z)` Back to Main Menu
+
+### Remaining unfinished Rolodex menu items
+- `(E)` Print Phone Book
+- `(F)` Print Labels
+
+## Final Behavior of `(G) Look up Area Codes`
+- Triggered inline from the Rolodex screen.
+- Prompt is DOS-style and shown inside the black screen.
+- No Windows popup dialog is used.
+- Supports:
+  - `A`
+  - `Q`
+  - state code like `CA`
+  - numeric area code like `213`
+  - `Esc`
+  - `Enter`
+- Results show in a scrollable viewer window.
+- Viewer no longer highlights all text in blue.
+- Viewer no longer depends on hidden page-advance keys.
+
+## Design Decisions Captured
+- Prefer DOS visual fidelity where possible.
+- Avoid Windows dialogs when DOS behavior is clearly inline.
+- Prefer visible controls like scrollbars when original behavior would be too hidden/confusing in WinForms.
+- Match the actual data files in the repo rather than inferred historical formats.
+- Do not convert `areacodes.csv` to pipe-delimited format.
+
+## Files Changed or Replaced During Session
+- `FrmRolodexMenu.vb`
+- `RolodexMenuInlineMode.vb`
+- `AreaCodeEntry.vb`
+- `RolodexAreaCodeService.vb`
+- `FrmPagedTextViewer.vb`
+
+## Important Data Facts Confirmed
+- `areacodes.csv` format:
+  - `AreaCode,State,Location`
+- It is not pipe-delimited.
+- It does not include full state names in the CSV structure.
+- Therefore current grouped output is by state code, not by full state name.
+
+## Next Recommended Work
+- Start tomorrow with:
+  - `(E) Print Phone Book`
+  - `(F) Print Labels`
+- First questions to answer tomorrow:
+  - What exact DOS behavior is expected for E and F?
+  - What current data source powers Rolodex printing?
+  - Is preview-first acceptable, or is direct printer output required immediately?
+  - Are there existing print helper classes already in `AmiWinForms`?
+
+## Suggested Tomorrow Kickoff
+- Paste:
+  - `00-next-day-kickoff.md`
+  - `01-amiwinforms-scan.md`
+  - `02-amidatastore-scan.md`
+  - `03-dos-mainmenu-behavior.md`
+- Then begin by investigating the implementation path for:
+  - `(E) Print Phone Book`
+  - `(F) Print Labels`

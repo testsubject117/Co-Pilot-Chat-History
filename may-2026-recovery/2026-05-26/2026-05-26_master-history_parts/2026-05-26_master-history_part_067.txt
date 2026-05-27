@@ -1,4 +1,8 @@
-﻿        End If
+﻿
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
 
         Try
             _all.AddRange(LedgerCurReader.ReadAll(path))
@@ -1994,7 +1998,3 @@ If it doesnâ€™t, paste the result and weâ€™ll only need a very small a
 4050 IF INKEY$=CHR$(27) THEN RESET:GOTO 330
 4060 IF N#(Y)>N#(Y+1) THEN 4090
 4070 SWAP N$(Y),N$(Y+1)
-4080 SWAP N#(Y),N#(Y+1)
-4090 NEXT Y,X
-4100 PRINT CHR$(30):PRINT"Printing...";TAB(70):PRINT:WIDTH LPRINT 200
-4110 LPRINT "Report of totals and Percent of Business";SPACE$(5);"Date: ";DATE$

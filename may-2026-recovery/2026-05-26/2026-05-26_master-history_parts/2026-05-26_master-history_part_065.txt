@@ -1,4 +1,8 @@
-﻿        End If
+﻿        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
 
         ShowInvoiceDetails(entry)
     End Sub
@@ -1994,7 +1998,3 @@ Yes â€” I can see the likely problem.
 
 ## Direct answer
 Your `InvoiceChkReader.vb` is **very close**, but the record-number math is almost certainly off by one.
-
-From the AMiDataStore notes and your own comment:
-
-- GW-BASIC uses `FILNUM = InvoiceNumber - 75000`

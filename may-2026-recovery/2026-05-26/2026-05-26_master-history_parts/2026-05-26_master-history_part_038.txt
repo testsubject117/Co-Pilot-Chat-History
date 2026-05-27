@@ -1,4 +1,8 @@
-﻿                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+﻿            If line.StartsWith("""", StringComparison.Ordinal) Then
+                headers += 1
+            Else
+                invLines += 1
+                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
                 If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
             End If
 
@@ -1994,7 +1998,3 @@ Change the lookup from:
 
 to:
 - **last matching check**
-
----
-
-## Make this one change in `FormDeleteCheck.vb`

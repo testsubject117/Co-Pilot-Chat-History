@@ -1,0 +1,2000 @@
+﻿    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        If _isComplete Then Return ""
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        If _isComplete Then Return False
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Return _isComplete
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 1 : Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 2 : Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 3 : Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 4 : Return $"Zip Code [ENTER = {WorkingRecord.ZipCode}] ?"
+            Case 5 : Return $"Area Code [ENTER = {WorkingRecord.AreaCode}] ?"
+            Case 6 : Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber}] ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 8 : Return "Is this correct (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetDeletePrompt() As String
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Delete this Person (Y/N) [Q = Quit] ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetLookupPrompt() As String
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Is this the Person you are looking for (Y/N) ?"
+            Case 2
+                Return "[D] to Dial Number" & Environment.NewLine & Environment.NewLine &
+                       "[Shift] and [PrtSc] to Print"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                WorkingRecord.City = input.Trim()
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.City = input.Trim()
+            Case 3
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.AreaCode = input.Trim()
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+            Case 7
+                Dim value = input.Trim()
+                If value.ToUpperInvariant() = "A" Then
+                    WorkingRecord.Misc = WorkingRecord.Misc & " "
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+            Case 8
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitDeleteInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+                _stepIndex = 1
+                Return True
+
+            Case 1
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Delete this Person (Y/N) [Q = Quit] ? " & input.Trim())
+
+                Select Case answer
+                    Case "Y"
+                        Transcript.Add("")
+                        Transcript.Add("Person deleted.")
+                        _isComplete = True
+                        Return True
+
+                    Case "N", "Q"
+                        Transcript.Add("")
+                        Transcript.Add("Delete cancelled.")
+                        _isComplete = True
+                        Return True
+
+                    Case Else
+                        Transcript.Add("")
+                        Transcript.Add("Please answer Y, N, or Q.")
+                        Return True
+                End Select
+        End Select
+
+        Return False
+    End Function
+
+    Private Function SubmitLookupInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+                _stepIndex = 1
+                Return True
+
+            Case 1
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Is this the Person you are looking for (Y/N) ? " & input.Trim())
+
+                If answer = "Y" Then
+                    _stepIndex = 2
+                    Return True
+                ElseIf answer = "N" Then
+                    Transcript.Add("")
+                    Transcript.Add("Lookup cancelled.")
+                    _isComplete = True
+                    Return True
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("Please answer Y or N.")
+                    Return True
+                End If
+
+            Case 2
+                Transcript.Add("")
+                Transcript.Add("[D] to Dial Number")
+                Transcript.Add("")
+                Transcript.Add("[Shift] and [PrtSc] to Print")
+                _isComplete = True
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts(parts.Length - 1)
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## What this fixes for Delete
+Now when you do:
+
+- search for `TEST`
+- get the record
+- answer `N`
+
+the screen should show:
+- `Delete cancelled.`
+
+and then the form should finish/close.
+
+If you answer:
+- `Y`
+
+it should show:
+- `Person deleted.`
+
+and finish/close.
+
+If you answer something invalid:
+- it should remain active and say:
+  - `Please answer Y, N, or Q.`
+
+---
+
+## One more important thing
+Your current `FrmRolodexPrompt.vb` probably still shows a review popup whenever `IsComplete()` becomes true.
+
+Thatâ€™s fine for Add/Modify, but **not ideal for Delete/Lookup**, because Delete shouldnâ€™t end in a record review MessageBox.
+
+So the next likely adjustment will be in `FrmRolodexPrompt.vb`:
+- only show the final review popup for `AddPerson` and `ModifyPerson`
+- for `DeletePerson` and `LookupPerson`, just close or pause appropriately
+
+If after this change Delete ends with a weird MessageBox, thatâ€™s the next file Iâ€™ll fix.
+
+## @testsubject117
+
+when I choose N to not delete, I get a popup: shouldn't it just exit to the previous menu? this is very confusing for the users. They choose delete, then when asked are they sure they want to delete and they say no, they get a prompt that asks to accept the record? they should not get that prompt.\
+
+## Copilot
+
+Yes â€” that popup is wrong.
+
+## Direct answer
+For **Delete Person**, if the user answers **`N`** to:
+
+- `Delete this Person (Y/N) [Q = Quit] ?`
+
+they should **not** get:
+- `Accept this record?`
+
+That popup is coming from `FrmRolodexPrompt.vb`, which is still treating every completed flow like Add/Modify review.
+
+## Correct behavior
+- **Add / Modify**: review/accept prompt makes sense
+- **Delete**: no review popup
+- **Lookup**: no â€œaccept this recordâ€ popup either
+
+So we need to change `FrmRolodexPrompt.vb` so the final MessageBox only happens for:
+- `AddPerson`
+- `ModifyPerson`
+
+and not for:
+- `DeletePerson`
+- `LookupPerson`
+
+---
+
+# Replace `FrmRolodexPrompt.vb` with this version
+
+This keeps the inline DOS-style typing and fixes the bad popup behavior.
+
+```vb name=FrmRolodexPrompt.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexPrompt
+    Inherits Form
+
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Private lblTitle As Label
+    Private txtScreen As TextBox
+
+    Private _currentInput As String = ""
+
+    Public Sub New(engine As RolodexPromptEngine)
+        MyBase.New()
+        _engine = engine
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "Rolodex Prompt"
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Height = 40,
+            .Dock = DockStyle.Top,
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold),
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(lblTitle)
+
+        AddHandler Me.Load, AddressOf FrmRolodexPrompt_Load
+        AddHandler Me.Shown, AddressOf FrmRolodexPrompt_Shown
+        AddHandler Me.KeyPress, AddressOf FrmRolodexPrompt_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexPrompt_KeyDown
+        AddHandler txtScreen.Click, AddressOf RefocusScreen
+        AddHandler Me.Click, AddressOf RefocusScreen
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshScreen()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Shown(sender As Object, e As EventArgs)
+        RefocusScreen(Nothing, EventArgs.Empty)
+    End Sub
+
+    Private Sub RefocusScreen(sender As Object, e As EventArgs)
+        Me.Activate()
+        txtScreen.Focus()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If Char.IsControl(e.KeyChar) Then Return
+
+        _currentInput &= e.KeyChar
+        RefreshScreen()
+        e.Handled = True
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Back Then
+            If _currentInput.Length > 0 Then
+                _currentInput = _currentInput.Substring(0, _currentInput.Length - 1)
+                RefreshScreen()
+            End If
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim submitted = _currentInput
+            _currentInput = ""
+
+            _engine.SubmitInput(submitted)
+
+            If _engine.IsComplete() Then
+                HandleCompletedFlow()
+                Return
+            End If
+
+            RefreshScreen()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshScreen()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(AppendInlineInput(prompt, _currentInput))
+        End If
+
+        txtScreen.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtScreen.SelectionStart = txtScreen.TextLength
+        txtScreen.ScrollToCaret()
+    End Sub
+
+    Private Function AppendInlineInput(prompt As String, input As String) As String
+        Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+
+        If parts.Length = 0 Then
+            Return input
+        End If
+
+        parts(parts.Length - 1) &= " " & input
+
+        Return String.Join(Environment.NewLine, parts)
+    End Function
+
+    Private Sub HandleCompletedFlow()
+        RefreshScreen()
+
+        If RequiresAcceptancePrompt() Then
+            ShowReviewAndCloseIfAccepted()
+        Else
+            Me.DialogResult = DialogResult.OK
+            Me.Close()
+        End If
+    End Sub
+
+    Private Function RequiresAcceptancePrompt() As Boolean
+        Dim title = _engine.Title.ToUpperInvariant()
+
+        If title.Contains("ADD A PERSON") Then Return True
+        If title.Contains("MODIFY A PERSON") Then Return True
+
+        Return False
+    End Function
+
+    Private Sub ShowReviewAndCloseIfAccepted()
+        Dim reviewLines = _engine.GetReviewLines()
+        Dim reviewText = String.Join(Environment.NewLine, reviewLines)
+
+        Dim result = MessageBox.Show(
+            reviewText & Environment.NewLine & Environment.NewLine & "Accept this record?",
+            "Rolodex",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        )
+
+        If result = DialogResult.Yes Then
+            Me.DialogResult = DialogResult.OK
+        Else
+            Me.DialogResult = DialogResult.Cancel
+        End If
+
+        Me.Close()
+    End Sub
+End Class
+```
+
+---
+
+## What this fixes
+### Delete Person
+If the user answers:
+- `N`
+- or `Q`
+
+the form should now just close and return to the Rolodex menu.
+
+### Lookup Person
+It also prevents the weird â€œAccept this record?â€ popup there too.
+
+### Add / Modify
+Those still keep the review popup for now.
+
+---
+
+## Why this happened
+The form layer had no idea which workflow was ending. It treated every completed flow as â€œreview this record,â€ which is only appropriate for Add/Modify.
+
+---
+
+## Best next test
+After replacing this file:
+
+1. Open `(N)` Rolodex
+2. choose `(B)` Delete Person
+3. search for your test record
+4. answer `N`
+
+Expected:
+- no popup
+- return to Rolodex menu
+
+If that works, test:
+- `Y` on delete
+- `C` lookup flow
+- `D` modify flow
+
+If you want, after that I can help make **Delete return instantly on single-key `Y/N/Q` without requiring Enter**, which is even closer to DOS.
+
+## @testsubject117
+
+ok, I just went back and checked (A) add a person. after entering a new person, I get a windows style popup that asks accept this record? that should not happen. we don't need to confirm with the user with a windows dialogue when it's supposed to look and feel like dos. what should happen here is just like in dos, when the user answers "Is This Correct (y/n) ?" types the Y for yes and hits enter. the entry should just be added with no prompt.
+
+## Copilot
+
+Yes â€” that Windows popup should be removed.
+
+## Correct behavior
+For **Add Person** and **Modify Person**, when the user answers:
+
+- `IS THIS CORRECT (Y/N) ? Y`
+
+the app should:
+- save/apply the record
+- close or return to menu
+- **not** show any Windows MessageBox
+
+So the review/accept popup needs to go away entirely.
+
+---
+
+# Direct fix
+Replace `FrmRolodexPrompt.vb` with this version.
+
+This version:
+- keeps inline DOS-style typing
+- removes the Windows â€œAccept this record?â€ popup completely
+- simply closes the form when the flow completes
+
+```vb name=FrmRolodexPrompt.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexPrompt
+    Inherits Form
+
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Private lblTitle As Label
+    Private txtScreen As TextBox
+
+    Private _currentInput As String = ""
+
+    Public Sub New(engine As RolodexPromptEngine)
+        MyBase.New()
+        _engine = engine
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "Rolodex Prompt"
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Height = 40,
+            .Dock = DockStyle.Top,
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold),
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(lblTitle)
+
+        AddHandler Me.Load, AddressOf FrmRolodexPrompt_Load
+        AddHandler Me.Shown, AddressOf FrmRolodexPrompt_Shown
+        AddHandler Me.KeyPress, AddressOf FrmRolodexPrompt_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexPrompt_KeyDown
+        AddHandler txtScreen.Click, AddressOf RefocusScreen
+        AddHandler Me.Click, AddressOf RefocusScreen
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshScreen()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Shown(sender As Object, e As EventArgs)
+        RefocusScreen(Nothing, EventArgs.Empty)
+    End Sub
+
+    Private Sub RefocusScreen(sender As Object, e As EventArgs)
+        Me.Activate()
+        txtScreen.Focus()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If Char.IsControl(e.KeyChar) Then Return
+
+        _currentInput &= e.KeyChar
+        RefreshScreen()
+        e.Handled = True
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Back Then
+            If _currentInput.Length > 0 Then
+                _currentInput = _currentInput.Substring(0, _currentInput.Length - 1)
+                RefreshScreen()
+            End If
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim submitted = _currentInput
+            _currentInput = ""
+
+            _engine.SubmitInput(submitted)
+
+            If _engine.IsComplete() Then
+                RefreshScreen()
+                Me.DialogResult = DialogResult.OK
+                Me.Close()
+                Return
+            End If
+
+            RefreshScreen()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshScreen()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(AppendInlineInput(prompt, _currentInput))
+        End If
+
+        txtScreen.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtScreen.SelectionStart = txtScreen.TextLength
+        txtScreen.ScrollToCaret()
+    End Sub
+
+    Private Function AppendInlineInput(prompt As String, input As String) As String
+        Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+
+        If parts.Length = 0 Then
+            Return input
+        End If
+
+        parts(parts.Length - 1) &= " " & input
+
+        Return String.Join(Environment.NewLine, parts)
+    End Function
+End Class
+```
+
+---
+
+## What this changes
+### Add Person
+Now when user finishes:
+- `IS THIS CORRECT (Y/N) ? Y`
+
+the form just closes.
+
+### Modify Person
+Same behavior:
+- no Windows popup
+- just finish the DOS-style flow
+
+### Delete / Lookup
+Still no popup there either.
+
+---
+
+## Important consequence
+Right now the form will close on completion, but it does **not yet display a final â€œsavedâ€ message**. That is probably okay for now, because your DOS description suggests the record is simply added and control returns.
+
+---
+
+## One thing to verify
+Your `RolodexPromptEngine` still needs to correctly treat:
+- `Y` as complete
+- `N` as cancel/re-edit, depending on the flow
+
+If Add currently closes even when the user types `N`, then the next thing we fix is the engine branching for Add/Modify confirmations.
+
+---
+
+## Best next test
+After replacing `FrmRolodexPrompt.vb`, test:
+
+### Add Person
+- fill in fields
+- answer `Y`
+- confirm no popup appears
+
+### Then test
+- what happens if you answer `N` to `IS THIS CORRECT (Y/N) ?`
+
+That next behavior will tell us what we need to fix in `RolodexPromptEngine.vb`.
+
+## @testsubject117
+
+ok, I just added another fake test entry. Pluto at my address and phone number and area code. However if I then go to (b) delete a person and search for "Pluto" it returns my previous "Test" entry, not "Pluto". I'm going to test this in dos right now to see if the same thing happens
+
+## Copilot
+
+That means the current WinForms Rolodex is **not searching real stored entries yet**.
+
+## Direct answer
+Right now `Delete` is using a **hardcoded sample record**, not the data you added.
+
+Thatâ€™s why searching for:
+- `Pluto`
+
+still returns:
+- `TEST`
+
+because the scaffolded `RolodexPromptEngine` currently does this in Delete/Lookup:
+
+```vb
+WorkingRecord = New RolodexPersonRecord With {
+    .PersonName = "TEST",
+    ...
+}
+```
+
+So your app is not broken in a mysterious way â€” itâ€™s just still on placeholder data.
+
+## Good next move
+Yes, go verify DOS behavior if you want. But regardless, we already know the WinForms side now needs the next major piece:
+
+# We need real Rolodex storage + search
+
+Specifically:
+1. when Add Person completes, save the record
+2. when Delete/Lookup/Modify search by name, search saved records
+3. return the best matching record, not the hardcoded `TEST`
+
+---
+
+## What needs to be added next
+You now need a small in-memory repository/service, for example:
+
+- `RolodexRepository.vb`
+
+It should:
+- hold records in a shared list
+- `AddRecord(record)`
+- `FindFirstByNamePrefix(search)`
+- `DeleteRecord(record)`
+- maybe `GetAllRecords()`
+
+Then:
+- `AddPerson` saves to repository
+- `DeletePerson` searches repository
+- `LookupPerson` searches repository
+- `ModifyPerson` searches repository / updates repository
+
+---
+
+## Short version of the issue
+Current state:
+- UI flow exists
+- data flow does not yet exist
+
+So the behavior you saw is expected from the current scaffold.
+
+---
+
+## Recommendation
+Donâ€™t spend too long checking DOS for this specific symptom, because DOS almost certainly searches the actual rolodex data, while your current port does not yet.
+
+The real task now is:
+- connect the prompt engine to a real Rolodex data store
+
+## Best next step
+If you want, I can generate the next set of files/code to make this work:
+
+1. `RolodexRepository.vb`
+2. update `RolodexPromptEngine.vb` to use it
+3. make Add save real records
+4. make Delete/Lookup/Modify find real records by typed name
+
+That is the next major step to turn this from a UI mock into a working Rolodex.
+
+## @testsubject117
+
+to clarify, I think the .bas files that are used in dos will need to be copied over to \\invoice\mainmenu\data won't they?
+
+## Copilot
+
+Probably **some of them, yes â€” but not necessarily all `.BAS` files, and not necessarily as executable BASIC source**.
+
+## Direct answer
+If your WinForms port still depends on the DOS-era `.BAS` files for:
+- seed data
+- lookup tables
+- legacy text/resources
+- conversion input
+- exact menu/help content
+
+then yes, those files â€” or converted equivalents â€” need to be available under something like:
+
+```text
+\\invoice\mainmenu\data
+```
+
+or, in your Windows app, whatever the equivalent runtime data folder is.
+
+But if a `.BAS` file is only:
+- GW-BASIC program source
+- old DOS control flow you are now rewriting in VB.NET
+
+then you do **not** need to copy it just to â€œrunâ€ the WinForms app. `.BAS` is a GW-BASIC program format, not something a VB.NET WinForms app executes directly. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/Chapter%205.html?utm_source=openai))
+
+## Best way to think about it
+Split the DOS `.BAS` files into two categories:
+
+### 1. `.BAS` files that are really **application logic**
+Examples:
+- main menu logic
+- add/modify/delete workflows
+- print routines
+- DOS UI flow
+
+These should be:
+- **ported into VB.NET code**
+- not copied over as runtime dependencies
+
+### 2. `.BAS` files that are really **data containers or lookup assets**
+Examples:
+- embedded lists
+- state/zip/area lookup content
+- maybe seeded records or constants if the DOS app loaded them from disk
+
+These likely need to be:
+- copied into the WinForms appâ€™s data folder, or
+- extracted/converted into cleaner formats like `.txt`, `.csv`, `.json`, or app-managed data files
+
+---
+
+## For your specific case
+Based on what youâ€™ve described, the important question is:
+
+### Is Rolodex data currently stored in DOS-era files that your new app is supposed to read?
+If yes, then those source data files need to be present in your appâ€™s data location, or migrated into a new storage format.
+
+For example:
+- person records
+- phone book entries
+- customer flags
+- zip/area code datasets
+
+## What I would *not* do blindly
+I would **not** just dump every `.BAS` file into `\\invoice\mainmenu\data` and assume that solves it.
+
+Why:
+- many `.BAS` files are probably program code, not data
+- some may be binary/protected GW-BASIC format
+- WinForms wonâ€™t natively interpret them as executable logic anyway ([stackoverflow.com](https://stackoverflow.com/questions/41167778/how-do-i-view-the-source-code-of-a-gw-basic-bas-file/41168561?utm_source=openai))
+
+---
+
+## Better rule
+For each DOS `.BAS` file, ask:
+
+- Is this **code** we are porting?
+  - then rewrite in VB.NET
+- Is this **data** the program reads at runtime?
+  - then copy/convert it into the app data folder
+
+---
+
+## For todayâ€™s Rolodex issue
+Your current delete/search problem is **not yet about copying `.BAS` files**.  
+Itâ€™s because the WinForms code is still using a hardcoded placeholder record instead of a real repository.
+
+So even if the DOS files belong in `\\invoice\mainmenu\data`, you still need code that:
+- loads them
+- parses them
+- searches them
+- saves updates back appropriately
+
+---
+
+## My recommendation
+Yes, we should determine which legacy files belong in your Windows data folder. But first, we should identify:
+
+1. **Which file in DOS actually stores Rolodex records**
+2. **Which files store area/zip lookup data**
+3. **Which `.BAS` files are only program source**
+
+Once we know that, we can decide:
+- copy as-is
+- convert
+- or reimplement in code
+
+## Best next step
+If you want, paste:
+- the list of relevant DOS files in the Rolodex area, or
+- screenshots / names of the `.BAS` files and data files in that folder
+
+Then I can help you classify them into:
+- **must copy**
+- **must port**
+- **can ignore**
+
+## @testsubject117
+
+in particular I was referring to the rolodex functionality. isn't there a .bas file that has the database?
+
+## Copilot
+
+Yes â€” **possibly**, but not by default in the way modern apps use a â€œdatabase.â€
+
+In GW-BASIC-era apps, a `.BAS` file was usually:
+- **program code**
+- sometimes with **DATA statements embedded inside**
+- occasionally with hardcoded records or seed tables
+
+So a `.BAS` file *can* contain what looks like a database, but more often it contains:
+- the code to read/write some separate data file, or
+- lookup data embedded directly in source
+
+## For Rolodex specifically
+There are three likely possibilities:
+
+### 1. The `.BAS` file is just the Rolodex program
+Meaning:
+- menus
+- add/delete/modify logic
+- file I/O code
+
+And the actual records are stored in a separate file:
+- `.DAT`
+- `.TXT`
+- `.DB`
+- no extension / custom flat file
+
+### 2. The `.BAS` file contains embedded starter data
+Meaning:
+- `DATA` statements
+- arrays initialized in code
+- lookup/reference lists
+
+This is more common for:
+- area codes
+- zip/state tables
+- constants
+than for a live editable Rolodex database
+
+### 3. The `.BAS` file itself is acting like a pseudo-database
+Possible, but less ideal for an editable user Rolodex. That would mean:
+- records are literally stored inside code lines or DATA blocks
+- the program may rewrite/export them somehow
+
+Thatâ€™s possible, but I would not assume it without checking.
+
+---
+
+## Important distinction
+If the users have been:
+- adding people
+- modifying people
+- deleting people
+
+for years in DOS, then the live Rolodex data is **very likely not meant to live only inside static source code**. It is more likely stored in a separate runtime data file that the BASIC program reads and writes.
+
+## So the answer is:
+**There may be a `.BAS` file that contains the Rolodex logic, but the actual editable database is more likely a separate data file.**
+
+---
+
+## What you need to find
+Search the DOS folder for files related to:
+- `PHONE`
+- `ROLODEX`
+- `PHONE.BAS`
+- `PHONE.DAT`
+- `PHONE.*`
+- `ROLODEX.*`
+- customer/name files
+- random extensionless files with recent timestamps
+
+Also inspect the BASIC source for lines like:
+- `OPEN`
+- `FIELD`
+- `GET`
+- `PUT`
+- `INPUT #`
+- `WRITE #`
+- `LINE INPUT #`
+- file names in quotes
+
+Those will usually tell you what file actually stores the records.
+
+---
+
+## For example
+If the BASIC file contains something like:
+
+```basic
+OPEN "PHONE.DAT" FOR RANDOM AS #1
+```
+
+or
+
+```basic
+OPEN "PHONE" FOR INPUT AS #1
+```
+
+then **that** is the real data store.
+
+If it contains lots of:
+
+```basic
+DATA JOHN DOE,123 MAIN,...
+```
+
+then maybe the data is embedded.
+
+---
+
+## Best practical answer
+So: **yes, there may be a `.BAS` involved, but I would not assume the `.BAS` itself is the live Rolodex database until we inspect the file references.**
+
+## Best next step
+If you can give me:
+- the name of the Rolodex `.BAS` file, or
+- the relevant section of that BASIC source, or
+- a directory listing of the DOS Rolodex files
+
+I can help determine exactly:
+- whether the database is inside the `.BAS`
+- or which external file actually holds the Rolodex records.
+
+## @testsubject117
+
+so how did the gw basic app store the rolodex?
+
+## Copilot
+
+Usually, a GW-BASIC Rolodex would store data in **disk files**, not inside the `.BAS` program itself. GW-BASIC supported two main styles: **sequential files** (written/read in order with `PRINT#`/`WRITE#` and `INPUT#`/`LINE INPUT#`) and **random-access files** (fixed-length records using `OPEN ... FOR RANDOM`, `FIELD`, `GET`, and `PUT`). ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/Chapter%205.html?utm_source=openai))
+
+For something like a Rolodex that needs **add / find / modify / delete** by record, the classic pattern was often a **random-access file**: the BASIC program defined a fixed record layout with `FIELD`, loaded one record with `GET`, changed fields in a buffer, then saved it back with `PUT`. GW-BASICâ€™s docs explicitly describe random files as suitable for keyed record storage and show that records are addressed by record number rather than rereading the whole file. ([www-user.tu-chemnitz.de](https://www-user.tu-chemnitz.de/~heha/hs/chm/gwbasic.chm/Chapter5.html?utm_source=openai))
+
+A simpler app could also use a **sequential text file**, where each contact is written one after another and the program scans from the top to find a match. But sequential files are less convenient for in-place edits, because updating one record often means rereading and rewriting much or all of the file. GW-BASIC documentation contrasts this with random-access storage, noting sequential data is stored â€œone item after anotherâ€ and random-access files are better when you need record-oriented updates. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/Chapter%205.html?utm_source=openai))
+
+So the likely answer is: **the GW-BASIC app probably stored Rolodex entries in a separate data file on disk, most likely a random-access flat file if it supported editing efficiently, or a sequential flat file if it was simpler.** The `.BAS` file usually contained the **logic** to read and write that file, not the live database itself. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/Chapter%205.html?utm_source=openai))
+
+The fastest way to know for sure in your app is to inspect the Rolodex BASIC source and look for file statements such as:
+- `OPEN "..." FOR RANDOM`
+- `FIELD`
+- `GET` / `PUT`
+- or `OPEN "..." FOR INPUT/OUTPUT`, `WRITE#`, `INPUT#`, `LINE INPUT#`  
+Those lines will tell you the exact filename and storage style the DOS app used. ([www-user.tu-chemnitz.de](https://www-user.tu-chemnitz.de/~heha/hs/chm/gwbasic.chm/Chapter5.html?utm_source=openai))
+
+If you want, paste the Rolodex `.BAS` file or the lines with `OPEN`/`GET`/`PUT`, and Iâ€™ll tell you exactly what file is the real Rolodex database and how to port it.
+
+## @testsubject117
+
+can you scan the amidatastore repo and determine exactly how the rolodex data was stored and if we need to copy any files to \\invoice\mainmenu\data
+
+## Copilot
+
+I canâ€™t complete that repo scan from here right now because the repository investigation didnâ€™t return results.
+
+What I **can** tell you is the exact evidence we need to answer this definitively in a few minutes:
+
+1. the Rolodex program source file name, likely something like `PHONE.BAS` or similar  
+2. any lines in that source containing:
+   - `OPEN`
+   - `FIELD`
+   - `GET`
+   - `PUT`
+   - `INPUT #`
+   - `WRITE #`
+   - `LINE INPUT #`
+3. the filenames in the same DOS folder that look like runtime data:
+   - `.DAT`
+   - `.TXT`
+   - extensionless files
+   - area/zip lookup files
+
+## Most likely outcome
+For Rolodex support, the files that may need to be copied into `\\invoice\mainmenu\data` are probably:
+- the **actual Rolodex data file**
+- the **area code lookup data**
+- the **zip code lookup data**
+
+But probably **not** the main `.BAS` program file, unless your WinForms port is reading embedded lookup data out of it manually.
+
+## Fastest way to settle it
+If you paste either:
+- a directory listing of the Rolodex-related files in that repo, or
+- the Rolodex BASIC source file,
+
+I can tell you exactly:
+- how the data was stored
+- which files must be copied
+- which files are only source code and should not be copied as runtime data.
+
+## @testsubject117
+
+here's the contents of phone.bas, does this look like it was the rolodex file?: 10 CLEAR:RESET
+20 FOR X=1 TO 10:Q$=INKEY$:NEXT X
+30 KEY OFF
+40 FOR X=1 TO 10
+50 KEY X,""
+60 NEXT X
+70 KEY 2,"LIST 2300-2460"+CHR$(13):KEY 1,"LIST ":KEY 10,"SAVE"+CHR$(34)+"PHONE"+CHR$(13)
+80 REM #################################################################              ###    CTRL - BREAK       &      CTRL - C                 ########              ################################################################
+90 REM KEY 15, CHR$(&H4) + CHR$(&H46):KEY(15) ON:ON KEY(15) GOSUB 330
+100 REM KEY 15, CHR$(&H4) + CHR$(&H2E):KEY(15) ON:ON KEY(15) GOSUB 330
+110 ON ERROR GOTO 140
+120 DIM FULL$(700)
+130 GOTO 210
+140  IF ERR=24 OR ERR=57 OR ERR=68 THEN INPUT"PRINTER IS NOT READY!, Get it ready and hit [ENTER]";Q$:RESUME
+150 IF ERL=2380 THEN RESUME 2450
+151 IF ERL=2680 THEN RESUME 2790
+155 IF ERL=2084 THEN CLOSE 3:RESUME 2085
+160 IF ERR=53 AND ERL=850 THEN RESET:RESUME 940
+170 IF ERR=53 AND ERL=2090 THEN RESET:RESUME 2060
+180 IF ERR=53 THEN RESET:RESUME 210
+190 IF ERR=70 THEN KEY OFF:H8=CSRLIN:H9=POS(0):LOCATE 25,1:PRINT"Please Wait, someone is using your file....":FOR GHG=1 TO 4500:NEXT:LOCATE 25,1:PRINT SPACE$(77):LOCATE H8,H9:RESUME
+199 OPEN "F:\ERRORS.LST" FOR APPEND LOCK READ WRITE AS 4:WRITE#4,"PHONE",DATE$,TIME$,ERR,ERL:CLOSE 4
+200 PRINT"ERR ";ERR;"   IN LINE ";ERL:RESUME NEXT
+210 CLS:PRINT:PRINT"****** ROLODEX MENU ******";SPACE$(28);"Todays Date: ";DATE$:PRINT:PRINT:BLANK=TIMER
+220 PRINT"(A) Add a Person"
+230 PRINT"(B) Delete a Person"
+240 PRINT"(C) Look up a Person"
+250 PRINT"(D) Modify a Person"
+260 PRINT"(E) Print Phone Book"
+270 PRINT"(F) Print Labels"
+280 PRINT"(G) Look up Area Codes"
+283 PRINT"(H) Look up Zip Codes"
+285 PRINT"(I) Test Entire Rolodex for Errors"
+290 PRINT"(Z) Back to Main Menu"
+300 PRINT:PRINT:FOR X=1 TO 10:Q$=INKEY$:NEXT:X=0
+310 COLOR 23,0:PRINT CHR$(30);"TYPE A LETTER             ";:COLOR 7,0
+320 Q$=INKEY$
+330 IF TIMER-BLANK > (60*5) THEN 460
+340 IF Q$="" THEN 320
+350 COLOR 0,7:PRINT Q$;CHR$(29);:COLOR 7,0:IF ASC(Q$)>96 AND ASC(Q$)<123 AND X=0 THEN X=1:PRINT SPACE$(20)"Hit CAPS/LOCK Button"
+360 IF Q$="A" THEN 550
+370 IF Q$="B" THEN TITLE$="DELETE":GOTO 1020
+380 IF Q$="C" THEN TITLE$="LOOK UP":GOTO 1020
+390 IF Q$="D" THEN TITLE$="MODIFY":GOTO 1020
+400 IF Q$="E" THEN GOTO 1840
+405 IF Q$="I" THEN GOTO 2650
+410 IF Q$="F" THEN GOTO 2310
+420 IF Q$="G" THEN GOTO 2480
+423 IF Q$="H" THEN SHELL"ZIPKEY 2":GOTO 210
+430 IF Q$="Z" THEN SHELL"CD ..":CHAIN "MAINMENU"
+440 GOTO 320
+450 REM ##################################################################              ####################  SCREEN BLANKING  ###########################              ##################################################################
+460 BLANK=0:KEY OFF
+470 BLANK3=BLANK3+1:IF BLANK3>2 THEN BLANK3=1
+480 IF BLANK3=1 THEN U1=0:U2=7 ELSE U1=7:U2=0
+490 BLANK=BLANK+1:IF BLANK=26 THEN 460
+500 LOCATE BLANK,1:COLOR U1,U2:PRINT STRING$(80," ");:COLOR 7,0
+510 FOR BLKK=1 TO 999:NEXT BLKK
+520 O$=INKEY$:IF O$<>"" THEN 210
+530 GOTO 490
+540 REM ##################################################################              ####################    ADD A PERSON   ###########################              ##################################################################
+550 CLS:PRINT:PRINT"<<<< ADD A PERSON >>>>":PRINT:PRINT
+560 INPUT "Person or Company Name: ";N$:IF LEN(N$)<3 OR INSTR(N$,CHR$(34))>0 THEN PRINT CHR$(30);:GOTO 560
+570 Z=0
+580 Z=Z+1:IF Z>LEN(N$) THEN 610
+590 IF ASC(MID$(N$,Z,1))>90 THEN 550
+600 GOTO 580
+610 PRINT
+620 INPUT "Address Number & Street: [N = Nothing]";A$:IF A$="" THEN PRINT CHR$(30);:GOTO 620
+630 IF INSTR(A$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 620
+640 PRINT
+650 IF A$="N" OR A$="n" THEN A$="":C$="":S$="":Z=0:GOTO 750
+660 INPUT "City: ";C$:IF C$="" THEN PRINT CHR$(30);:GOTO 660
+670 PRINT
+680 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(21);"__";CHR$(30):INPUT "State [ENTER = CA] ";S$
+690 IF INSTR(S$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 680
+700 IF S$="" THEN S$="CA"
+710 IF LEN(S$)<>2 THEN PRINT CHR$(30);:GOTO 680
+720 PRINT
+730 PRINT SPACE$(79);CHR$(30):PRINT"            _____";CHR$(30):INPUT "Zip Code: ";Z
+740 PRINT
+750 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(27);"###";CHR$(30):INPUT "Area Code  [ENTER = 818] ";A:IF A=0 THEN A=818
+760 IF A<100 OR A>999 THEN PRINT CHR$(30);:GOTO 750
+770 PRINT
+780 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(15);"#######";CHR$(30):INPUT "Phone Number ";P:IF P<1000000! OR P>9999999! THEN PRINT CHR$(30);:GOTO 780
+790 PRINT:PRINT"When entering in a Fax #, put a 1 in front of it if it is not 818.":PRINT"Make sure there is a space after the #.       Example:   FAX:1805-222-3333":PRINT
+800 INPUT "Misc: ";M$
+810 IF INSTR(M$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 800
+820 CLS:PRINT:PRINT
+830 PRINT N$:IF A$<>"" THEN PRINT A$:PRINT C$;" , ";S$;"  ";Z
+840 PRINT "(";RIGHT$(STR$(A),3);")";LEFT$(STR$(P),4);"-";RIGHT$(STR$(P),4):PRINT M$
+850 Q$=LEFT$(N$,1)+".LST":OPEN Q$ FOR INPUT AS 1
+860 IF EOF(1) THEN CLOSE 1:GOTO 940
+870 INPUT#1,N1$,A1$,C1$,S1$,Z1,A1,P1,M1$
+880 IF A1=A AND P1=P THEN 900
+890 GOTO 860
+900 BEEP:PRINT:PRINT:COLOR 0,7:PRINT" THE FOLLOWING ENTRY ALREADY EXIST:":PRINT:PRINT:COLOR 7,0
+910 PRINT N1$:IF A1$<>"" THEN PRINT A1$:PRINT C1$;" , ";S1$;"  ";Z1
+920 PRINT "(";RIGHT$(STR$(A1),3);")";LEFT$(STR$(P1),4);"-";RIGHT$(STR$(P1),4):PRINT M1$:CLOSE 1
+930 PRINT:PRINT:PRINT:PRINT"DO YOU WANT TO ADD THE TOP ENTRY ANYWAY (Y/N) ?":GOTO 950
+940 PRINT:PRINT:PRINT:PRINT"IS THIS CORRECT (Y/N) ?"
+950 Q$=INKEY$
+960 IF Q$="N" OR Q$="n" THEN 210
+970 IF Q$="Y" OR Q$="y" THEN 990
+980 GOTO 950
+990 Q$=LEFT$(N$,1)+".LST":OPEN Q$ FOR APPEND LOCK READ WRITE AS 1:WRITE#1,N$,A$,C$,S$,Z,A,P,M$:CLOSE 1
+1000 GOTO 210
+1010 REM ##################################################################              ######     MODIFY  DELETE OR LOOK UP A PERSON    #################              ##################################################################
+1020 FLAG=0:FG=0:CLS:PRINT:PRINT "<<<< ";TITLE$;" A PERSON >>>>":PRINT:PRINT
+1030 PRINT"Enter 1st Part of Whole Name";
+1040 IF TITLE$="LOOK UP" THEN PRINT" or First Inital Followed by Any Part of Whole Name.":PRINT:ELSE PRINT:PRINT
+1041 IF TITLE$="MODIFY" THEN PRINT"End with a ~ to modify in the word processor Example: C~"
+1050 INPUT "Person or Company Name [G = Global Search] ";N2$:IF N2$="" THEN PRINT CHR$(30);:GOTO 1050
+1051 IF N2$="g" OR N2$="G" THEN GOTO 1052 ELSE:GOTO 1060
+1052 PRINT:PRINT"When viewing [F3] will search for another occurance.":PRINT"Enter something to search for in any category like Misc., Phone#, or Name.":PRINT:INPUT Q$
+1053 Q$="F:\L ALLNAMES.TMP /F"+Q$
+1054 SHELL"copy *.lst allnames.TMP":SHELL Q$
+1055 GOTO 210
+1060 Z=0
+1065 IF TITLE$="MODIFY" AND RIGHT$(N2$,1)="~" THEN SHELL"CD \WORD":Q$="WORD \PHONE\"+LEFT$(N2$,1)+".LST":SHELL Q$:SHELL"CD \PHONE":GOTO 210
+1070 Z=Z+1:IF Z>LEN(N2$) THEN 1100
+1080 IF ASC(MID$(N2$,Z,1))>90 THEN PRINT"hit Caps/Lock":FOR Z=1 TO 3999:NEXT:GOTO 1020
+1090 GOTO 1070
+1100 Q$=LEFT$(N2$,1)+".LST":OPEN Q$ FOR INPUT AS 1
+1110 Q$=LEFT$(N2$,1)+".TMP":OPEN Q$ FOR OUTPUT LOCK WRITE AS 2
+1120 IF EOF(1) THEN RESET:GOTO 1340
+1130 INPUT#1,N$,A$,C$,S$,Z,A,P,M$
+1140 IF TITLE$="LOOK UP" THEN IF INSTR(N$,RIGHT$(N2$,LEN(N2$)-1))>0 THEN 1160
+1150 IF N2$<>LEFT$(N$,LEN(N2$)) THEN WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1160 CLS:PRINT:PRINT
+1170 PRINT N$:IF A$<>"" THEN PRINT A$:PRINT C$;" , ";S$;"  ";Z
+1190 PRINT "(";RIGHT$(STR$(A),3);")";LEFT$(STR$(P),4);"-";RIGHT$(STR$(P),4):PRINT M$:PRINT:PRINT:PRINT
+1200 IF TITLE$="LOOK UP" THEN 1290
+1210 IF TITLE$="MODIFY" THEN 1360
+1220 PRINT"Delete this Person (Y/N) [Q = Quit] ?  ";
+1230 Q$=INKEY$
+1240 IF FG=1 THEN PRINT:WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1250 IF Q$="Y" OR Q$="y" THEN PRINT"(DELETED)":FLAG=1:GOTO 1120
+1260 IF Q$="Q" OR Q$="q" THEN FG=1:GOTO 1230
+1270 IF Q$="N" OR Q$="n" THEN PRINT:WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1280 GOTO 1230
+1290 PRINT"Is this the Person you are looking for (Y/N) ?":PRINT:PRINT"[D]  to Dial Number":PRINT:PRINT"[Shift] and [PrtSc]  to Print":T=TIMER
+1293 Q$=STR$(P):Q$=RIGHT$(Q$,LEN(Q$)-1):DIAL$=Q$
+1294 Q$=STR$(A):Q$=RIGHT$(Q$,LEN(Q$)-1)
+1295 IF A<>818 THEN DIAL$="1"+Q$+DIAL$
+1300 Q$=INKEY$
+1305 IF TIMER-T>30 THEN RESET:PRINT:INPUT "Time limit expired, tap [Enter] to go back to menu";Q$:GOTO 210
+1310 IF Q$="Y" OR Q$="y" THEN RESET:GOTO 210
+1320 IF Q$="N" OR Q$="n" THEN 1120
+1325 IF Q$="D" OR Q$="d" THEN Q$="DIAL 1 "+DIAL$:SHELL Q$:GOTO 1160:REM ############################   DIAL [COM PORT] [PHONE NUMBER]   #####################
+1330 GOTO 1300
+1340 IF FLAG=1 THEN COLOR 23,0:PRINT"PLEASE WAIT...":COLOR 7,0:KILL LEFT$(N$,1)+".LST":NAME LEFT$(N2$,1)+".TMP " AS LEFT$(N2$,1)+".LST"
+1350 GOTO 210
+1360 PRINT"Modify this Person (Y/N) [Q = Quit] ?  "
+1370 Q$=INKEY$
+1380 IF FG=1 THEN PRINT:WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1390 IF Q$="Y" OR Q$="y" THEN 1430
+1400 IF Q$="Q" OR Q$="q" THEN FG=1:GOTO 1380
+1410 IF Q$="N" OR Q$="n" THEN WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1420 GOTO 1370
+1430 CLS:PRINT:PRINT"<<<< MODIFY A PERSON >>>>":PRINT:PRINT
+1440 PRINT"Person or Company Name: [ENTER = ";N$;"] ";:INPUT N1$:IF N1$="" THEN N1$=N$
+1441 IF INSTR(N$,",")>0 OR INSTR(N1$,CHR$(34))>0 THEN 1440
+1450 IF INSTR(N1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1440
+1460 IF LEFT$(N1$,1)<>LEFT$(N$,1) THEN N1$=""
+1470 IF LEN(N1$)<3 THEN PRINT CHR$(30);:GOTO 1440
+1480 Z8=0
+1490 Z8=Z8+1:IF Z8>LEN(N1$) THEN 1520
+1500 IF ASC(MID$(N1$,Z8,1))>90 THEN PRINT CHR$(30);:GOTO 1440
+1510 GOTO 1490
+1520 PRINT
+1530 PRINT"Address Number & Street: [N = Nothing] [ENTER = ";A$;"] ";:INPUT A1$
+1540 IF INSTR(A1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1530
+1541 IF INSTR(A1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1530
+1542 IF INSTR(A1$,",")>0 THEN BEEP:PRINT "Please Dont Use COMMAS!":GOTO 1530
+1550 PRINT:IF A1$="" THEN A1$=A$
+1560 IF A1$="N" OR A1$="n" OR A1$="" THEN A1$="":C1$="":S1$="":Z1=0:GOTO 1670
+1570 PRINT"City: [ENTER = ";C$;"] ";:INPUT C1$:IF C1$="" THEN C1$=C$
+1580 IF INSTR(C1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1570
+1590 PRINT
+1600 PRINT "State [ENTER = ";S$;"] ";:INPUT S1$
+1610 IF INSTR(S1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1600
+1620 IF S1$="" THEN S1$=S$
+1630 REM IF LEN(S1$)<>2 THEN PRINT CHR$(30);:GOTO 1600
+1640 PRINT
+1650 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(23+LEN(STR$(Z)));"_____";CHR$(30):PRINT "Zip Code [ENTER = ";Z;"] ";:INPUT Z1
+1660 PRINT:IF Z1=0 THEN Z1=Z
+1670 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(29);"###";CHR$(30):PRINT"Area Code  [ ENTER =";A;"] ";:INPUT A1:IF A1=0 THEN A1=A
+1680 IF A1<100 OR A1>999 THEN PRINT CHR$(30);:GOTO 1670
+1690 PRINT
+1700 PRINT SPACE$(79);CHR$(30):PRINT SPACE$(15);"#######";CHR$(30):PRINT"Phone Number [ENTER =";P;"] ";:INPUT P1:IF P1=0 THEN P1=P
+1710 IF P1<1000000! OR P1>9999999! THEN PRINT CHR$(30);:GOTO 1700
+1720 PRINT:M2=0
+1725 PRINT:PRINT"When entering in a Fax #, put a 1 in front of it if it is not 818.":PRINT"Make sure there is a space after the #.       Example:   FAX:1805-222-3333":PRINT
+1730 PRINT "Misc: [A = Append] [ENTER = ";M$;"] ";:INPUT M1$:IF M1$="" THEN M1$=M$
+1740 IF INSTR(M1$,CHR$(34))>0 THEN BEEP:PRINT "Please Dont Use Quotes!":GOTO 1730
+1745 IF M1$="A" OR M1$="a" THEN PRINT:INPUT "Enter data to append";M1$:M2=1:GOTO 1740
+1747 IF M2=1 THEN M1$=M$+" "+M1$
+1750 CLS:PRINT:PRINT
+1760 PRINT N1$:IF A1$<>"" THEN PRINT A1$:PRINT C1$;" , ";S1$;"  ";Z1
+1770 PRINT "(";RIGHT$(STR$(A1),3);")";LEFT$(STR$(P1),4);"-";RIGHT$(STR$(P1),4):PRINT M1$
+1780 PRINT:PRINT:PRINT:PRINT"Is this correct (Y/N) ? ";
+1790 Q$=INKEY$
+1800 IF Q$="N" OR Q$="n" THEN PRINT "(NOT CHANGED)":WRITE#2,N$,A$,C$,S$,Z,A,P,M$:GOTO 1120
+1810 IF Q$="Y" OR Q$="y" THEN PRINT "(CHANGED)":WRITE#2,N1$,A1$,C1$,S1$,Z1,A1,P1,M1$:FLAG=1:GOTO 1120
+1820 GOTO 1790
+1830 REM ##################################################################              ####################  PRINT PHONE BOOK ###########################              ##################################################################
+1840 PRINT:PRINT:PRINT"Do you want to print your customers only (Y/N) ? ";
+1850 Q$=INKEY$:IF Q$="y" OR Q$="Y" THEN PRINT"Yes":FLAG=1:GOTO 1880
+1860 IF Q$="n" OR Q$="N" THEN PRINT"No":FLAG=0:GOTO 1880
+1870 GOTO 1850
+1880 PRINT:PRINT"Do you want High Quality but slow print (Y/N) ? ";
+1890 Q$=INKEY$:IF Q$="y" OR Q$="Y" THEN PRINT"Yes":NLQ=1:GOTO 1920
+1900 IF Q$="n" OR Q$="N" THEN PRINT"No":NLQ=0:GOTO 1920
+1910 GOTO 1890
+1920 PRINT:PRINT"Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)":FST=0
+1930 Q$=INKEY$:IF Q$="" THEN 1930
+1940 IF Q$=CHR$(27) THEN 210
+1950 CT=64:IF Q$=CHR$(13) THEN 2000
+1960 CT=CT+1:IF CT=91 THEN CT=48
+1970 IF CT=58 THEN 1930
+1980 IF Q$=CHR$(CT) THEN 2000
+1990 GOTO 1960
+2000 IF FLAG=0 THEN 2040
+2010 Y=0:PRINT"Please Wait...":SHELL "CD ..":OPEN "REALNAME.DAT" FOR INPUT AS 1
+2020 Y=Y+1:INPUT#1,A$:INPUT#1,FULL$(Y):IF EOF(1) THEN RESET:SHELL"cd phone":GOTO 2040
+2030 GOTO 2020
+2040 LPRINT CHR$(27);"@":CLS:PRINT:TITLE=0:IF FLAG=1 THEN PRINT"Print Customers Only."
+2050 CT=64:PRINT:PRINT"Esc = Quit       ";:IF Q$<>CHR$(13) THEN PRINT "Printing All People Beginning with ";Q$:PRINT:PRINT ELSE PRINT:PRINT:PRINT
+2060 PG=0:CT=CT+1:IF CT=91 THEN CT=48
+2070 IF CT=58 THEN RESET:LPRINT CHR$(27);"@":GOTO 210
+2080 IF Q$<>CHR$(13) AND Q$<>CHR$(CT) THEN 2060
+2081 GOTO 2090:PRINT"Sorting ";CHR$(CT):SRT$="BIGSORT /B /S 1,20 <"+CHR$(CT)+".LST >PHONESRT.TMP":SHELL SRT$
+2084 TST=0:OPEN "PHONESRT.TMP" FOR INPUT AS 3:TST=LOF(3):CLOSE 3
+2085 IF TST>10 THEN SRT$="COPY PHONESRT.TMP "+CHR$(CT)+".LST":SHELL SRT$
+2090 OPEN CHR$(CT)+".LST" FOR INPUT AS 1:PRINT CHR$(30);"Printing the letter ";CHR$(CT)
+2100 GOTO 2170
+2110 IF FST=0 THEN FST=1:GOTO 2130
+2120 LPRINT CHR$(12)
+2130 TITLE=1:LPRINT CHR$(27);"j";CHR$(63);:LPRINT CHR$(27);"h";CHR$(2);CHR$(CT);
+2140 LPRINT CHR$(27);"h";CHR$(0);:LPRINT CHR$(27);"J";CHR$(63)
+2150 LPRINT CHR$(27);"x";CHR$(1);:IF NLQ=0 THEN LPRINT CHR$(27);"@";
+2160 RETURN
+2170 IF EOF(1) THEN RESET:LPRINT CHR$(27);"x";CHR$(0);:TITLE=0:GOTO 2060
+2180 X=0:INPUT#1,N$,A$,C$,S$,Z,A,P,M$
+2190 IF FLAG=0 THEN 2230
+2200 X=X+1:IF N$=FULL$(X) THEN 2230
+2210 IF X=Y THEN 2270
+2220 GOTO 2200
+2230 IF TITLE=0 THEN GOSUB 2110
+2240 LPRINT N$:IF A$<>"" THEN LPRINT "     ";A$;"   ";C$;",";S$;Z
+2250 Z$="     ("+RIGHT$(STR$(A),3)+")"+LEFT$(STR$(P),4)+"-"+RIGHT$(STR$(P),4)+"    ":LPRINT Z$;:IF LEN(M$)<56 THEN LPRINT M$:GOTO 2270
+2260 LPRINT LEFT$(M$,55):LPRINT SPACE$(23);RIGHT$(M$,LEN(M$)-55)
+2270 IF INKEY$=CHR$(27) THEN CT=58:GOTO 2070
+2280 PG=PG+1:IF PG=20 THEN PG=0:TITLE=0
+2290 GOTO 2170
+2300 REM ##################################################################              ####################  PRINT LABELS     ###########################              ##################################################################
+2310 PRINT:PRINT:PRINT"Do you want to print your customers only (Y/N) ? ";
+2320 Q$=INKEY$:IF Q$="y" OR Q$="Y" THEN PRINT"Yes":FLAG=1:GOTO 2335
+2330 IF Q$="n" OR Q$="N" THEN PRINT"No":PRINT:PRINT:PRINT:PRINT:FLAG=0:GOTO 2350
+2333 GOTO 2320
+2335 Y=0:PRINT:PRINT"Please Wait...":SHELL "CD ..":OPEN "REALNAME.DAT" FOR INPUT AS 1
+2337 Y=Y+1:INPUT#1,A$:INPUT#1,FULL$(Y):IF EOF(1) THEN RESET:SHELL"cd phone":GOTO 2350
+2340 GOTO 2337
+2350 PRINT:PRINT"Enter 1st Letter to start with [Enter = A]  ";
+2351 Q$=INKEY$:IF Q$="" THEN 2351
+2352 PRINT Q$:PRINT:IF Q$=CHR$(13) THEN 2359
+2353 IF Q$<"0" OR Q$>"Z" THEN 2351
+2359 PRINT CHR$(30);CHR$(30);CHR$(30);"Printing Labels...          [ESC] to Exit":PRINT:PRINT:PRINT
+2360 LPRINT CHR$(27);CHR$(15);
+2365 BEG=ASC(Q$)
+2366 IF Q$=CHR$(13) THEN BEG=ASC("0")
+2370 FOR X=BEG TO ASC("Z"):PRINT CHR$(30);"Printing the ";CHR$(X);"'s"
+2380 OPEN CHR$(X)+".LST" FOR INPUT AS 1
+2390 IF EOF(1) THEN RESET:GOTO 2450
+2400 INPUT#1,N$,A$,C$,S$,Z,A,P,M$
+2410 IF INKEY$=CHR$(27) THEN RESET:GOTO 210
+2413 IF A$="" THEN 2390
+2415 Q=0:IF FLAG=0 THEN 2430
+2417 Q=Q+1:IF N$=FULL$(Q) THEN 2430
+2418 IF Q=Y THEN 2390
+2420 GOTO 2417
+2430 LPRINT N$:LPRINT A$:LPRINT C$;" , ";S$;"  ";Z:LPRINT:LPRINT:LPRINT
+2440 GOTO 2390
+2450 NEXT:LPRINT CHR$(27);"@"
+2460 GOTO 210
+2470 REM ##################################################################              #################  LOOK UP AREA CODES  ###########################              ##################################################################
+2480 CLS:PRINT:PRINT"<<< LOOK UP AREA CODES >>>":PRINT:PRINT
+2490 PRINT"Enter Area Code to find city or 2 letter abreviation of state to find area code":PRINT"  Example:  California = CA":PRINT:PRINT
+2500 PRINT TAB(25);"___";CHR$(30):INPUT "[A = All]  [Q = Quit] "; Q$:IF Q$="q" OR Q$="Q" THEN 210
+2510 IF Q$="a" OR Q$="A" THEN Q$="*|MORE":GOTO 2530
+2520 IF LEN(Q$)>3 OR LEN(Q$)<2 THEN 2480
+2530 Q$="areacode "+Q$:CLS:SHELL Q$
+2540 LOCATE 25,1:INPUT "Hit Enter";Q$
+2550 GOTO 210
+2650 PRINT:PRINT CHR$(30);"Checking Rolodex for Errors...     [ESC] to Exit":PRINT:PRINT:PRINT
+2670 FOR X=ASC("0") TO ASC("Z"):PRINT CHR$(30);"Testing the ";CHR$(X);"'s"
+2680 OPEN CHR$(X)+".LST" FOR INPUT AS 1
+2690 IF EOF(1) THEN RESET:GOTO 2790
+2700 INPUT#1,N$,A$,C$,S$,Z,A,P,M$
+2710 IF INKEY$=CHR$(27) THEN RESET:GOTO 210
+2712 IF LEFT$(N$,1)<>CHR$(X) THEN 2730
+2713 IF A=0 OR P=0 THEN 2730
+2715 N1$=N$:A1$=A$:C1$=C$:S1$=S$:Z1=Z:A1=A:P1=P:M1$=M$
+2720 GOTO 2690
+2730 TTL=TTL+1:IF TTL=1 THEN PRINT:PRINT "The following ERRORS were found:":PRINT TAB(9);"POST NAME";TAB(40);"BAD NAME ENTRY":PRINT STRING$(79,"=")
+2745 PRINT "<<<";CHR$(X);">>> ";N1$;TAB(40);N$
+2750 GOTO 2690
+2790 NEXT:PRINT:INPUT "Hit [ENTER] to continue"; AAA$
+2799 GOTO 210
+
+
+## Copilot
+
+Yes â€” `PHONE.BAS` is clearly the **Rolodex program**, and it also shows **exactly how the data was stored**.
+
+## Bottom line
+The Rolodex data was **not stored inside `PHONE.BAS` itself**.  
+It was stored in a set of **per-letter sequential files** in the `PHONE` directory:
+
+- `A.LST`
+- `B.LST`
+- ...
+- `Z.LST`
+- and also numeric starters:
+- `0.LST` through `9.LST`
+
+The program chooses the file by the **first character of the name** using `LEFT$(N$,1)+".LST"`. For Add, it appends a record to that file; for search/delete/modify, it opens the same per-letter file and scans each record with `INPUT#`. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/INPUTF.html?utm_source=openai))
+
+## Exact evidence from your code
+### Add writes to `<first-letter>.LST`
+In line 850 and again at 990:
+
+- `Q$=LEFT$(N$,1)+".LST"`
+- `OPEN Q$ FOR INPUT AS 1`
+- later:
+- `OPEN Q$ FOR APPEND LOCK READ WRITE AS 1:WRITE#1,N$,A$,C$,S$,Z,A,P,M$:CLOSE 1`
+
+That means a name like `PLUTO` is stored in:
+- `P.LST`
+
+and a name like `TEST` is stored in:
+- `T.LST`
+
+Because it uses `WRITE#`, each record is a sequential line of 8 fields:
+1. name
+2. address
+3. city
+4. state
+5. zip
+6. area code
+7. phone number
+8. misc
+
+GW-BASIC `WRITE#` writes comma-delimited records and quotes strings so they can be read back reliably with `INPUT#`; your code uses exactly that pair. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/WRITEF.html?utm_source=openai))
+
+### Delete / Lookup / Modify read the same `<first-letter>.LST`
+At lines 1100 and 1130:
+
+- `Q$=LEFT$(N2$,1)+".LST":OPEN Q$ FOR INPUT AS 1`
+- `INPUT#1,N$,A$,C$,S$,Z,A,P,M$`
+
+So when the user searches `PLUTO`, DOS opens:
+- `P.LST`
+
+and scans records from that file. It does **not** search a single monolithic Rolodex database file. It uses **one file per starting letter/number**. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/INPUTF.html?utm_source=openai))
+
+### Delete / Modify rebuild the letter file using a temp file
+At lines 1110, 1240â€“1270, and 1340:
+
+- opens `<letter>.TMP` for output
+- copies surviving records there
+- then if changes were made:
+  - `KILL LEFT$(N$,1)+".LST"`
+  - `NAME LEFT$(N2$,1)+".TMP " AS LEFT$(N2$,1)+".LST"`
+
+That confirms `.LST` files are the live database files, and `.TMP` files are temporary rebuild files during delete/modify. ([hwiegman.home.xs4all.nl](https://hwiegman.home.xs4all.nl/gw-man/INPUTF.html?utm_source=openai))
+
+## So do you need to copy files to `\\invoice\mainmenu\data`?
+**Yes â€” if you want the WinForms app to use the existing DOS Rolodex data, you need to copy the Rolodex `.LST` data files** into the Windows appâ€™s data location, or otherwise migrate them there.
+
+### Must-copy for Rolodex functionality
+At minimum, copy the live Rolodex data files:
+- `0.LST`â€“`9.LST` if they exist
+- `A.LST`â€“`Z.LST`
+
+These are the actual Rolodex database shards.
+
+### Probably also copy if the corresponding features are used
+- `REALNAME.DAT`  
+  The print routines use this when printing â€œcustomers only.â€ See lines 2010â€“2030 and 2335â€“2340 where it opens `REALNAME.DAT` from the parent directory. If you want Print Phone Book / Print Labels customer-only behavior to work, this file matters.
+- Area/zip helper executables/data:
+  - Area code lookup uses `SHELL "areacode "+Q$` at line 2530, so it depends on an external `areacode` program/data being available.
+  - Zip lookup uses `SHELL "ZIPKEY 2"` at line 423, so that depends on external `ZIPKEY` assets being present.
+
+## What you do **not** need to copy just to use the Rolodex database
+- `PHONE.BAS` itself is program logic, not the live record store.
+- `.TMP` files are transient working files, not the source of truth.
+
+## Why your WinForms test returned `TEST` instead of `PLUTO`
+Because your current port is still using a hardcoded placeholder record. It is **not yet reading `P.LST` / `T.LST`** like DOS does.
+
+## Practical recommendation
+For the WinForms port, the next step should be:
+
+1. Copy the legacy Rolodex data files into your Windows data folder:
+   - `\\invoice\mainmenu\data\phone\A.LST` â€¦ `Z.LST` and any numeric `.LST` files
+2. Implement a repository that:
+   - determines target file from `Left(name, 1)`
+   - reads records from the matching `.LST`
+   - parses 8 fields per record
+   - appends on add
+   - rewrites file on delete/modify
+3. Optionally also bring over:
+   - `REALNAME.DAT`
+   - area code / zip lookup assets if you want those features to match DOS
+
+## One subtle but important detail
+DOS stores only records from the corresponding first-letter file, so searching `PLUTO` should only look in `P.LST`, not scan all files, except for the special â€œGlobal Searchâ€ branch (`G`) which does a broader search via temp files and shell commands.
+
+If you want, next I can generate:
+- a `RolodexRepository.vb` that reads/writes the legacy `.LST` format
+- plus the changes to `RolodexPromptEngine.vb` so Add/Delete/Lookup/Modify use the real DOS-era files instead of the fake `TEST` record.
+
+## @testsubject117
+
+can you give me an exact list of files that the rolodex accessed and revised so I can copy all those files over?
+
+## Copilot
+
+Yes. From `PHONE.BAS`, the exact Rolodex-related files it **accesses or writes** are:
+
+## Core Rolodex data files
+These are the actual live record files.
+
+- `0.LST`
+- `1.LST`
+- `2.LST`
+- `3.LST`
+- `4.LST`
+- `5.LST`
+- `6.LST`
+- `7.LST`
+- `8.LST`
+- `9.LST`
+- `A.LST`
+- `B.LST`
+- `C.LST`
+- `D.LST`
+- `E.LST`
+- `F.LST`
+- `G.LST`
+- `H.LST`
+- `I.LST`
+- `J.LST`
+- `K.LST`
+- `L.LST`
+- `M.LST`
+- `N.LST`
+- `O.LST`
+- `P.LST`
+- `Q.LST`
+- `R.LST`
+- `S.LST`
+- `T.LST`
+- `U.LST`
+- `V.LST`
+- `W.LST`
+- `X.LST`
+- `Y.LST`
+- `Z.LST`
+
+### Why
+The program repeatedly opens files using:
+- `LEFT$(N$,1)+".LST"` for add
+- `LEFT$(N2$,1)+".LST"` for lookup/delete/modify
+- `CHR$(X)+".LST"` in print/error-check loops
+
+So those `.LST` files are the main Rolodex database shards.
+
+---
+
+## Temporary working files created/revised by Rolodex
+These are used during delete/modify.
+
+- `0.TMP`
+- `1.TMP`
+- `2.TMP`
+- `3.TMP`
+- `4.TMP`
+- `5.TMP`
+- `6.TMP`
+- `7.TMP`
+- `8.TMP`
+- `9.TMP`
+- `A.TMP`
+- `B.TMP`
+- `C.TMP`
+- `D.TMP`
+- `E.TMP`
+- `F.TMP`
+- `G.TMP`
+- `H.TMP`
+- `I.TMP`
+- `J.TMP`
+- `K.TMP`
+- `L.TMP`
+- `M.TMP`
+- `N.TMP`
+- `O.TMP`
+- `P.TMP`
+- `Q.TMP`
+- `R.TMP`
+- `S.TMP`
+- `T.TMP`
+- `U.TMP`
+- `V.TMP`
+- `W.TMP`
+- `X.TMP`
+- `Y.TMP`
+- `Z.TMP`
+
+### Why
+During delete/modify it does:
+- open `<letter>.LST` for input
+- open `<letter>.TMP` for output
+- rebuild records
+- replace `.LST` with `.TMP`
+
+You do **not** usually need to copy old `.TMP` files from DOS.  
+They are scratch files. But your Windows app may create them during updates if you mimic DOS behavior.
+
+---
+
+## Additional non-`.LST` files used by Rolodex features
+
+### `REALNAME.DAT`
+Used by:
+- Print Phone Book â†’ â€œcustomers onlyâ€
+- Print Labels â†’ â€œcustomers onlyâ€
+
+So if you want those two features to match DOS, copy:
+
+- `REALNAME.DAT`
+
+### `ALLNAMES.TMP`
+Used by the global search workflow:
+- generated from copied `.LST` files
+- searched externally
+
+This is a temporary/generated file, so you likely do **not** need to pre-copy it, but Rolodex may create/use:
+
+- `ALLNAMES.TMP`
+
+### `PHONESRT.TMP`
+Used by phone book printing/sorting.
+
+Again, generated scratch file, probably not something to pre-copy, but it is used:
+
+- `PHONESRT.TMP`
+
+### `F:\ERRORS.LST`
+Used only for logging runtime errors:
+- not Rolodex data
+- not needed for the actual Rolodex database migration
+
+---
+
+# Exact practical copy list
+## Files you should copy for core Rolodex records
+Copy all existing:
+- `*.LST`
+
+from the DOS Rolodex folder, especially:
+- `0.LST`â€“`9.LST`
+- `A.LST`â€“`Z.LST`
+
+## Also copy if you want print/customer behavior preserved
+- `REALNAME.DAT`
+
+## Usually do not bother copying
+These are generated/temporary:
+- `*.TMP`
+- `ALLNAMES.TMP`
+- `PHONESRT.TMP`
+
+---
+
+# Recommended destination
+If your Windows app will read from a data folder, copy these into something like:
+
+```text
+\\invoice\mainmenu\data\phone\
+```
+
+or whatever folder your new Rolodex repository will use.
+
+## Best structure
+If you want to stay close to DOS layout:
+
+```text
+\\invoice\mainmenu\data\phone\A.LST
+\\invoice\mainmenu\data\phone\B.LST
+...
+\\invoice\mainmenu\data\phone\Z.LST
+\\invoice\mainmenu\data\REALNAME.DAT
+```
+
+Because DOS code suggests `REALNAME.DAT` lived one directory above `PHONE`, while the `.LST` files lived in the `PHONE` folder.
+
+---
+
+# Final answer
+## Definitely copy
+- all existing `*.LST` Rolodex files
+- `REALNAME.DAT` if you want customer-only print features
+
+## Do not worry about copying
+- `.TMP` files
+- `ALLNAMES.TMP`
+- `PHONESRT.TMP`
+
+If you want, next I can turn this into a **clean file checklist** you can hand to someone, or I can help you write the VB.NET repository that reads the legacy `.LST` files exactly like DOS did.
+
+## @testsubject117
+
+Realname.dat is already there. so copy all these files and place them in \\invoice\mainmenu\data so that our vb rolodex can access the files
+
+## Copilot
+
+Yes â€” for the VB Rolodex to access the legacy data, copy the **actual Rolodex `.LST` files** into the appâ€™s data location. Since `REALNAME.DAT` is already there, the remaining important files are the Rolodex letter/number shards.
+
+## Copy these files
+From the DOS `PHONE` folder, copy all existing:
+
+- `0.LST`
+- `1.LST`
+- `2.LST`
+- `3.LST`
+- `4.LST`
+- `5.LST`
+- `6.LST`
+- `7.LST`
+- `8.LST`
+- `9.LST`
+- `A.LST`
+- `B.LST`
+- `C.LST`
+- `D.LST`
+- `E.LST`
+- `F.LST`
+- `G.LST`
+- `H.LST`
+- `I.LST`
+- `J.LST`
+- `K.LST`
+- `L.LST`
+- `M.LST`
+- `N.LST`
+- `O.LST`
+- `P.LST`
+- `Q.LST`
+- `R.LST`
+- `S.LST`
+- `T.LST`
+- `U.LST`
+- `V.LST`
+- `W.LST`
+- `X.LST`
+- `Y.LST`
+- `Z.LST`
+
+## Put them here
+Per your plan:
+
+```text
+\\invoice\mainmenu\data
+```
+
+If you want to mirror the DOS structure more cleanly, an even better layout would be:
+
+```text
+\\invoice\mainmenu\data\phone
+```
+
+but if your current VB code expects `\\invoice\mainmenu\data`, then put them there for now.
+
+## Do not bother copying
+You do **not** need to copy the temporary files:
+- `*.TMP`
+- `ALLNAMES.TMP`
+- `PHONESRT.TMP`
+
+## Important note
+Copying the files is necessary, but by itself it wonâ€™t make the current WinForms Rolodex use them yet.  
+The VB code still needs to be updated to:
+- read the `.LST` files
+- search the correct file by first letter
+- append new records
+- rewrite on delete/modify
+
+So the sequence is:
+
+1. copy the `.LST` files
+2. then update the VB Rolodex code to use them
+
+## Best next step
+Once youâ€™ve copied the files, tell me where exactly they ended up, for example:
+
+- `\\invoice\mainmenu\data\A.LST`
+or
+- `\\invoice\mainmenu\data\phone\A.LST`
+
+Then Iâ€™ll generate the repository code to read/write them correctly.
+
+## @testsubject117
+
+ok, I created a folder called phone. that will keep things cleaner. so the .vb app accesses rolodex files at this location \\invoice\mainmenu\data\phone
+
+## Copilot
+
+Perfect. Thatâ€™s the right setup.
+
+## Use this as the Rolodex data location
+Your VB app should read/write Rolodex files from:
+
+```text
+\\invoice\mainmenu\data\phone
+```
+
+## What should be in that folder
+Copy the legacy Rolodex shard files there:
+
+- `0.LST` through `9.LST` if present
+- `A.LST` through `Z.LST`
+
+So examples would be:
+
+```text
+\\invoice\mainmenu\data\phone\A.LST
+\\invoice\mainmenu\data\phone\P.LST
+\\invoice\mainmenu\data\phone\T.LST
+```
+
+## Keep `REALNAME.DAT` where it already is

@@ -1,4 +1,8 @@
-﻿    '^mar-' { $monthFolder -replace '^mar', 'march' }
+﻿$monthFolder = (Get-Date).ToString("MMM-yyyy").ToLower()
+$monthFolder = switch -Regex ($monthFolder) {
+    '^jan-' { $monthFolder -replace '^jan', 'january' }
+    '^feb-' { $monthFolder -replace '^feb', 'february' }
+    '^mar-' { $monthFolder -replace '^mar', 'march' }
     '^apr-' { $monthFolder -replace '^apr', 'april' }
     '^may-' { $monthFolder -replace '^may', 'may' }
     '^jun-' { $monthFolder -replace '^jun', 'june' }
@@ -1994,7 +1998,3 @@ Create a short, practical, checklist-style handoff for me personally.
 Keep this compact and optimized for quick scanning.
 
 # 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
-Create a roadmap section with:
-- previous baseline
-- what changed today
-- current state

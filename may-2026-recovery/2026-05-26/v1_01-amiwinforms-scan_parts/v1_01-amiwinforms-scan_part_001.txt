@@ -1,0 +1,58 @@
+﻿# AmiWinForms Scan Snapshot
+
+## Repository
+- `testsubject117/AmiWinForms`
+
+## Relevant Project Area
+- WinForms recreation of the DOS/GWBASIC office app.
+- Current focus is the Rolodex menu and its child flows.
+
+## Confirmed Relevant Files
+- `FrmRolodexMenu.vb`
+- `RolodexMenuInlineMode.vb`
+- `AreaCodeEntry.vb`
+- `RolodexAreaCodeService.vb`
+- `FrmPagedTextViewer.vb`
+- `FrmZipKeyPopup.vb`
+- `FrmRolodexPrompt.vb`
+- `RolodexPromptEngine.vb`
+- `RolodexPersonRecord.vb`
+
+## Confirmed UI / Flow Pattern
+- Rolodex screen uses:
+  - black background
+  - white monospace text
+  - keyboard-driven prompts
+- Inline DOS-style flows are implemented using:
+  - `_inlineMode`
+  - `txtInline`
+  - `KeyPress` + `KeyDown`
+  - manual prompt rendering
+- Child forms/viewers are still used where practical in WinForms.
+
+## Confirmed Current Behavior
+- `(G) Look up Area Codes` no longer uses `InputBox`.
+- `(G)` now starts an inline DOS-style prompt inside the Rolodex screen.
+- Area-code input is collected by keyboard handling, not a Windows popup.
+- Search supports:
+  - `A`
+  - `Q`
+  - 2-letter state codes
+  - numeric area codes
+- Results open in `FrmPagedTextViewer`.
+- `FrmPagedTextViewer` now shows one scrollable combined text view with a visible vertical scrollbar.
+- `FrmPagedTextViewer` no longer relies on hidden Enter paging.
+- Blue selection highlight issue in viewer was fixed.
+- `(H)` opens `FrmZipKeyPopup` and is currently acceptable.
+- `(E)` and `(F)` still have prompt scaffolding but not completed output/printing logic.
+
+## Known Design Decisions
+- Favor DOS visual feel where it improves fidelity.
+- Favor WinForms usability when DOS behavior is hidden/confusing.
+- Scrollbars are acceptable replacement for hidden page-advance behavior.
+
+## Likely Next Relevant Investigation Area
+- Phone book printing flow
+- Label printing flow
+- Any existing print helper classes / printer integration code
+- Rolodex record source and customer-only filtering rules

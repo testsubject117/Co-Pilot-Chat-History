@@ -1,4 +1,8 @@
-﻿        End If
+﻿
+        Dim existing = _checks.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, record.CheckNumber, StringComparison.OrdinalIgnoreCase))
+        If existing IsNot Nothing Then
+            _checks.Remove(existing)
+        End If
 
         _checks.Add(record)
     End Sub
@@ -1994,7 +1998,3 @@ So likely:
 
 ## So the short practical answer is
 For **View Checks**, yes:
-- the main rows you want are in **`LEDGER.CUR`**
-
-For deeper linked invoice details:
-- there may be supporting files too

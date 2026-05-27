@@ -1,0 +1,59 @@
+﻿# DOS MainMenu Behavior Reference
+
+## General UX Style
+- Black screen with white monospace text.
+- Keyboard-driven interaction.
+- Inline prompts are preferred over Windows-style popup dialogs when reproducing DOS behavior.
+- ESC commonly cancels current inline action or returns to previous menu.
+- Some original DOS flows likely relied on Enter-to-continue behavior, but in WinForms, visible scrollbars are acceptable where they improve usability.
+
+## Rolodex Menu Items
+- `(A)` Add a Person
+- `(B)` Delete a Person
+- `(C)` Look up a Person
+- `(D)` Modify a Person
+- `(E)` Print Phone Book
+- `(F)` Print Labels
+- `(G)` Look up Area Codes
+- `(H)` Look up Zip Codes
+- `(I)` Test Entire Rolodex for Errors
+- `(Z)` Back to Main Menu
+
+## Confirmed Behavior for (G) Look up Area Codes
+- Should appear inline in the black DOS-style screen, not as a Windows popup.
+- Prompt format should resemble:
+  - `<<< LOOK UP AREA CODES >>>`
+  - explanatory text
+  - `[A = All] [Q = Quit] ? _`
+- Valid inputs:
+  - `A` = all area codes
+  - `Q` = quit
+  - 2-letter state code like `CA`
+  - numeric area code like `213`
+- In the WinForms version, results may open in a separate viewer window.
+- For WinForms usability, a visible scrollbar is preferred over hidden Enter-to-continue paging.
+
+## Confirmed Behavior for (H) Look up Zip Codes
+- Opens ZIP lookup form/popup.
+- Current implementation is acceptable.
+
+## Confirmed Behavior for (I) Test Entire Rolodex for Errors
+- Exists as an inline flow in the WinForms version.
+- Current placeholder/flow is acceptable for now.
+
+## Current WinForms Alignment Notes
+- DOS visual fidelity matters.
+- But if the DOS interaction model is unclear or unfriendly in Windows, usability improvements are acceptable.
+- Example accepted modernization:
+  - area code results now use a scrollbar instead of hidden Enter paging.
+
+## Remaining Priority Items
+- `(E) Print Phone Book`
+- `(F) Print Labels`
+
+## Next Session Focus
+- Start with `(E)` and `(F)`.
+- Determine:
+  - how DOS behavior should map to WinForms
+  - where data comes from
+  - whether preview-first or direct-print-first is the best implementation path

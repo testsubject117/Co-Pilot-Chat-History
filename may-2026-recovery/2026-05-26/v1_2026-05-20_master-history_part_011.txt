@@ -1,0 +1,2000 @@
+
+    git add $RepoSubfolder
+
+    $status = git status --porcelain
+    if (-not $status) {
+        Write-Host "No changes to commit."
+        exit 0
+    }
+
+    $commitMessage = "Add chat history files for $today"
+    git commit -m $commitMessage
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git commit failed."
+    }
+
+    git push origin $BranchName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git push failed."
+    }
+
+    Write-Host "Synced chat history to repo: $RepoSubfolder"
+}
+finally {
+    Pop-Location
+}
+```
+
+---
+
+# What it copies
+For a day like `2026-05-19`, it will copy into something like:
+
+```text
+E:\Co-Pilot-Chat-History\may-2026-recovery\2026-05-19\
+```
+
+including:
+
+- `2026-05-19_master-history.md`
+- extracted transcript `.md`
+- extracted `.json`
+- extracted `.txt`
+
+---
+
+# Important limitation in current version
+This version copies all extracted `.md/.json/.txt` files into a **single dated folder** and does **not preserve nested folder structure**.
+
+That is probably okay for your current goal, but if you want, I can make the next revision preserve subfolders too.
+
+---
+
+# How to test manually
+Run:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1"
+```
+
+Then check:
+
+```text
+E:\Co-Pilot-Chat-History\may-2026-recovery\YYYY-MM-DD\
+```
+
+and run:
+
+```powershell
+cd E:\Co-Pilot-Chat-History
+git status
+```
+
+You should see the copied files staged/committed/pushed if there were changes.
+
+---
+
+# Suggested schedule
+I recommend a task like this:
+
+- 8:00 AM
+- 2:00 PM
+- 8:00 PM
+- 11:55 PM
+
+or even every 6 hours.
+
+---
+
+# Next step after manual success
+Once you confirm the script works manually, create a second scheduled task that runs:
+
+```text
+powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1" -Silent
+```
+
+---
+
+# My recommendation
+Test manually first before scheduling it.
+
+If you want, next I can give you:
+
+1. a **safer improved version** that preserves extracted subfolder structure and avoids filename collisions, and/or  
+2. the exact **schtasks command** to create the scheduled task.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1"
+Already on 'upload-chat-history'
+Your branch is up to date with 'origin/upload-chat-history'.
+From https://github.com/testsubject117/Co-Pilot-Chat-History
+ * branch            upload-chat-history -> FETCH_HEAD
+Already up to date.
+warning: in the working copy of 'may-2026-recovery/2026-05-18/2026-05-18_master-history.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'may-2026-recovery/2026-05-18/mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'may-2026-recovery/2026-05-18/v1_AMI_COPILOT_HANDOFF.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'may-2026-recovery/2026-05-18/v1_AMI_NEXT_STEPS_CHECKLIST.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'may-2026-recovery/2026-05-18/v1_daily-copilot-chat-history-checklist.md', LF will be replaced by CRLF the next time Git touches it
+[upload-chat-history 3082ef1] Add chat history files for 2026-05-18
+ 5 files changed, 29505 insertions(+)
+ create mode 100644 may-2026-recovery/2026-05-18/2026-05-18_master-history.md
+ create mode 100644 may-2026-recovery/2026-05-18/mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md
+ create mode 100644 may-2026-recovery/2026-05-18/v1_AMI_COPILOT_HANDOFF.txt
+ create mode 100644 may-2026-recovery/2026-05-18/v1_AMI_NEXT_STEPS_CHECKLIST.txt
+ create mode 100644 may-2026-recovery/2026-05-18/v1_daily-copilot-chat-history-checklist.md
+Enumerating objects: 11, done.
+Counting objects: 100% (11/11), done.
+Delta compression using up to 32 threads
+Compressing objects: 100% (9/9), done.
+Writing objects: 100% (9/9), 132.18 KiB | 9.44 MiB/s, done.
+Total 9 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)
+remote: Resolving deltas: 100% (3/3), completed with 2 local objects.
+To https://github.com/testsubject117/Co-Pilot-Chat-History.git
+   2d994c2..3082ef1  upload-chat-history -> upload-chat-history
+Synced chat history to repo: may-2026-recovery\2026-05-18
+
+## Copilot
+
+Perfect â€” **the repo sync script worked**.
+
+## What just happened
+It successfully:
+
+- checked out `upload-chat-history`
+- pulled latest from GitHub
+- copied the files into:
+  - `may-2026-recovery/2026-05-18/`
+- committed them
+- pushed them to:
+  - `testsubject117/Co-Pilot-Chat-History`
+  - branch `upload-chat-history`
+
+So yes: **the second phase is now working manually**.
+
+---
+
+## What the output confirms
+These files were pushed:
+
+- `2026-05-18_master-history.md`
+- `mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md`
+- `v1_AMI_COPILOT_HANDOFF.txt`
+- `v1_AMI_NEXT_STEPS_CHECKLIST.txt`
+- `v1_daily-copilot-chat-history-checklist.md`
+
+That means your repo now has the daily history available for future review.
+
+---
+
+## About the warnings
+These warnings:
+
+```text
+LF will be replaced by CRLF
+```
+
+are **not failures**.
+
+They only mean Git noticed line-ending normalization differences between Unix-style and Windows-style endings.
+
+So:
+- script succeeded
+- commit succeeded
+- push succeeded
+
+You can ignore those for now.
+
+---
+
+## One note
+Right now the sync script copied:
+
+- the actual transcript
+- the master history
+- and also checklist/helper files
+
+That is not wrong.
+
+It just means the repo contains:
+- useful chat history
+- plus supporting handoff/checklist files
+
+If thatâ€™s what you want, great.  
+If later you want to limit it to only:
+- transcript `.md`
+- `.json`
+- master history
+
+we can tighten it.
+
+---
+
+# Where you are now
+## You now have:
+### Local automation
+- detects exports every 30 minutes
+- extracts them
+- builds daily master history files
+
+### Repo sync automation script
+- copies selected daily files into your repo
+- commits and pushes to `upload-chat-history`
+
+So the only thing left is scheduling this second script.
+
+---
+
+# Next recommended step
+Create a scheduled task for:
+
+```text
+powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1" -Silent
+```
+
+and run it several times daily, especially near midnight.
+
+---
+
+# Suggested schedule
+I recommend one of these:
+
+## Option A: four fixed times
+- 8:00 AM
+- 2:00 PM
+- 8:00 PM
+- 11:55 PM
+
+## Option B: every 6 hours
+- simpler
+- also works well
+
+If your main goal is â€œrepo is current by morning,â€ then **11:55 PM** is the most important one.
+
+---
+
+# Short answer
+**Yes â€” manual sync to GitHub is now working.**  
+Your repo received the daily chat history files successfully.
+
+If you want, next I can give you the exact **schtasks command** to create the scheduled repo-sync task.
+
+## @testsubject117
+
+yes, lets create the scheduled repo-sync task, first before I forget, I also want a daily command I can input into each chat session that will automatically create a detailed summary of what was discussed this day, what was accomplished, what the plan moving forward is, and what needs to be addressed first thing at the beginning of the next day, that includes the summary data from reviewing the amidatastore and amiwinforms repos, and comparing what dos does to what we already have done in vb, while keeping the look and feel, what was accomplished, what is left to do, in a checklist fashion for me, also in a checklist fashion of code or shorthand for any future chat session, that would reload all the needed info quickly into any chat session, as well as a detailed roadmap of where we were, are and are going.
+
+## Copilot
+
+Yes â€” do **two things**:
+
+1. create the scheduled repo-sync task  
+2. create a reusable **end-of-day prompt template** you can paste into any chat
+
+---
+
+# Part 1: Scheduled repo-sync task
+
+Use this command in PowerShell:
+
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /TR "powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+```
+
+## What it does
+This creates a task named:
+
+```text
+Sync Chat History To Repo
+```
+
+that runs every day at:
+
+```text
+12:05 AM
+```
+
+and executes your repo sync script silently.
+
+---
+
+## If you also want extra daytime runs
+Since you said â€œseveral times a day,â€ the easiest clean option is to add a repeating schedule.
+
+Use this instead if you want it to run every 6 hours:
+
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /RI 360 /DU 23:59 /TR "powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+```
+
+## Meaning
+- starts at `12:05 AM`
+- repeats every `360` minutes
+- continues for `23:59`
+
+That gives you approximately:
+- 12:05 AM
+- 6:05 AM
+- 12:05 PM
+- 6:05 PM
+
+Thatâ€™s a very good fit for your use case.
+
+---
+
+## Verify it
+After creating it:
+
+```powershell
+schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+```
+
+You should see the repetition details.
+
+---
+
+# Part 2: Your reusable end-of-day master prompt
+
+Below is a daily prompt you can paste into any chat session.
+
+It is designed to make me generate:
+
+- detailed day summary
+- accomplishments
+- blockers
+- next-day priorities
+- repo review synthesis
+- DOS vs VB comparison
+- preserved look-and-feel constraints
+- checklist for you
+- shorthand/context reload block for future chats
+- roadmap from past â†’ present â†’ next
+
+---
+
+## Recommended daily prompt
+Copy/save this somewhere like a note file called:
+
+```text
+Daily Copilot Wrap-Up Prompt.md
+```
+
+and paste it near the end of each dayâ€™s session.
+
+````text
+Please create a complete end-of-day project wrap-up for todayâ€™s work.
+
+I want the output organized into the exact sections below, with strong detail and high accuracy based on everything discussed in this chat session.
+
+IMPORTANT REQUIREMENTS:
+- Be concrete, not vague.
+- Include specific files, forms, features, logic, bugs, and decisions discussed today.
+- Include both coding work and planning/analysis work.
+- If repo review or code comparisons were discussed, incorporate them.
+- If AMiDataStore and AMiWinForms were reviewed, include what was learned from each.
+- Include comparisons between DOS behavior and the VB implementation where relevant.
+- Preserve the idea that the VB app should match the DOS workflow/behavior/look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Call out assumptions, unresolved questions, and risks.
+- Make this useful both for me tomorrow morning and for quickly reloading context into a future chat session.
+
+OUTPUT FORMAT:
+
+# 1. Executive Summary
+Give a detailed but readable summary of what was discussed and accomplished today.
+
+# 2. Work Completed Today
+Provide a checklist of what was completed today.
+Use markdown checkboxes.
+Be specific.
+
+# 3. Key Technical Findings
+Summarize important technical discoveries, decisions, architecture findings, code behavior, and repo insights from today.
+
+# 4. Repo Review Summary
+Create a structured summary of anything learned from:
+- AMiDataStore
+- AMiWinForms
+
+Include:
+- what was reviewed
+- why it mattered
+- what dependencies or interactions were identified
+- what it means for future work
+
+# 5. DOS vs VB Comparison Summary
+Summarize all comparisons made between DOS behavior and the current VB implementation.
+
+Include:
+- what DOS does
+- what VB already does
+- what VB still needs to do
+- what must remain visually or behaviorally consistent with DOS
+- any known deviations or acceptable differences
+
+# 6. Current Project State
+Summarize where the project stands right now.
+Include:
+- what is working
+- what is partially working
+- what is not started
+- what is broken or uncertain
+
+# 7. Remaining Work / Open Items
+Create a checklist of what still needs to be done.
+Group items by area if possible.
+
+# 8. Highest Priority Next Steps
+List the most important items that should be addressed first thing next session / next morning.
+Order them by priority.
+
+# 9. Known Risks / Blockers / Questions
+List unresolved issues, blockers, unknowns, and anything that needs confirmation.
+
+# 10. Future Chat Reload Pack
+Create a compact but information-dense context reload section that I can paste into a brand new chat session to quickly restore working context.
+
+This section must include:
+- project identity
+- current goal
+- active branch/repo context if discussed
+- most important files/forms/components discussed
+- major constraints
+- DOS compatibility expectations
+- current implementation status
+- immediate next coding targets
+
+# 11. Shorthand Operator Notes
+Create a compact checklist / shorthand version for me personally, optimized for quick scanning.
+This should be much shorter than the full summary.
+Think of it like a tactical handoff card.
+
+# 12. Roadmap: Past -> Present -> Next
+Create a roadmap section with:
+- Where we were
+- What changed today
+- Where we are now
+- What comes next
+- What success looks like
+
+# 13. First Thing Tomorrow
+End with a very short checklist of the exact first actions to take at the beginning of the next work session.
+
+Please make this comprehensive, structured, and reusable.
+````
+
+---
+
+# Why this prompt is good
+It forces the output to include:
+
+- daily summary
+- checklists
+- technical discoveries
+- repo comparisons
+- DOS/VB parity goals
+- future chat context loading
+- roadmap
+- next morning startup actions
+
+That is exactly the kind of durable project memory prompt you want.
+
+---
+
+# Even better workflow suggestion
+Use this prompt at the **end of each day**, then:
+
+1. paste the generated summary into a markdown file
+2. include it in your exported session
+3. let your scheduled sync push it into the repo
+
+That way your repo contains:
+- raw transcript
+- cumulative history
+- structured day summary
+
+Which is ideal.
+
+---
+
+# My recommendation
+## For the scheduled task:
+Use the repeating-every-6-hours version:
+
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /RI 360 /DU 23:59 /TR "powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+```
+
+## For the daily summary:
+Use the prompt template above at the end of each day.
+
+---
+
+# Short answer
+Yes â€” I recommend:
+
+- creating the repo sync task now
+- and using the reusable end-of-day prompt above in each chat session
+
+If you want, next I can also create a **shorter â€œmorning startup promptâ€ companion template** that reloads yesterdayâ€™s state and tells me exactly how to resume work fast.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /TR "powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+ERROR: Invalid argument/option - '-Silent /RL HIGHEST /F'.
+Type "SCHTASKS /CREATE /?" for usage.
+PS C:\Users\capnkirk\source\repos\AMiWinForms> schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /RI 360 /DU 23:59 /TR "powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+ERROR: Invalid argument/option - '-Silent /RL HIGHEST /F'.
+Type "SCHTASKS /CREATE /?" for usage.
+PS C:\Users\capnkirk\source\repos\AMiWinForms> schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+ERROR: The system cannot find the file specified.
+
+## Copilot
+
+The issue is quoting: `schtasks` is swallowing the rest of `/TR` after `-File ...` and treating `-Silent /RL HIGHEST /F` as separate broken args.
+
+## Use this exact command
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /TR "'powershell.exe' -ExecutionPolicy Bypass -File 'H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1' -Silent" /RL HIGHEST /F
+```
+
+## If you want repeat every 6 hours
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /RI 360 /DU 23:59 /TR "'powershell.exe' -ExecutionPolicy Bypass -File 'H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1' -Silent" /RL HIGHEST /F
+```
+
+---
+
+## Then verify
+```powershell
+schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+```
+
+---
+
+## If `schtasks` still complains
+Use `cmd /c` wrapping instead:
+
+```powershell
+schtasks /Create /TN "Sync Chat History To Repo" /SC DAILY /ST 00:05 /RI 360 /DU 23:59 /TR "cmd /c powershell.exe -ExecutionPolicy Bypass -File \"H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1\" -Silent" /RL HIGHEST /F
+```
+
+That usually works more reliably with Windows argument parsing.
+
+---
+
+## Short answer
+Your task was **not created yet**, which is why query failed.  
+Use one of the corrected commands above, preferably the first one with single quotes inside `/TR`.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+
+Folder: \
+HostName:                             RED-NEURONS
+TaskName:                             \Sync Chat History To Repo
+Next Run Time:                        5/19/2026 12:05:00 AM
+Status:                               Ready
+Logon Mode:                           Interactive only
+Last Run Time:                        11/30/1999 12:00:00 AM
+Last Result:                          267011
+Author:                               RED-NEURONS\CapnKirk
+Task To Run:                          "powershell.exe" -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1" -Silent
+Start In:                             N/A
+Comment:                              N/A
+Scheduled Task State:                 Enabled
+Idle Time:                            Disabled
+Power Management:                     Stop On Battery Mode, No Start On Batteries
+Run As User:                          CapnKirk
+Delete Task If Not Rescheduled:       Disabled
+Stop Task If Runs X Hours and X Mins: 72:00:00
+Schedule:                             Scheduling data is not available in this format.
+Schedule Type:                        Daily
+Start Time:                           12:05:00 AM
+Start Date:                           5/18/2026
+End Date:                             N/A
+Days:                                 Every 1 day(s)
+Months:                               N/A
+Repeat: Every:                        6 Hour(s), 0 Minute(s)
+Repeat: Until: Time:                  None
+Repeat: Until: Duration:              23 Hour(s), 59 Minute(s)
+Repeat: Stop If Still Running:        Disabled
+
+## Copilot
+
+Perfect â€” the task is created correctly.
+
+## What this confirms
+Your scheduled task now exists and is set to:
+
+- run daily starting at **12:05 AM**
+- repeat every **6 hours**
+- run:
+  ```text
+  "powershell.exe" -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1" -Silent
+  ```
+
+So it should run at approximately:
+
+- 12:05 AM
+- 6:05 AM
+- 12:05 PM
+- 6:05 PM
+
+Thatâ€™s exactly the kind of cadence you wanted.
+
+---
+
+## About `Last Result: 267011`
+That is **not necessarily a current failure**.
+
+Because:
+
+- `Last Run Time` is still:
+  ```text
+  11/30/1999 12:00:00 AM
+  ```
+- which means it has **not actually run yet**
+
+So that result is basically not meaningful yet for a real execution outcome.
+
+---
+
+## Best next test
+Run the task once manually to confirm it works under Task Scheduler context:
+
+```powershell
+schtasks /Run /TN "Sync Chat History To Repo"
+```
+
+Then wait 10â€“20 seconds and check:
+
+```powershell
+schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+```
+
+Look at:
+- `Last Run Time`
+- `Last Result`
+
+---
+
+## What success should look like
+After a successful manual scheduled run:
+
+- `Last Run Time` should update to now
+- `Last Result` should ideally be:
+  ```text
+  0
+  ```
+
+That means success.
+
+---
+
+## Very important note
+Your task is set to:
+
+```text
+Logon Mode: Interactive only
+```
+
+That means it will run when you are logged in interactively.
+
+If your machine is on but locked, it may still be fine.  
+If you are logged out entirely, it may not run.
+
+If later you want it to run regardless of whether you are logged in, we can change that.
+
+---
+
+# Where you are now
+You now have:
+
+## Task 1
+Local sync/extract/history build
+
+## Task 2
+Repo sync every 6 hours, including just after midnight
+
+That means your workflow is basically in place.
+
+---
+
+# Short answer
+**Yes â€” the scheduled repo-sync task is now created successfully.**
+
+## Next recommended action:
+Run this once:
+
+```powershell
+schtasks /Run /TN "Sync Chat History To Repo"
+```
+
+and then verify `Last Result` becomes `0`.
+
+If you want, after that I can help you create:
+1. a **morning startup prompt**, and  
+2. a **refined end-of-day summary prompt** specifically tuned to your DOS/VB migration workflow.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> schtasks /Query /TN "Sync Chat History To Repo" /V /FO LIST
+
+Folder: \
+HostName:                             RED-NEURONS
+TaskName:                             \Sync Chat History To Repo
+Next Run Time:                        5/19/2026 12:05:00 AM
+Status:                               Ready
+Logon Mode:                           Interactive only
+Last Run Time:                        5/18/2026 6:46:22 PM
+Last Result:                          0
+Author:                               RED-NEURONS\CapnKirk
+Task To Run:                          "powershell.exe" -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1" -Silent
+Start In:                             N/A
+Comment:                              N/A
+Scheduled Task State:                 Enabled
+Idle Time:                            Disabled
+Power Management:                     Stop On Battery Mode, No Start On Batteries
+Run As User:                          CapnKirk
+Delete Task If Not Rescheduled:       Disabled
+Stop Task If Runs X Hours and X Mins: 72:00:00
+Schedule:                             Scheduling data is not available in this format.
+Schedule Type:                        Daily
+Start Time:                           12:05:00 AM
+Start Date:                           5/18/2026
+End Date:                             N/A
+Days:                                 Every 1 day(s)
+Months:                               N/A
+Repeat: Every:                        6 Hour(s), 0 Minute(s)
+Repeat: Until: Time:                  None
+Repeat: Until: Duration:              23 Hour(s), 59 Minute(s)
+Repeat: Stop If Still Running:        Disabled
+
+## Copilot
+
+Perfect â€” **itâ€™s working**.
+
+## Direct answer
+Your scheduled repo-sync task has now run successfully.
+
+### The key proof is:
+- `Last Run Time: 5/18/2026 6:46:22 PM`
+- `Last Result: 0`
+
+`0` means success.
+
+---
+
+## So where you are now
+You now have a working automated pipeline that:
+
+### Locally
+- scans for exported chat files
+- extracts them
+- builds/updates the daily master history file
+
+### To GitHub
+- syncs the extracted/exported chat files and daily history into  
+  `testsubject117/Co-Pilot-Chat-History`
+- on the `upload-chat-history` branch
+- every 6 hours
+- including just after midnight
+
+That means your repo should now stay updated automatically through the day and overnight.
+
+---
+
+## One small note about `Next Run Time`
+It shows:
+
+```text
+5/19/2026 12:05:00 AM
+```
+
+That is consistent with the schedule currently being between repeated intervals.
+
+Since it repeats every 6 hours starting from 12:05 AM, that is fine.
+
+---
+
+# Recommended next step
+At this point, the next valuable thing is exactly what you asked for earlier:
+
+## build your reusable daily prompt system:
+1. **End-of-day wrap-up prompt**
+2. **Morning startup / reload prompt**
+
+You already asked for the first one, and I gave a strong version.  
+Now I recommend I give you the second one too, so you have a matched pair:
+
+- **night prompt** = summarize, roadmap, next actions
+- **morning prompt** = reload yesterdayâ€™s context and resume work quickly
+
+---
+
+## Short answer
+**Yes â€” your scheduled repo-sync task is successfully created and successfully running.**
+
+Youâ€™re in good shape now.
+
+If you want, Iâ€™ll next give you the **morning startup prompt template** that pairs with your end-of-day summary prompt.
+
+## @testsubject117
+
+build your reusable daily prompt system
+
+## Copilot
+
+Use these two reusable prompts: one at end of day, one at start of day.
+
+## 1) End-of-day wrap-up prompt
+Save as `Daily-End-Of-Day-Prompt.md` and paste near the end of each session.
+
+````text
+Please create a complete end-of-day project wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, specific, and detailed. Do not be vague. Include code work, repo review, debugging, planning, architecture findings, DOS behavior comparisons, UI/UX constraints, and next-step decisions.
+
+Important requirements:
+- Include exact forms, files, classes, methods, features, bugs, and workflows discussed today.
+- If AMiDataStore and/or AMiWinForms were reviewed, include what was learned from each.
+- Compare DOS behavior to the current VB implementation wherever relevant.
+- Preserve the requirement that the VB version should match DOS workflow, behavior, and look-and-feel as closely as practical unless explicitly decided otherwise.
+- Call out assumptions, unresolved questions, risks, blockers, and dependencies.
+- Make the output useful for:
+  1. me tomorrow morning,
+  2. future chat sessions,
+  3. roadmap tracking,
+  4. implementation handoff.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of what was discussed and accomplished today.
+
+# 2. Work Completed Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+# 3. Key Technical Findings
+Summarize important technical discoveries, code behavior, architecture insights, and implementation details learned today.
+
+# 4. Repo Review Summary
+Create separate subsections for:
+- AMiDataStore
+- AMiWinForms
+
+For each, include:
+- what was reviewed
+- what behavior or implementation was identified
+- why it mattered
+- how it affects next steps
+
+# 5. DOS vs VB Comparison Summary
+Summarize:
+- what DOS does
+- what VB already does
+- what VB still needs to do
+- what must stay visually/behaviorally consistent
+- any acceptable deviations we discussed
+
+# 6. Current Project State
+Summarize where the project stands right now:
+- working
+- partially working
+- not started
+- broken/uncertain
+
+# 7. Remaining Work / Open Items
+Create a grouped markdown checklist of remaining work.
+
+# 8. Highest Priority Next Steps
+List the most important next tasks in priority order.
+
+# 9. Known Risks / Blockers / Questions
+List unresolved issues, blockers, risks, missing information, and things that need confirmation.
+
+# 10. Future Chat Reload Pack
+Create a compact but high-value context block I can paste into a brand new chat to quickly restore working context.
+
+Include:
+- project identity
+- current goal
+- repo/branch context if discussed
+- key forms/files/components discussed
+- major constraints
+- DOS compatibility expectations
+- current status
+- immediate next coding targets
+
+# 11. Shorthand Operator Notes
+Create a shorter tactical checklist for me personally.
+This should be compact, fast to scan, and action-oriented.
+
+# 12. Roadmap: Past -> Present -> Next
+Include:
+- where we were
+- what changed today
+- where we are now
+- what comes next
+- what success looks like
+
+# 13. First Thing Tomorrow
+End with a short checklist of the exact first actions to take at the beginning of the next work session.
+
+Please make the result comprehensive, structured, reusable, and easy to scan.
+````
+
+---
+
+## 2) Morning startup / reload prompt
+Save as `Daily-Morning-Startup-Prompt.md` and paste at the start of the next session.
+
+````text
+I am resuming work on my AMi modernization / DOS-to-VB migration effort.
+
+I want you to act like a project continuity assistant and help me quickly reload context, identify where we left off, and resume productive work immediately.
+
+Use:
+- the chat context already available in this session,
+- any summary text I paste below,
+- any roadmap/checklist/handoff text I paste below,
+- and any repo review details discussed previously.
+
+Primary goals:
+- restore working context quickly
+- identify current priorities
+- align DOS behavior with VB implementation
+- preserve the DOS look-and-feel and workflow as closely as practical
+- focus on what matters most next
+
+Please produce the output in exactly these sections:
+
+# 1. Reloaded Project Context
+Summarize the project, current objective, and where we left off.
+
+# 2. Current Working Memory
+List the most important facts I need in mind right now:
+- active forms/files/components
+- key technical constraints
+- known bugs/issues
+- repo relationships
+- DOS behavior expectations
+- immediate dependencies
+
+# 3. Current State Assessment
+Summarize:
+- what is done
+- what is in progress
+- what is blocked
+- what is unclear
+
+# 4. Highest Priority Actions Right Now
+Give the top priority tasks in order.
+Be practical and execution-focused.
+
+# 5. DOS vs VB Focus Points
+List the most important parity items to keep in mind today:
+- behavior
+- workflow
+- navigation
+- layout/look-and-feel
+- data handling
+
+# 6. Recommended First Task
+Tell me the single best task to start with first and why.
+
+# 7. If We Need Repo Review
+Summarize what should be checked in:
+- AMiDataStore
+- AMiWinForms
+
+and why.
+
+# 8. Tactical Checklist For This Session
+Create a concise markdown checklist for todayâ€™s session.
+
+# 9. Paste-Forward Context Pack
+Create a short reusable context block that can be pasted into another new chat if needed.
+
+After that, ask me only the most useful next question to move the work forward.
+````
+
+---
+
+## 3) Optional ultra-short daily handoff prompt
+Use when you want a lighter summary.
+
+````text
+Create a concise end-of-day handoff in checklist form.
+
+Include:
+- what was accomplished
+- what was learned
+- what changed in the repos/code
+- what DOS behavior matters here
+- what is left to do
+- exact first steps for tomorrow
+- a short context reload pack for a new chat
+
+Be specific and practical.
+````
+
+---
+
+## 4) Best workflow
+Use them like this:
+
+### End of day
+Paste:
+- `Daily-End-Of-Day-Prompt`
+
+### Start of next day
+Paste:
+- yesterdayâ€™s generated summary
+- then `Daily-Morning-Startup-Prompt`
+
+That gives you continuity.
+
+---
+
+## 5) Best practice for your setup
+Since you now have:
+- local daily history
+- repo sync automation
+- exported transcripts
+
+I recommend adding one more habit:
+
+At the end of each day, generate the wrap-up and paste it into:
+- the current chat, and/or
+- your `##_ New Notes` section in the daily master file
+
+That makes the summary part of the persisted history too.
+
+---
+
+## 6) Optional custom version for your exact project
+I can also build a **project-specific version** tuned to:
+- `AMiDataStore`
+- `AMiWinForms`
+- DOS parity tracking
+- forms/menu migration
+- ledger/check workflow
+- shorthand coding handoff style
+
+If you want that, I can make a **v2 customized prompt set** specifically for your AMi workflow.
+
+## @testsubject117
+
+yes on 5 and 6
+
+## Copilot
+
+Yes â€” hereâ€™s the upgraded system for **both**:
+
+- **5:** best-practice workflow integrated with your daily master-history process
+- **6:** a **custom AMi-specific prompt set** tuned to:
+  - `AMiDataStore`
+  - `AMiWinForms`
+  - DOS â†’ VB parity
+  - forms / menus / check workflows
+  - repo review continuity
+  - shorthand handoff use
+
+---
+
+# Part 5: Best-practice workflow for your setup
+
+## Recommended daily operating pattern
+
+### During the day
+You work normally in chat and code.
+
+Your automations already do this:
+- local daily history file updates
+- extracted export capture
+- repo sync every 6 hours
+
+### End of day
+At the end of the workday:
+
+1. paste the **AMi End-of-Day Wrap-Up Prompt**
+2. let me generate the structured summary
+3. copy that generated summary into:
+   - the current chat session, **and/or**
+   - the `## New Notes` section of your daily master history file
+4. export the session if needed
+5. let the scheduled tasks handle the rest
+
+That way the repo ends up with:
+- raw exported transcript
+- daily master history
+- structured summary/handoff
+- continuity for next day
+
+---
+
+## Why this is the best pattern
+Because each day you preserve **three layers of memory**:
+
+### Layer 1: raw session transcript
+What was actually said.
+
+### Layer 2: daily running master history
+Your cumulative persistent day-by-day record.
+
+### Layer 3: structured summary / roadmap / next steps
+The most useful operational memory for resuming work.
+
+That is exactly how you avoid losing context over long migrations.
+
+---
+
+## Best place to store the daily wrap-up
+Best practical place:
+
+### Preferred
+Paste the generated daily wrap-up into the bottom of:
+
+```text
+H:\AM\DailyConversations\YYYY-MM-DD\YYYY-MM-DD_master-history.md
+```
+
+under:
+
+```text
+## New Notes
+```
+
+### Also good
+Leave it in the chat itself so it appears in the exported transcript too.
+
+### Best overall
+Do both.
+
+That gives you redundancy and easier future retrieval.
+
+---
+
+# Part 6: Custom AMi-specific reusable prompt system
+
+Below are the **customized versions** for your exact workflow.
+
+---
+
+# A. AMi End-of-Day Master Wrap-Up Prompt
+Save as something like:
+
+```text
+AMi-End-Of-Day-Master-Prompt.md
+```
+
+````text
+Please create a complete AMi project end-of-day wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+Core requirements:
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of todayâ€™s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly. Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+````
+
+---
+
+# B. AMi Morning Startup Prompt
+Save as:
+
+```text
+AMi-Morning-Startup-Prompt.md
+```
+
+````text
+I am resuming work on the AMi modernization / DOS-to-VB continuation effort.
+
+I need you to act as a continuity assistant and help me reload working context quickly and accurately.
+
+Use:
+- the current chat context,
+- any summary or handoff text I paste below,
+- any roadmap/checklist text I paste below,
+- any repo review findings previously discussed.
+
+Primary goals:
+- quickly restore context
+- identify the current highest-priority work
+- maintain DOS parity where required
+- preserve DOS workflow/look-and-feel expectations
+- continue implementation in a focused way
+
+Output in exactly these sections:
+
+# 1. Reloaded AMi Project Context
+Summarize the project, current objective, and where we left off.
+
+# 2. Current Working Memory
+List the most important facts to hold in mind right now, including:
+- active forms
+- active workflows
+- relevant files/components
+- AMiWinForms concerns
+- AMiDataStore concerns
+- DOS parity requirements
+- blockers / constraints / assumptions
+
+# 3. Current State Assessment
+Summarize:
+- what is complete
+- what is in progress
+- what is blocked
+- what is unclear
+
+# 4. Highest Priority Work Right Now
+List the highest priority actions in order.
+
+# 5. DOS Parity Focus For Today
+List the most important DOS behavior / workflow / navigation / look-and-feel items that must be preserved or checked today.
+
+# 6. Recommended First Task
+Tell me the single best task to start with first and explain why.
+
+# 7. Repo Review Targets
+If repo review is needed, summarize what should be checked in:
+- AMiWinForms
+- AMiDataStore
+
+and why.
+
+# 8. Tactical Session Checklist
+Create a concise markdown checklist for this session.
+
+# 9. Copy/Paste Future Context Pack
+Create a short reusable block I can paste into another new chat if needed.
+
+After that, ask me only the single best next question to move the work forward.
+````
+
+---
+
+# C. AMi Ultra-Short End-of-Day Prompt
+Use when tired or in a hurry.
+
+````text
+Create a concise AMi end-of-day handoff in checklist form.
+
+Include:
+- what was accomplished
+- what was learned
+- AMiWinForms findings
+- AMiDataStore findings
+- DOS vs VB parity notes
+- what is left to do
+- highest priority next steps
+- exact first actions for tomorrow morning
+- a short future-chat reload block
+
+Be concrete, specific, and practical.
+````
+
+---
+
+# D. AMi Fast Reload Prompt
+Use when opening a new chat and you want fast continuity.
+
+````text
+Help me quickly reload AMi project context.
+
+Using the summary/handoff text below, tell me:
+- where we left off
+- what the current priority is
+- what DOS behavior matters most
+- what AMiWinForms / AMiDataStore items matter right now
+- what I should do first next
+
+Then give me:
+1. a concise context summary
+2. a tactical checklist
+3. a single recommended first task
+4. the single best next question
+
+Summary/handoff text:
+[PASTE HERE]
+````
+
+---
+
+# E. Best daily usage pattern for you specifically
+
+## End of day
+1. paste `AMi-End-Of-Day-Master-Prompt`
+2. let me generate the structured wrap-up
+3. paste that wrap-up into:
+   - the current chat
+   - and the bottom of the dayâ€™s master-history file under `## New Notes`
+
+## Morning
+1. open the latest master-history or prior wrap-up
+2. paste the saved summary into a new chat
+3. use `AMi-Morning-Startup-Prompt`
+4. resume immediately
+
+---
+
+# F. My recommendation for storage
+Create a folder like:
+
+```text
+H:\AM\Prompts\
+```
+
+and save:
+
+- `AMi-End-Of-Day-Master-Prompt.md`
+- `AMi-Morning-Startup-Prompt.md`
+- `AMi-Ultra-Short-End-Of-Day.md`
+- `AMi-Fast-Reload-Prompt.md`
+
+That keeps your continuity system organized.
+
+---
+
+# G. Strong recommendation
+At the end of each day:
+
+- generate the structured summary
+- paste it into the daily master history file
+- export the chat if needed
+- let the repo sync task push it overnight
+
+That gives you:
+- transcript memory
+- operational memory
+- roadmap memory
+
+all preserved.
+
+---
+
+## Short answer
+Yes â€” you should:
+
+- use the summary in `## New Notes` of the daily master file
+- and use the AMi-specific prompt set above as your reusable daily continuity system
+
+If you want, I can next turn these into **ready-to-save `.md` files with clean headings** so you can paste them directly into `H:\AM\Prompts\`.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” here are the **ready-to-save `.md` files**.
+
+Create these under:
+
+```text
+H:\AM\Prompts\
+```
+
+---
+
+## 1) `H:\AM\Prompts\AMi-End-Of-Day-Master-Prompt.md`
+
+````markdown
+# AMi End-Of-Day Master Prompt
+
+Please create a complete AMi project end-of-day wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+## Core requirements
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+## Output in exactly these sections
+
+# 1. Executive Summary
+Write a detailed narrative summary of todayâ€™s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly.
+
+Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+````
+
+---
+
+## 2) `H:\AM\Prompts\AMi-Morning-Startup-Prompt.md`
+
+````markdown
+# AMi Morning Startup Prompt
+
+I am resuming work on the AMi modernization / DOS-to-VB continuation effort.
+
+I need you to act as a continuity assistant and help me reload working context quickly and accurately.
+
+Use:
+- the current chat context,
+- any summary or handoff text I paste below,
+- any roadmap/checklist text I paste below,
+- any repo review findings previously discussed.
+
+## Primary goals
+- quickly restore context
+- identify the current highest-priority work
+- maintain DOS parity where required
+- preserve DOS workflow/look-and-feel expectations
+- continue implementation in a focused way
+
+## Output in exactly these sections
+
+# 1. Reloaded AMi Project Context
+Summarize the project, current objective, and where we left off.
+
+# 2. Current Working Memory
+List the most important facts to hold in mind right now, including:
+- active forms
+- active workflows
+- relevant files/components
+- AMiWinForms concerns
+- AMiDataStore concerns
+- DOS parity requirements
+- blockers / constraints / assumptions
+
+# 3. Current State Assessment
+Summarize:
+- what is complete
+- what is in progress
+- what is blocked
+- what is unclear
+
+# 4. Highest Priority Work Right Now
+List the highest priority actions in order.
+
+# 5. DOS Parity Focus For Today
+List the most important DOS behavior / workflow / navigation / look-and-feel items that must be preserved or checked today.
+
+# 6. Recommended First Task
+Tell me the single best task to start with first and explain why.
+
+# 7. Repo Review Targets
+If repo review is needed, summarize what should be checked in:
+- AMiWinForms
+- AMiDataStore
+
+and why.
+
+# 8. Tactical Session Checklist
+Create a concise markdown checklist for this session.
+
+# 9. Copy/Paste Future Context Pack
+Create a short reusable block I can paste into another new chat if needed.
+
+After that, ask me only the single best next question to move the work forward.
+````
+
+---
+
+## 3) `H:\AM\Prompts\AMi-Ultra-Short-End-Of-Day.md`
+
+````markdown
+# AMi Ultra-Short End-Of-Day Prompt
+
+Create a concise AMi end-of-day handoff in checklist form.
+
+Include:
+- what was accomplished
+- what was learned
+- AMiWinForms findings
+- AMiDataStore findings
+- DOS vs VB parity notes
+- what is left to do
+- highest priority next steps
+- exact first actions for tomorrow morning
+- a short future-chat reload block
+
+Be concrete, specific, and practical.
+````
+
+---
+
+## 4) `H:\AM\Prompts\AMi-Fast-Reload-Prompt.md`
+
+````markdown
+# AMi Fast Reload Prompt
+
+Help me quickly reload AMi project context.
+
+Using the summary/handoff text below, tell me:
+- where we left off
+- what the current priority is
+- what DOS behavior matters most
+- what AMiWinForms / AMiDataStore items matter right now
+- what I should do first next
+
+Then give me:
+1. a concise context summary
+2. a tactical checklist
+3. a single recommended first task
+4. the single best next question
+
+Summary/handoff text:
+[PASTE HERE]
+````
+
+---
+
+# Fastest way to create them
+If you want to create them quickly in PowerShell, first make the folder:
+
+```powershell
+New-Item -ItemType Directory -Path "H:\AM\Prompts" -Force
+```
+
+Then either:
+- paste each file manually into Notepad and save, or
+- ask me next and Iâ€™ll give you a **single PowerShell script** that writes all 4 files automatically.
+
+---
+
+# Recommendation
+The most useful day-to-day pair will be:
+
+- `AMi-End-Of-Day-Master-Prompt.md`
+- `AMi-Morning-Startup-Prompt.md`
+
+The other two are convenience versions.
+
+---
+
+## Short answer
+You can save the four markdown files above into:
+
+```text
+H:\AM\Prompts\
+```
+
+If you want, I can next give you **one PowerShell here-string script that creates all 4 files automatically**.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Use this one PowerShell script to create all 4 prompt files automatically.
+
+```powershell
+New-Item -ItemType Directory -Path "H:\AM\Prompts" -Force | Out-Null
+
+@'
+# AMi End-Of-Day Master Prompt
+
+Please create a complete AMi project end-of-day wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+## Core requirements
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+## Output in exactly these sections
+
+# 1. Executive Summary
+Write a detailed narrative summary of todayâ€™s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly.
+
+Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+'@ | Set-Content -Path "H:\AM\Prompts\AMi-End-Of-Day-Master-Prompt.md" -Encoding UTF8
+
+@'
+# AMi Morning Startup Prompt
+
+I am resuming work on the AMi modernization / DOS-to-VB continuation effort.
+
+I need you to act as a continuity assistant and help me reload working context quickly and accurately.
+
+Use:
+- the current chat context,
+- any summary or handoff text I paste below,
+- any roadmap/checklist text I paste below,
+- any repo review findings previously discussed.
+
+## Primary goals
+- quickly restore context
+- identify the current highest-priority work
+- maintain DOS parity where required
+- preserve DOS workflow/look-and-feel expectations
+- continue implementation in a focused way
+
+## Output in exactly these sections
+
+# 1. Reloaded AMi Project Context
+Summarize the project, current objective, and where we left off.
+
+# 2. Current Working Memory
+List the most important facts to hold in mind right now, including:
+- active forms
+- active workflows
+- relevant files/components
+- AMiWinForms concerns
+- AMiDataStore concerns
+- DOS parity requirements
+- blockers / constraints / assumptions
+
+# 3. Current State Assessment
+Summarize:
+- what is complete
+- what is in progress
+- what is blocked
+- what is unclear
+
+# 4. Highest Priority Work Right Now
+List the highest priority actions in order.
+
+# 5. DOS Parity Focus For Today

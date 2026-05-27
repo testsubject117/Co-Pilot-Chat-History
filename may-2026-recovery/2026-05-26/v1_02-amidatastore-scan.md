@@ -1,0 +1,33 @@
+# AMiDataStore Scan Snapshot
+
+## Repository
+- `testsubject117/AMiDataStore`
+
+## Current Relevant Data Area
+- Rolodex-related reference data used by the WinForms recreation.
+
+## Confirmed Data Facts
+- `areacodes.csv` is currently a 3-column CSV:
+  - `AreaCode,State,Location`
+- Example rows:
+  - `201,NJ,Northern New Jersey`
+  - `202,DC,Washington`
+  - `213,CA,Los Angeles`
+- It is **not** pipe-delimited.
+- It does **not** include full state names in separate columns.
+
+## Important Decision
+- Do **not** convert `areacodes.csv` to a pipe-delimited DOS-style format.
+- Instead, keep the file as-is and align WinForms parsing logic to the real data.
+
+## Important Warning
+- If historical DOS screenshots imply a richer data structure, do not assume the modern data file matches it.
+- Always verify actual file contents before changing parsers or proposing data conversion.
+
+## Possible Next Data Questions
+- Is there a Rolodex/person master data file that powers:
+  - print phone book
+  - print labels
+- Is there a customer-only flag in the current data model?
+- Are there print-order rules embedded in data, or inferred from DOS behavior?
+- Are there ZIP/label-specific reference files that affect `(F)`?

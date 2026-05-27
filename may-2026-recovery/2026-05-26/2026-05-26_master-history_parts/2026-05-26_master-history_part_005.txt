@@ -1,4 +1,8 @@
-﻿$header = @"
+﻿
+$newFileName = "${timestamp}_${safeDescription}.txt"
+$newFilePath = Join-Path $todayFolder $newFileName
+
+$header = @"
 Conversation Session
 Date: $($now.ToString("yyyy-MM-dd"))
 Time: $($now.ToString("HH:mm:ss"))
@@ -1994,7 +1998,3 @@ Public Class FormAddChecks
         lstMatches.Items.Clear()
         btnContinue.Enabled = False
         _selectedCompany = Nothing
-
-        Dim enteredCode As String = txtCompanyCode.Text.Trim().ToUpperInvariant()
-
-        If enteredCode = "" Then

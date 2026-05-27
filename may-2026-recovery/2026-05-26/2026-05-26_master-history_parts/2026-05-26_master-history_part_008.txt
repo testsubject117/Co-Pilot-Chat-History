@@ -1,4 +1,8 @@
-﻿PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.WorkingDirectory = Split-Path $ScriptPath
+﻿PS C:\Users\capnkirk\source\repos\AMiWinForms> $wshShell = New-Object -ComObject WScript.Shell
+PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut = $wshShell.CreateShortcut($shortcutPath)
+PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.TargetPath = "powershell.exe"
+PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.Arguments = "-ExecutionPolicy Bypass -File `"$ScriptPath`""
+PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.WorkingDirectory = Split-Path $ScriptPath
 PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.IconLocation = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe,0"
 PS C:\Users\capnkirk\source\repos\AMiWinForms> $shortcut.Save()
 PS C:\Users\capnkirk\source\repos\AMiWinForms>
@@ -1994,7 +1998,3 @@ Replace that function with this:
 ```powershell
 function Get-LatestPreferredExport {
     param([System.IO.FileInfo[]]$Files)
-
-    if (-not $Files -or $Files.Count -eq 0) {
-        return $null
-    }

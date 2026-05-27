@@ -1,0 +1,2000 @@
+﻿    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshScreen()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Shown(sender As Object, e As EventArgs)
+        RefocusScreen(Nothing, EventArgs.Empty)
+    End Sub
+
+    Private Sub RefocusScreen(sender As Object, e As EventArgs)
+        Me.Activate()
+        txtScreen.Focus()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If Char.IsControl(e.KeyChar) Then Return
+
+        _currentInput &= e.KeyChar
+        RefreshScreen()
+        e.Handled = True
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Back Then
+            If _currentInput.Length > 0 Then
+                _currentInput = _currentInput.Substring(0, _currentInput.Length - 1)
+                RefreshScreen()
+            End If
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim submitted = _currentInput
+            _currentInput = ""
+
+            _engine.SubmitInput(submitted)
+            RefreshScreen()
+
+            If _engine.IsComplete() Then
+                Me.DialogResult = DialogResult.OK
+                Me.Close()
+                Return
+            End If
+
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshScreen()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(AppendInlineInput(prompt, _currentInput))
+        End If
+
+        txtScreen.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtScreen.SelectionStart = txtScreen.TextLength
+        txtScreen.ScrollToCaret()
+    End Sub
+
+    Private Function AppendInlineInput(prompt As String, input As String) As String
+        Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+
+        If parts.Length = 0 Then
+            Return input
+        End If
+
+        parts(parts.Length - 1) &= " " & input
+
+        Return String.Join(Environment.NewLine, parts)
+    End Function
+End Class
+```
+
+---
+
+## Notes
+### Why repository rewrite matters
+Previously, `AddRecord()` appended raw text to the file. If the old DOS file already ended with `Ctrl+Z`, your new line got appended after that marker and became hard to parse.
+
+Now:
+- the file is read cleanly
+- records are rewritten cleanly
+- old `Ctrl+Z` junk gets removed naturally over time
+
+### Your existing `P.LST`
+After using this code once for add/update/delete, the rewritten file should no longer preserve that bad embedded EOF marker line.
+
+---
+
+## What to test now
+1. Replace all 3 files above
+2. Build
+3. Test:
+   - Lookup `PLUTO`
+   - Delete `PLUTO`
+   - Add another `PLUTO2`
+   - Lookup `PLUTO2`
+
+Expected:
+- `PLUTO` should now be found
+- no mysterious close due to parser failure
+- file should gradually normalize
+
+---
+
+## One likely compile note
+If your project does not already import LINQ globally, keep this in `RolodexRepository.vb`:
+
+```vb
+Imports System.Linq
+```
+
+and `RolodexPromptEngine.vb` may also need it if `.Where(...)` is used there.
+
+If you want, next paste any compile errors you get and Iâ€™ll correct them line-by-line.
+
+## @testsubject117
+
+no errors
+
+## Copilot
+
+Good â€” compile is clean.
+
+## Next test
+Please test these in order:
+
+1. **Lookup Person**
+   - search `PLUTO`
+
+2. **Delete Person**
+   - search `PLUTO`
+   - answer `N`
+   - verify it returns cleanly
+
+3. **Delete Person**
+   - search `PLUTO`
+   - answer `Y`
+   - verify it deletes
+
+4. **Add Person**
+   - add a new fake entry like `PLUTO2`
+
+5. **Lookup Person**
+   - search `PLUTO2`
+
+## What I expect now
+Because the repository now strips the DOS `Ctrl+Z` marker and rewrites files cleanly, `PLUTO` should be found now instead of the form just closing.
+
+## Very important thing to watch
+After you test `PLUTO2`, open `P.LST` again and check whether the weird line now looks clean, like:
+
+```text
+"PLUTO","19760 Terri Dr.","Canyon Country","CA",91351,661,4780990,"he's a dog"
+```
+
+with **no** leading ``.
+
+If thatâ€™s clean, then the repository fix is doing exactly what it should.
+
+## Tell me just these results
+- does `PLUTO` now get found?
+- does delete `N` behave correctly?
+- does delete `Y` behave correctly?
+- does `PLUTO2` get added and found?
+
+## @testsubject117
+
+does PLUTO now get found? Yes
+does delete N behave correctly? Yes
+does delete Y behave correctly? Yes
+does PLUTO2 get added and found? Yes and no does EOF markers.
+
+## Copilot
+
+Excellent â€” the main Rolodex behavior is working now.
+
+## Direct answer
+If:
+- `PLUTO` is found
+- delete `N` works
+- delete `Y` works
+- `PLUTO2` adds and is found
+
+then the repository/search logic is fixed.
+
+The remaining issue is just file hygiene:
+
+## EOF markers
+If you mean:
+- **â€œyes, PLUTO2 gets added and found, but no, the EOF markers are still present in the fileâ€**
+
+then that means the app is now **tolerating** the DOS EOF markers correctly, but it is not yet fully **cleaning them out of every file on disk** unless that specific file gets rewritten in a way that removes them.
+
+That is a cleanup issue, not a functional blocker.
+
+---
+
+## Why this is happening
+Right now the parser strips `Chr(26)` when reading lines, so the app works.
+
+But if a file already contains:
+- embedded `Ctrl+Z`
+- odd trailing DOS characters
+- malformed line endings
+
+those may remain physically present until that file is fully rewritten cleanly.
+
+---
+
+## Best next move
+We should add a **normalization pass** so the repository can clean legacy `.LST` files.
+
+There are two good options:
+
+### Option 1 â€” automatic per-file cleanup
+Whenever the app reads a `.LST`, it:
+- parses valid records
+- rewrites the file immediately in normalized format
+
+### Option 2 â€” one-time cleanup utility
+Create a small cleanup routine that:
+- scans all `0-9`, `A-Z` `.LST` files
+- parses valid records
+- rewrites them cleanly once
+
+## My recommendation
+Use **Option 2** first:
+- safer
+- easier to reason about
+- doesnâ€™t rewrite files every single time the user searches
+
+That gives you a one-time â€œconvert/normalize the Rolodex dataâ€ step.
+
+---
+
+## What I suggest next
+I can generate a small helper class like:
+
+- `RolodexMaintenance.vb`
+
+with a method such as:
+- `NormalizeAllLegacyFiles()`
+
+It would:
+1. loop through `0-9`, `A-Z`
+2. read each `.LST`
+3. strip DOS EOF markers
+4. keep valid parsed records only
+5. rewrite each file in clean VB-generated format
+
+That would permanently clean the old data set.
+
+---
+
+## Status right now
+### Functional status
+- search works
+- add works
+- delete works
+- lookup works
+
+### Remaining issue
+- legacy file cleanup only
+
+So you are in much better shape now.
+
+If you want, Iâ€™ll generate the **one-time cleanup/normalization class** next so you can permanently remove the old DOS EOF junk from all Rolodex `.LST` files.
+
+## @testsubject117
+
+the EOF markers are not present
+
+## Copilot
+
+Perfect â€” then youâ€™re in good shape.
+
+## Direct answer
+If:
+- `PLUTO` is found
+- delete `N` works
+- delete `Y` works
+- `PLUTO2` adds and is found
+- and **EOF markers are not present**
+
+then the Rolodex file access is now working correctly against:
+
+```text
+\\invoice\mainmenu\data\phone
+```
+
+## What that means
+Your VB Rolodex is now successfully:
+- reading legacy DOS-style `.LST` data
+- searching by first-letter file
+- adding records
+- deleting records
+- handling the old data format correctly
+
+## Current status
+### Fixed
+- no Windows confirmation popup
+- delete `N` exits cleanly
+- delete `Y` works
+- lookup works
+- add works
+- real `PHONE\*.LST` files are being used
+
+### No longer blocked
+- hardcoded `TEST` record issue
+- search immediately closing because of bad placeholder data
+- DOS file format compatibility for normal cases
+
+---
+
+## Recommended next step
+The next thing I would test is **Modify Person**.
+
+### Test plan
+1. add a fake record like:
+   - `MARS`
+2. choose `(D) Modify a Person`
+3. search `MARS`
+4. change:
+   - address
+   - misc
+   - maybe phone
+5. answer `Y`
+6. lookup `MARS`
+
+## Why this is the next likely edge case
+Modify is the most complex file operation because:
+- it loads from one `.LST`
+- updates fields
+- may need to rewrite the source file
+- may need to move to a different `.LST` if the first letter changes
+
+Thatâ€™s the next place subtle bugs usually show up.
+
+---
+
+## Short version
+The Rolodex is now basically working with the legacy data files.
+
+If you want, next I can help you:
+- test/fix **Modify Person**
+- or move on to **Area Code / Zip Code lookup**
+- or help wire in **Global Search (G)** like DOS.
+
+## @testsubject117
+
+yes it works
+
+## Copilot
+
+Great â€” Rolodex is working.
+
+## Whatâ€™s confirmed working
+- Add Person
+- Lookup Person
+- Delete Person
+- legacy `PHONE\*.LST` file access
+- data path at:
+  - `\\invoice\mainmenu\data\phone`
+
+That means the VB port is now using the real Rolodex data model instead of placeholder records.
+
+## Good stopping point
+This is a solid milestone.
+
+## Best next candidates
+Pick whichever you want next:
+
+1. **Modify Person**
+   - verify/fix update flow fully
+
+2. **Global Search (G)**
+   - DOS had special broader search behavior
+
+3. **Area Code lookup**
+   - `(G)` in Rolodex menu
+
+4. **Zip Code lookup**
+   - `(H)` in Rolodex menu
+
+5. **Print Phone Book / Labels**
+   - if those matter now
+
+6. **Polish the DOS feel**
+   - single-key `Y/N/Q` without Enter
+   - better screen formatting
+   - less WinForms feel
+
+If you want the most logical next step, Iâ€™d do:
+
+**Modify Person next**, then **Area/Zip lookup**.
+
+## @testsubject117
+
+Modify Person
+
+verify/fix update flow fully
+
+
+## Copilot
+
+Good â€” if **Modify Person works**, then the remaining task is to **verify edge cases and tighten the update flow**.
+
+## What to test for Modify specifically
+Please test these 4 cases:
+
+### 1. Modify without changing first letter
+Example:
+- search `PLUTO2`
+- change only:
+  - address
+  - misc
+  - phone
+- save with `Y`
+
+Then verify:
+- lookup `PLUTO2`
+- old values are updated
+- record still exists only in `P.LST`
+
+### 2. Modify and change the name but keep same first letter
+Example:
+- `PLUTO2` â†’ `PLUTOX`
+
+Verify:
+- `PLUTOX` is found
+- `PLUTO2` is not found
+- record remains in `P.LST`
+
+### 3. Modify and change the first letter
+Example:
+- `PLUTOX` â†’ `MLUTOX`
+
+Verify:
+- record is removed from `P.LST`
+- record is added to `M.LST`
+- lookup `MLUTOX` works
+- lookup `PLUTOX` no longer works
+
+### 4. Modify and answer `N` at final confirmation
+Verify:
+- no changes are saved
+
+---
+
+## Based on current code, likely weak spots
+Even though normal Modify may work, these are the areas most likely to need fixing:
+
+1. **Changing first letter**
+   - source file removal + target file add
+
+2. **Blank-enter defaults**
+   - preserving original values correctly
+
+3. **Misc append behavior**
+   - DOS had `[A = Append]`
+
+4. **Cancel/no-save behavior**
+   - answer `N` should not change file
+
+---
+
+## Most likely status right now
+From the code we already put in:
+- same-letter modify should probably work
+- cross-letter rename should probably work
+- append behavior may not yet match DOS exactly
+- final confirmation behavior should work, but should be tested
+
+## Important note
+I couldnâ€™t inspect your actual WinForms/VB project files directly from the repo listing just now â€” only the legacy data/code structure was visible, and those results are incomplete because the API listing is paginated. You can browse the repo contents directly in GitHub if needed. If you want deeper code review of the current VB implementation, paste the current `RolodexPromptEngine.vb` and Iâ€™ll verify Modify line-by-line.  
+
+## Best next step
+Run those 4 Modify tests and tell me only what failed, if anything.
+
+If you want, I can also proactively give you a **hardened Modify implementation** that more closely matches DOS behavior before you test further.
+
+## @testsubject117
+
+all 4 tests work
+
+## Copilot
+
+Excellent â€” then **Modify Person is fully working**.
+
+## Whatâ€™s now confirmed working
+- Add Person
+- Lookup Person
+- Delete Person
+- Modify Person
+- cross-file rename behavior (`P.LST` â†’ `M.LST`, etc.)
+- legacy Rolodex storage in:
+  - `\\invoice\mainmenu\data\phone`
+
+That means the main Rolodex CRUD flow is now operational against the real DOS-era data files.
+
+## Practical conclusion
+The Rolodex portion is in a good completed state.
+
+## Best next options
+The next logical items are:
+
+1. **Global Search (G)**
+   - DOS supported broader search across categories
+
+2. **Area Code lookup**
+   - Rolodex menu option `(G)`
+
+3. **Zip Code lookup**
+   - Rolodex menu option `(H)`
+
+4. **Print Phone Book / Labels**
+   - if those are still needed
+
+5. **UI polish**
+   - closer DOS behavior
+   - single-key prompts
+   - better review/confirmation formatting
+
+## My recommendation
+If you want to continue in the same area, do:
+
+**Global Search first**, then  
+**Area Code lookup**, then  
+**Zip Code lookup**
+
+because those are the next remaining Rolodex menu items after CRUD.
+
+If you want, Iâ€™m ready for the next one.
+
+## @testsubject117
+
+what is CRUD
+
+## Copilot
+
+**CRUD** means:
+
+- **C**reate
+- **R**ead
+- **U**pdate
+- **D**elete
+
+For your Rolodex:
+
+- **Create** = Add Person
+- **Read** = Look up Person
+- **Update** = Modify Person
+- **Delete** = Delete Person
+
+So when I said the Rolodex CRUD flow is working, I meant the basic data operations are all working.
+
+## @testsubject117
+
+lets do Global Search (G)
+
+DOS supported broader search across categories
+
+## Copilot
+
+Yes â€” I found the DOS behavior for **Global Search (G)**.
+
+## What DOS did
+When the user typed `G` at the â€œPerson or Company Name [G = Global Search]â€ prompt, the program:
+
+1. showed this message:
+   - â€œWhen viewing [F3] will search for another occurance.â€
+   - â€œEnter something to search for in any category like Misc., Phone#, or Name.â€
+2. copied all `*.LST` files into a combined temp file:
+   - `ALLNAMES.TMP`
+3. invoked an external search utility against that temp file with the userâ€™s search text. îˆ€citeîˆ‚turn0commentary0îˆ
+
+So the functional intent was:
+
+- **search across all Rolodex records**
+- not just one first-letter file
+- and search across **any field**, not only name
+
+## Best VB.NET equivalent
+For the WinForms port, the cleanest replacement is:
+
+- scan all `0-9`, `A-Z` `.LST` files in `\\invoice\mainmenu\data\phone`
+- parse every record
+- return matches where the search text appears in any of:
+  - name
+  - street
+  - city
+  - state
+  - zip
+  - area code
+  - phone
+  - misc
+
+That matches the DOS intent better than trying to recreate `ALLNAMES.TMP` + shell search.
+
+---
+
+# Replace `RolodexRepository.vb` with this version
+This adds:
+- `GlobalSearch(term As String)`
+
+```vb name=RolodexRepository.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Linq
+Imports Microsoft.VisualBasic.FileIO
+
+Public Class RolodexRepository
+
+    Private Shared ReadOnly BaseFolder As String = "\\invoice\mainmenu\data\phone"
+
+    Public Function FindFirstByNamePrefix(search As String) As RolodexPersonRecord
+        If String.IsNullOrWhiteSpace(search) Then Return Nothing
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim filePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(filePath) Then Return Nothing
+
+        For Each record In ReadAllRecordsFromFile(filePath)
+            If record Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(record.PersonName) Then Continue For
+
+            If record.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                Return CloneRecord(record)
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+    Public Function GlobalSearch(term As String) As List(Of RolodexPersonRecord)
+        Dim results As New List(Of RolodexPersonRecord)
+
+        If String.IsNullOrWhiteSpace(term) Then
+            Return results
+        End If
+
+        Dim normalized = term.Trim().ToUpperInvariant()
+
+        For Each key In GetAllShardKeys()
+            Dim filePath = GetFilePathForKey(key)
+
+            If Not File.Exists(filePath) Then Continue For
+
+            For Each record In ReadAllRecordsFromFile(filePath)
+                If record Is Nothing Then Continue For
+
+                If RecordContains(record, normalized) Then
+                    results.Add(CloneRecord(record))
+                End If
+            Next
+        Next
+
+        Return results
+    End Function
+
+    Public Function AddRecord(record As RolodexPersonRecord) As Boolean
+        If record Is Nothing OrElse String.IsNullOrWhiteSpace(record.PersonName) Then Return False
+
+        EnsureBaseFolder()
+
+        Dim filePath = GetFilePathForKey(record.PersonName.Trim()(0))
+        Dim records = ReadAllRecordsFromFile(filePath)
+
+        records.Add(CloneRecord(record))
+        WriteAllRecordsToFile(filePath, records)
+
+        Return True
+    End Function
+
+    Public Function DeleteFirstByNamePrefix(search As String) As Boolean
+        If String.IsNullOrWhiteSpace(search) Then Return False
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim filePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(filePath) Then Return False
+
+        Dim records = ReadAllRecordsFromFile(filePath)
+        Dim removed As Boolean = False
+
+        For i As Integer = 0 To records.Count - 1
+            Dim r = records(i)
+            If r Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+
+            If r.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                records.RemoveAt(i)
+                removed = True
+                Exit For
+            End If
+        Next
+
+        If removed Then
+            WriteAllRecordsToFile(filePath, records)
+        End If
+
+        Return removed
+    End Function
+
+    Public Function UpdateFirstByNamePrefix(search As String, updatedRecord As RolodexPersonRecord) As Boolean
+        If String.IsNullOrWhiteSpace(search) Then Return False
+        If updatedRecord Is Nothing OrElse String.IsNullOrWhiteSpace(updatedRecord.PersonName) Then Return False
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim sourcePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(sourcePath) Then Return False
+
+        Dim sourceRecords = ReadAllRecordsFromFile(sourcePath)
+        Dim matchIndex As Integer = -1
+
+        For i As Integer = 0 To sourceRecords.Count - 1
+            Dim r = sourceRecords(i)
+            If r Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+
+            If r.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                matchIndex = i
+                Exit For
+            End If
+        Next
+
+        If matchIndex = -1 Then Return False
+
+        sourceRecords.RemoveAt(matchIndex)
+        WriteAllRecordsToFile(sourcePath, sourceRecords)
+
+        Dim targetPath = GetFilePathForKey(updatedRecord.PersonName.Trim()(0))
+        Dim targetRecords = ReadAllRecordsFromFile(targetPath)
+        targetRecords.Add(CloneRecord(updatedRecord))
+        WriteAllRecordsToFile(targetPath, targetRecords)
+
+        Return True
+    End Function
+
+    Public Function ReadAllRecordsForLetter(ch As Char) As List(Of RolodexPersonRecord)
+        Dim filePath = GetFilePathForKey(ch)
+        Return ReadAllRecordsFromFile(filePath)
+    End Function
+
+    Private Shared Sub EnsureBaseFolder()
+        If Not Directory.Exists(BaseFolder) Then
+            Directory.CreateDirectory(BaseFolder)
+        End If
+    End Sub
+
+    Private Shared Function GetFilePathForKey(ch As Char) As String
+        EnsureBaseFolder()
+
+        Dim key As Char = Char.ToUpperInvariant(ch)
+
+        If Not Char.IsLetterOrDigit(key) Then
+            key = "0"c
+        End If
+
+        Return Path.Combine(BaseFolder, key & ".LST")
+    End Function
+
+    Private Function GetAllShardKeys() As IEnumerable(Of Char)
+        Dim keys As New List(Of Char)
+
+        For c As Char = "0"c To "9"c
+            keys.Add(c)
+        Next
+
+        For c As Char = "A"c To "Z"c
+            keys.Add(c)
+        Next
+
+        Return keys
+    End Function
+
+    Private Function ReadAllRecordsFromFile(filePath As String) As List(Of RolodexPersonRecord)
+        Dim results As New List(Of RolodexPersonRecord)
+
+        If Not File.Exists(filePath) Then
+            Return results
+        End If
+
+        For Each rawLine In File.ReadAllLines(filePath)
+            Dim record = ParseLine(rawLine)
+            If record IsNot Nothing Then
+                results.Add(record)
+            End If
+        Next
+
+        Return results
+    End Function
+
+    Private Sub WriteAllRecordsToFile(filePath As String, records As List(Of RolodexPersonRecord))
+        EnsureBaseFolder()
+
+        Using sw As New StreamWriter(filePath, False)
+            For Each record In records
+                If record Is Nothing Then Continue For
+                If String.IsNullOrWhiteSpace(record.PersonName) Then Continue For
+
+                sw.WriteLine(SerializeRecord(record))
+            Next
+        End Using
+    End Sub
+
+    Private Function ParseLine(line As String) As RolodexPersonRecord
+        Try
+            If line Is Nothing Then Return Nothing
+
+            Dim cleaned = line.Replace(ControlChars.NullChar, "")
+            cleaned = cleaned.Trim()
+
+            If cleaned.Length = 0 Then Return Nothing
+
+            cleaned = cleaned.TrimStart(ChrW(26), " "c, ControlChars.Tab)
+
+            If cleaned.Length = 0 Then Return Nothing
+
+            Using parser As New TextFieldParser(New StringReader(cleaned))
+                parser.SetDelimiters(",")
+                parser.HasFieldsEnclosedInQuotes = True
+                parser.TrimWhiteSpace = False
+
+                Dim fields = parser.ReadFields()
+                If fields Is Nothing OrElse fields.Length < 8 Then Return Nothing
+
+                Dim zipValue As Integer = 0
+                Dim areaValue As Integer = 0
+                Dim phoneValue As Long = 0
+
+                Integer.TryParse(OnlyDigits(fields(4)), zipValue)
+                Integer.TryParse(OnlyDigits(fields(5)), areaValue)
+                Long.TryParse(OnlyDigits(fields(6)), phoneValue)
+
+                Return New RolodexPersonRecord With {
+                    .PersonName = SafeTrim(fields(0)),
+                    .Street = SafeTrim(fields(1)),
+                    .City = SafeTrim(fields(2)),
+                    .StateCode = SafeTrim(fields(3)),
+                    .ZipCode = If(zipValue = 0, "", zipValue.ToString(CultureInfo.InvariantCulture)),
+                    .AreaCode = If(areaValue = 0, "", areaValue.ToString(CultureInfo.InvariantCulture)),
+                    .PhoneNumber = If(phoneValue = 0, "", phoneValue.ToString(CultureInfo.InvariantCulture)),
+                    .Misc = SafeTrim(fields(7))
+                }
+            End Using
+        Catch
+            Return Nothing
+        End Try
+    End Function
+
+    Private Function SerializeRecord(record As RolodexPersonRecord) As String
+        Dim zipValue As Integer = 0
+        Dim areaValue As Integer = 0
+        Dim phoneValue As Long = 0
+
+        Integer.TryParse(OnlyDigits(record.ZipCode), zipValue)
+        Integer.TryParse(OnlyDigits(record.AreaCode), areaValue)
+        Long.TryParse(OnlyDigits(record.PhoneNumber), phoneValue)
+
+        Return String.Join(",",
+                           Quote(record.PersonName),
+                           Quote(record.Street),
+                           Quote(record.City),
+                           Quote(record.StateCode),
+                           zipValue.ToString(CultureInfo.InvariantCulture),
+                           areaValue.ToString(CultureInfo.InvariantCulture),
+                           phoneValue.ToString(CultureInfo.InvariantCulture),
+                           Quote(record.Misc))
+    End Function
+
+    Private Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        Return """" & value.Replace("""", """""") & """"
+    End Function
+
+    Private Function OnlyDigits(value As String) As String
+        If String.IsNullOrWhiteSpace(value) Then Return ""
+        Return New String(value.Where(Function(c) Char.IsDigit(c)).ToArray())
+    End Function
+
+    Private Function SafeTrim(value As String) As String
+        If value Is Nothing Then Return ""
+        Return value.Trim()
+    End Function
+
+    Private Function RecordContains(record As RolodexPersonRecord, term As String) As Boolean
+        Dim fields = {
+            record.PersonName,
+            record.Street,
+            record.City,
+            record.StateCode,
+            record.ZipCode,
+            record.AreaCode,
+            record.PhoneNumber,
+            record.Misc
+        }
+
+        For Each field In fields
+            If String.IsNullOrWhiteSpace(field) Then Continue For
+            If field.ToUpperInvariant().Contains(term) Then Return True
+        Next
+
+        Return False
+    End Function
+
+    Private Function CloneRecord(record As RolodexPersonRecord) As RolodexPersonRecord
+        If record Is Nothing Then Return Nothing
+
+        Return New RolodexPersonRecord With {
+            .PersonName = record.PersonName,
+            .Street = record.Street,
+            .City = record.City,
+            .StateCode = record.StateCode,
+            .ZipCode = record.ZipCode,
+            .AreaCode = record.AreaCode,
+            .PhoneNumber = record.PhoneNumber,
+            .Misc = record.Misc,
+            .IsCustomer = record.IsCustomer
+        }
+    End Function
+
+End Class
+```
+
+---
+
+# Replace `RolodexPromptEngine.vb`
+This adds DOS-style `G` handling for Lookup/Delete/Modify:
+- user types `G`
+- next prompt asks for broad search term
+- first result is shown
+
+```vb name=RolodexPromptEngine.vb
+Imports System.Linq
+
+Public Class RolodexPromptEngine
+    Private ReadOnly _mode As RolodexPromptMode
+    Private ReadOnly _repo As New RolodexRepository()
+
+    Private _stepIndex As Integer = 0
+    Private _isComplete As Boolean = False
+    Private _searchText As String = ""
+    Private _globalSearchMode As Boolean = False
+    Private _globalResults As New List(Of RolodexPersonRecord)
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = New RolodexPersonRecord With {
+                .PersonName = existingRecord.PersonName,
+                .Street = existingRecord.Street,
+                .City = existingRecord.City,
+                .StateCode = existingRecord.StateCode,
+                .ZipCode = existingRecord.ZipCode,
+                .AreaCode = existingRecord.AreaCode,
+                .PhoneNumber = existingRecord.PhoneNumber,
+                .Misc = existingRecord.Misc,
+                .IsCustomer = existingRecord.IsCustomer
+            }
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        If _isComplete Then Return ""
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        If _isComplete Then Return False
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Return _isComplete
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Misc., Phone#, or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1 : Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 2 : Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 3 : Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 4 : Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 5 : Return $"Zip Code [ENTER = {WorkingRecord.ZipCode}] ?"
+            Case 6 : Return $"Area Code [ENTER = {WorkingRecord.AreaCode}] ?"
+            Case 7 : Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber}] ?"
+            Case 8
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 9 : Return "Is this correct (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetDeletePrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Misc., Phone#, or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Delete this Person (Y/N) [Q = Quit] ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetLookupPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Misc., Phone#, or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Is this the Person you are looking for (Y/N) ?"
+            Case 2
+                Return "[D] to Dial Number" & Environment.NewLine & Environment.NewLine &
+                       "[Shift] and [PrtSc] to Print"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                WorkingRecord.City = input.Trim()
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.AddRecord(WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT ADDED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                _searchText = input.Trim()
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If _searchText.Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                WorkingRecord = _repo.FindFirstByNamePrefix(_searchText)
+                If WorkingRecord Is Nothing Then
+                    Transcript.Add("")
+                    Transcript.Add("NO MATCH FOUND.")
+                    Transcript.Add("")
+                    Transcript.Add("Press ENTER to return.")
+                    _isComplete = True
+                    Return True
+                End If
+
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+                _stepIndex = 2
+                Return True
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _globalResults = _repo.GlobalSearch(input.Trim())
+
+                    If _globalResults.Count = 0 Then
+                        Transcript.Add("")
+                        Transcript.Add("NO MATCH FOUND.")
+                        Transcript.Add("")
+                        Transcript.Add("Press ENTER to return.")
+                        _isComplete = True
+                        Return True
+                    End If
+
+                    WorkingRecord = _globalResults(0)
+                    _searchText = WorkingRecord.PersonName
+
+                    Transcript.Add("")
+                    For Each line In WorkingRecord.GetDisplayLines()
+                        Transcript.Add(line)
+                    Next
+
+                    _globalSearchMode = False
+                    _stepIndex = 2
+                    Return True
+                End If
+
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.PersonName = input.Trim()
+            Case 3
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.City = input.Trim()
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.ZipCode = input.Trim()
+            Case 7
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.AreaCode = input.Trim()
+            Case 8
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+            Case 9
+                Dim value = input.Trim()
+                If value.Equals("A", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Misc = WorkingRecord.Misc & " "
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+            Case 10
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.UpdateFirstByNamePrefix(_searchText, WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT CHANGED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitDeleteInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                _searchText = input.Trim()
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If _searchText.Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                WorkingRecord = _repo.FindFirstByNamePrefix(_searchText)
+
+                If WorkingRecord Is Nothing Then
+                    Transcript.Add("")
+                    Transcript.Add("NO MATCH FOUND.")
+                    Transcript.Add("")
+                    Transcript.Add("Press ENTER to return.")
+                    _isComplete = True
+                    Return True
+                End If
+
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+                _stepIndex = 2
+                Return True
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _globalResults = _repo.GlobalSearch(input.Trim())
+
+                    If _globalResults.Count = 0 Then
+                        Transcript.Add("")
+                        Transcript.Add("NO MATCH FOUND.")
+                        Transcript.Add("")
+                        Transcript.Add("Press ENTER to return.")
+                        _isComplete = True
+                        Return True
+                    End If
+
+                    WorkingRecord = _globalResults(0)
+                    _searchText = WorkingRecord.PersonName
+
+                    Transcript.Add("")
+                    For Each line In WorkingRecord.GetDisplayLines()
+                        Transcript.Add(line)
+                    Next
+
+                    _globalSearchMode = False
+                    _stepIndex = 2
+                    Return True
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Delete this Person (Y/N) [Q = Quit] ? " & input.Trim())
+
+                Select Case answer
+                    Case "Y"
+                        _repo.DeleteFirstByNamePrefix(_searchText)
+                        Transcript.Add("(DELETED)")
+                        _isComplete = True
+                        Return True
+
+                    Case "N", "Q"
+                        _isComplete = True
+                        Return True
+
+                    Case Else
+                        Transcript.Add("Please answer Y, N, or Q.")
+                        Return True
+                End Select
+        End Select
+
+        Return False
+    End Function
+
+    Private Function SubmitLookupInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                _searchText = input.Trim()
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If _searchText.Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                WorkingRecord = _repo.FindFirstByNamePrefix(_searchText)
+
+                If WorkingRecord Is Nothing Then
+                    Transcript.Add("")
+                    Transcript.Add("NO MATCH FOUND.")
+                    Transcript.Add("")
+                    Transcript.Add("Press ENTER to return.")
+                    _isComplete = True
+                    Return True
+                End If
+
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+                _stepIndex = 2
+                Return True
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _globalResults = _repo.GlobalSearch(input.Trim())
+
+                    If _globalResults.Count = 0 Then
+                        Transcript.Add("")
+                        Transcript.Add("NO MATCH FOUND.")
+                        Transcript.Add("")
+                        Transcript.Add("Press ENTER to return.")
+                        _isComplete = True
+                        Return True
+                    End If
+
+                    WorkingRecord = _globalResults(0)
+                    _searchText = WorkingRecord.PersonName
+
+                    Transcript.Add("")
+                    For Each line In WorkingRecord.GetDisplayLines()
+                        Transcript.Add(line)
+                    Next
+
+                    _globalSearchMode = False
+                    _stepIndex = 2
+                    Return True
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Is this the Person you are looking for (Y/N) ? " & input.Trim())
+
+                If answer = "Y" Then
+                    _stepIndex = 3
+                    Return True
+                ElseIf answer = "N" Then
+                    _isComplete = True
+                    Return True
+                Else
+                    Transcript.Add("Please answer Y or N.")
+                    Return True
+                End If
+
+            Case 3
+                Transcript.Add("")
+                Transcript.Add("[D] to Dial Number")
+                Transcript.Add("")
+                Transcript.Add("[Shift] and [PrtSc] to Print")
+                _isComplete = True
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts(parts.Length - 1)
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+## What this gives you
+### DOS-style Global Search behavior
+For Lookup/Delete/Modify:
+1. type `G`
+2. enter search term like:
+   - `dog`
+   - `4780990`
+   - `Canyon`
+   - `PLUTO`
+3. first matching record is shown
+
+### Search scope
+Matches any field:
+- Name
+- Address
+- City
+- State
+- Zip
+- Area code
+- Phone
+- Misc
+
+## Limitation vs DOS
+The old DOS version supported `[F3]` to move to another occurrence via the external viewer. I have **not** implemented multi-result browsing yet. This version shows the **first** match only, which is the minimum faithful port of the behavior intent. îˆ€citeîˆ‚turn0commentary0îˆ
+
+## Next test
+Please test:
+1. Lookup â†’ type `G`
+2. search for `dog`
+3. search for a phone fragment
+4. Delete â†’ type `G`
+5. Modify â†’ type `G`
+
+If you want after that, I can add:
+- **Next match / Previous match**
+- a proper results list
+- a closer DOS `[F3]`-style experience.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30337	'For' loop control variable cannot be of type 'Char' because the type does not support the required operators.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexRepository.vb	164	
+Error (active)	BC30337	'For' loop control variable cannot be of type 'Char' because the type does not support the required operators.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexRepository.vb	168	
+
+
+## Copilot
+
+Replace the `GetAllShardKeys()` method only.
+
+VB.NET doesnâ€™t allow `For c As Char = "0"c To "9"c`.
+
+Use this version instead:
+
+```vb name=RolodexRepository_GetAllShardKeys.vb
+Private Function GetAllShardKeys() As IEnumerable(Of Char)
+    Dim keys As New List(Of Char)
+
+    For i As Integer = AscW("0"c) To AscW("9"c)
+        keys.Add(ChrW(i))
+    Next
+
+    For i As Integer = AscW("A"c) To AscW("Z"c)
+        keys.Add(ChrW(i))
+    Next
+
+    Return keys
+End Function
+```
+
+## Why
+Your compile errors are coming from these two loops:
+- `For c As Char = "0"c To "9"c`
+- `For c As Char = "A"c To "Z"c`
+
+VB requires an integral loop variable there, so `Integer` + `ChrW()` fixes it.
+
+After replacing that method, rebuild and the Global Search code should compile.
+
+## @testsubject117
+
+please regenerate the RolodexRepository.vb file code for the entire file with the replacement code 
+
+## Copilot
+
+Yes â€” here is the full corrected `RolodexRepository.vb` with the `GetAllShardKeys()` fix included.
+
+```vb name=RolodexRepository.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Linq
+Imports Microsoft.VisualBasic.FileIO
+
+Public Class RolodexRepository
+
+    Private Shared ReadOnly BaseFolder As String = "\\invoice\mainmenu\data\phone"
+
+    Public Function FindFirstByNamePrefix(search As String) As RolodexPersonRecord
+        If String.IsNullOrWhiteSpace(search) Then Return Nothing
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim filePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(filePath) Then Return Nothing
+
+        For Each record In ReadAllRecordsFromFile(filePath)
+            If record Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(record.PersonName) Then Continue For
+
+            If record.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                Return CloneRecord(record)
+            End If
+        Next
+
+        Return Nothing
+    End Function
+
+    Public Function GlobalSearch(term As String) As List(Of RolodexPersonRecord)
+        Dim results As New List(Of RolodexPersonRecord)
+
+        If String.IsNullOrWhiteSpace(term) Then
+            Return results
+        End If
+
+        Dim normalized = term.Trim().ToUpperInvariant()
+
+        For Each key In GetAllShardKeys()
+            Dim filePath = GetFilePathForKey(key)
+
+            If Not File.Exists(filePath) Then Continue For
+
+            For Each record In ReadAllRecordsFromFile(filePath)
+                If record Is Nothing Then Continue For
+
+                If RecordContains(record, normalized) Then
+                    results.Add(CloneRecord(record))
+                End If
+            Next
+        Next
+
+        Return results
+    End Function
+
+    Public Function AddRecord(record As RolodexPersonRecord) As Boolean
+        If record Is Nothing OrElse String.IsNullOrWhiteSpace(record.PersonName) Then Return False
+
+        EnsureBaseFolder()
+
+        Dim filePath = GetFilePathForKey(record.PersonName.Trim()(0))
+        Dim records = ReadAllRecordsFromFile(filePath)
+
+        records.Add(CloneRecord(record))
+        WriteAllRecordsToFile(filePath, records)
+
+        Return True
+    End Function
+
+    Public Function DeleteFirstByNamePrefix(search As String) As Boolean
+        If String.IsNullOrWhiteSpace(search) Then Return False
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim filePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(filePath) Then Return False
+
+        Dim records = ReadAllRecordsFromFile(filePath)
+        Dim removed As Boolean = False
+
+        For i As Integer = 0 To records.Count - 1
+            Dim r = records(i)
+            If r Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+
+            If r.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                records.RemoveAt(i)
+                removed = True
+                Exit For
+            End If
+        Next
+
+        If removed Then
+            WriteAllRecordsToFile(filePath, records)
+        End If
+
+        Return removed
+    End Function
+
+    Public Function UpdateFirstByNamePrefix(search As String, updatedRecord As RolodexPersonRecord) As Boolean
+        If String.IsNullOrWhiteSpace(search) Then Return False
+        If updatedRecord Is Nothing OrElse String.IsNullOrWhiteSpace(updatedRecord.PersonName) Then Return False
+
+        Dim normalized = search.Trim().ToUpperInvariant()
+        Dim sourcePath = GetFilePathForKey(normalized(0))
+
+        If Not File.Exists(sourcePath) Then Return False
+
+        Dim sourceRecords = ReadAllRecordsFromFile(sourcePath)
+        Dim matchIndex As Integer = -1
+
+        For i As Integer = 0 To sourceRecords.Count - 1
+            Dim r = sourceRecords(i)
+            If r Is Nothing Then Continue For
+            If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+
+            If r.PersonName.Trim().ToUpperInvariant().StartsWith(normalized, StringComparison.Ordinal) Then
+                matchIndex = i
+                Exit For
+            End If
+        Next
+
+        If matchIndex = -1 Then Return False
+
+        sourceRecords.RemoveAt(matchIndex)
+        WriteAllRecordsToFile(sourcePath, sourceRecords)
+
+        Dim targetPath = GetFilePathForKey(updatedRecord.PersonName.Trim()(0))
+        Dim targetRecords = ReadAllRecordsFromFile(targetPath)
+        targetRecords.Add(CloneRecord(updatedRecord))
+        WriteAllRecordsToFile(targetPath, targetRecords)
+
+        Return True
+    End Function
+
+    Public Function ReadAllRecordsForLetter(ch As Char) As List(Of RolodexPersonRecord)
+        Dim filePath = GetFilePathForKey(ch)
+        Return ReadAllRecordsFromFile(filePath)
+    End Function
+
+    Private Shared Sub EnsureBaseFolder()
+        If Not Directory.Exists(BaseFolder) Then
+            Directory.CreateDirectory(BaseFolder)
+        End If
+    End Sub
+
+    Private Shared Function GetFilePathForKey(ch As Char) As String
+        EnsureBaseFolder()
+
+        Dim key As Char = Char.ToUpperInvariant(ch)
+
+        If Not Char.IsLetterOrDigit(key) Then
+            key = "0"c
+        End If
+
+        Return Path.Combine(BaseFolder, key & ".LST")
+    End Function
+
+    Private Function GetAllShardKeys() As IEnumerable(Of Char)
+        Dim keys As New List(Of Char)
+
+        For i As Integer = AscW("0"c) To AscW("9"c)
+            keys.Add(ChrW(i))
+        Next
+
+        For i As Integer = AscW("A"c) To AscW("Z"c)
+            keys.Add(ChrW(i))
+        Next
+
+        Return keys
+    End Function
+
+    Private Function ReadAllRecordsFromFile(filePath As String) As List(Of RolodexPersonRecord)
+        Dim results As New List(Of RolodexPersonRecord)
+
+        If Not File.Exists(filePath) Then
+            Return results
+        End If
+
+        For Each rawLine In File.ReadAllLines(filePath)
+            Dim record = ParseLine(rawLine)
+            If record IsNot Nothing Then
+                results.Add(record)
+            End If
+        Next
+
+        Return results
+    End Function
+
+    Private Sub WriteAllRecordsToFile(filePath As String, records As List(Of RolodexPersonRecord))
+        EnsureBaseFolder()
+
+        Using sw As New StreamWriter(filePath, False)
+            For Each record In records
+                If record Is Nothing Then Continue For
+                If String.IsNullOrWhiteSpace(record.PersonName) Then Continue For
+
+                sw.WriteLine(SerializeRecord(record))
+            Next
+        End Using
+    End Sub
+
+    Private Function ParseLine(line As String) As RolodexPersonRecord
+        Try
+            If line Is Nothing Then Return Nothing
+
+            Dim cleaned = line.Replace(ControlChars.NullChar, "")
+            cleaned = cleaned.Trim()
+
+            If cleaned.Length = 0 Then Return Nothing
+
+            cleaned = cleaned.TrimStart(ChrW(26), " "c, ControlChars.Tab)
+
+            If cleaned.Length = 0 Then Return Nothing
+
+            Using parser As New TextFieldParser(New StringReader(cleaned))
+                parser.SetDelimiters(",")
+                parser.HasFieldsEnclosedInQuotes = True
+                parser.TrimWhiteSpace = False
+
+                Dim fields = parser.ReadFields()
+                If fields Is Nothing OrElse fields.Length < 8 Then Return Nothing
+
+                Dim zipValue As Integer = 0
+                Dim areaValue As Integer = 0
+                Dim phoneValue As Long = 0
+
+                Integer.TryParse(OnlyDigits(fields(4)), zipValue)
+                Integer.TryParse(OnlyDigits(fields(5)), areaValue)
+                Long.TryParse(OnlyDigits(fields(6)), phoneValue)
+
+                Return New RolodexPersonRecord With {
+                    .PersonName = SafeTrim(fields(0)),
+                    .Street = SafeTrim(fields(1)),
+                    .City = SafeTrim(fields(2)),
+                    .StateCode = SafeTrim(fields(3)),
+                    .ZipCode = If(zipValue = 0, "", zipValue.ToString(CultureInfo.InvariantCulture)),
+                    .AreaCode = If(areaValue = 0, "", areaValue.ToString(CultureInfo.InvariantCulture)),
+                    .PhoneNumber = If(phoneValue = 0, "", phoneValue.ToString(CultureInfo.InvariantCulture)),
+                    .Misc = SafeTrim(fields(7))
+                }
+            End Using
+        Catch
+            Return Nothing
+        End Try
+    End Function
+
+    Private Function SerializeRecord(record As RolodexPersonRecord) As String
+        Dim zipValue As Integer = 0
+        Dim areaValue As Integer = 0
+        Dim phoneValue As Long = 0
+
+        Integer.TryParse(OnlyDigits(record.ZipCode), zipValue)
+        Integer.TryParse(OnlyDigits(record.AreaCode), areaValue)
+        Long.TryParse(OnlyDigits(record.PhoneNumber), phoneValue)
+
+        Return String.Join(",",
+                           Quote(record.PersonName),
+                           Quote(record.Street),
+                           Quote(record.City),
+                           Quote(record.StateCode),
+                           zipValue.ToString(CultureInfo.InvariantCulture),
+                           areaValue.ToString(CultureInfo.InvariantCulture),
+                           phoneValue.ToString(CultureInfo.InvariantCulture),
+                           Quote(record.Misc))
+    End Function
+
+    Private Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        Return """" & value.Replace("""", """""") & """"
+    End Function
+
+    Private Function OnlyDigits(value As String) As String
+        If String.IsNullOrWhiteSpace(value) Then Return ""
+        Return New String(value.Where(Function(c) Char.IsDigit(c)).ToArray())
+    End Function
+
+    Private Function SafeTrim(value As String) As String
+        If value Is Nothing Then Return ""
+        Return value.Trim()
+    End Function
+
+    Private Function RecordContains(record As RolodexPersonRecord, term As String) As Boolean
+        Dim fields = {
+            record.PersonName,
+            record.Street,
+            record.City,
+            record.StateCode,
+            record.ZipCode,
+            record.AreaCode,
+            record.PhoneNumber,
+            record.Misc
+        }
+
+        For Each field In fields
+            If String.IsNullOrWhiteSpace(field) Then Continue For
+            If field.ToUpperInvariant().Contains(term) Then Return True
+        Next
+
+        Return False
+    End Function
+
+    Private Function CloneRecord(record As RolodexPersonRecord) As RolodexPersonRecord
+        If record Is Nothing Then Return Nothing
+
+        Return New RolodexPersonRecord With {
+            .PersonName = record.PersonName,
+            .Street = record.Street,
+            .City = record.City,
+            .StateCode = record.StateCode,
+            .ZipCode = record.ZipCode,
+            .AreaCode = record.AreaCode,
+            .PhoneNumber = record.PhoneNumber,
+            .Misc = record.Misc,
+            .IsCustomer = record.IsCustomer
+        }
+    End Function
+
+End Class
+```
+
+After replacing this file, rebuild.
+
+If you want, next I can also regenerate the **entire corrected `RolodexPromptEngine.vb`** again so it matches this repository version exactly for Global Search.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” here is the full `RolodexPromptEngine.vb` that matches the current `RolodexRepository.vb` and adds **Global Search (G)** for Lookup / Delete / Modify.
+
+```vb name=RolodexPromptEngine.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.Linq
+
+Public Class RolodexPromptEngine
+    Private ReadOnly _mode As RolodexPromptMode
+    Private ReadOnly _repo As New RolodexRepository()
+
+    Private _stepIndex As Integer = 0
+    Private _isComplete As Boolean = False
+    Private _searchText As String = ""
+    Private _globalSearchMode As Boolean = False
+    Private _globalResults As New List(Of RolodexPersonRecord)
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = New RolodexPersonRecord With {
+                .PersonName = existingRecord.PersonName,
+                .Street = existingRecord.Street,
+                .City = existingRecord.City,
+                .StateCode = existingRecord.StateCode,
+                .ZipCode = existingRecord.ZipCode,
+                .AreaCode = existingRecord.AreaCode,
+                .PhoneNumber = existingRecord.PhoneNumber,
+                .Misc = existingRecord.Misc,
+                .IsCustomer = existingRecord.IsCustomer
+            }
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        If _isComplete Then Return ""
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        If _isComplete Then Return False
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Return _isComplete
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
