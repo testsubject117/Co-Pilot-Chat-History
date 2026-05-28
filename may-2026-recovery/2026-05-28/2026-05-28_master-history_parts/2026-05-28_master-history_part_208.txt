@@ -1,0 +1,2000 @@
+﻿
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _promptMode <> PromptMode.None AndAlso e.KeyCode = Keys.Escape Then
+            StopPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' =========================
+        ' Prompt capture mode
+        ' =========================
+        If _promptMode <> PromptMode.None Then
+            Select Case _promptMode
+                Case PromptMode.ActualNames_PQ
+                    Select Case up
+                        Case "P"
+                            StopPrompt()
+                            OpenActualCustomerNames()
+                            Return
+                        Case "Q"
+                            StopPrompt()
+                            Return
+                        Case Else
+                            Return ' ignore
+                    End Select
+
+                Case PromptMode.LogBook_Year
+                    HandleLogBookYearPromptKey(ch)
+                    Return
+            End Select
+        End If
+
+        ' =========================
+        ' Normal menu mode
+        ' =========================
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                StartLogBookYearPrompt()
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' ==========================================================
+    ' DOS-style prompt bar (bottom) + common prompt lifecycle
+    ' ==========================================================
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a thicker yellow border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StopPrompt()
+        _promptMode = PromptMode.None
+        _logBookYearInput.Clear()
+        HideBottomPrompt()
+    End Sub
+
+    ' ==========================================================
+    ' (J) Actual Names prompt: P/Q
+    ' ==========================================================
+    Private Sub StartActualNamesPrompt()
+        _promptMode = PromptMode.ActualNames_PQ
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    ' ==========================================================
+    ' (E) Log Book prompt: choose year
+    ' ==========================================================
+    Private Sub StartLogBookYearPrompt()
+        _promptMode = PromptMode.LogBook_Year
+        _promptBorderColor = Color.Yellow
+
+        _logBookDefaultYear = DateTime.Now.Year
+        _logBookYearInput.Clear()
+
+        UpdateLogBookYearPromptText()
+    End Sub
+
+    Private Sub UpdateLogBookYearPromptText()
+        Dim defaultYearText As String = _logBookDefaultYear.ToString()
+
+        Dim typed As String = _logBookYearInput.ToString()
+        If typed.Length > 0 Then
+            ShowBottomPrompt("What year do you want to use [Enter = " & defaultYearText & "] ? " & typed)
+        Else
+            ShowBottomPrompt("What year do you want to use [Enter = " & defaultYearText & "] ?")
+        End If
+    End Sub
+
+    Private Sub HandleLogBookYearPromptKey(rawChar As String)
+        ' rawChar is the original KeyPress char (preserve digits)
+        If rawChar Is Nothing Then Return
+
+        Dim c As Char = rawChar(0)
+
+        ' Enter -> accept
+        If c = ChrW(13) OrElse c = ChrW(10) Then
+            Dim year As Integer = _logBookDefaultYear
+
+            Dim typed As String = _logBookYearInput.ToString().Trim()
+            If typed.Length > 0 Then
+                Dim parsed As Integer
+                If Integer.TryParse(typed, parsed) Then
+                    year = parsed
+                Else
+                    ' Invalid input -> ignore (DOS would usually just keep waiting)
+                    Return
+                End If
+            End If
+
+            StopPrompt()
+            OpenLogBookForYear(year)
+            Return
+        End If
+
+        ' Backspace editing
+        If c = ChrW(8) Then
+            If _logBookYearInput.Length > 0 Then
+                _logBookYearInput.Length -= 1
+                UpdateLogBookYearPromptText()
+            End If
+            Return
+        End If
+
+        ' Allow digits only (up to 4)
+        If Char.IsDigit(c) Then
+            If _logBookYearInput.Length < 4 Then
+                _logBookYearInput.Append(c)
+                UpdateLogBookYearPromptText()
+            End If
+            Return
+        End If
+
+        ' Optional: allow Q to cancel like other prompts
+        If c = "q"c OrElse c = "Q"c Then
+            StopPrompt()
+            Return
+        End If
+
+        ' Ignore everything else
+    End Sub
+
+    Private Sub OpenLogBookForYear(year As Integer)
+        ' We need to confirm DOS file naming before implementing.
+        ' Replace this stub once we know the logbook file(s) and format.
+        NotYet("View Log Book for year " & year.ToString())
+    End Sub
+
+    ' ==========================================================
+    ' Existing (J) action (invoked by P)
+    ' ==========================================================
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## What I need next to finish (E) completely
+To implement `OpenLogBookForYear(year)` correctly (not just â€œNotYetâ€), I need the DOS logbook storage info:
+
+1) What is the logbook filename pattern? (examples: `LOGBOOK26.DAT`, `LOGBOOK.2026`, `LOGBOOK26`, `LOGBOOK.DAT` + year inside file, etc.)
+2) Where is it located relative to your other data (same folder as `REALNAME.DAT`?)  
+3) Is it plain text, fixed-width records, or something like CSV?
+
+If you can, send either:
+- a directory listing screenshot from DOS showing logbook files, **or**
+- the actual file(s) from your VB appâ€™s data folder (names only is enough), **or**
+- the current VB code that reads logbook in any existing form/module.
+
+Once you give me that, Iâ€™ll regenerate the full file again with the real logbook viewer wired in.
+
+## @testsubject117
+
+I hit enter for 2026:
+
+## Copilot
+
+Youâ€™ve just clarified something important: **(E) â€œView Log Bookâ€ is not a simple viewer.** In DOS, after you choose the year, it goes to a **LOG BOOK subâ€‘menu** (with options 1â€“9 and Q to quit). So the WinForms match is:
+
+**E â†’ prompt for year â†’ open a Log Book menu screen** (not immediately show a text file).
+
+### Whatâ€™s next on our side
+Before we build the whole Log Book module, we should do the **smallest faithful step**:
+
+1) Keep the year prompt exactly like DOS (you already captured it)
+2) After Enter, open a new WinForms form that shows the â€œLOG BOOKâ€ menu for that selected year (and later we wire options 1â€“9).
+
+That gives you a visible, correct flow quickly, and we can implement each option one by one.
+
+---
+
+## I need one concrete thing before I can generate the full replacement file
+Do you already have a form like `FormLogBookMenu` / `FrmLogBookMenu` / `FormLogBook` in your VB project?
+
+- If **yes**: tell me the exact class name (or paste that file) and Iâ€™ll wire `E` to open it.
+- If **no**: I can write a new `FormLogBookMenu.vb`, but you asked for â€œentire file replacementsâ€ â€” that would be **two files** (FormMainMenu + new LogBook form). I can do that, but I need your projectâ€™s naming conventions (prefix `Form` vs `Frm`) and whether you want it modal (`ShowDialog`) like the other menus.
+
+---
+
+## Quick read of the DOS log book menu (from your screenshot)
+After year selection (2026 â†’ â€œYear in use: 26â€), the menu options are:
+
+1. View one customer  
+2. View all customers  
+3. Look up an invoice  
+4. Look up a P.O. Number  
+5. Look up the last date of business for a customer  
+6. Scan entire logbook to find customers with a certain spec or part number  
+7. Scan logbook for errors  
+8. Scan 2026 logbook to find ANYTHING  
+9. Update BFGOODRICH spec list from floppy disk  
+Q. Quit
+
+So realistically, **E** is a whole feature area.
+
+---
+
+## Recommendation: implement â€œLOG BOOK menu shellâ€ next
+If you say â€œyes, create itâ€, Iâ€™ll:
+- Keep your existing J changes untouched
+- Replace your E handling so it:
+  - prompts for year
+  - opens `FormLogBookMenu(year)` (new form)
+- The new form will:
+  - display â€œLOG BOOKâ€ header
+  - show â€œYear in use: 26â€
+  - list options 1â€“9 and Q
+  - accept keypresses and show `NotYet(...)` for each option initially
+
+That matches DOS flow and gives us a stable base.
+
+---
+
+## Two questions (pick one option)
+1) Do you already have a Log Book menu form in the project? If so, whatâ€™s its class name/path?
+2) If not, do you want me to create a new form named:
+   - `FormLogBookMenu` (matches your `FormMainMenu`, `FormAbout` style), or
+   - `FrmLogBookMenu` (matches your `FrmRolodexMenu` style)?
+
+Answer those and Iâ€™ll generate the full replacement(s).
+
+## @testsubject117
+
+I then hit (1) View One Customer:
+
+## Copilot
+
+Weâ€™re **not done with (E)** yetâ€”your new screenshot shows the LOG BOOK module is interactive and DOS-like:
+
+- After choosing the year, it stays on the LOG BOOK menu screen.
+- When you press **(1)** it does *not* open a new screen; it **adds an input prompt at the bottom**:
+  - `CUSTOMER NAME? ________`
+â€¦and itâ€™s waiting for typing.
+
+So the next correct WinForms step is:
+
+## Implement the LOG BOOK â€œmenu shellâ€ + option (1) prompt (customer name)
+This gives you a faithful skeleton we can grow option-by-option.
+
+### What I need from you before I generate full replacement code
+Because you requested â€œentire file replacementsâ€, implementing this properly requires **at least one new form file** (a Log Book form). I canâ€™t safely jam a whole screenâ€™s worth of UI into `FormMainMenu.vb` alone without your designer context.
+
+Please answer these 2 questions and Iâ€™ll generate the full code:
+
+1) Do you want the LOG BOOK to open in a **new modal form** (like your other menus: `ShowDialog(Me)`) or non-modal (`Show`)?
+   - DOS feels modal; I recommend **ShowDialog**.
+
+2) Which naming convention should I use?
+   - `FormLogBook` / `FormLogBookMenu`
+   - or `FrmLogBook` / `FrmLogBookMenu`
+
+### After you answer, I will generate:
+- **Updated `FormMainMenu.vb`** (full file) where `E`:
+  - prompts for year in the bottom prompt bar (like DOS),
+  - then opens the new Log Book form with that year.
+
+- **New form file** (full code): `FormLogBookMenu.vb` (or your preferred name) that:
+  - Renders the DOS-like LOG BOOK menu (header + menu items)
+  - Shows `Year in use: 26`
+  - Handles keypress:
+    - `1` triggers â€œCUSTOMER NAME?â€ input prompt at the bottom of that Log Book form
+    - `Esc` / `Q` quits back to main menu
+  - For now, after entering a name and pressing Enter, it can show a `NotYet("View one customer: " & name)` messageâ€”until we implement actual lookup.
+
+---
+
+## One more key detail (to match DOS exactly)
+In DOS, after you press `1`, does it allow:
+- **Backspace editing**?
+- **Enter with blank** (cancel)?
+- **Esc** to cancel and return to menu list?
+- How long is that input fieldâ€”does it stop at ~8 chars? (looks like ~8â€“10 in the screenshot)
+
+If you answer â€œyes backspace, esc cancels, max 8/10/20 charsâ€, Iâ€™ll match that behavior.
+
+---
+
+### Your next reply (minimal)
+Just reply with:
+
+- Modal: `ShowDialog` or `Show`
+- Form name: `FormLogBookMenu` or `FrmLogBookMenu`
+- Input rules: (backspace? esc cancels? max length?)
+
+Then Iâ€™ll output the complete replacement files.
+
+## @testsubject117
+
+I then Entered PSIBEARI in the customer name _______ field:
+
+## Copilot
+
+Great â€” that screenshot nails the exact DOS flow for **LOG BOOK â†’ (1) View one customer**:
+
+- Youâ€™re still on the LOG BOOK screen (year in use: 26).
+- Press `1` â†’ bottom prompt: `CUSTOMER NAME? ____`
+- Type a customer key (like `PSIBEARI`) â†’ `Enter`
+- DOS then shows a **paged results screen**:
+  - multiple â€œblocksâ€ per invoice entry
+  - bottom help line: **`[ENTER = More]   [ESC = Quit]`**
+  - `Enter` advances to next page; `Esc` returns back.
+
+### What this means for the WinForms port
+This isnâ€™t â€œopen a text fileâ€; itâ€™s:
+1) a LogBook menu form
+2) an interactive query prompt
+3) a paged viewer that supports **Enter = next page** and **Esc = close**
+
+You already have `FrmPagedTextViewer`, but it currently uses buttons + scroll. To match DOS, we should add a â€œDOS paging modeâ€ to it (or a new lightweight viewer) that:
+- hides buttons (optional)
+- shows the bottom help line
+- handles keys: Enter/ESC
+
+---
+
+## Before I generate full replacement files: 3 quick confirmations
+Because you want **entire file outputs**, Iâ€™m going to generate **multiple files** (not just `FormMainMenu.vb`) and I want to match your existing naming.
+
+1) **Form naming**: should the new Log Book menu be:
+   - `FormLogBookMenu` (matches `FormMainMenu`, `FormAbout`)
+   - or `FrmLogBookMenu` (matches `FrmRolodexMenu`)?
+
+2) **Modal behavior**: should Log Book open with `ShowDialog(Me)` (recommended, DOS-like), or `Show()`?
+
+3) **Data source**: where is the logbook data coming from in your VB app today?
+   - Do you already have a file like `LOGBOOK26.DAT` / `LOG26.DAT` / etc.?
+   - Or do you already have code/classes that read logbook entries?
+
+If you donâ€™t know #3, thatâ€™s fine: I can still build the **UI shell + prompts + viewer** with stubbed data, but to make option (1) actually show real results we need the log data format.
+
+---
+
+## What I will generate once you confirm (1) + (2)
+### Files Iâ€™ll output in full:
+1) **`FormMainMenu.vb`**  
+   - `E` prompts for year (already modeled)
+   - then opens the log book menu form for that year
+
+2) **`FormLogBookMenu.vb`** (or `FrmLogBookMenu.vb`)  
+   - renders the DOS menu list
+   - handles keys `1..9`, `Q`, `Esc`
+   - implements option **(1)**:
+     - prompt `CUSTOMER NAME?`
+     - accepts typing + backspace
+     - Enter runs the query and opens the viewer
+
+3) **(Optional but likely) update `FrmPagedTextViewer.vb`**  
+   Add a â€œDOS paging modeâ€:
+   - bottom line text: `[ENTER = More]  [ESC = Quit]`
+   - Enter advances page
+   - Esc closes viewer
+
+If you donâ€™t want to modify `FrmPagedTextViewer`, I can instead create a new viewer form (ex: `FrmDosPagedViewer`) to avoid impacting other features.
+
+---
+
+## One more detail from your screenshot (so we match perfectly)
+On the results screen, do you know if:
+- **Enter** shows the next â€œsetâ€ of entries until done, then returns automatically?
+- or does it show a â€œno moreâ€ message?
+- and does it return to the LOG BOOK menu or to the main menu?
+
+If youâ€™re not sure, we can implement: **Enter advances pages; when out of pages, close and return to log book menu** (closest typical DOS behavior).
+
+---
+
+Reply with:
+- `FormLogBookMenu` vs `FrmLogBookMenu`
+- `ShowDialog` vs `Show`
+- whether you prefer **modifying existing `FrmPagedTextViewer`** or creating a **new Dos viewer form**
+
+â€¦and Iâ€™ll generate the full replacement code files.
+
+## @testsubject117
+
+hitting enter progesses to more listings for psibeari
+
+## Copilot
+
+Understood â€” **ENTER = More** is confirmed (it pages forward through additional PSIBEARI listings). Next step is to build the WinForms equivalent of that exact flow.
+
+### One blocker before I can generate the â€œentire fileâ€ replacements
+To implement option **(E) â†’ year prompt â†’ LOG BOOK menu â†’ (1) CUSTOMER NAME? â†’ results pager with ENTER=More**, I need to know where to put the new Log Book UI code:
+
+- Do you already have an existing Log Book form/class in your VB project (anything named like `FormLogBook`, `FormLogBookMenu`, `FrmLogBook`, `LogBookMenu`, etc.)?
+
+If you do, tell me its name and Iâ€™ll wire into it.
+
+If you **donâ€™t**, Iâ€™ll create new files â€” but I need you to choose:
+
+1) **Form name convention**
+   - `FormLogBookMenu` (matches `FormMainMenu`, `FormAbout`)
+   - or `FrmLogBookMenu` (matches `FrmRolodexMenu`)
+
+2) **Viewer approach**
+   - Modify your existing `FrmPagedTextViewer` to add a DOS paging mode (ENTER=More, ESC=Quit, bottom hint line)
+   - Or create a new form `FrmDosPagedViewer` so nothing else changes
+
+Once you answer those two, I will output the complete files in full.
+
+---
+
+## What I will implement (based on your confirmation)
+### In the results viewer:
+- **ENTER** advances to the next page of results for that customer.
+- **ESC** closes the results view and returns to the Log Book menu.
+- (Optional) If you hit ENTER on the last page: either stays on last page or closes automatically â€” we can match whichever your DOS does once you confirm.
+
+### In the LOG BOOK menu:
+- Option (1) shows `CUSTOMER NAME?` input on the bottom line
+- Typing shows live input, backspace edits
+- ENTER launches the results pager
+
+---
+
+### Quick question (so the paging feels identical)
+When you reach the *last* page in DOS and press **ENTER**, does it:
+- (A) do nothing / beep and stay,
+- (B) return to the LOG BOOK menu,
+- (C) loop back to the first page?
+
+If youâ€™re not sure, Iâ€™ll implement **(B)** (return to menu) because thatâ€™s the most typical.
+
+Reply with:
+- Form name: `FormLogBookMenu` or `FrmLogBookMenu`
+- Viewer: â€œmodify `FrmPagedTextViewer`â€ or â€œnew `FrmDosPagedViewer`â€
+- Last-page ENTER behavior: A/B/C (or â€œnot sureâ€)
+
+## @testsubject117
+
+esc exits back to the log book menu
+
+## Copilot
+
+Got it: **ESC exits back to the LOG BOOK menu** from the customer results screen.
+
+To generate the full â€œreplace-the-whole-file(s)â€ code you want, I still need two choices from you (then I can produce the complete files):
+
+1) **What should we name the new Log Book menu form?**
+   - `FormLogBookMenu` (matches `FormMainMenu`, `FormAbout`)
+   - or `FrmLogBookMenu` (matches `FrmRolodexMenu`)
+
+2) **Do you want to reuse your existing paged viewer or create a DOS-specific one?**
+   - **Option A (recommended):** create a new `FrmDosPagedViewer` that exactly matches DOS keys:
+     - ENTER = More (next page)
+     - ESC = Quit (close viewer)
+     - bottom hint line `[ENTER = More]   [ESC = Quit]`
+     - no Print/Close buttons (or optional)
+   - **Option B:** modify your existing `FrmPagedTextViewer` to add a DOS-mode flag (risk: impacts other uses).
+
+Reply with:
+- Form name: `FormLogBookMenu` or `FrmLogBookMenu`
+- Viewer: `FrmDosPagedViewer` (new) or modify `FrmPagedTextViewer`
+
+Once you answer, Iâ€™ll output **complete full files**:
+- `FormMainMenu.vb` (updated E flow)
+- the new Log Book menu form file
+- the viewer file (new or modified)
+
+One more thing Iâ€™ll ask right after that: the **logbook data file naming/location**, so option (1) can return real results. If we donâ€™t have that yet, Iâ€™ll stub the data but the UI/flow will be correct.
+
+## @testsubject117
+
+2) View all customers, literally views all customers in the same way it listed out psibeari: 
+
+## Copilot
+
+Goodâ€”option **(2) View all customers** confirms the same exact **DOS paging viewer** behavior as option (1):
+
+- It renders repeated â€œentry blocksâ€
+- Bottom hint line: **`[ENTER = More]   [ESC = Quit]`**
+- **ENTER pages forward**
+- **ESC returns to the LOG BOOK menu**
+
+So we should build **one reusable DOS-style paged viewer** and use it for both option (1) and option (2) (and likely options 6/8 as well).
+
+---
+
+## One last decision I still need from you (so I can generate the complete files)
+You havenâ€™t answered these yet, and I canâ€™t safely output the full replacement files without it:
+
+### A) New form naming
+Which do you want:
+- `FormLogBookMenu`  
+or  
+- `FrmLogBookMenu`
+
+### B) Viewer approach (recommended: new form)
+Which do you want:
+- **Create new** `FrmDosPagedViewer` (recommended; wonâ€™t affect your existing `FrmPagedTextViewer`)  
+or  
+- Modify existing `FrmPagedTextViewer` to support DOS paging mode
+
+If you reply with just:
+- `FormLogBookMenu` + `FrmDosPagedViewer`
+(or whatever you pick)
+â€¦I will generate the entire code for all needed files.
+
+---
+
+## Also: we need the logbook data source
+To make option (1) and (2) show real entries, I need to know what file(s) store the log book for year 26:
+
+- Is there a file in your data folder like `LOGBOOK26.DAT`, `LOGBOOK.26`, `LOG26.DAT`, etc.?
+- If you donâ€™t know, tell me where your data folder is on disk, and list the filenames in it that look logbook-related (just names; you can paste them).
+
+If you canâ€™t provide that yet, I can still generate the UI and stub the results; then we wire the data once you locate the file.
+
+---
+
+### What Iâ€™ll build next once you choose A/B
+- `FormMainMenu.vb`: `E` â†’ year prompt â†’ opens LogBook menu form
+- `FormLogBookMenu.vb` (or `FrmLogBookMenu.vb`): shows menu + handles keys 1/2/Q/Esc
+- `FrmDosPagedViewer.vb`: DOS pager with ENTER=More / ESC=Quit, bottom hint line
+
+Reply with:
+1) **FormLogBookMenu vs FrmLogBookMenu**
+2) **New FrmDosPagedViewer vs modify FrmPagedTextViewer**
+3) Any clue on the **log book data file name(s)** (even a guess or folder listing)
+
+## @testsubject117
+
+Clicking (3) Look Up Invoice:
+
+## Copilot
+
+Option **(3) Look up an invoice** fits the same pattern: it stays on the LOG BOOK menu and shows a bottom input prompt:
+
+> `INVOICE NUMBER TO LOOK UP?`
+
+So the correct build plan is:
+
+1) Implement **LOG BOOK menu form** (year in use)
+2) Implement **a reusable bottom prompt/input line** on that form
+3) Implement options as â€œprompt â†’ run query â†’ show DOS paged results viewerâ€
+
+We can wire (1), (2), (3) quickly once the shell exists.
+
+---
+
+## I canâ€™t generate the full replacement files yet because you still havenâ€™t answered the 2 required choices
+Please reply with just these two lines:
+
+1) **Log book form name**: `FormLogBookMenu` **or** `FrmLogBookMenu`  
+2) **Viewer approach**: `FrmDosPagedViewer` (new) **or** â€œmodify `FrmPagedTextViewer`â€
+
+I recommend:
+- **`FormLogBookMenu`** (since your main menu is `FormMainMenu`)
+- **`FrmDosPagedViewer` (new)** (so we donâ€™t risk breaking your existing viewer)
+
+---
+
+## Also needed to make the results real (data file)
+To actually show invoices / customers, we need to know where the 2026 logbook data lives. Can you paste either:
+
+- the list of files in your `LegacyDataPaths.BaseDataDir` folder, **or**
+- a screenshot of that folder, **or**
+- any filenames you see that look like: `LOG*`, `BOOK*`, `LB*`, `INV*`
+
+Without that, I can still implement the UI and prompts, but results will be stubbed.
+
+---
+
+### While you gather that, hereâ€™s what Iâ€™ll implement once you confirm:
+- **E on main menu**
+  - prompt: `What year do you want to use [Enter = 2026] ?`
+  - Enter opens LogBook menu for year
+
+- **LogBook menu form**
+  - shows the exact options list (1â€“9, Q)
+  - bottom prompt line changes based on option selected:
+    - (1) `CUSTOMER NAME?`
+    - (2) no prompt; runs â€œall customersâ€ query immediately
+    - (3) `INVOICE NUMBER TO LOOK UP?`
+  - `Esc` / `Q` exits back to main menu
+
+- **DOS viewer**
+  - `[ENTER = More]   [ESC = Quit]`
+  - Enter pages forward
+  - Esc returns to LogBook menu
+
+Reply with the 2 choices and (if possible) a file listing, and Iâ€™ll generate the complete full code files.
+
+## @testsubject117
+
+I tried searching for known invoice numbers, but maybe I  don't understand fully what this screen is for. if I search for  or invoice 3's 727400 or 726218, both known PSIBEARI invoices, I get this as a result for both: 
+
+## Copilot
+
+That DOS result screen is telling us something very specific about option **(3) Look up an invoice**:
+
+### What â€œEND OF LOG BOOK, HIT [ESC] to Exitâ€ means
+It means the lookup routine **scanned the logbook for that year and did not find a matching invoice number**, then it dropped into a â€œno results / end of fileâ€ viewer state.
+
+So either:
+
+1) **Option (3) is not searching the same â€œInvoice#â€ youâ€™re looking at** on the customer listings screen (e.g., it might search a different field/format), **or**
+2) **It expects a different invoice number format** (e.g., without leading digits, last 5 digits, or something like `736255` vs `727400`), **or**
+3) **Those invoices arenâ€™t in the 2026 logbook file actually being searched** (possible if the PSIBEARI display is coming from a different source or merged view), **or**
+4) The DOS routine might require **exact spacing / fixed width / leading zeros**.
+
+From your PSIBEARI listing screenshot, the invoice numbers shown are like **736255 / 736256 / 736367**. If you searched for **727400** and **726218**, those may be *invoice numbers from a different subsystem* (or a different yearâ€™s logbook).
+
+---
+
+## How to verify what option (3) expects (fast tests in DOS)
+Try these in the DOS app, in year 26:
+
+1) Pick option (1) and find PSIBEARI listings.
+2) Use one of the **exact invoice numbers shown on screen** (e.g. `736255`) and enter that into option (3).
+
+- If `736255` works: then option (3) is functioning; the â€œ727400/726218â€ numbers are simply not the same thing (or not in that year/file).
+- If `736255` still returns â€œEND OF LOG BOOKâ€: then option (3) likely searches a *different dataset/file* than option (1)/(2), or the invoice lookup is coded oddly.
+
+If you can do that test and tell me the result, weâ€™ll know whether to implement (3) as:
+- a scan through the same entries used for (1)/(2), or
+- a different file/index.
+
+---
+
+## For the WinForms port: what we should implement regardless
+Even without fully decoding invoice numbering today, we can still match the DOS UX:
+
+### For option (3) in WinForms:
+- Prompt: `INVOICE NUMBER TO LOOK UP?`
+- On Enter:
+  - If found â†’ show results in the same DOS pager
+  - If not found â†’ show a pager with a single page:
+    - `END OF LOG BOOK, HIT [ESC] to Exit`
+  - ESC returns to the LOG BOOK menu
+
+So your screenshot gives us the â€œno matchâ€ screen exactlyâ€”good.
+
+---
+
+## We still need 2 decisions from you to proceed with code generation
+You havenâ€™t answered these yet, and I need them to generate the full â€œentire fileâ€ replacements:
+
+1) Log book menu form name: **`FormLogBookMenu`** or **`FrmLogBookMenu`**  
+2) Viewer: **new `FrmDosPagedViewer`** or modify **`FrmPagedTextViewer`**
+
+If you reply with those two choices, Iâ€™ll generate the full files and stub the data layer where needed. Then weâ€™ll plug the real logbook data format once we locate the file(s).
+
+---
+
+## One more question (so we implement correct year handling)
+In the DOS â€œYear in use: 26â€ screen, itâ€™s showing **2-digit year**. In your WinForms app, do you want to display:
+- `Year in use: 26` (DOS exact), or
+- `Year in use: 2026` (clearer)?
+
+I recommend **DOS exact** inside the logbook module.
+
+Reply with:
+- `FormLogBookMenu` vs `FrmLogBookMenu`
+- `FrmDosPagedViewer` vs modify `FrmPagedTextViewer`
+- display year: `26` or `2026`
+
+## @testsubject117
+
+If I choose the next option, (4) Search by P.O. number, and search for  7077, this is what is returned: 
+
+## Copilot
+
+That screenshot is very helpful: it proves options (3) and (4) are doing a **sequential scan** through the yearâ€™s logbook and then stopping at the first (or each) match, with the same â€œend-of-logbookâ€ footer.
+
+### What option (4) is doing (based on your example)
+You searched for **7077**, and it returned an entry whose P.O. number is **70771**.
+
+So the DOS behavior is almost certainly:
+
+- **Substring / prefix match**, not exact match.
+  - i.e., it matches if the entered digits appear inside the P.O. field (or the P.O. begins with that sequence).
+- It then shows the matching entry (or first match), and when you page forward, it continues scanning for the next match until end, at which point it shows:
+  - `END OF LOG BOOK, HIT [ESC] to Exit`
+
+That also explains why invoice searches might fail: option (3) might expect **partial** matches, **fixed width**, or a different invoice format than what you typed.
+
+---
+
+## What we should build next (implementation plan)
+We should implement **the LOG BOOK module** as its own UI + a data scan engine:
+
+### UI flow (DOS-faithful)
+- Main menu `E` â†’ year prompt â†’ open Log Book menu
+- Options:
+  - (1) prompt customer â†’ scan entries where `Customer = input` (likely exact/starts-with)
+  - (2) view all â†’ just iterate all entries
+  - (3) prompt invoice # â†’ scan entries where invoice contains/starts-with input
+  - (4) prompt PO # â†’ scan entries where PO contains/starts-with input (your 7077â†’70771 confirms)
+- Results screen:
+  - ENTER = More (continue scan from where it left off)
+  - ESC = quit back to Log Book menu
+  - At end: show `END OF LOG BOOK, HIT [ESC] to Exit`
+
+### Data needs
+To do this for real, we must locate the actual logbook data file(s) and parse the records. Until then, we can build the exact UI/paging behavior with stub entries.
+
+---
+
+## I still need your two â€œproject decisionsâ€ to generate the full files
+Please answer these (even one-word answers are fine):
+
+1) **Log Book form name**: `FormLogBookMenu` or `FrmLogBookMenu`  
+2) **Viewer**: create new `FrmDosPagedViewer` or modify existing `FrmPagedTextViewer`
+
+My recommendation (least risk):
+- `FormLogBookMenu`
+- new `FrmDosPagedViewer`
+
+---
+
+## And one â€œdata locationâ€ request (so option 1â€“4 can really work)
+Please paste a file list from your data directory (where `REALNAME.DAT` lives). You can just paste filenames.
+
+If youâ€™re on Windows and the files are in the same folder your app reads from, you can:
+- open that folder in Explorer,
+- sort by name,
+- copy/paste the names.
+
+Iâ€™m specifically looking for anything like:
+- `LOG*`, `BOOK*`, `LB*`, `DAY*`, `SHOP*`, `INV*`, or files with `26` in the name.
+
+---
+
+## Quick DOS confirmation (optional, but helps match exactly)
+For option (4), after the first match:
+- If you press **ENTER**, does it show the *next* match for that PO search (continuing scan), or does it just show the next log entry regardless?
+
+If you donâ€™t know, thatâ€™s fineâ€”Iâ€™ll implement it as â€œcontinue scanning for next matchâ€, which is consistent with how these DOS routines usually work.
+
+Reply with the two decisions + (if possible) the file list, and Iâ€™ll generate the complete full files.
+
+## @testsubject117
+
+now I'm choosing (5) Look up the last date of business for a customer: when the dialogue appeared at the bottom of the screen I typed in PSI, I also tried PSIBEARI and both showed an error, then if I hit enter, it asked for a number, why I don't know. I just hit 2, and it continued and loaded PSIBEARI Invoice data:
+
+## Copilot
+
+What youâ€™re seeing on **(5) â€œLook up the last date of business for a customerâ€** is consistent with a *buggy / fragile* DOS routine, not something youâ€™re doing wrong.
+
+### What the DOS screen is actually asking for
+The prompt is:
+
+**â€œEnter Part or all of Customers abbreviation [ENTER = All Customers] ?â€**
+
+So itâ€™s not asking for a â€œfull nameâ€, itâ€™s asking for the **customer abbreviation/key** (like the 8â€‘char code you used earlier: `PSIBEARI`). It likely supports partial prefixes (like `PSI`) too.
+
+### Why you get â€œERROR 53 â€¦â€
+In classic DOS BASIC / QuickBASIC, **Error 53 = â€œFile not found.â€**
+
+So when you type `PSI` or `PSIBEARI`, the program is probably trying to open a file based on what you typed (e.g., a per-customer index file), and that file doesnâ€™t exist in the current yearâ€™s dataset or expected directory. Then it recovers by asking for a number / continuing in a different path.
+
+Thatâ€™s good news for the WinForms port: we donâ€™t need to reproduce the error; we can implement the *intended behavior* robustly.
+
+---
+
+## Practical port plan for option (5)
+For WinForms, we should implement option (5) as:
+
+1) Prompt: **â€œEnter Part or all of Customers abbreviation [ENTER = All Customers] ?â€**
+2) If user enters a prefix:
+   - scan the yearâ€™s logbook entries
+   - group by customer key
+   - find the **latest date** per customer
+   - then show results (either as a list of customers + last date, or jump straight to the last entry for that customerâ€”depending on what DOS does after it works)
+3) If user presses Enter blank:
+   - compute last date for **all customers**
+   - show a paged list
+
+But to do this, we must have the **logbook data file** and know how to parse the **date field** reliably.
+
+---
+
+## What I need from you right now (so we can stop circling and actually code E)
+You keep giving great DOS screenshots (thank you), but weâ€™re blocked on two concrete choices + data location.
+
+### 1) Choose these two so I can generate the files
+- **Log Book form name:** `FormLogBookMenu` or `FrmLogBookMenu`
+- **Viewer:** new `FrmDosPagedViewer` or modify `FrmPagedTextViewer`
+
+(Strong recommendation: `FormLogBookMenu` + new `FrmDosPagedViewer`.)
+
+### 2) Locate the logbook data files
+Please paste the **file names** in the folder where `REALNAME.DAT` is (or wherever your appâ€™s legacy data lives). Even just the names.
+
+If you donâ€™t know where that folder is:
+- In your WinForms app, you already use `LegacyDataPaths.BaseDataDir`. If you can show me what that resolves to at runtime (MessageBox it / debug output), we can find the files.
+
+Without the data file(s), I can only build the UI shell and stub resultsâ€”which is still useful, but youâ€™ll immediately want real data.
+
+---
+
+## Small request about option (5) behavior (to match DOS once it works)
+When DOS *does* work (after you enter a number and it proceeds), what does it actually display as the â€œlast date of businessâ€ result?
+- Does it show a summary line like: `PSIBEARI 01-08-2026`?
+- Or does it just jump to the newest invoice entries for that customer?
+
+If you can get one screenshot of the â€œsuccessfulâ€ end result for option (5), thatâ€™ll tell us exactly what to output.
+
+---
+
+Reply with:
+1) `FormLogBookMenu` vs `FrmLogBookMenu`
+2) `FrmDosPagedViewer` vs modify `FrmPagedTextViewer`
+3) file list from the data folder (or the folder path)
+
+â€¦and we can start writing the actual Log Book module instead of only documenting DOS screens.
+
+## @testsubject117
+
+it looks like there is some weirdness happening in dos. I actually don't think item (5) works. if I put in PSI or PSIBEARI, I get the error and if I hit enter, it just drops back to the log book menu.
+
+## Copilot
+
+Agreed â€” with what youâ€™ve shown, **option (5) is effectively broken in DOS** (Error 53 = file not found, then it bails back to the menu). Thatâ€™s actually a good opportunity for the Windows port: we can implement (5) in a clean, reliable way based on the logbook records, and youâ€™ll end up with something *better than DOS* while still fitting the same menu flow.
+
+## Are we â€œdoneâ€ with E?
+Not yet. What we *do* have now is enough to build the **LOG BOOK shell** and wire up options (1)â€“(4) + (2) paging, and we can either:
+- implement (5) as â€œNot implemented / broken in DOSâ€ for now, or
+- implement a working version and call it out as â€œfixed behaviorâ€.
+
+Either way, the next engineering step is the same: **create the Log Book menu form + DOS paging viewer**, then hook `E` to it.
+
+---
+
+## Two decisions I still need (so I can generate the full files)
+Please answer these, and Iâ€™ll produce the complete file replacements immediately:
+
+1) **Log book form name**: `FormLogBookMenu` or `FrmLogBookMenu`  
+2) **Viewer**: create new `FrmDosPagedViewer` or modify existing `FrmPagedTextViewer`
+
+My recommendation (least risk): **`FormLogBookMenu` + new `FrmDosPagedViewer`**.
+
+---
+
+## One more essential: where is the logbook data?
+To make options (1)â€“(4) actually return real records (customer, invoice, PO), we must know what file(s) hold the logbook for year 26.
+
+Please do one of these:
+
+### Option A (fastest)
+Paste a **file listing** of the folder where `REALNAME.DAT` lives (the same folder your WinForms app reads legacy data from). Just filenames is fine.
+
+### Option B
+Tell me the resolved path of `LegacyDataPaths.BaseDataDir` on your machine.
+
+Once we know the file name(s), I can implement the scan engine so:
+- (1) Customer: exact or prefix match
+- (2) All: sequential
+- (3) Invoice: likely substring/prefix match
+- (4) PO: substring/prefix match (your â€œ7077 â†’ 70771â€ proves that)
+- Results: `ENTER = More`, `ESC = Quit`, and at end show `END OF LOG BOOK, HIT [ESC] to Exit`
+
+---
+
+## What I suggest we do with option (5)
+Since DOS seems broken, pick one:
+
+- **(5a) Keep DOS parity:** show a page that says something like  
+  `THIS OPTION DOES NOT WORK IN DOS (ERROR 53)` and return on ESC  
+- **(5b) Improve it:** implement â€œlast date of businessâ€ by scanning entries and finding the latest date per customer
+
+Tell me which you prefer, but we can decide laterâ€”(1)â€“(4) are the priority.
+
+---
+
+Reply with:
+- `FormLogBookMenu` or `FrmLogBookMenu`
+- `FrmDosPagedViewer` or â€œmodify `FrmPagedTextViewer`â€
+- and either a file listing or the base data folder path
+
+â€¦and Iâ€™ll generate the full code files.
+
+## @testsubject117
+
+ok, I tried doing (6) Scan entire logbook to find customers with a certain spec or part number.: ten if I type the word cadmium when the prompt appears at the bottom and hit enter, I get this: it scans through years, then jumps to this screen: 
+
+## Copilot
+
+What you found is extremely useful: it confirms **(E) Log Book is a whole subsystem**, and it also reveals something about the DOS implementation of option **(6)**:
+
+## What DOS option (6) is doing
+From your screenshots:
+
+1) It prompts:
+   - **â€œEnter Part or all of the Spec to search for ?â€**
+2) Then it prints status lines like:
+   - `LOG BOOK does'nt exist for the year of 0..9`
+   - `Scanning the year of 1910`, `1911`, etc.
+
+That means the DOS code is looping through **2â€‘digit â€œyearsâ€** (00â€“99) and turning them into **19xx** years (hence 1910, 1911). Itâ€™s basically saying: â€œfor each year, if a logbook file exists, scan itâ€.
+
+3) Then it opens **Microsoft Word** on a file named:
+   - **`LOGSPEC.DOC`**
+
+So option (6) is not â€œview results on screenâ€; itâ€™s:
+- scan many logbooks across years,
+- write results to a Word document (or at least generate a `.DOC`),
+- launch Word to view/print/search the results.
+
+Also: the fact itâ€™s scanning â€œ1910â€ etc is almost certainly â€œyear=10â€ â†’ 1910, which looks wrong for a business system; likely it *intended* to scan 2010+ but the DOS program is hard-coded to 19xx. Another example of DOS weirdness you mentioned.
+
+## What we should do in the Windows port
+We have two sensible choices for option (6):
+
+### Option A (match output style, but modern)
+- Scan logbooks across available years
+- Generate a **text report** (or HTML) instead of a Word `.DOC`
+- Show it in our **DOS paged viewer** (ENTER=More / ESC=Quit)
+- Optional: add an â€œExportâ€ button later
+
+### Option B (match â€œWord docâ€ behavior)
+- Generate a `.docx` (OpenXML) or `.rtf`
+- Launch Word if installed (or default associated app)
+- More work and more dependencies
+
+Given your earlier â€œquick visible winsâ€ plan, **Option A is the fastest** and will still feel very close to DOS (just without Word).
+
+---
+
+# But we still canâ€™t implement E until you answer the two structural questions
+You keep giving perfect DOS behavior references (thank you), but weâ€™re blocked from writing the actual WinForms forms because you still havenâ€™t picked:
+
+1) **Log book form name:** `FormLogBookMenu` vs `FrmLogBookMenu`  
+2) **Viewer approach:** new `FrmDosPagedViewer` vs modify `FrmPagedTextViewer`
+
+If you reply with:
+- `FormLogBookMenu`
+- `FrmDosPagedViewer`
+
+â€¦I will proceed with a clean implementation that wonâ€™t affect other screens.
+
+---
+
+## One more â€œdataâ€ blocker (critical)
+To make any of (1)â€“(4) and scans (6) work, we must know **what files represent a yearâ€™s log book** in your Windows port.
+
+Please paste **the filenames** in the directory where your app reads legacy data (the one containing `REALNAME.DAT`). Just names.
+
+If you canâ€™t find that folder, Iâ€™ll add a temporary debug message to show the full path of `LegacyDataPaths.BaseDataDir`â€”but that is a code change, so Iâ€™d rather you paste it.
+
+---
+
+## Concrete next step (what I recommend you do next, right now)
+Reply with three things:
+
+1) **Use `FormLogBookMenu`**
+2) **Use new `FrmDosPagedViewer`**
+3) Paste a file list from the legacy data folder
+
+Then Iâ€™ll generate the complete replacement files and weâ€™ll start implementing E in the same incremental way youâ€™re exploring DOS: first the menu shell + option (1)/(2), then (3)/(4), then (6).
+
+## @testsubject117
+
+If I Choose (7): Then if I hit enter: if I try it on the production machine: after that if I hit enter it goes back to the log book menu screen
+
+## Copilot
+
+Option **(7) â€œScan logbook for errorsâ€** is clearly another DOS routine thatâ€™s half report / half printing workflow, and itâ€™s also clearly fragile on the production machine:
+
+- It prompts: **â€œGet printer ready & hit ENTER!?â€**
+- Then: **â€œFinding & printing logbook errorsâ€¦ Press [ESC] to Exitâ€**
+- It can error with:
+  - **â€œPRINTER IS NOT READY!â€** (classic DOS printer device error)
+  - **â€œERROR 24 â€¦â€** (in BASIC this is commonly a device I/O error, e.g., printer not ready / device timeout)
+
+So for the Windows port, we should treat (7) as a **report generator** first (show on screen), and only add printing once the report content is correct.
+
+### Practical Windows behavior for (7)
+Recommended parity-friendly implementation:
+1) Prompt: â€œPress Enter to scan logbook for errors (ESC to cancel).â€
+2) Scan selected yearâ€™s logbook entries.
+3) Show results in the DOS paging viewer:
+   - `[ENTER = More]   [ESC = Quit]`
+4) Optional later: â€œPrintâ€¦â€ button (using Windows printing APIs).
+
+This avoids the â€œprinter not readyâ€ trap and matches how users actually want to see the data.
+
+---
+
+## But we still need to stop collecting screenshots and actually build the Log Book module
+At this point youâ€™ve mapped options (1)â€“(7) enough to implement the shell. The remaining blockers are the same as before:
+
+### 1) Confirm the two structure choices
+Please reply explicitly:
+
+- **Form name:** `FormLogBookMenu`
+- **Viewer:** new `FrmDosPagedViewer`
+
+(If you want different names, say so.)
+
+### 2) Provide the logbook data file list (critical)
+Paste the filenames in the folder where your app reads legacy data (the one containing `REALNAME.DAT`), so we can implement real scanning.
+
+Even a partial list is fineâ€”anything that looks like:
+- `LOG*`, `BOOK*`, `LB*`, `INV*`, `PO*`, or files with year suffixes.
+
+Without this, I can only stub out options (1)â€“(7), which wonâ€™t be satisfying.
+
+---
+
+## Whatâ€™s â€œnext on the listâ€ once E is underway?
+Per your earlier priority list, after we have a working **E (Log Book)** shell and at least options (1)/(2) functional, the next biggest visible win is:
+
+**(Q) Word Processor**, then **(R) Find Word Processor Text**, then **(T) Change Date/Time**.
+
+But we shouldnâ€™t move on until **E at least opens the Log Book menu and can display entries**â€”otherwise everything downstream (searches, scans, error scans) canâ€™t be validated.
+
+---
+
+### Your next message (minimal)
+Please respond with:
+
+1) `FormLogBookMenu` and `FrmDosPagedViewer` (confirm)
+2) Paste the legacy data folderâ€™s filenames (or tell me the folder path)
+
+Then Iâ€™ll generate the full replacement files and weâ€™ll be implementing instead of documenting.
+
+## @testsubject117
+
+IF i HIT (8): then I type PSIBEARI next to the question "What do you want to look for?" I get this screen: THEN i HIT f3 THREE TIMES:
+
+## Copilot
+
+Option **(8) â€œScan 2026 Logbook to find ANYTHINGâ€** is now very clear from your screenshots:
+
+- The LOG BOOK menu prompts: **â€œWhat do you want to look for?â€**
+- Then it switches to a **raw logbook record viewer/editor** (the red screen), showing something like `LOGBOOK.21` (so itâ€™s opening the yearâ€™s logbook file directly).
+- The instruction says: **â€œWhile in red screen, hit [F3] to scan for the next match.â€**
+- Pressing **F3** repeatedly jumps to the next occurrence of the search term (your PSIBEARI matches).
+
+So in the Windows port, option (8) should *not* be the same as our normal â€œformatted results listâ€. Itâ€™s more like:
+- open the underlying logbook text/record stream
+- provide â€œFind nextâ€ repeatedly (F3)
+- allow exit back to menu
+
+### Practical Windows equivalent for (8)
+We can implement option (8) as a dedicated â€œraw logbook viewerâ€ form:
+
+- Displays the logbook content in a monospaced, read-only text area
+- Highlights matches of the search term
+- **F3 = find next**
+- ESC = exit back to log book menu
+
+That will feel very close to the DOS behavior without emulating the entire DOS editor UI.
+
+---
+
+## Key data discovery from your screenshot
+The header shows `LOGBOOK.21`, which strongly suggests the logbook file naming convention is:
+
+- `LOGBOOK.<yy>` (two-digit year), e.g.
+  - `LOGBOOK.21`
+  - `LOGBOOK.26`
+
+That is exactly the missing piece we needed for options (1)â€“(4) too.
+
+### Quick confirmation request
+Can you confirm you actually have files like these on disk in your data folder?
+
+- `LOGBOOK.21`
+- `LOGBOOK.26`
+
+If yes, we can implement real scanning.
+
+---
+
+## We are now ready to implement (E) properly â€” but I still need you to confirm the two project choices
+Please reply with a simple â€œyesâ€ to these, unless you want different names:
+
+1) Use **`FormLogBookMenu`** as the new form name  
+2) Create a new viewer form **`FrmDosPagedViewer`** (ENTER=More / ESC=Quit) rather than modifying `FrmPagedTextViewer`
+
+Once you confirm, I will generate full code files for:
+
+- `FormMainMenu.vb` (E â†’ year prompt â†’ open log book menu)
+- `FormLogBookMenu.vb` (menu + prompts + routing to features)
+- `FrmDosPagedViewer.vb` (paged results)
+- `FrmRawLogBookViewer.vb` (for option 8 with F3 find-next)
+
+And weâ€™ll wire at least:
+- (1) View one customer
+- (2) View all customers
+- (4) Search PO
+- (8) Find anything (raw viewer)
+
+Option (3) invoice search we can implement too, but weâ€™ll need to validate invoice number format (as discussed).
+
+---
+
+## One more thing: where is the data folder?
+If you can paste the directory contents (or at least confirm the presence of `LOGBOOK.21` / `LOGBOOK.26`), weâ€™re unblocked.
+
+Reply with:
+- â€œYes: FormLogBookMenu + FrmDosPagedViewerâ€
+- and â€œLogbook files are named LOGBOOK.xxâ€ (confirm) + where they are located (folder path or list).
+
+## @testsubject117
+
+hitting (U): 
+
+## Copilot
+
+That `(U)` screen is option **(9) â€œUpdate BFGOODRICH spec list from floppy diskâ€** (your DOS menu shows it as 9, but itâ€™s triggered by the key **U** in your build). Itâ€™s a pure legacy I/O workflow:
+
+- Prompt: **â€œPut in BF GOODRICH floppy disk and hit [Enter]?â€**
+- Then it likely reads a file off `A:\` and updates a local â€œspec listâ€ file used elsewhere (probably for lookups/scans).
+
+### What we should do in the Windows port
+Treat this as **low priority** for â€œquick visible winsâ€ and also not something we should emulate literally (no floppy).
+
+Best modern equivalent:
+1) When user selects it, open a file picker:
+   - â€œSelect BFGOODRICH spec list file to importâ€¦â€
+2) Parse/import into whatever local format the app uses now.
+3) Show success/failure summary.
+
+But we shouldnâ€™t do this until the Log Book read/search workflows are working.
+
+---
+
+## We need to stop exploring DOS and start implementing E
+At this point youâ€™ve mapped enough of E to build it properly:
+- year prompt
+- log book menu
+- options 1/2/3/4 prompts
+- results paging (ENTER=More, ESC=Quit)
+- option 8 raw viewer (F3 find-next)
+- option 7 prints/errors (weâ€™ll implement as report-on-screen)
+- option 9 â€œupdate from floppyâ€ (defer)
+
+### Two confirmations I still need
+Please reply explicitly:
+
+1) **Use `FormLogBookMenu`** (form name) â€” yes/no  
+2) **Create new `FrmDosPagedViewer`** â€” yes/no
+
+### And one data confirmation
+Can you confirm logbook file naming is **`LOGBOOK.<yy>`** (like `LOGBOOK.21`, `LOGBOOK.26`) and that these files exist in your Windows appâ€™s data folder?
+
+If you answer those 3, Iâ€™ll generate the complete code files next.
+
+---
+
+## If you want my recommendation for â€œwhat nextâ€ after E
+Once E is implemented and stable, the next â€œquick winâ€ from your earlier list is:
+
+**(Q) Word Processor**, then **(R) Find Word Processor text**, then **(T) Change Date/Time**.
+
+But E has enough defined behavior that we should implement it now rather than continuing DOS archaeology.
+
+Send the 3 confirmations and Iâ€™ll write the full replacements.
+
+## @testsubject117
+
+ok, couple of things. on those previous menu tests, I did enter 2021 instead of hitting just enter for 2026 a few times. nothing really changed except at the top of the screen it said year 21. everything else still functioned the same. Also, the users have confirmed that on the log book menu, they never use (5). I've also reached out to clarify a few other things such as: if (U) is even still used. I am doubtful since I don't think in today's day and age, the company still has floppies from BF Goodrich, or still being sent floppies from BF GOODRICH.
+
+## Copilot
+
+That all lines up with what the DOS screens are telling us:
+
+- The â€œyear in useâ€ is basically just selecting which `LOGBOOK.<yy>` file (or equivalent) to operate on. If you typed **2021**, DOS displayed **Year 21** and continued normally, which strongly suggests itâ€™s keying off the **last two digits** (and not changing the menu behavior otherwise).
+- **(5)** can be treated as deprecated/unused (we can either omit it in the Windows port, or leave it but show â€œNot supported / not usedâ€).
+- **(U)/(9)** â€œBFGOODRICH floppy importâ€ is almost certainly obsolete. We should not build a floppy workflow; if itâ€™s needed at all, it becomes an â€œImport spec listâ€¦â€ from a file path.
+
+## Recommendation: how we implement this in WinForms
+1) **Year selection behavior**
+   - Accept `Enter` = current year (e.g., 2026).
+   - Accept 2-digit (`21`) or 4-digit (`2021`) input.
+   - Normalize to **two-digit year for display** and to compute the file name:
+     - `2021` â†’ `21`
+     - `21` â†’ `21`
+     - `2026` â†’ `26`
+
+2) **Log book menu**
+   - Implement options users actually use: (1), (2), (3), (4), (6), (7), (8)
+   - For **(5)**: either hide it or leave it visible but disable with a message (â€œNot used / not implementedâ€).
+
+3) **(U)/(9)**
+   - For now: leave it visible but show â€œNot implemented / likely obsoleteâ€ until you confirm.
+   - If later confirmed needed: implement a modern â€œImportâ€¦â€ dialog.
+
+## What I need next to start writing the code
+You still havenâ€™t confirmed the two implementation choices I asked for (I need them to generate the full replacement files in the style you want):
+
+1) Log book menu form name: **`FormLogBookMenu`** (ok?)  
+2) Viewer approach: **new `FrmDosPagedViewer`** (ok?)
+
+And one data check:
+
+3) Can you confirm the logbook files are named like **`LOGBOOK.21`, `LOGBOOK.26`** and exist in your data folder?  
+If you canâ€™t confirm, paste the filenames you see that start with `LOGBOOK`.
+
+If you reply with:
+- â€œYes: FormLogBookMenuâ€
+- â€œYes: FrmDosPagedViewerâ€
+- â€œYes: files are LOGBOOK.xxâ€
+â€¦Iâ€™ll output the full new/updated files next and wire:
+- Main menu `E` â†’ year prompt â†’ open log book menu
+- Log book menu options (1)/(2)/(4) using real scans
+- Option (8) raw viewer with F3 â€œfind nextâ€
+â€¦and leave (5) + (U) as disabled stubs until you confirm theyâ€™re required.
+
+## @testsubject117
+
+ok, I have not read anything you said since beginning to past the log book menu screen captures for each key and function, let me go back and read and get caught up
+
+## Copilot
+
+Take your time. When youâ€™re caught up, the only things I need from you to move from â€œDOS archaeologyâ€ to â€œWindows implementationâ€ are these three confirmations:
+
+1) **Form name:** should the new Log Book menu form be `FormLogBookMenu` (recommended) or `FrmLogBookMenu`?
+2) **Viewer:** should we create a new DOS-style pager `FrmDosPagedViewer` (recommended) or modify your existing `FrmPagedTextViewer`?
+3) **Data file naming/location:** do you have logbook files named like `LOGBOOK.21`, `LOGBOOK.26` in your legacy data folder (same place as `REALNAME.DAT`)? If yes, paste a quick filename list (or just confirm).
+
+Once you answer those, Iâ€™ll generate the full replacement code files (no commit/push) and weâ€™ll have **E â†’ year prompt â†’ LOG BOOK menu** working, with ENTER=More / ESC=Quit behavior matching DOS.
+
+## @testsubject117
+
+in response to your previous question: What is the logbook filename pattern? (examples: LOGBOOK26.DAT, LOGBOOK.2026, LOGBOOK26, LOGBOOK.DAT + year inside file, etc.)
+Where is it located relative to your other data (same folder as REALNAME.DAT?)
+Is it plain text, fixed-width records, or something like CSV?, the files are located in the same folder as realname.dat. the filename format is logbook.1, logbook.2, etc. all the way to logbook.26 from what I can see. I found logbook.14 and opened it with a text editor, here's the contents: "01-02-2014"
+"3VFASTEN"
+"MS9557-38 1/4-28 X 3.250"
+581579
+"135648/00865635"
+"STRIP COPPER"
+" 15707"
+" "
+"A-286"
+""
+""
+""
+"01-02-2014"
+"3VFASTEN"
+"NAS8703A3 10/32 X .511 FLAT"
+581580
+"135686/00865678"
+"104-ASTM-B117-REV09/AMS2700E METHOD 1 TYPE 2/SALT SPRAY 13 13A 0R"
+" 9804"
+" "
+"A-286"
+""
+""
+""
+"01-02-2014"
+"3VFASTEN"
+"3V2063-E6S12LK TORX FLAT"
+581581
+"135685/00865677"
+"CLEANCLEAN /104-ASTM-B117-REV09/AMS2700E METHOD 1 TYPE 2 CLASS 4/SALT SPRAY 13 13A 0R"
+" 6686"
+" "
+"A-286"
+""
+""
+""
+"01-02-2014"
+"BARRYCON"
+"09-9675-01 BRACKET"
+581582
+"Ref:581012"
+"ASTM-E-1444/E1444M-12"
+"1"
+"2"
+"17-4PH STEEL"
+""
+"SHRINK CRACKS/ac"
+"Final"
+"01-02-2014"
+"ACUFASTA"
+"NAS6712U43 REV 9"
+581583
+"25002"
+"104-ASTM-B117-REV09/AMS2700E METHOD 1 TYPE 2 CLASS 1/ASTM-E-1417/E1417M-13 TYPE 1 METHOD B LEVEL 3 NAS4003 REV 11/SALT SPRAY 13 13A 0R"
+"301"
+"0"
+"A-286"
+""
+""
+"Final"
+"01-02-2014"
+"ACUFASTA"
+"KTST1780-13 REV A"
+581584
+"24970"
+"CLEAN/HIGH HUMIDITYCLEAN TK2072/MIL-STD-753C METHOD 101/ASTM-A-967-13/NITRIC 4 TK2069/ASTM-E-1444/E1444M-12  TK2069/High Humidity 13 13A 0R"
+"2501"
+"0"
+"CUSTOM455"
+""
+""
+"Final"
+"01-02-2014"
+"PAMCO"
+"US1112W1010 REV D ELBOW 90O"
+581585
+"0042773"
+"ASTM-E-1417/E1417M-13 AS18280 REV E PARA 4.6.3 MIL-STD-1907 N3 GR-C"
+"30"
+"0"
+"7075-T73"
+""
+""
+"Final"
+"01-02-2014"
+"BARRYCON"
+"96037-07BR LINK"
+581586
+"113623S"
+"104-ASTM-B117-REV09/AMS-QQ-P-35 REV N/C/ASTM-E-1444/E1444M-12/SALT SPRAY 13 13A 0R"
+"50"
+"0"
+"15-5PH"
+""
+""
+"Final"
+"01-02-2014"
+"MACLEANS"
+"NAS625H52 WO# W010932/1"
+581587
+"P036386"
+"ASTM-E-1444/E1444M-12  NAS4002-10"
+"300"
+"2"
+"4340"
+"HT# 10192540"
+"HEAD FORMING INDICATIONS"
+"Final"
+"01-02-2014"
+"THEBYRAN"
+"Y-42276-1-1 SHAFT"
+581588
+"V19217"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/ASTM A967-13 NITRIC 3/Copper Sulfate 13 13A 0R"
+" 270"
+" "
+"304 S/ST"
+""
+""
+""
+"01-02-2014"
+"BARRYCON"
+"MISC DECEMBER INVOICES"
+581589
+"113623S"
+"PROCESSESMAG/PENE/ELECTRO/PASS/SALT/MASK"
+" 1"
+" "
+"VARIOUS"
+""
+""
+""
+"01-02-2014"
+"3VFASTEN"
+"NAS626-16 3/8-24 X 1.619"
+581590
+"135380/00864372"
+"CAD FLUOBORATE/23HRS POSTBAKE/SURCHARGE 10%/NAS672 REV 8"
+" 2504"
+" "
+"8740"
+"RC# 41 42 43"
+""
+""
+"01-02-2014"
+"EXCELMAN"
+"202097-9 REV AY RETURN"
+581591
+"Ref:579546"
+"ASTM-E-1444/E1444M-12 MNF5202 REV P CLASS B"
+"96"
+"0"
+"4140"
+""
+""
+"Final"
+"01-02-2014"
+"EXCELMAN"
+"202097-9 REV AY RETURN"
+581591
+"Ref:579546"
+"CAD PLATE/4HRS PREBAKE/23HRS POSTBAKE/ASTM-E-1444/E1444M-12 BMF5202 REV P CLASS B/AMS-QQ-P-416C/.3120-.3115 DIA/.0002-.0003 THK"
+"96"
+"0"
+"4140"
+""
+"/ac"
+"Final"
+"01-02-2014"
+"AMEPRECT"
+"SP-1806-2 REV AB"
+581592
+"213334"
+"CAD PLATE/SURCHARGE 10%/QQ-P-416F"
+" 283"
+" "
+"LEDLOY"
+"HT# AR395423"
+""
+""
+"01-02-2014"
+"ROBERTST"
+"10-9125-01 REV B BUSHING"
+581593
+"188437"
+"104-ASTM-B117-REV09/AMS2700E/ASTM-E-1417/E1417M-13 TYPE 1 SENS LEVEL 3/SALT SPRAY 13 13A 0R"
+"420"
+"0"
+"13-8"
+""
+""
+"Final"
+"01-02-2014"
+"SATURNFA"
+"20-114-5-20"
+581594
+"N25311"
+"ASTM-E-1444/E1444M-12  4PCS STRESS COUPONS ONLY"
+"4"
+"0"
+"8740"
+"HT# 407290"
+""
+"Final"
+"01-02-2014"
+"SATURNFA"
+"MS21250-03004"
+581595
+"N25312"
+"ASTM-E-1444/E1444M-12  5PCS STRESS COUPONS ONLY"
+"5"
+"0"
+"8740"
+"HT# 10136930"
+""
+"Final"
+"01-02-2014"
+"3VFASTEN"
+"NAS9703-16 HEX HEAD EXT"
+581596
+"135536/00864987"
+"CAD PLATE/23HRS POSTBAKE/SURCHARGE 10%/AMS-QQ-P-416C"
+" 5593"
+" "
+"8740"
+"RC# 38 39"
+""
+""
+"01-02-2014"
+"FABERENT"
+"NAS1763J050606.B TEE"
+581597
+"292620"
+"AMS2700E METHOD 1 TYPE 6 / NO TEST"
+" 65"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"ACUFASTA"
+"AS3580-6-31 REV NC"
+581598
+"25006"
+"104-ASTM-B117-REV09/AMS2700E/AMS-QQ-P-35 REV N/C/ASTM-E-1417/E1417M-13 TYPE 1 METHOD A SENS LEVEL 2 FORM A AS4877C/SALT SPRAY 13 13A 0R"
+"315"
+"0"
+"INCO-718"
+""
+""
+"Final"
+"01-02-2014"
+"ACUFASTA"
+"NAS1158E22 REV 15"
+581599
+"25012"
+"104-ASTM-B117-REV09/AMS2700E METHOD 1 TYPE 2 CLASS 4/ASTM-E-1417/E1417M-13 TYPE 1 METHOD B LEVEL 3 NAS4003 REV 11/SALT SPRAY 13 13A 0R"
+"396"
+"0"
+"A-286"
+""
+""
+"Final"
+"01-02-2014"
+"ROBERTST"
+"CY-4-49 BARREL SWIVEL MT"
+581600
+"188453"
+"COPPER SULPHATE/MIL-STD-753C METHOD 102/AMS-QQ-P-35 REV N/C/Copper Sulfate 13 13A 0R"
+" 17"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"PERMASWA"
+"NAS1763D200816 TEE BODY"
+581601
+"34552"
+"ASTM-E-1417/E1417M-13  AS18280E"
+"42"
+"0"
+"2014-T6"
+""
+""
+"Final"
+"01-02-2014"
+"PSIBEARI"
+"P2A4800-3 REV E"
+581602
+"361115/PA52749"
+"ENV/P3TF48 S2 CLASS A  P3TF44 S3 CLASS A"
+"1"
+"0"
+"MARAGE 250 STEEL"
+""
+""
+"Final"
+"01-02-2014"
+"3VFASTEN"
+"NAS1581K3R5 10/32 X .675"
+581603
+"135629/00865589"
+"CLEAN/GLASSBEADCLEAN ASTM B 600-11"
+" 25606"
+" "
+"6AL-4V"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21913-4J REV D PLUG"
+581604
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R"
+" 18"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21913-5J REV D PLUG"
+581604
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R"
+" 18"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21913-6J REV D PLUG"
+581604
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R"
+" 18"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21913-16J REV D PLUG"
+581604
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R"
+" 18"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21914-4J.INSERT REV C"
+581605
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R"
+" 24"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21914-5J.INSERT REV C"
+581605
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R"
+" 24"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21914-6J.INSERT REV C"
+581605
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R"
+" 24"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XMS21914-16J.INSERT REV C"
+581605
+"100147"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R/Copper Sulfate 13 13A 0R"
+" 24"
+" "
+"304"
+""
+""
+""
+"01-02-2014"
+"SPENCERA"
+"XSA2002J04 REV NC UNION"
+581606
+"100144"
+"COPPER SULFATE/MIL-STD-753C METHOD 102/AMS2700E METHOD 1 TYPE 6/Copper Sulfate 13 13A 0R"
+" 36"
+" "
+"304"
+""

@@ -1,0 +1,2000 @@
+﻿
+That combination is the most likely to stop repeat quarantines during development. This is an inference based on Bitdefenderâ€™s separate docs for antivirus exceptions and ATD exceptions. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/13427/?utm_source=openai))
+
+## One more thing
+Since this appears to be a **false positive**, Bitdefender recommends submitting the file to their labs for analysis so the detection can be corrected in future updates. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+If you want, I can give you a **very short exact click-by-click checklist** for Bitdefender Total Security on Windows so you can do it in 2 minutes.
+
+## @testsubject117
+
+actually, I keep getting a pop up that every time I restore from quarantine, it removes it again. It's removing it from c:\users\capnkirk\appdata\microsoft\visualstudio\18.0_2da9a820\WinformsDesigner\dblqxmiv.fwy\UserAppData\AMiOffice.dll
+
+## Copilot
+
+Whatâ€™s happening is: Visual Studioâ€™s **WinForms Designer** is copying your app assembly into its own designer shadow-cache under `...VisualStudio\18.0_...\WinformsDesigner\...\UserAppData\AMiOffice.dll`, and **Bitdefender is quarantining that designer copy immediately after restore**. That matches the behavior Bitdefender users report when a restored file is re-detected â€œin the very next moment,â€ and Bitdefenderâ€™s own docs say you need **exceptions for restored files** plus, when behavior protection is involved, a separate **Advanced Threat Defense** exception for the process/app. ([community.bitdefender.com](https://community.bitdefender.com/en/discussion/43906/restored-quarantined-items-gets-re-detected-at-once?utm_source=openai))
+
+## Direct answer
+You need to exclude **both**:
+1. your project/build folders, and  
+2. the **Visual Studio WinForms Designer cache path** that is actually being quarantined.  
+
+And if it still fires, add an **Advanced Threat Defense** exception for the relevant executable/process because ATD exceptions are separate from file/folder exclusions. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+## What to do right now
+
+### 1) Turn on automatic whitelisting for restored files
+In Bitdefender:
+- **Protection**
+- **Antivirus**
+- **Open**
+- **Settings**
+- **Manage quarantine**
+- **View Settings**
+- enable **Create exception for the restored files**
+
+Bitdefender says this causes restored files to be automatically whitelisted from future scans. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+### 2) Add Antivirus folder exceptions for all relevant paths
+Add these as **Antivirus** exceptions:
+
+```text
+C:\Users\CapnKirk\source\repos\AmiWinForms\
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin\
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\
+```
+
+The critical new one is the **Visual Studio AppData / WinFormsDesigner** tree, because that is the location Bitdefender is actively re-quarantining from. This is an inference from the path you provided. Bitdefenderâ€™s consumer docs confirm folder-based antivirus exclusions are supported. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+If you want to scope it narrower, you can try just:
+
+```text
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\18.0_2da9a820\WinFormsDesigner\
+```
+
+But broader `VisualStudio\` is often easier for dev machines.
+
+### 3) Add an Advanced Threat Defense exception
+Bitdefender documents that **Advanced Threat Defense** exceptions are added separately and apply to an application/process. If the file keeps getting removed even after AV exclusions, this is the next thing to add. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/130706/?utm_source=openai))
+
+Add an ATD exception for:
+```text
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin\Debug\net10.0-windows\AMiOffice.exe
+```
+
+If Visual Studio/designer behavior itself is what triggers it, you may also need to exempt the relevant Visual Studio process from ATD, but start with your built EXE first. Bitdefenderâ€™s ATD docs describe this path as process/app-based rather than folder-based. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/130706/?utm_source=openai))
+
+## Then clean up and rebuild
+After exclusions are added:
+1. close Visual Studio
+2. end any `devenv.exe`, `AMiOffice.exe`, and stuck `dotnet.exe` if needed
+3. delete:
+   - `AMiOffice\bin`
+   - `AMiOffice\obj`
+4. reopen Visual Studio
+5. build again
+
+If the quarantined copy in the designer cache wonâ€™t restore, thatâ€™s okay â€” Visual Studio will recreate it on the next successful design/build once exclusions stop Bitdefender from grabbing it again.
+
+## Why it suddenly â€œwonâ€™t allow accessâ€
+Because Bitdefender is actively intercepting/quarantining the DLL after it is created/restored, so Windows/Visual Studio then see missing or locked outputs. This matches reports of restored files being instantly re-detected and Bitdefenderâ€™s own guidance that restored-file whitelisting and separate protection exceptions may be needed. ([community.bitdefender.com](https://community.bitdefender.com/en/discussion/43906/restored-quarantined-items-gets-re-detected-at-once?utm_source=openai))
+
+## If restore still loops
+At that point, itâ€™s likely a false positive that needs vendor review. Bitdefender recommends submitting suspected false positives to their labs. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+## Small correction
+The path you wrote used:
+```text
+c:\users\capnkirk\appdata\microsoft\visualstudio\...
+```
+but the standard Windows location is typically:
+```text
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\...
+```
+So make sure you exclude the **actual existing path on disk**.
+
+## Fastest practical setup for a dev machine
+Add these 5 exclusions:
+- repo root
+- project `bin`
+- project `obj`
+- Visual Studio WinFormsDesigner cache path
+- ATD exception for `AMiOffice.exe`
+
+If you want, I can turn this into a **1-minute exact click-by-click Bitdefender checklist** with the precise menu names in order.
+
+## @testsubject117
+
+I'm not able to delete \bin it says access denied
+
+## Copilot
+
+That usually means **a process still has a file open in `bin`** â€” most likely:
+- `AMiOffice.exe`
+- `devenv.exe` (Visual Studio / WinForms Designer)
+- `dotnet.exe`
+
+## Do this in order
+
+### 1. Close Visual Studio completely
+Not just the solution â€” fully close **Visual Studio**.
+
+### 2. Open Task Manager
+End these if they exist:
+- `AMiOffice.exe`
+- `devenv.exe`
+- `dotnet.exe`
+
+If you see multiple `dotnet.exe` processes, end the ones that appeared while you were building/testing.
+
+### 3. Try deleting `bin` again
+If it still says access denied, then the WinForms Designer cache or Bitdefender may still be touching the file.
+
+---
+
+## If that still fails, restart Windows
+This is often the fastest way to clear:
+- stuck file handles
+- Visual Studio designer locks
+- antivirus hooks
+
+After restart:
+
+1. **do not open Visual Studio yet**
+2. first fix Bitdefender exclusions
+3. then delete:
+   - `bin`
+   - `obj`
+4. then reopen Visual Studio
+
+---
+
+## Best immediate next step for Bitdefender
+Because Bitdefender is likely the thing re-touching the DLL, after restart do this first:
+
+Add exclusions for:
+```text
+C:\Users\CapnKirk\source\repos\AmiWinForms\
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin\
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\
+```
+
+Then try deleting the folders again.
+
+---
+
+## If Windows still refuses
+Open **Command Prompt as Administrator** and run:
+
+```cmd
+rmdir /s /q "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin"
+rmdir /s /q "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj"
+```
+
+If that still fails, then a live process still has a lock.
+
+---
+
+## Best tool if you want to identify the lock
+Use **Process Explorer** from Microsoft Sysinternals:
+- run as admin
+- Find Handle or DLL
+- search for:
+  ```text
+  AMiOffice.dll
+  ```
+  or
+  ```text
+  \AmiWinForms\AMiOffice\bin
+  ```
+
+That will tell you exactly which process is holding it.
+
+---
+
+## Short answer
+The folder is locked by a running process.  
+Fastest path:
+
+1. close Visual Studio  
+2. kill `AMiOffice.exe`, `devenv.exe`, `dotnet.exe`  
+3. reboot if needed  
+4. add Bitdefender exclusions before reopening VS  
+5. delete `bin` and `obj`
+
+If you want, I can give you the **exact Process Explorer steps** to identify the lock in under 2 minutes.
+
+## @testsubject117
+
+none of those files are running I have process explorer open. what about checking the appdata path?
+
+## Copilot
+
+Yes â€” **check the AppData Visual Studio path**, because that is now the most likely location involved. Visual Studioâ€™s WinForms Designer commonly loads your assembly from a designer-specific cache under `AppData\Local\Microsoft\VisualStudio\...`, and the path you mentioned matches that pattern. Process Explorer is the right tool for identifying whether that cache path or a specific DLL inside it is still locked. Microsoft documents using Process Explorer specifically to track handle/DLL issues. ([learn.microsoft.com](https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer?linkId=111906253&utm_source=openai))
+
+## Direct answer
+Use Process Explorer to search for these exact strings:
+
+```text
+AMiOffice.dll
+```
+
+and then, if needed:
+
+```text
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\
+```
+
+and also:
+
+```text
+WinFormsDesigner
+```
+
+If a handle shows up there, thatâ€™s your lock.
+
+## Important correction
+The likely path is:
+
+```text
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\18.0_2da9a820\WinFormsDesigner\...
+```
+
+not just `AppData\Microsoft\VisualStudio`. If you exclude or inspect the wrong path, it wonâ€™t help. Thatâ€™s an inference based on the standard VS path structure and the location you reported. ([learn.microsoft.com](https://learn.microsoft.com/en-us/sysinternals/downloads/process-explorer?linkId=111906253&utm_source=openai))
+
+## What to do in Process Explorer
+1. In Process Explorer, press **Ctrl+F**
+2. Search for:
+   ```text
+   AMiOffice.dll
+   ```
+3. If no result, search for:
+   ```text
+   WinFormsDesigner
+   ```
+4. If still no result, search for:
+   ```text
+   \AmiWinForms\AMiOffice\bin
+   ```
+
+If it finds a handle:
+- note the process name
+- double-click it
+- either close the handle carefully or kill the process if itâ€™s safe
+
+## If no process is locking it
+Then the â€œaccess deniedâ€ may be from:
+- permissions/ownership
+- Bitdefender continuing to intercept the file
+- a stale protected folder state after quarantine activity
+
+Given your Bitdefender behavior, that remains very plausible. Bitdefenderâ€™s docs and community reports show restored files can be immediately re-detected unless exceptions are in place, and restoring to some locations may require admin rights. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+## Also check this exact folder
+In File Explorer, manually inspect whether this exists:
+
+```text
+C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\18.0_2da9a820\WinFormsDesigner\
+```
+
+If it does, you can try deleting only the relevant temporary subfolder under it **after Visual Studio is closed**. Since the Designer cache is temporary, removing the affected cache folder can force Visual Studio to regenerate it on next open. This is an inference from the Designer cache behavior you described.
+
+## Bitdefender side
+If Bitdefender keeps re-quarantining from that AppData designer location, add an antivirus exception for the relevant Visual Studio AppData path. Bitdefender documents antivirus folder exceptions and also says restored files should be auto-whitelisted if **Create exception for restored files** is enabled. ([bitdefender.com](https://www.bitdefender.com/consumer/support/answer/2092/?utm_source=openai))
+
+## My recommended next 3 checks
+1. **Process Explorer search for `AMiOffice.dll`**
+2. **Inspect/delete the affected `WinFormsDesigner` cache folder**
+3. **Add Bitdefender exclusion for the Visual Studio AppData path**
+
+## Short answer
+Yes â€” checking the **AppData Visual Studio WinFormsDesigner path** is the right next move.
+
+If you want, I can give you the **exact safe folder(s) under `WinFormsDesigner` to delete** once you tell me what you see there.
+
+## @testsubject117
+
+nothing, but I still can't delete. guess I'll have to reboot
+
+## Copilot
+
+Yes â€” **reboot now**. Thatâ€™s the right move.
+
+## Best next sequence after reboot
+Do this in exactly this order:
+
+1. **Reboot**
+2. **Do not open Visual Studio yet**
+3. Open **Bitdefender**
+4. Add exclusions for:
+   ```text
+   C:\Users\CapnKirk\source\repos\AmiWinForms\
+   C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin\
+   C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\
+   C:\Users\CapnKirk\AppData\Local\Microsoft\VisualStudio\
+   ```
+5. Also turn on:
+   - **Create exception for restored files**
+6. Then delete:
+   - `bin`
+   - `obj`
+7. Then open Visual Studio
+8. Rebuild
+
+## Why this order matters
+If you open Visual Studio first:
+- WinForms Designer may recreate the cached DLL
+- Bitdefender may immediately grab it again
+- you end up back in the same loop
+
+## If `bin` still wonâ€™t delete after reboot
+That would point more toward:
+- Bitdefender still intercepting it
+- permissions issue on the folder itself
+
+Then the next step would be:
+- delete with **admin command prompt**
+- or reset folder ownership/permissions
+
+But reboot first, because that will usually clear the lock.
+
+## Short answer
+Yes â€” reboot, then fix Bitdefender **before** reopening Visual Studio.
+
+When youâ€™re back, if you want, send me:
+- whether `bin` deleted successfully
+- whether the build works
+- whether button `3` opens `FormMiscMenu`
+
+and Iâ€™ll help you from there.
+
+## @testsubject117
+
+I already added the bitdefender exclusions
+
+## Copilot
+
+Good â€” then **reboot is still the right next step**.
+
+## Why
+Even with the exclusions already added:
+- Bitdefender may still have a stale handle
+- Visual Studio designer may still have a stale handle
+- Windows may still be holding the locked file/folder state
+
+A reboot clears all of that.
+
+## After reboot
+Since the exclusions are already in place, do this:
+
+1. reboot
+2. **before opening Visual Studio**, try deleting:
+   - `AMiOffice\bin`
+   - `AMiOffice\obj`
+3. if they delete successfully:
+   - open Visual Studio
+   - rebuild
+4. if they still do **not** delete:
+   - then weâ€™re dealing with permissions rather than a live lock
+
+## If it becomes a permissions issue
+Then the next thing to try is an **elevated Command Prompt**:
+
+```cmd
+rmdir /s /q "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin"
+rmdir /s /q "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj"
+```
+
+If Windows says access denied even after reboot, then run:
+
+```cmd
+takeown /f "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin" /r /d y
+icacls "C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\bin" /grant %username%:F /t
+```
+
+and then try deleting again.
+
+## Short answer
+Since exclusions are already added:
+- **reboot**
+- try deleting `bin` and `obj` before opening VS
+- if still blocked, itâ€™s likely permissions, not a running process
+
+When you come back, tell me which of these happened:
+1. `bin` deleted
+2. `bin` still access denied
+3. rebuild worked
+4. Bitdefender quarantined again
+
+and Iâ€™ll give you the next exact step.
+
+## @testsubject117
+
+ok, rebooted, deleted folder and am in vb with app running, what were we doing?
+
+## Copilot
+
+We were wiring up **main menu option `3`** so it opens a new **Miscellaneous Menu** form instead of showing â€œNot Yet Implemented.â€
+
+## Where we left off
+You had:
+- rebooted
+- cleared the locked/quarantined build output
+- reopened Visual Studio
+- app is running again
+
+So now we want to finish and test:
+
+### Goal
+From the main menu:
+- pressing **`3`**
+- or clicking **Miscellaneous Menu**
+
+should open `FormMiscMenu`.
+
+---
+
+## The 3 pieces involved
+
+### 1. `FormMiscMenu.vb`
+This is the **form code-behind** file.
+
+It should contain:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A", Sub() NotYet("Placeholder Item A"))
+        AddMenuButton(flpLeft, "B", "Placeholder Item B", Sub() NotYet("Placeholder Item B"))
+        AddMenuButton(flpLeft, "C", "Placeholder Item C", Sub() NotYet("Placeholder Item C"))
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D", Sub() NotYet("Placeholder Item D"))
+        AddMenuButton(flpRight, "E", "Placeholder Item E", Sub() NotYet("Placeholder Item E"))
+        AddMenuButton(flpRight, "F", "Placeholder Item F", Sub() NotYet("Placeholder Item F"))
+    End Sub
+End Class
+```
+
+---
+
+### 2. `FormMiscMenu.Designer.vb`
+This is the **designer** file.
+
+Most important thing:
+it should inherit:
+
+```vbnet
+Inherits DosMenuFormBase
+```
+
+not plain `Form`.
+
+A valid minimal version is:
+
+```vbnet
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        components = New System.ComponentModel.Container()
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.ClientSize = New System.Drawing.Size(800, 450)
+        Me.Text = "FormMiscMenu"
+    End Sub
+End Class
+```
+
+---
+
+### 3. `FormMainMenu.vb`
+We changed main menu option `3`.
+
+#### It should now have this in `HandleMenuKey`:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+instead of:
+
+```vbnet
+Case "3" : NotYet("Miscellaneous Menu")
+```
+
+---
+
+## What to test right now
+In the running app:
+
+### Test 1
+Press keyboard **`3`**
+
+### Test 2
+Click **Miscellaneous Menu**
+
+### Expected result
+A DOS-style submenu opens titled:
+
+```text
+MISCELLANEOUS
+```
+
+with placeholder buttons:
+- A
+- B
+- C
+- D
+- E
+- F
+
+and ESC should close it.
+
+---
+
+## If it is not working
+Tell me which one is true:
+
+1. **button 3 still says Not Yet**
+2. **compile failed**
+3. **submenu opens**
+4. **submenu opens but layout is wrong**
+5. **FormMiscMenu doesnâ€™t exist / designer issue**
+
+## Short answer
+We were finishing **step #1 of the top-5 plan**:
+
+> wire main menu button `3` to a new `FormMiscMenu` DOS-style submenu.
+
+So right now, just test whether `3` opens the submenu.
+
+## @testsubject117
+
+I just found out by testing the dos app that the miscellaneous menu doesn't appear to really work or errors out. I'm confirming with the users if they even use it. I'll determine how we handle it after I hear back from them, let's hold on (3) miscellaneous menu and move to the next one                                                                                                                                                                                                                                       
+
+## Copilot
+
+Sounds good â€” **skip `3` for now** and move to **H â€” Quick Message Flashing**.
+
+## Why this is the right next one
+If the original DOS Miscellaneous Menu is broken or unused, itâ€™s not worth porting yet.
+
+So the next best fast win is:
+
+**H â€” Quick Message Flashing**
+
+because it can be implemented as a small self-contained WinForms feature with:
+- simple input
+- simple display
+- no complex accounting/data rules
+
+## Recommended scope for first version
+Letâ€™s keep version 1 very small:
+
+### Main behavior
+From main menu `H`:
+- open a form
+- user enters a message
+- click **Show**
+- a second fullscreen or large black form appears
+- message displays in big text
+- optional flashing / timer
+- ESC closes it
+
+## Simplest possible v1
+We can do this in two forms:
+
+1. `FormQuickMessage.vb`
+   - message entry
+   - buttons like Show / Close
+
+2. `FormQuickMessageDisplay.vb`
+   - large black screen
+   - bright text
+   - optional blink timer
+   - ESC closes
+
+## Even simpler option
+If you want maximum speed, we can do it with **one form only**:
+- big text box
+- preview area
+- show message on same form
+
+But the **two-form version** feels more like the original idea.
+
+## Recommendation
+I recommend the **two-form version**.
+
+## Next files weâ€™d create
+- `FormQuickMessage.vb`
+- `FormQuickMessage.Designer.vb`
+- `FormQuickMessageDisplay.vb`
+- `FormQuickMessageDisplay.Designer.vb`
+
+and then change main menu `H` from:
+
+```vb
+Case "H" : NotYet("Quick Message Flashing")
+```
+
+to:
+
+```vb
+Case "H"
+    Using f As New FormQuickMessage()
+        f.ShowDialog(Me)
+    End Using
+```
+
+## Short answer
+Yes â€” letâ€™s pause `(3) Miscellaneous Menu` and move to **H â€” Quick Message Flashing** next.
+
+If you want, Iâ€™ll give you the **fastest ready-to-paste version** of:
+1. `FormQuickMessage.vb`
+2. `FormQuickMessageDisplay.vb`
+3. the `FormMainMenu.vb` change for `H`
+
+## @testsubject117
+
+I'm reviewing this also with the users. In DOS when I hit (H) the next thing I get is enter password. I don't know the password. I've asked the users for it.
+
+## Copilot
+
+Perfect â€” then **hold H too**.
+
+## Direct recommendation
+Do **not** implement Quick Message Flashing yet if the DOS flow immediately requires a password and you donâ€™t know:
+
+- the password
+- whether users still use it
+- what happens after login
+- whether there are multiple screens behind it
+
+That means the feature is not yet well-defined.
+
+## Best move now
+Skip **H** for the moment and move to the next candidate that does **not** depend on:
+- unknown credentials
+- hidden DOS-only behavior
+- user memory
+
+## Updated recommendation
+Since both:
+- `3` Miscellaneous Menu
+- `H` Quick Message Flashing
+
+are now blocked by real-world uncertainty,
+
+the next best target is probably:
+
+## **N â€” Rolodex**
+Why:
+- likely straightforward
+- likely user-visible
+- likely data-driven
+- less likely to depend on secret passwords or broken DOS submenu behavior
+
+### After that:
+- **F â€” Price List Program**
+- then **A â€” Shop Card Generator**
+
+## Short answer
+Yes â€” pause `H` until the users tell you:
+- the password
+- whether they still use it
+- what the feature is supposed to do
+
+## Best next feature now
+Move on to:
+
+**N â€” Rolodex**
+
+If you want, I can help you first inspect the repo to see whether any Rolodex data files, readers, or partial forms already exist.
+
+## @testsubject117
+
+ok, they responded to the first question, they don't use (3) Miscellaneous Menu, so lets change our strategy on that one. let's change the actual menu it does to to say Misc. Menu (placeholder for future menu) and for each of it's buttons let's have it say Not Yet Implemented. Also, for (H) Quick Message Flashing. They don't use that one either. I would like to still figure out what the DOS menu item does, so we'll also skip that one for now. lets move to the next one.
+
+## Copilot
+
+Good plan.
+
+## Updated strategy
+- **(3) Miscellaneous Menu**: keep it, but clearly mark it as a placeholder
+- **(H) Quick Message Flashing**: skip for now
+- move on to the **next real target**
+
+## For `(3)`
+Yes â€” we should keep the submenu shell, but rename the main menu item to:
+
+**`Misc. Menu (placeholder for future menu)`**
+
+and inside that submenu, every button can say some variation of:
+- `Placeholder A - Not Yet Implemented`
+- `Placeholder B - Not Yet Implemented`
+
+or just open `NotYet(...)`.
+
+That way:
+- users wonâ€™t expect real behavior
+- the slot stays reserved
+- future work still has a home
+
+## So the next item to work on
+Since:
+- `3` is now just placeholder infrastructure
+- `H` is skipped
+- `A` is probably bigger
+- `N` is likely a good data-driven candidate
+
+the next one to do is:
+
+## **N â€” Rolodex**
+
+That is now the best next target.
+
+## Why
+Itâ€™s likely:
+- more useful than the placeholder menu
+- more concrete than Quick Message Flashing
+- smaller and safer than Invoice Generator or Shop Card Generator
+
+## Immediate small cleanup to make later
+At some point, we should update main menu text from:
+
+```vb
+AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+```
+
+to:
+
+```vb
+AddMenuButton(flpRight, "3", "Misc. Menu (placeholder for future menu)")
+```
+
+and keep its submenu clearly placeholder.
+
+But that can be done alongside other changes.
+
+## Short answer
+Agreed:
+- `(3)` becomes an explicit placeholder menu
+- `(H)` stays skipped for now
+- next feature to implement is **`N â€” Rolodex`**
+
+If you want, I can now help you investigate whether the repo already contains:
+1. rolodex data files,
+2. a reader/service,
+3. any partial form or legacy path references.
+
+## @testsubject117
+
+No, I want the (3) Miscellaneous Menu to still be displayed and actually work when they click on it. I want it to say Placeholder once the new screen opens
+
+## Copilot
+
+Got it â€” keep **(3) Miscellaneous Menu** on the main menu exactly as a normal working item, but when it opens, the **new submenu screen itself** should clearly say itâ€™s a **placeholder** and every item there should be **Not Yet Implemented**.
+
+## Recommended behavior
+### Main menu
+Leave this text as:
+
+```vb
+Miscellaneous Menu
+```
+
+### Opened submenu
+Make the submenu title something like:
+
+```text
+MISCELLANEOUS MENU - PLACEHOLDER
+```
+
+or:
+
+```text
+MISCELLANEOUS MENU
+```
+
+with placeholder wording in the button labels.
+
+## Best practical version
+Iâ€™d suggest:
+
+### Title
+```text
+MISCELLANEOUS MENU - PLACEHOLDER
+```
+
+### Buttons
+- A â€” Placeholder Item A - Not Yet Implemented
+- B â€” Placeholder Item B - Not Yet Implemented
+- C â€” Placeholder Item C - Not Yet Implemented
+- D â€” Placeholder Item D - Not Yet Implemented
+- E â€” Placeholder Item E - Not Yet Implemented
+- F â€” Placeholder Item F - Not Yet Implemented
+
+and clicking any one just shows:
+```vb
+NotYet("Placeholder Item A")
+```
+
+## Main menu behavior
+So:
+- `(3)` still works
+- it opens a real form
+- users can see it is intentionally just a placeholder
+- no one thinks it is broken
+
+## Minimal change
+### In `FormMiscMenu.vb`
+Use:
+
+```vbnet
+SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+```
+
+and button text like:
+
+```vbnet
+AddMenuButton(flpLeft, "A", "Placeholder Item A - Not Yet Implemented", Sub() NotYet("Placeholder Item A"))
+```
+
+## Short answer
+Yes â€” thatâ€™s the better approach.
+
+- keep `(3)` visible and working
+- when opened, it clearly says **placeholder**
+- every submenu button says **Not Yet Implemented**
+
+If you want, I can give you the **final cleaned-up `FormMiscMenu.vb`** exactly in that format.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” hereâ€™s the cleaned-up `FormMiscMenu.vb` so `(3)` opens a real submenu and that submenu clearly shows it is a placeholder.
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A - Not Yet Implemented", Sub() NotYet("Placeholder Item A"))
+        AddMenuButton(flpLeft, "B", "Placeholder Item B - Not Yet Implemented", Sub() NotYet("Placeholder Item B"))
+        AddMenuButton(flpLeft, "C", "Placeholder Item C - Not Yet Implemented", Sub() NotYet("Placeholder Item C"))
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D - Not Yet Implemented", Sub() NotYet("Placeholder Item D"))
+        AddMenuButton(flpRight, "E", "Placeholder Item E - Not Yet Implemented", Sub() NotYet("Placeholder Item E"))
+        AddMenuButton(flpRight, "F", "Placeholder Item F - Not Yet Implemented", Sub() NotYet("Placeholder Item F"))
+    End Sub
+End Class
+```
+
+## Reminder
+For this to work:
+
+### `FormMainMenu.vb`
+must still have:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+## Optional tweak
+If you want the placeholder wording to be a little cleaner, you could shorten the buttons to:
+
+```vbnet
+AddMenuButton(flpLeft, "A", "Placeholder A", Sub() NotYet("Placeholder A"))
+```
+
+and let the title carry the â€œplaceholderâ€ meaning.
+
+But your current wording is clearer for users.
+
+## Next
+Once you confirm `(3)` now opens properly, we can move on to the next real feature candidate.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter+HeapOrReferenceIndex`1[[System.Reflection.Metadata.BlobHandle, System.Reflection.Metadata, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].AddItem(System.Reflection.Metadata.BlobHandle, Int32)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter+HeapOrReferenceIndexBase`1[[System.Reflection.Metadata.BlobHandle, System.Reflection.Metadata, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].Add(System.Reflection.Metadata.BlobHandle)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter+HeapOrReferenceIndexBase`1[[System.Reflection.Metadata.BlobHandle, System.Reflection.Metadata, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].GetOrAdd(System.Reflection.Metadata.BlobHandle)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.FullMetadataWriter.GetOrAddStandaloneSignatureHandle(System.Reflection.Metadata.BlobHandle)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.SerializeLocalVariablesSignature(Microsoft.Cci.IMethodBody)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.SerializeMethodBodies(System.Reflection.Metadata.BlobBuilder, Microsoft.Cci.PdbWriter, System.Reflection.Metadata.Blob ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.MetadataWriter.BuildMetadataAndIL(Microsoft.Cci.PdbWriter, System.Reflection.Metadata.BlobBuilder, Microsoft.Cci.PooledBlobBuilder ByRef, Microsoft.Cci.PooledBlobBuilder ByRef, System.Reflection.Metadata.Blob ByRef, System.Reflection.Metadata.Blob ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.Cci.PeWriter.WritePeToStream(Microsoft.CodeAnalysis.Emit.EmitContext, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializePeToStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.CommonMessageProvider, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, System.Func`1<System.IO.Stream>, Microsoft.Cci.PdbWriter, System.String, Microsoft.CodeAnalysis.RebuildData, Boolean, Boolean, Boolean, Boolean, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.Compilation.SerializeToPeStream(Microsoft.CodeAnalysis.Emit.CommonPEModuleBuilder, EmitStreamProvider, EmitStreamProvider, EmitStreamProvider, Microsoft.CodeAnalysis.RebuildData, System.Func`2<Microsoft.DiaSymReader.ISymWriterMetadataProvider,Microsoft.DiaSymReader.SymUnmanagedWriter>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.Emit.EmitOptions, System.Nullable`1<System.Security.Cryptography.RSAParameters>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.CompileAndEmit(Microsoft.CodeAnalysis.TouchedFileLogger, Microsoft.CodeAnalysis.Compilation ByRef, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.ISourceGenerator>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AdditionalText>, Microsoft.CodeAnalysis.AnalyzerConfigSet, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AnalyzerConfigOptionsResult>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.EmbeddedText>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken, System.Threading.CancellationTokenSource ByRef, Microsoft.CodeAnalysis.Diagnostics.AnalyzerDriver ByRef, System.Nullable`1<Microsoft.CodeAnalysis.GeneratorDriverTimingInfo> ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.RunCore(System.IO.TextWriter, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.Run(System.IO.TextWriter, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.ConsoleUtil.RunWithUtf8Output[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`2<System.IO.TextWriter,Int32>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This looks like a **VB compiler crash**, not a normal code error. Most likely one of the recent edits introduced something Roslyn/VB on **.NET 10 SDK 10.0.300** is choking on.
+
+## Fastest way to isolate it
+**Undo the new `FormMiscMenu` changes temporarily** and rebuild.
+
+### Do this first
+1. Remove or exclude `FormMiscMenu.vb` from the project for a moment
+2. Change main menu option `3` back to:
+
+```vbnet
+Case "3" : NotYet("Miscellaneous Menu")
+```
+
+3. Build again
+
+## Why
+If the build succeeds after that, then the crash is tied to:
+- `FormMiscMenu.vb`
+- `FormMiscMenu.Designer.vb`
+- or some interaction with `DosMenuFormBase`
+
+If it still crashes, then the problem is elsewhere.
+
+---
+
+## Most likely cause
+The biggest red flag is the inline lambdas inside `AddMenuButton(...)` calls in VB:
+
+```vbnet
+Sub() NotYet("Placeholder Item A")
+```
+
+Those are legal VB, but because this is an inherited WinForms form on .NET 10, and given the exact stack trace references local variable signature serialization, I suspect the compiler is choking on one of those closures in this context.
+
+## Safer rewrite
+Instead of inline lambdas, use named click handlers or small private methods.
+
+### Replace `FormMiscMenu.vb` with this safer version:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A - Not Yet Implemented", AddressOf ShowPlaceholderA)
+        AddMenuButton(flpLeft, "B", "Placeholder Item B - Not Yet Implemented", AddressOf ShowPlaceholderB)
+        AddMenuButton(flpLeft, "C", "Placeholder Item C - Not Yet Implemented", AddressOf ShowPlaceholderC)
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D - Not Yet Implemented", AddressOf ShowPlaceholderD)
+        AddMenuButton(flpRight, "E", "Placeholder Item E - Not Yet Implemented", AddressOf ShowPlaceholderE)
+        AddMenuButton(flpRight, "F", "Placeholder Item F - Not Yet Implemented", AddressOf ShowPlaceholderF)
+    End Sub
+
+    Private Sub ShowPlaceholderA()
+        NotYet("Placeholder Item A")
+    End Sub
+
+    Private Sub ShowPlaceholderB()
+        NotYet("Placeholder Item B")
+    End Sub
+
+    Private Sub ShowPlaceholderC()
+        NotYet("Placeholder Item C")
+    End Sub
+
+    Private Sub ShowPlaceholderD()
+        NotYet("Placeholder Item D")
+    End Sub
+
+    Private Sub ShowPlaceholderE()
+        NotYet("Placeholder Item E")
+    End Sub
+
+    Private Sub ShowPlaceholderF()
+        NotYet("Placeholder Item F")
+    End Sub
+End Class
+```
+
+---
+
+## Also check the base method signature
+This only works if `AddMenuButton` in `DosMenuFormBase` expects a parameter compatible with `AddressOf ShowPlaceholderA`, likely:
+- `Action`
+- or a delegate with no parameters
+
+If it expects a different signature, weâ€™ll adjust.
+
+---
+
+## Very important test
+### Test A
+Temporarily revert `Case "3"` to `NotYet(...)`
+and see if build succeeds.
+
+### Test B
+If yes, restore `FormMiscMenu` using the safer `AddressOf` version above.
+
+---
+
+## Another possible issue
+If `FormMiscMenu.Designer.vb` and `FormMiscMenu.vb` both say:
+
+```vbnet
+Inherits DosMenuFormBase
+```
+
+that is usually okay in partial classes, but sometimes designer-generated inheritance plus manual inheritance can get weird if the form was initially created inheriting plain `Form`.
+
+If needed, the safer route is:
+- create a normal class file instead of a WinForms designer form
+- manually inherit `DosMenuFormBase`
+
+But first try the lambda-free rewrite.
+
+## Short answer
+This is probably not your logic being wrong â€” it looks like a **Roslyn/VB compiler crash**.
+
+### Best next step:
+1. revert button `3` to `NotYet(...)`
+2. confirm build works
+3. then replace `FormMiscMenu.vb` with the safer `AddressOf` version above
+
+If you want, after that I can help you verify whether `FormMiscMenu.Designer.vb` might also be contributing.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseOneImportsDirective()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseImportsStatement(Microsoft.CodeAnalysis.Syntax.InternalSyntax.SyntaxList`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.AttributeListSyntax>, Microsoft.CodeAnalysis.Syntax.InternalSyntax.SyntaxList`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.KeywordSyntax>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseDeclarationStatementInternal()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseDeclarationStatement()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseCompilationUnitCore()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseWithStackGuard[[System.__Canon, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`1<System.__Canon>, System.Func`1<System.__Canon>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicSyntaxTree.ParseText(Microsoft.CodeAnalysis.Text.SourceText, Boolean, Microsoft.CodeAnalysis.VisualBasic.VisualBasicParseOptions, System.String, System.Collections.Immutable.ImmutableDictionary`2<System.String,Microsoft.CodeAnalysis.ReportDiagnostic>, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.OptionsValidator.ParseImports(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.DiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.ParseGlobalImports(System.String, System.Collections.Generic.List`1<Microsoft.CodeAnalysis.VisualBasic.GlobalImport>, System.Collections.Generic.List`1<Microsoft.CodeAnalysis.Diagnostic>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.Parse(System.Collections.Generic.IEnumerable`1<System.String>, System.String, System.String, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler..ctor(Microsoft.CodeAnalysis.CommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompiler..ctor(Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This new stack trace points to a **compiler/options parse crash**, not your `FormMiscMenu` code. Itâ€™s crashing while parsing **imports/global imports/compiler options**. So the next step is **not** to keep editing the form â€” itâ€™s to inspect project settings / `.vbproj` / global imports.
+
+## Most likely causes
+One of these is probably malformed:
+
+- a bad **global import** in the project settings
+- something corrupted in the `.vbproj`
+- a broken response/options entry being passed to `vbc`
+- less likely, a weird character introduced into a file that affects parsing
+
+Because the stack includes:
+
+- `ParseOneImportsDirective`
+- `ParseImportsStatement`
+- `OptionsValidator.ParseImports`
+- `VisualBasicCommandLineParser.ParseGlobalImports`
+
+that strongly suggests the issue is around **Imports configuration**, not menu logic.
+
+---
+
+## Fastest test
+### 1. Unload and reload the project / inspect `.vbproj`
+In Visual Studio:
+- right-click project
+- **Edit Project File**
+
+Look for anything suspicious like:
+
+```xml
+<Import Include="...">
+```
+
+or malformed entries under VB settings / item groups.
+
+### 2. Check project-level imported namespaces
+In project properties:
+- open **References** / **Imported Namespaces** if available for VB
+- see if there is a blank, malformed, or strange namespace entry
+
+A malformed imported namespace can crash older or buggy VB compiler paths.
+
+---
+
+## Important question
+Did this start **only after** creating `FormMiscMenu`, or after changing any project settings too?
+
+If you only added a new form file, then the project file may have gotten weirdly modified by the designer/tooling.
+
+---
+
+## Best isolation step
+### Temporarily remove the new form from the project
+Not just reverting code in `FormMainMenu`, but actually:
+
+- remove `FormMiscMenu.vb`
+- remove `FormMiscMenu.Designer.vb`
+- remove `FormMiscMenu.resx` if it exists
+
+from the project
+
+Then build again.
+
+If it still crashes, the form file is not the cause.
+
+---
+
+## Also inspect for file corruption at top of `FormMiscMenu.vb`
+Sometimes a pasted bad character or broken header can confuse the compiler.
+
+The file should begin exactly like this:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+```
+
+No text before it, no stray `<Global...` designer attribute, no duplicate `Class`, no merged designer content.
+
+But again, your current stack trace suggests project/global imports more than this specific file.
+
+---
+
+## Strong next step
+### Clean the hidden VS metadata
+Close Visual Studio, then delete:
+- `.vs` folder in the solution root
+- `bin`
+- `obj`
+
+Then reopen and build.
+
+Because the compiler command line or cached design-time build state may be corrupted.
+
+---
+
+## If still failing
+Open the `.vbproj` and paste the contents here, especially sections containing:
+- `Import`
+- `ItemGroup`
+- `PropertyGroup`
+- `RootNamespace`
+- `StartupObject`
+
+Thatâ€™s the most likely place the actual problem lives now.
+
+## Short answer
+This no longer looks like `FormMiscMenu` code itself.  
+It looks like a **VB project/compiler configuration issue**, especially around **global imports**.
+
+### Do these next:
+1. remove the new form from the project temporarily
+2. delete `.vs`, `bin`, `obj`
+3. inspect `.vbproj` for malformed imports
+4. check project imported namespaces
+
+If you want, paste your `.vbproj` and Iâ€™ll look for the exact problem.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS MENU - PLACEHOLDER")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A - Not Yet Implemented", AddressOf ShowPlaceholderA)
+        AddMenuButton(flpLeft, "B", "Placeholder Item B - Not Yet Implemented", AddressOf ShowPlaceholderB)
+        AddMenuButton(flpLeft, "C", "Placeholder Item C - Not Yet Implemented", AddressOf ShowPlaceholderC)
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D - Not Yet Implemented", AddressOf ShowPlaceholderD)
+        AddMenuButton(flpRight, "E", "Placeholder Item E - Not Yet Implemented", AddressOf ShowPlaceholderE)
+        AddMenuButton(flpRight, "F", "Placeholder Item F - Not Yet Implemented", AddressOf ShowPlaceholderF)
+    End Sub
+
+    Private Sub ShowPlaceholderA()
+        NotYet("Placeholder Item A")
+    End Sub
+
+    Private Sub ShowPlaceholderB()
+        NotYet("Placeholder Item B")
+    End Sub
+
+    Private Sub ShowPlaceholderC()
+        NotYet("Placeholder Item C")
+    End Sub
+
+    Private Sub ShowPlaceholderD()
+        NotYet("Placeholder Item D")
+    End Sub
+
+    Private Sub ShowPlaceholderE()
+        NotYet("Placeholder Item E")
+    End Sub
+
+    Private Sub ShowPlaceholderF()
+        NotYet("Placeholder Item F")
+    End Sub
+End Class
+```
+ENTIRE CONTENTS OF FORMMISCMENU.VB: 
+
+## Copilot
+
+`FormMiscMenu.vb` looks syntactically fine. The more likely issue is the **WinForms-generated companion files** or a duplicate class definition. Given your earlier errors and the Roslyn crash, the safest move is to **stop using a designer-generated form for this placeholder** and create it as a plain code file only, or inspect/remove the duplicate partial pieces.
+
+## Whatâ€™s most likely wrong
+Visual Studio probably created:
+- `FormMiscMenu.vb`
+- `FormMiscMenu.Designer.vb`
+- maybe `FormMiscMenu.resx`
+
+If your `FormMiscMenu.vb` now contains a **full class**, and the designer file also contains a partial class with inherited base form setup, that is normally okay â€” **but only if they are consistent**. If the designer file or `.resx` is malformed, or the file was generated oddly, it can trip VB/WinForms tooling badly.
+
+## Best next step
+### Paste the contents of:
+- `FormMiscMenu.Designer.vb`
+
+That is now the most likely culprit.
+
+---
+
+## Quick checks you can do immediately
+### 1. Make sure there is only one `FormMiscMenu.vb`
+Sometimes people accidentally create:
+- `FormMiscMenu.vb`
+- another similarly named file
+- or nested duplicate partial classes
+
+### 2. Check `FormMiscMenu.Designer.vb`
+Look for:
+- `Partial Class FormMiscMenu`
+- `Inherits DosMenuFormBase`
+- no stray `Imports` in the wrong place
+- no duplicate or broken generated code
+
+### 3. Temporarily exclude designer artifacts
+If this is meant to be a code-only placeholder, the cleanest test is:
+
+- remove `FormMiscMenu.Designer.vb` from project
+- remove `FormMiscMenu.resx` from project
+- keep only `FormMiscMenu.vb`
+
+If `DosMenuFormBase` already defines the UI, you may not need designer code at all.
+
+Thatâ€™s actually the cleanest architecture for this form.
+
+---
+
+## Why this matters
+Your form code does not appear to use any controls declared in a local designer file â€” it relies on inherited members like:
+- `flpLeft`
+- `flpRight`
+- `SetMenuTitle`
+- `ClearMenu`
+- `AddMenuButton`
+
+That suggests **the local designer file may be unnecessary**.
+
+## Recommended simplified approach
+For `FormMiscMenu`, make it a **plain class file only**:
+
+- keep `FormMiscMenu.vb`
+- delete/remove:
+  - `FormMiscMenu.Designer.vb`
+  - `FormMiscMenu.resx`
+
+if they are not needed
+
+Then rebuild.
+
+## Short answer
+Your `FormMiscMenu.vb` looks okay.  
+The next thing to inspect is **`FormMiscMenu.Designer.vb`**, and my suspicion is that you may not need that file at all for this inherited placeholder form.
+
+Paste `FormMiscMenu.Designer.vb` next, and Iâ€™ll tell you exactly whether to keep it, fix it, or delete it.
+
+## @testsubject117
+
+```
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Default fallback only; GenerateBuildInfo should replace this -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+    <Compile Remove="FormMiscMenu.Designer.vb" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Remove="FormMiscMenu.resx" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(BuildCounterFile)" Overwrite="true" Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+here's project file: 
+
+## Copilot
+
+I see the likely culprit.
+
+## Direct fix
+In your `.vbproj`, remove this entire block:
+
+```xml
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+```
+
+## Why
+Those are **project-level VB global imports**, and your compiler crash stack was specifically failing in:
+
+- `ParseOneImportsDirective`
+- `ParseImportsStatement`
+- `ParseGlobalImports`
+
+So this block is the first thing I would remove.
+
+Also, in SDK-style VB projects, these namespaces are usually unnecessary anyway.
+
+---
+
+## What to do next
+### 1. Edit the project file
+Delete this block:
+
+```xml
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+```
+
+### 2. Save the project file
+
+### 3. Close Visual Studio
+
+### 4. Delete these folders if they exist
+- `.vs`
+- `bin`
+- `obj`
+
+### 5. Reopen Visual Studio
+
+### 6. Build again
+
+---
+
+## Why I think this is it
+Your latest Roslyn crash is not in codegen anymore â€” it is in **VB command-line/global import parsing**. That strongly points at this `<Import Include="..."/>` section.
+
+The form code you pasted looks valid.
+
+---
+
+## Secondary observation
+You also have:
+
+```xml
+<Compile Remove="FormMiscMenu.Designer.vb" />
+<EmbeddedResource Remove="FormMiscMenu.resx" />
+```
+
+That is okay **if** you want `FormMiscMenu` to be code-only, which I think is the right approach here.
+
+So that part is actually fine.
+
+---
+
+## Best cleaned-up plan
+For `FormMiscMenu`, keep:
+- `FormMiscMenu.vb`
+
+Remove from compile:
+- `FormMiscMenu.Designer.vb`
+- `FormMiscMenu.resx`
+
+And remove the project global-import block above.
+
+---
+
+## If build still crashes after that
+Then next suspect is the SDK / compiler itself, especially since you're on:
+
+- `.NET SDK 10.0.300`
+
+If needed, the fallback would be:
+- try building under an earlier SDK if installed
+- or pin SDK with `global.json`
+
+But first remove the `<Import Include=...>` block, because your stack trace points right at it.
+
+## Exact edit summary
+### Remove:
+```xml
+<ItemGroup>
+  <Import Include="System" />
+  <Import Include="System.Windows.Forms" />
+  <Import Include="System.Drawing" />
+</ItemGroup>
+```
+
+### Keep:
+```xml
+<Compile Remove="FormMiscMenu.Designer.vb" />
+<EmbeddedResource Remove="FormMiscMenu.resx" />
+```
+
+## Short answer
+Yes â€” the project file likely contains the problem, and the most suspicious part is the **VB global imports block**.
+
+If you want, after you edit it, paste the updated `.vbproj` or tell me whether the build gets past the crash.
+
+## @testsubject117
+
+give me the new code to replace the project file please
+
+## Copilot
+
+Yes â€” replace your project file with this version:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Default fallback only; GenerateBuildInfo should replace this -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+    <Compile Remove="FormMiscMenu.Designer.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="FormMiscMenu.resx" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(BuildCounterFile)" Overwrite="true" Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## What changed
+I removed only this block:
+
+```xml
+<ItemGroup>
+  <Import Include="System" />
+  <Import Include="System.Windows.Forms" />
+  <Import Include="System.Drawing" />
+</ItemGroup>
+```
+
+## After you save it
+Do this next:
+
+1. close Visual Studio
+2. delete:
+   - `.vs`
+   - `bin`
+   - `obj`
+3. reopen Visual Studio
+4. rebuild
+
+## Short answer
+This is your same project file, minus the likely-bad VB global imports section.
+
+If you want, after the rebuild, tell me whether:
+- it builds cleanly
+- or it still throws the Roslyn fatal error.
+
+## @testsubject117
+
+yeah it built cleanly, but the misc menu isn't there now
+
+## Copilot
+
+Good â€” the build problem is fixed.
+
+The Misc menu likely â€œisnâ€™t thereâ€ because the project file currently excludes the designer/resx, and the main menu may not yet be wired back to open `FormMiscMenu`.
+
+## Direct fix
+You want two things true:
+
+1. main menu option **3** must open `FormMiscMenu`
+2. `FormMiscMenu.vb` must still be included in the project
+
+Your `.vbproj` is currently only removing:
+- `FormMiscMenu.Designer.vb`
+- `FormMiscMenu.resx`
+
+That is okay.
+
+So the most likely issue now is in **`FormMainMenu.vb`**.
+
+## Check this exact code
+Find the `Select Case` handling menu keys and make sure it says:
+
+```vbnet
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+If it still says:
+
+```vbnet
+Case "3" : NotYet("Miscellaneous Menu")

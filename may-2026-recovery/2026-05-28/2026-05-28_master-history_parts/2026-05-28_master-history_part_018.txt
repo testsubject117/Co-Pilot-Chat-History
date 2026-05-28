@@ -1,0 +1,2000 @@
+﻿- use the same background/button/font/layout family as existing forms
+- keep keyboard-first behavior
+- keep it simple and DOS-like
+
+## What I want to confirm before I draft the files
+To avoid giving you the wrong version:
+
+### Do you want `FormAddChecks.vb` to be:
+**A.** a modal prompt-style screen with labels/textbox/listbox/buttons, but visually matching the existing shell
+
+or
+
+**B.** a more menu-like screen built more directly around the `DosMenuFormBase` approach
+
+## My recommendation
+I recommend **A**:
+- easier
+- safer
+- better fit for data entry
+- still can match the appâ€™s current DOS-style look/feel
+
+If you want, I can proceed immediately with:
+- full replacement for `FormLedgerMenu.vb`
+- full replacement for `FormAddChecks.vb`
+
+using **option A**.
+
+## @testsubject117
+
+yes, let's try A, but I want to test and have the ability to roll back if it doesn't work.
+
+## Copilot
+
+Yes â€” Option A is the safer choice.
+
+And yes, youâ€™ll absolutely be able to roll back.
+
+## Best rollback safety
+Before replacing anything, copy the current files to `.bak` files or make a local git checkpoint.
+
+### Easiest git safety
+From your `AMiWinForms` repo:
+
+```powershell
+git status
+git add AMiOffice/FormLedgerMenu.vb AMiOffice/FormAddChecks.vb
+git commit -m "Backup before Add Checks UI wiring/refactor test"
+```
+
+If you donâ€™t want to commit, then just duplicate the files as backups.
+
+### Simple file backup
+```powershell
+Copy-Item AMiOffice\FormLedgerMenu.vb AMiOffice\FormLedgerMenu.vb.bak
+Copy-Item AMiOffice\FormAddChecks.vb AMiOffice\FormAddChecks.vb.bak
+```
+
+Then if needed:
+
+```powershell
+Copy-Item AMiOffice\FormLedgerMenu.vb.bak AMiOffice\FormLedgerMenu.vb -Force
+Copy-Item AMiOffice\FormAddChecks.vb.bak AMiOffice\FormAddChecks.vb -Force
+```
+
+---
+
+# Replacement file 1: `AMiOffice/FormLedgerMenu.vb`
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb url=https://github.com/testsubject117/AmiWinForms/blob/master/AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+---
+
+# Replacement file 2: `AMiOffice/FormAddChecks.vb`
+
+```vbnet name=AMiOffice/FormAddChecks.vb url=https://github.com/testsubject117/AmiWinForms/blob/master/AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private ReadOnly pnlHeader As New Panel()
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblDateTime As New Label()
+    Private ReadOnly tmrClock As New Timer()
+
+    Private ReadOnly pnlMain As New Panel()
+    Private ReadOnly pnlBottom As New Panel()
+
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtCompanyCode As New TextBox()
+
+    Private ReadOnly btnValidate As New Button()
+    Private ReadOnly btnContinue As New Button()
+    Private ReadOnly btnEscClose As New Button()
+
+    Private ReadOnly lblStatusCaption As New Label()
+    Private ReadOnly lblStatus As New Label()
+
+    Private ReadOnly lblMatches As New Label()
+    Private ReadOnly lstMatches As New ListBox()
+
+    Private _lookup As CompanyLookupService
+    Private _selectedCompany As CompanyInfo
+
+    Public ReadOnly Property SelectedCompany As CompanyInfo
+        Get
+            Return _selectedCompany
+        End Get
+    End Property
+
+    Public Sub New()
+        MyBase.New()
+        BuildLayout()
+    End Sub
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Me.KeyPreview = True
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.FromArgb(32, 32, 32)
+        Me.ForeColor = Color.White
+        Me.Text = "CHECKS"
+        Me.Width = 1000
+        Me.Height = 720
+        Me.MinimumSize = New Size(900, 650)
+
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, AddressOf tmrClock_Tick
+        tmrClock.Start()
+
+        Try
+            Dim realNamePath As String = "\\invoice\MainMenu\Data\REALNAME.DAT"
+
+            _lookup = New CompanyLookupService(realNamePath)
+            _lookup.LoadData()
+
+            lblStatus.Text = "Enter company code, then press Enter or click Validate."
+            txtCompanyCode.Focus()
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load company data." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            "Add Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+
+            lblStatus.Text = "Company data could not be loaded."
+            btnValidate.Enabled = False
+            btnContinue.Enabled = False
+            txtCompanyCode.Enabled = False
+            lstMatches.Enabled = False
+        End Try
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        MyBase.OnFormClosed(e)
+        Try
+            tmrClock.Stop()
+        Catch
+        End Try
+    End Sub
+
+    Private Sub BuildLayout()
+        Me.Controls.Clear()
+
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Height = 78
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Padding = New Padding(8, 6, 8, 6)
+
+        lblTitle.AutoSize = True
+        lblTitle.Text = "CHECKS"
+        lblTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblTitle.ForeColor = Color.Yellow
+        lblTitle.BackColor = Color.Black
+        lblTitle.Location = New Point(8, 6)
+
+        lblDateTime.AutoSize = False
+        lblDateTime.Dock = DockStyle.Right
+        lblDateTime.Width = 430
+        lblDateTime.TextAlign = ContentAlignment.MiddleRight
+        lblDateTime.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblDateTime.ForeColor = Color.Yellow
+        lblDateTime.BackColor = Color.Black
+
+        pnlHeader.Controls.Add(lblDateTime)
+        pnlHeader.Controls.Add(lblTitle)
+
+        pnlBottom.Dock = DockStyle.Bottom
+        pnlBottom.Height = 52
+        pnlBottom.BackColor = Color.FromArgb(32, 32, 32)
+        pnlBottom.Padding = New Padding(0, 10, 0, 0)
+
+        btnEscClose.Text = "(ESC) Close"
+        btnEscClose.AutoSize = False
+        btnEscClose.Width = 160
+        btnEscClose.Height = 30
+        btnEscClose.Anchor = AnchorStyles.Right Or AnchorStyles.Bottom
+        btnEscClose.UseVisualStyleBackColor = False
+        btnEscClose.BackColor = Color.Silver
+        btnEscClose.ForeColor = Color.Black
+        btnEscClose.FlatStyle = FlatStyle.Flat
+        btnEscClose.FlatAppearance.BorderColor = Color.Gainsboro
+        btnEscClose.FlatAppearance.MouseOverBackColor = Color.Gainsboro
+        btnEscClose.FlatAppearance.MouseDownBackColor = Color.DarkGray
+        btnEscClose.FlatAppearance.BorderSize = 1
+        btnEscClose.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        AddHandler btnEscClose.Click, AddressOf btnEscClose_Click
+
+        pnlBottom.Controls.Add(btnEscClose)
+        AddHandler pnlBottom.Resize,
+            Sub()
+                btnEscClose.Left = pnlBottom.ClientSize.Width - btnEscClose.Width
+                btnEscClose.Top = pnlBottom.ClientSize.Height - btnEscClose.Height
+            End Sub
+
+        pnlMain.Dock = DockStyle.Fill
+        pnlMain.BackColor = Color.FromArgb(32, 32, 32)
+        pnlMain.Padding = New Padding(36, 26, 36, 20)
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Text = "Enter customer/company code:"
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.FromArgb(32, 32, 32)
+        lblPrompt.SetBounds(24, 20, 320, 30)
+
+        txtCompanyCode.CharacterCasing = CharacterCasing.Upper
+        txtCompanyCode.BorderStyle = BorderStyle.FixedSingle
+        txtCompanyCode.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        txtCompanyCode.SetBounds(24, 56, 260, 30)
+        txtCompanyCode.MaxLength = 8
+        AddHandler txtCompanyCode.KeyDown, AddressOf txtCompanyCode_KeyDown
+
+        btnValidate.Text = "(Enter) Validate"
+        btnValidate.SetBounds(310, 54, 170, 34)
+        StyleActionButton(btnValidate)
+        AddHandler btnValidate.Click, AddressOf btnValidate_Click
+
+        btnContinue.Text = "(C) Continue"
+        btnContinue.SetBounds(490, 54, 160, 34)
+        btnContinue.Enabled = False
+        StyleActionButton(btnContinue)
+        AddHandler btnContinue.Click, AddressOf btnContinue_Click
+
+        lblStatusCaption.AutoSize = False
+        lblStatusCaption.Text = "Status:"
+        lblStatusCaption.TextAlign = ContentAlignment.MiddleLeft
+        lblStatusCaption.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblStatusCaption.ForeColor = Color.White
+        lblStatusCaption.BackColor = Color.FromArgb(32, 32, 32)
+        lblStatusCaption.SetBounds(24, 112, 90, 28)
+
+        lblStatus.AutoSize = False
+        lblStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblStatus.Font = New Font("Segoe UI", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblStatus.ForeColor = Color.White
+        lblStatus.BackColor = Color.Black
+        lblStatus.BorderStyle = BorderStyle.FixedSingle
+        lblStatus.SetBounds(120, 110, 700, 32)
+
+        lblMatches.AutoSize = False
+        lblMatches.Text = "Possible matches:"
+        lblMatches.TextAlign = ContentAlignment.MiddleLeft
+        lblMatches.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblMatches.ForeColor = Color.White
+        lblMatches.BackColor = Color.FromArgb(32, 32, 32)
+        lblMatches.SetBounds(24, 170, 180, 28)
+
+        lstMatches.Font = New Font("Segoe UI", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lstMatches.BackColor = Color.Black
+        lstMatches.ForeColor = Color.White
+        lstMatches.BorderStyle = BorderStyle.FixedSingle
+        lstMatches.HorizontalScrollbar = True
+        lstMatches.SetBounds(24, 204, 796, 280)
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
+
+        pnlMain.Controls.Add(lblPrompt)
+        pnlMain.Controls.Add(txtCompanyCode)
+        pnlMain.Controls.Add(btnValidate)
+        pnlMain.Controls.Add(btnContinue)
+        pnlMain.Controls.Add(lblStatusCaption)
+        pnlMain.Controls.Add(lblStatus)
+        pnlMain.Controls.Add(lblMatches)
+        pnlMain.Controls.Add(lstMatches)
+
+        Me.Controls.Add(pnlMain)
+        Me.Controls.Add(pnlBottom)
+        Me.Controls.Add(pnlHeader)
+    End Sub
+
+    Private Sub StyleActionButton(btn As Button)
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.TextAlign = ContentAlignment.MiddleLeft
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs)
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+        lblDateTime.Text = now.ToString("dddd") & "  " &
+                           now.ToString("MM-dd-yyyy") & "          " &
+                           now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub btnValidate_Click(sender As Object, e As EventArgs)
+        ValidateCompany()
+    End Sub
+
+    Private Sub btnContinue_Click(sender As Object, e As EventArgs)
+        If _selectedCompany Is Nothing Then
+            MessageBox.Show("Please validate a company first.",
+                            "Add Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Exit Sub
+        End If
+
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnEscClose_Click(sender As Object, e As EventArgs)
+        _selectedCompany = Nothing
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub txtCompanyCode_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            ValidateCompany()
+            e.Handled = True
+            e.SuppressKeyPress = True
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        AcceptSelectedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            AcceptSelectedMatch()
+            e.Handled = True
+            e.SuppressKeyPress = True
+        End If
+    End Sub
+
+    Private Sub AcceptSelectedMatch()
+        If lstMatches.SelectedItem Is Nothing Then Exit Sub
+
+        Dim selectedText As String = lstMatches.SelectedItem.ToString()
+        If String.IsNullOrWhiteSpace(selectedText) Then Exit Sub
+
+        Dim parts() As String = selectedText.Split("-"c)
+        If parts.Length > 0 Then
+            txtCompanyCode.Text = parts(0).Trim()
+            ValidateCompany()
+        End If
+    End Sub
+
+    Private Sub ValidateCompany()
+        If _lookup Is Nothing Then Exit Sub
+
+        lstMatches.Items.Clear()
+        btnContinue.Enabled = False
+        _selectedCompany = Nothing
+
+        Dim enteredCode As String = txtCompanyCode.Text.Trim().ToUpperInvariant()
+
+        If enteredCode = "" Then
+            lblStatus.Text = "Company code is required."
+            txtCompanyCode.Focus()
+            Return
+        End If
+
+        If enteredCode.Length > 8 Then
+            enteredCode = enteredCode.Substring(0, 8)
+            txtCompanyCode.Text = enteredCode
+        End If
+
+        Dim exact As CompanyInfo = _lookup.FindExact(enteredCode)
+
+        If exact IsNot Nothing Then
+            _selectedCompany = exact
+            lblStatus.Text = exact.CompanyCode & " - " & exact.CompanyName
+            btnContinue.Enabled = True
+            Return
+        End If
+
+        lblStatus.Text = "Company code not found."
+
+        Dim matches As List(Of CompanyInfo) = _lookup.FindByPrefix(enteredCode)
+
+        If matches.Count = 0 AndAlso enteredCode.Length > 0 Then
+            matches = _lookup.FindByFirstLetter(enteredCode.Substring(0, 1))
+        End If
+
+        For Each item As CompanyInfo In matches
+            lstMatches.Items.Add(item.CompanyCode & " - " & item.CompanyName)
+        Next
+
+        If matches.Count > 0 Then
+            lblStatus.Text = "Company not found. Select a match or enter another code."
+            lstMatches.SelectedIndex = 0
+            lstMatches.Focus()
+        Else
+            txtCompanyCode.Focus()
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        Select Case keyData
+            Case Keys.Escape
+                btnEscClose.PerformClick()
+                Return True
+            Case Keys.C
+                If btnContinue.Enabled Then
+                    btnContinue.PerformClick()
+                    Return True
+                End If
+        End Select
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+End Class
+```
+
+---
+
+# Suggested test sequence
+After replacing the two files:
+
+1. build solution
+2. open main menu
+3. choose `(C) Checks and Cash Receipts`
+4. choose `(1) Add Checks to ledger & cash receipts`
+5. confirm:
+   - form opens
+   - style feels consistent with current app
+   - Escape closes
+   - Enter validates company code
+   - possible matches populate
+   - Continue only enables after exact match
+
+---
+
+# Rollback
+If anything breaks, restore your backups or use git.
+
+If you want, after you test these two files, I can help you with the **next iteration**:
+- make `FormAddChecks` even more DOS-like,
+- or move into the next step after company validation.
+
+## @testsubject117
+
+where is it looking for realname.dat at?
+
+## Copilot
+
+Right now it is looking here:
+
+```text
+\\invoice\MainMenu\Data\REALNAME.DAT
+```
+
+That comes from this line in `FormAddChecks.vb`:
+
+```vb
+Dim realNamePath As String = "\\invoice\MainMenu\Data\REALNAME.DAT"
+```
+
+## Important
+That means it is using a **hardcoded UNC network path** right now.
+
+## What that implies
+For the form to work as currently written:
+
+- the machine must be able to reach the `\\invoice` share
+- that share must contain:
+  `MainMenu\Data\REALNAME.DAT`
+
+## Likely better next step
+Since the project already has path infrastructure like:
+- `AppPaths.vb`
+- `LegacyDataPaths.vb`
+
+the better long-term fix is probably to stop hardcoding that path and instead pull `REALNAME.DAT` from the same central path logic the rest of the app uses.
+
+## Short answer
+**It is currently looking at `\\invoice\MainMenu\Data\REALNAME.DAT`.**
+
+If you want, I can next help you change that to use the projectâ€™s shared path infrastructure instead of the hardcoded path.
+
+## @testsubject117
+
+ok, just making sure. that's the dev virtual machine's or the testing vm's shared location. it wasn't fully online, now it is. OK, this looks very much like where I remember we left off on Friday the 15th. and the same thing is happening. The only company code I remember is PSIBEARI, and we had gotten this far on Friday and when I searched for psibeari it was not found. I believe we were trying to resolve why, and I had then went and compared it to the Dos machine. Now, here's the gothcha, and maybe you can help here, in order to go test something on the dos machine, which is also the windows machine, i have to reboot between the 2. Is there a way to clone or copy the vm so I can have 2 vms, one that runs windows for testing the vb publishes, and one that runs the original dos gwbasic files so we can have a running production reference I can access at all times. right now it's inefficient to have to switch between windows and dos. this was by design for the company, and I copied their exact setup, however here, I need to be able to run both simultaneously for testing and development
+
+## Copilot
+
+Yes â€” **that is absolutely the right move**. You should create **two separate VMs** so you can run the DOS production reference and the Windows/VB test environment side-by-side.
+
+Because this involves current virtualization tooling and potentially risky system operations, I should verify specifics based on your hypervisor before giving step-by-step instructions. Right now, the safe high-level answer is:
+
+## Best approach
+Create:
+
+- **VM 1: DOS reference VM**
+  - preserves the original GW-BASIC runtime, data layout, shares, and startup behavior
+  - used as the â€œknown-goodâ€ production reference
+
+- **VM 2: Windows dev/test VM**
+  - used for VB.NET published builds, debugging, and data comparison
+  - can point at copied test data or a read-only mirror of relevant files
+
+That removes the reboot bottleneck and is the correct development setup for this kind of port.
+
+## Why this is the right solution
+Your current setup is inefficient because:
+- one environment is acting as both DOS runtime and Windows test machine
+- every comparison requires rebooting
+- that breaks flow when youâ€™re trying to verify subtle parity behavior like `PSIBEARI` lookup behavior
+
+For a DOS-faithful port, being able to:
+- inspect DOS behavior live
+- compare files immediately
+- test the VB app immediately after
+
+is hugely valuable.
+
+## Important caution
+Before cloning, you need to think about:
+- **licensing/activation**
+- **machine identity collisions** if both VMs are on the same network
+- **shared drive mappings / UNC paths**
+- whether the DOS app expects a specific machine name, drive letter, or share path
+- whether both VMs could accidentally write to the same live data at once
+
+In most cases, the safest pattern is:
+- DOS VM = authoritative reference
+- Windows VB VM = separate test environment using copied/snapshotted data
+
+## What I need from you to give exact instructions
+Tell me which hypervisor youâ€™re using, for example:
+
+- Hyper-V
+- VMware Workstation / Player
+- VirtualBox
+- Proxmox
+- something else
+
+Then I can tell you the exact safest way to:
+1. clone the VM
+2. avoid SID/name/network conflicts
+3. preserve access to the same files where appropriate
+4. keep the DOS environment available while testing VB
+
+## About the `PSIBEARI` gotcha
+That is also useful context:
+- if `PSIBEARI` should be valid in DOS but isnâ€™t matching in VB,
+- the likely issue is in how `REALNAME.DAT` is being parsed or normalized,
+- and having both environments live at once would make that much easier to diagnose.
+
+## Short answer
+**Yes â€” you should absolutely split this into two VMs so DOS and Windows can run simultaneously. Thatâ€™s the right fix for your workflow. Tell me what VM platform youâ€™re using, and Iâ€™ll give you the exact safest cloning plan.**
+
+## @testsubject117
+
+hyper-v is what I'm running. For right now, the existing vm with DOS on one VHD and windows on another vhd that I swap back and forth between the scsi and the ide 0 controller, depending on which I want to boot (mimmicking the exact production behavior) can be kept as is, I basically just need another vm that can run a copy of that dos vhd
+
+## Copilot
+
+Yes â€” thatâ€™s a good setup, and you **do not** need to disturb the existing dual-boot-behavior VM. The simplest plan is:
+
+## Recommendation
+Keep the current Hyper-V VM exactly as-is, and create a **second VM that boots from a copied DOS VHD**.
+
+That way you get:
+
+- **Existing VM** = preserved â€œproduction-faithfulâ€ swap setup
+- **New VM** = always-on DOS reference for comparison/testing
+
+Hyper-V supports creating a VM from an **existing virtual hard disk**, and Microsoftâ€™s docs explicitly describe creating a VM using an existing VHD/VHDX. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+## Safest way to do it
+Do **not** attach the same DOS VHD file to two VMs. Instead, make a **copy** of the DOS VHD and attach the copy to the new VM. Copying the disk file while the source VM is off is the safe approach; Microsoft guidance and support materials consistently treat storage issues and disk/file contention as real risks when VM disks are in use. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/hyper-v-virtual-machine-backup-checkpoint-storage?utm_source=openai))
+
+## Best practical plan
+### Option A â€” easiest and likely best for you
+1. **Shut down** the existing VM.
+2. Locate the **DOS VHD/VHDX** file currently used when you boot DOS.
+3. Copy that disk file to a new name, for example:
+   - `AMi-DOS-Reference.vhd`
+4. Create a **new Hyper-V VM**.
+5. When asked for a disk, choose **Use an existing virtual hard disk** and point it to the copied DOS VHD. Microsoft documents this workflow directly. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+6. Leave the original VM untouched.
+
+## Important cautions
+### 1. Donâ€™t let both VMs write to the same live shared data
+If both the DOS reference VM and the Windows VB test VM point at the same production-like network share, you could get confusing or unsafe results. The DOS app is file-coupled and write-heavy, so Iâ€™d strongly prefer:
+- DOS reference VM = reference behavior
+- Windows VB VM = test against copied/snapshotted data when possible
+
+That caution is especially important because Hyper-V/VM storage problems often show up as file access/contention issues when disks or backing files are in active use. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/hyper-v-virtual-machine-backup-checkpoint-storage?utm_source=openai))
+
+### 2. Expect identity/network cleanup if needed
+If the copied DOS VM has the same machine identity, network config, or mapped-drive expectations as the original, you may need to change:
+- computer name
+- NIC/MAC expectations
+- IP config
+- share mappings
+
+Whether that matters depends on how your DOS environment is set up.
+
+### 3. Match the generation/controller style to the original bootable disk
+If the DOS disk currently boots in a particular way on the original VM, try to match that as closely as possible in the clone VM. Hyper-V creation uses a selected VM generation and can boot from an existing VHD/VHDX; keep the new VMâ€™s boot style aligned with the original setup. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+## My concrete recommendation for your case
+Because you said the current VM swaps disks on **SCSI vs IDE 0** to mimic production, I would:
+
+- leave that VM alone
+- create a **new separate DOS-only reference VM**
+- attach only the **copied DOS VHD**
+- use that VM strictly as your always-available DOS comparison machine
+
+That gives you the least disruption and the clearest workflow.
+
+## If you want the exact steps in Hyper-V Manager
+At a high level:
+
+1. Turn off the original VM.
+2. Copy the DOS disk file in File Explorer or PowerShell.
+3. Open **Hyper-V Manager**.
+4. Click **New > Virtual Machine**.
+5. Choose the appropriate generation.
+6. Assign memory.
+7. Connect networking if needed.
+8. On **Connect Virtual Hard Disk**, choose:
+   - **Use an existing virtual hard disk**
+9. Browse to the copied DOS VHD.
+10. Finish and boot it.
+
+## Short answer
+**Yes â€” the right move is to keep your current VM unchanged and create a second Hyper-V VM that uses a copied DOS VHD. Do not share the exact same VHD file between both VMs; copy it first, then create the new VM from that copied disk.**
+
+If you want, I can next give you:
+1. a **very specific Hyper-V Manager click-by-click checklist**, or  
+2. a **PowerShell script** to create the second VM from the copied DOS VHD.
+
+## @testsubject117
+
+sorry, the production computers do not have scsi boot or use scsi. what I meant was, the production computers have a separate dos boot drive and a separate windows boot drive that have to be manually swapped in the bios.
+
+## Copilot
+
+Got it â€” thanks, thatâ€™s an important correction.
+
+## Clarified understanding
+The real production behavior is:
+
+- **separate DOS boot drive**
+- **separate Windows boot drive**
+- users manually choose between them via BIOS/boot drive selection
+- **not** SCSI-based production boot behavior
+
+So your Hyper-V setup is just a way of mimicking that separate-boot-drive model, not reproducing SCSI specifically.
+
+## Direct answer
+That does **not** change the recommendation.
+
+You should still:
+
+- keep the existing VM as-is
+- make a **copy of the DOS VHD**
+- create a **second DOS-only Hyper-V VM** from that copied disk
+
+That will give you:
+- one VM preserving your current â€œproduction-like separate boot diskâ€ behavior
+- one VM always available for DOS reference/testing
+
+## Practical implication
+For the new reference VM, you do **not** need to preserve the current swap-between-drives logic.
+
+The new VM can simply be:
+
+- **DOS-only**
+- attached to the copied DOS VHD
+- boot directly from that DOS disk
+
+That is the cleanest way to get constant DOS access.
+
+## Best model going forward
+### VM 1 â€” production-faithful test VM
+- keep your current VM
+- still use separate boot disks as you already do
+- use when you want to verify your â€œrealistic machine behaviorâ€ assumptions
+
+### VM 2 â€” DOS reference VM
+- boot only from copied DOS VHD
+- always available
+- use for quick behavior comparisons against the original app
+
+That is probably the ideal setup for your porting work.
+
+## Why this helps right now
+This is especially useful for problems like your `PSIBEARI` issue, because youâ€™ll be able to:
+
+- keep the DOS app open
+- inspect live behavior against `REALNAME.DAT`
+- compare with the VB app at the same time
+- stop rebooting between environments
+
+## Short answer
+**Yes â€” even with that clarification, the right move is still to create a second Hyper-V VM from a copied DOS VHD. The new VM can be DOS-only and does not need to mimic the boot-drive swapping logic.**
+
+If you want, I can now give you a **click-by-click Hyper-V Manager walkthrough** specifically for creating that DOS-only reference VM from the copied VHD.
+
+## @testsubject117
+
+yes please do that
+
+## Copilot
+
+Yes â€” hereâ€™s a **click-by-click Hyper-V Manager walkthrough** for creating a second **DOS-only reference VM** from a copied DOS VHD, while leaving your current VM untouched. Hyper-V Manager supports creating a VM from an existing virtual hard disk, and for prebuilt VHD-based guests, Microsoft recommends using a **Generation 1** VM rather than Generation 2/UEFI. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+## Before you start
+Do this first:
+
+1. **Shut down the current VM** that uses the DOS disk.
+2. Locate the **DOS VHD** file.
+3. Make a **copy** of that file to a new name, for example:
+   - `AMi-DOS-Reference.vhd`
+
+Do **not** point two VMs at the same exact VHD file. Use a copied disk file for the new VM. That keeps your original VM unchanged and avoids disk contention risk. Hyper-Vâ€™s documented workflow supports creating a VM from an existing VHD/VHDX. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+---
+
+# Click-by-click: create the DOS-only reference VM
+
+## 1. Open Hyper-V Manager
+- Press **Start**
+- type **Hyper-V Manager**
+- open it
+- select your Hyper-V host in the left pane
+
+## 2. Start the New Virtual Machine wizard
+- In the **Actions** pane on the right:
+  - click **New**
+  - click **Virtual Machine...**
+
+This is the standard Hyper-V Manager VM creation flow. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+## 3. Begin the wizard
+- Click **Next**
+
+## 4. Specify Name and Location
+- Name it something clear, for example:
+  - `AMi DOS Reference`
+- Optional: check **Store the virtual machine in a different location** if you want its config files somewhere specific
+
+Then click **Next**. This name/location step is part of the standard Hyper-V wizard. ([learn.microsoft.com](https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/quick-start/quick-create-virtual-machine?utm_source=openai))
+
+## 5. Specify Generation
+Choose:
+
+- **Generation 1**
+
+That is the right choice for an older DOS-style guest using an existing prebuilt **VHD** boot disk. Microsoft specifically notes Generation 1 is appropriate when using existing VHD-based disks that arenâ€™t compatible with UEFI/Gen 2 assumptions. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/plan/should-i-create-a-generation-1-or-2-virtual-machine-in-hyper-v?utm_source=openai))
+
+Then click **Next**.
+
+## 6. Assign Memory
+Pick a modest amount, for example:
+
+- **128 MB**
+or
+- **256 MB**
+
+DOS itself needs very little, but giving it a bit more in Hyper-V is usually fine.
+
+- You can leave **Use Dynamic Memory for this virtual machine** unchecked unless you know you want it.
+
+Then click **Next**.
+
+## 7. Configure Networking
+Pick one of these based on your goal:
+
+### If you want the DOS VM to reach shares/network resources:
+- choose your existing virtual switch
+
+### If you want a safer isolated reference VM:
+- choose **Not Connected**
+
+If your DOS environment depends on network access, use the switch. If you only need local behavior at first, disconnected is safer.
+
+Then click **Next**.
+
+## 8. Connect Virtual Hard Disk
+Choose:
+
+- **Use an existing virtual hard disk**
+
+Then browse to the **copied DOS VHD**, e.g.:
+- `...\AMi-DOS-Reference.vhd`
+
+This is the exact Hyper-V option Microsoft documents for building a VM around an existing disk. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+Then click **Next**.
+
+## 9. Installation Options / Summary
+Because the DOS system is already on the copied VHD, you are not installing a new OS from ISO.
+
+- review the summary
+- click **Finish**
+
+---
+
+# After the VM is created
+
+## 10. Open Settings before first boot
+Right-click the new VM:
+- **Settings**
+
+Review these items:
+
+### Firmware / boot order
+For Generation 1, make sure the hard disk is the bootable device if needed.
+
+### IDE Controller
+Generation 1 typically boots from IDE-attached disks. That aligns with old-style guest boot expectations better than Gen 2. Microsoftâ€™s guidance on VM generation and existing VHD use supports this older boot model. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/plan/should-i-create-a-generation-1-or-2-virtual-machine-in-hyper-v?utm_source=openai))
+
+### Network Adapter
+If you donâ€™t want the clone on the same live network yet, disconnect it now.
+
+### Automatic Start Action
+Optional:
+- set to **Nothing** if you donâ€™t want it auto-starting with the host
+
+Click **OK** when done.
+
+---
+
+# First boot checklist
+
+## 11. Start and connect
+- Right-click the new VM
+- click **Connect...**
+- in the VM window, click **Start**
+
+This is the normal Hyper-V connect/start process. ([learn.microsoft.com](https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/quick-start/quick-create-virtual-machine?utm_source=openai))
+
+## 12. Verify it boots to DOS
+You want to confirm:
+- it boots from the copied DOS VHD
+- the original DOS application starts as expected
+- nothing in the original VM was affected
+
+---
+
+# Recommended safety checks after boot
+
+## If the DOS VM uses network resources
+Check for conflicts in:
+- computer name
+- IP addressing
+- mapped shares
+- simultaneous writes to shared data
+
+If this DOS VM is only a **reference box**, safest practice is:
+- avoid letting both environments write to the same live accounting files at the same time
+
+That matters because your DOS app is file-coupled and stateful across files like `INVOICE.CHK`, `LEDGER.CUR`, and `CHECK.INV`, so simultaneous access can muddy testing conclusions. This is an inference from your app architecture, not a Hyper-V rule. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+---
+
+# My recommended settings for your case
+
+For the first pass, Iâ€™d do this:
+
+- **Name:** `AMi DOS Reference`
+- **Generation:** `1`
+- **Memory:** `128 MB` or `256 MB`
+- **Network:** start with the same switch only if DOS needs it; otherwise disconnected
+- **Disk:** copied DOS `.vhd`
+
+That gives you the simplest always-on DOS reference box.
+
+---
+
+# Short version
+1. Shut down original VM.
+2. Copy DOS VHD to a new filename.
+3. In Hyper-V Manager: **New > Virtual Machine**.
+4. Pick **Generation 1**.
+5. Choose **Use an existing virtual hard disk**.
+6. Select the copied DOS VHD.
+7. Finish, review settings, and boot. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/get-started/create-a-virtual-machine-in-hyper-v?utm_source=openai))
+
+If you want, I can next give you a **PowerShell version** that creates the new Hyper-V VM automatically from the copied DOS VHD.
+
+## @testsubject117
+
+ugh, it looks like it's made an .avhd out of it that it's using as it's current reference. How can I get rid of the extra files and push it back to one reliable disk file?
+
+## Copilot
+
+Yes â€” you can usually get back to **one reliable base disk**, but the **safe method depends on whether Hyper-V has checkpoints attached**.
+
+## Most important rule
+**Do not manually delete the `.avhd` / `.avhdx` files in File Explorer.** Hyper-V stores checkpoints as differencing disks, and when you delete the checkpoint properly, Hyper-V merges the `.avhdx` back into the parent `.vhdx`/`.vhd` for you. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+## What probably happened
+An `.avhd`/`.avhdx` means Hyper-V created a **checkpoint differencing disk**. The VM may now be writing to the `.avhdx`, not the original base disk. Hyper-Vâ€™s normal cleanup path is to **delete the checkpoint in Hyper-V Manager**, which triggers the merge and then removes the `.avhdx` file after completion. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+# Safest path: if the checkpoint is visible in Hyper-V Manager
+1. **Shut down the VM** if you want the least-risk path.
+2. Open **Hyper-V Manager**.
+3. Select the VM.
+4. In the **Checkpoints** pane, right-click the checkpoint.
+5. Choose **Delete** or **Delete Checkpoint Subtree** if thereâ€™s a chain.
+6. Wait for Hyper-V to complete the merge. Hyper-V merges the differencing disk back into the parent disk automatically. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+## Important
+Do **not** use **Delete Saved State** or delete files from disk by hand thinking thatâ€™s the same thing. The correct action is deleting the **checkpoint object** in Hyper-V Manager or with the checkpoint PowerShell cmdlet. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+# If checkpoints are not visible, but `.avhdx` files exist
+That can happen with backup tools or broken checkpoint cleanup. Microsoftâ€™s troubleshooting guidance says you may need to inspect the chain and manually merge with `Merge-VHD`, but that is the **fallback path**, not the first thing to try. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+# What I recommend you do right now
+## Step 1: Check whether Hyper-V thinks checkpoints exist
+In an elevated PowerShell, run:
+
+```powershell
+Get-VMCheckpoint -VMName "Your VM Name"
+```
+
+If that returns checkpoints, the clean path is:
+
+```powershell
+Remove-VMCheckpoint -VMName "Your VM Name"
+```
+
+or remove a specific one by name. Microsoft documents `Remove-VMCheckpoint` as the proper cleanup method, and deleting checkpoints triggers the merge automatically. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+## Step 2: If thereâ€™s a whole chain
+If multiple checkpoints exist, remove all visible checkpoints and let Hyper-V merge them back. Microsoft also documents deleting a checkpoint subtree when needed. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+## Step 3: Wait for merge completion
+The `.avhdx` may remain on disk while merging. Donâ€™t interrupt it. Once the merge completes successfully, the `.avhdx` file should disappear. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+# If Hyper-V Manager shows no checkpoints, but the `.avhdx` is still there
+Then youâ€™re in the more annoying case. Microsoftâ€™s recent guidance says to inspect the differencing chain and, if needed, use `Merge-VHD -Path <AVHDX> -DestinationPath <parent>` to merge manually. This is a recovery/troubleshooting path and should be done carefully, ideally with the VM off and after a backup. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+## Before any manual merge
+- **Back up the VM files first.**
+- Confirm which file is the **parent** and which file is the **active child**.
+- If there are multiple `.avhdx` files, they form a **chain**, and you merge from the newest child toward the parent according to the chain, not randomly. Microsoft explicitly discusses multi-differencing-disk chains in its troubleshooting guidance. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+# Practical advice for your scenario
+Because youâ€™re using this VM as a development/reference machine, the least risky approach is:
+
+1. **Back up the VM folder first.**
+2. Check for visible checkpoints in Hyper-V Manager.
+3. If visible, **delete checkpoints normally** and let Hyper-V merge.
+4. Only if theyâ€™re **not visible** should you move to manual chain inspection/merge. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+# Short answer
+**Yes, you can usually get back to one base disk file, but do it by deleting the Hyper-V checkpoint so Hyper-V merges the `.avhdx` back into the parent disk. Do not delete the `.avhdx` manually.** ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+If you want, next I can help you with the exact commands for your VM name:
+1. checking whether checkpoints exist, and  
+2. identifying whether you have a single `.avhdx` or a chain.
+
+## @testsubject117
+
+```
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMCheckpoint -VMName "Your VM Name"
+Get-VMCheckpoint : Hyper-V was unable to find a virtual machine with name "Your VM Name".
+At line:1 char:1
++ Get-VMCheckpoint -VMName "Your VM Name"
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : ObjectNotFound: (:) [Get-VMSnapshot], VirtualizationException
+    + FullyQualifiedErrorId : ObjectNotFound,Microsoft.HyperV.PowerShell.Commands.GetVMSnapshot
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms>
+```
+
+## Copilot
+
+That error is just because **`"Your VM Name"` was a placeholder** â€” not the actual VM name.
+
+## Do this first: list your real VM names
+Run:
+
+```powershell
+Get-VM | Select-Object Name, State
+```
+
+That will show the actual names of your Hyper-V VMs.
+
+## Then check checkpoints for the real VM
+Suppose the VM name comes back as something like:
+
+```text
+AMi DOS-Windows
+```
+
+Then run:
+
+```powershell
+Get-VMCheckpoint -VMName "AMi DOS-Windows"
+```
+
+## If you want to check all VMs at once
+Run:
+
+```powershell
+Get-VMCheckpoint -VM * | Select-Object VMName, Name, CreationTime
+```
+
+Thatâ€™s a quick way to see whether any VM has checkpoints.
+
+---
+
+# Recommended sequence right now
+
+## 1. List VMs
+```powershell
+Get-VM | Select-Object Name, State
+```
+
+## 2. List checkpoints across all VMs
+```powershell
+Get-VMCheckpoint -VM * | Select-Object VMName, Name, CreationTime
+```
+
+## 3. If checkpoints exist for the target VM
+Remove them with:
+
+```powershell
+Remove-VMCheckpoint -VMName "ACTUAL VM NAME"
+```
+
+or for a specific checkpoint:
+
+```powershell
+Remove-VMCheckpoint -VMName "ACTUAL VM NAME" -Name "CHECKPOINT NAME"
+```
+
+---
+
+# If you want the likely fastest one-liner
+Run this:
+
+```powershell
+Get-VM | ForEach-Object { Get-VMCheckpoint -VMName $_.Name -ErrorAction SilentlyContinue } | Select-Object VMName, Name, CreationTime
+```
+
+That avoids the placeholder problem and checks every VM.
+
+---
+
+# Short answer
+Nothing is wrong yet â€” you just used the sample placeholder name literally.
+
+## Next command to run:
+```powershell
+Get-VM | Select-Object Name, State
+```
+
+Paste me that output, and I can tell you the exact checkpoint command to run next.
+
+## @testsubject117
+
+Name              State
+----              -----
+AM-Invoice-Dev-VM   Off
+
+## Copilot
+
+Perfect â€” the VM name is:
+
+```text
+AM-Invoice-Dev-VM
+```
+
+## Now run this
+```powershell
+Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM"
+```
+
+That will tell us whether Hyper-V still sees checkpoints for that VM.
+
+## If you want the full useful version
+Run:
+
+```powershell
+Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM" | Select-Object VMName, Name, CreationTime
+```
+
+## If it returns checkpoints
+Then the next step will likely be:
+
+```powershell
+Remove-VMCheckpoint -VMName "AM-Invoice-Dev-VM"
+```
+
+But **donâ€™t run that yet** until you see what `Get-VMCheckpoint` returns.
+
+## Short answer
+Use the real VM name now:
+
+```powershell
+Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM"
+```
+
+Paste the result and Iâ€™ll tell you the next safest command.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VM | Select-Object Name, State
+
+Name              State
+----              -----
+AM-Invoice-Dev-VM   Off
+
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM"
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM" | Select-Object VMName, Name, CreationTime
+PS C:\Users\capnkirk\source\repos\AMiWinForms>
+
+## Copilot
+
+Good â€” that tells us something important:
+
+## Direct answer
+Hyper-V is showing **no visible checkpoints** for `AM-Invoice-Dev-VM`, but you still have an `.avhd`/`.avhdx` on disk.
+
+That usually means one of these:
+- an **orphaned/invisible checkpoint**
+- a leftover **backup/checkpoint differencing disk**
+- a differencing disk chain that Hyper-V Manager is not currently listing
+
+Microsoftâ€™s guidance explicitly covers this case: `.avhdx` files can remain even when checkpoints are not visible in Hyper-V Manager, often due to incomplete backup/checkpoint cleanup. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+## Most important next step
+We need to identify **which disk file the VM is actually attached to right now** and whether the attached disk is:
+- the base `.vhd`/`.vhdx`, or
+- the `.avhd`/`.avhdx` child.
+
+Do **not** delete anything yet. Microsoft explicitly says not to delete `.avhdx` files directly, and if a manual merge is needed, it must be done carefully with the VM off. ([learn.microsoft.com](https://learn.microsoft.com/en-us/windows-server/virtualization/hyper-v/checkpoints?utm_source=openai))
+
+## Run these commands next
+
+### 1. See what disk file the VM is attached to
+```powershell
+Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Select-Object ControllerType, ControllerNumber, ControllerLocation, Path
+```
+
+### 2. Inspect that disk file
+If the path returned is, for example, `D:\VMs\AMi\dos.avhdx`, then run:
+```powershell
+Get-VHD -Path "PASTE-THE-PATH-HERE" | Select-Object Path, VhdType, ParentPath, FileSize, Size
+```
+
+Microsoft documents `Get-VHD` for inspecting VHD/AVHD metadata, including differencing-disk relationships. ([learn.microsoft.com](https://learn.microsoft.com/en-us/powershell/module/hyper-v/get-vhd?view=windowsserver2025-ps&utm_source=openai))
+
+## If you want to inspect all virtual disk-like files in the VM folder
+If you know the VM folder path, run something like:
+```powershell
+Get-ChildItem "H:\Path\To\VmFolder" -Recurse -Include *.vhd,*.vhdx,*.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+That will help us see whether you have:
+- one orphaned `.avhdx`, or
+- a whole chain.
+
+## Likely outcomes
+
+### Case A: VM is attached directly to the `.avhd`/`.avhdx`
+That means the child disk is the active disk. In that case, a manual `Merge-VHD` may be needed if Hyper-V wonâ€™t auto-merge it, and Microsoft says `Merge-VHD` is an **offline** operation â€” the chain must not be attached when the merge is initiated. ([learn.microsoft.com](https://learn.microsoft.com/en-us/powershell/module/hyper-v/merge-vhd?view=windowsserver2025-ps&utm_source=openai))
+
+### Case B: VM is attached to the base `.vhd`/`.vhdx`, but extra `.avhdx` files are lying around
+Then we need to determine whether those `.avhdx` files are stale leftovers from backup/checkpoint activity. Microsoft notes that hidden/unmerged checkpoints can leave `.avhdx` files on disk even when not shown in Hyper-V Manager. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+### Case C: There is a chain of multiple `.avhdx` files
+Then we need to inspect parent-child relationships before doing anything. Microsoftâ€™s troubleshooting guidance specifically discusses multi-differencing-disk chains and warns that merging must follow the actual chain. ([learn.microsoft.com](https://learn.microsoft.com/en-us/troubleshoot/windows-server/virtualization/merge-checkpoints-with-many-differencing-disks?utm_source=openai))
+
+## My recommendation
+Run these two commands and paste the results:
+
+```powershell
+Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Select-Object ControllerType, ControllerNumber, ControllerLocation, Path
+```
+
+and then:
+
+```powershell
+Get-VHD -Path "THE-PATH-RETURNED-ABOVE" | Select-Object Path, VhdType, ParentPath, FileSize, Size
+```
+
+## Short version
+You likely have a hidden/orphaned differencing disk situation. The safe next move is to identify the VMâ€™s active disk attachment and inspect its parent chain before merging or deleting anything. Microsoft specifically recommends inspection first and manual merge only when needed, with the VM off. ([learn.microsoft.com](https://learn.microsoft.com/en-us/powershell/module/hyper-v/get-vhd?view=windowsserver2025-ps&utm_source=openai))
+
+## @testsubject117
+
+```
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM"
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMCheckpoint -VMName "AM-Invoice-Dev-VM" | Select-Object VMName, Name, CreationTime
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Select-Object ControllerType, ControllerNumber, ControllerLocation, Path
+
+ControllerType ControllerNumber ControllerLocation Path
+-------------- ---------------- ------------------ ----
+           IDE                0                  0 C:\Hyper-V Machines\Virtual Hard Disks\40 Gb...
+           IDE                1                  1 H:\Hyper V Testing Disks\AM Invoice Clone Fo...
+          SCSI                0                  0 C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd
+
+
+```
+
+## Copilot
+
+Good â€” that already tells us a lot.
+
+## Direct answer
+Your VM has **three attached disks**:
+
+- **IDE 0:0** â†’ one disk in `C:\Hyper-V Machines\Virtual Hard Disks\...`
+- **IDE 1:1** â†’ one disk in `H:\Hyper V Testing Disks\AM Invoice Clone Fo...`
+- **SCSI 0:0** â†’ `C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd`
+
+So before touching any `.avhd`/`.avhdx`, we need to determine **which of those attached disks is the one with the checkpoint/differencing situation**.
+
+## Important note
+From what you pasted, the active attached DOS disk currently shown is:
+
+```text
+C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd
+```
+
+That one is a plain `.vhd`, at least by attachment path.
+
+So the `.avhd`/`.avhdx` may be:
+- attached through one of the truncated paths you didnâ€™t fully show, or
+- sitting in the same folder as a hidden/orphaned child of one of these disks, or
+- unrelated leftover checkpoint data
+
+## Next step: get full paths
+Please run this exact command so we can see the full disk paths without truncation:
+
+```powershell
+Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Format-List ControllerType, ControllerNumber, ControllerLocation, Path
+```
+
+That will print the full paths.
+
+## Then inspect each attached disk
+After that, run these one at a time for each full path returned:
+
+```powershell
+Get-VHD -Path "FULL PATH HERE" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+We want to know:
+- whether each attached disk is `Fixed`, `Dynamic`, or `Differencing`
+- whether any of them has a `ParentPath`
+
+If any attached disk shows:
+
+- `VhdType : Differencing`
+
+then that is the active child disk and likely where the `.avhd` problem lives.
+
+## Also useful: find all AVHD files
+Run this too:
+
+```powershell
+Get-ChildItem "C:\Hyper-V Machines\Virtual Hard Disks" -Recurse -Include *.avhd,*.avhdx,*.vhd,*.vhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+and if that `H:` location is relevant too:
+
+```powershell
+Get-ChildItem "H:\Hyper V Testing Disks" -Recurse -Include *.avhd,*.avhdx,*.vhd,*.vhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+That will show us:
+- where the `.avhd`/`.avhdx` files actually are
+- whether there is just one
+- whether there is a chain
+
+## What we are trying to determine
+We need to answer these questions:
+
+1. Is the VM currently attached to a **base disk** or a **differencing disk**?
+2. Which exact file is the `.avhd`/`.avhdx`?
+3. Is it part of a single parent-child pair, or a longer chain?
+4. Is it attached, or orphaned?
+
+Only after that can we safely decide whether to:
+- merge
+- reconnect
+- or clean up stale files
+
+## Short answer
+Youâ€™re not at the delete-anything stage yet.  
+The next correct move is to get the **full attached paths** and inspect each with `Get-VHD`.
+
+## Please run these next:
+```powershell
+Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Format-List ControllerType, ControllerNumber, ControllerLocation, Path
+```
+
+Then paste that output.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMHardDiskDrive -VMName "AM-Invoice-Dev-VM" | Format-List ControllerType, ControllerNumber, ControllerLocation, Path
+
+
+ControllerType     : IDE
+ControllerNumber   : 0
+ControllerLocation : 0
+Path               : C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd
+
+ControllerType     : IDE
+ControllerNumber   : 1
+ControllerLocation : 1
+Path               : H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx
+
+ControllerType     : SCSI
+ControllerNumber   : 0
+ControllerLocation : 0
+Path               : C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd
+
+
+
+
+## Copilot
+
+Good â€” now we can be precise.
+
+## Whatâ€™s attached right now
+Your VM currently has these attached disks:
+
+- `C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd`
+- `H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx`
+- `C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd`
+
+## Important observation
+None of those attachment paths is an `.avhd`/`.avhdx`.
+
+That means one of two things:
+
+1. the `.avhd`/`.avhdx` is **not currently attached**, and may be orphaned or leftover, or
+2. one of the attached disks is itself a **differencing disk internally**, even though its filename ends in `.vhd`/`.vhdx`
+
+So the next step is to inspect the **disk type** of each attached file.
+
+---
+
+# Run these 3 commands
+
+## 1
+```powershell
+Get-VHD -Path "C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+## 2
+```powershell
+Get-VHD -Path "H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+## 3
+```powershell
+Get-VHD -Path "C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+---
+
+# Also locate the AVHD files
+Run these too:
+
+## 4
+```powershell
+Get-ChildItem "C:\Hyper-V Machines\Virtual Hard Disks" -Recurse -Include *.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+## 5
+```powershell
+Get-ChildItem "H:\Hyper V Testing Disks" -Recurse -Include *.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+---
+
+# What weâ€™re looking for
+We need to find out:
+
+- whether one of the attached disks is actually `Differencing`
+- where the `.avhd` or `.avhdx` file lives
+- whether that `.avhd` belongs to one of these disks
+- whether it is stale or active
+
+If the attached disks all come back as:
+- `Fixed`
+- or `Dynamic`
+
+with no `ParentPath`, then the `.avhd` is likely leftover and not currently active.
+
+If one comes back as:
+- `VhdType : Differencing`
+
+then thatâ€™s the chain we need to fix.
+
+---
+
+# Short answer
+Youâ€™re close â€” we now know the VM is not directly attached to a visibly named `.avhd` file.  
+The next step is to inspect the disk metadata with `Get-VHD` and separately locate the `.avhd` files on disk.
+
+Paste the output of those 5 commands and Iâ€™ll tell you exactly whatâ€™s safe to do next.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VHD -Path "C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+
+
+Path       : C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd
+VhdType    : Fixed
+ParentPath :
+FileSize   : 150323855872
+Size       : 150323855360
+
+
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VHD -Path "H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx" | Format-List Path, VhdType, ParentPath, FileSize, Size
+
+
+Path       : H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx
+VhdType    : Fixed
+ParentPath :
+FileSize   : 214752559104
+Size       : 214748364800
+
+
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VHD -Path "C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+
+
+Path       : C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd
+VhdType    : Fixed
+ParentPath :
+FileSize   : 2146435584
+Size       : 2146435072
+
+
+
+
+## Copilot
+
+Good news: **all three attached disks are plain fixed disks with no parent chain**.
+
+## Direct answer
+That means the VM is **not currently using any checkpoint/differencing disk**.
+
+Specifically:
+
+- `40 Gb VHD Disk.vhd` â†’ `VhdType: Fixed`
+- `AM Invoice Clone For Code Testing Win10 Drive.vhdx` â†’ `VhdType: Fixed`
+- `DOS5.vhd` â†’ `VhdType: Fixed`
+
+and all three have:
+
+- `ParentPath :` empty
+
+So there is **no active AVHD chain attached to this VM right now**.
+
+---
+
+# What this means
+If you saw an `.avhd` or `.avhdx` file somewhere, it is most likely:
+
+- a **leftover orphan**
+- a **failed/incomplete checkpoint artifact**
+- or a file belonging to something else, but **not the currently attached active disks** for this VM
+
+So this is actually a much safer situation than I was worried about.
+
+---
+
+# Next step
+Now we need to locate the `.avhd` / `.avhdx` file you saw and confirm exactly where it is.
+
+## Run these two commands
+
+```powershell
+Get-ChildItem "C:\Hyper-V Machines\Virtual Hard Disks" -Recurse -Include *.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+```powershell
+Get-ChildItem "H:\Hyper V Testing Disks" -Recurse -Include *.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+```
+
+---
+
+# If those commands find nothing
+Then the `.avhd` may have been:
+- in another folder
+- already merged/deleted
+- or misread
+
+---
+
+# If they do find one
+Then the next step is to inspect that file directly with:
+
+```powershell
+Get-VHD -Path "FULL PATH TO THE AVHDX FILE" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+That will tell us whether it points back to one of your base disks.
+
+---
+
+# Can you delete it?
+**Not yet.**  
+Even though it looks likely to be leftover, I still want to confirm the exact `.avhd` file path first before telling you itâ€™s safe to remove or archive.
+
+But the key result now is:
+
+## Important conclusion
+**Your VM is already back on normal base disks. It is not currently dependent on an AVHD checkpoint chain.**
+
+Thatâ€™s the big safety answer.
+
+---
+
+# Short answer
+The current VM is using only fixed base disks, not AVHD differencing disks. So the extra AVHD file you saw is almost certainly not active for this VM. Now we just need to locate that file and verify what it belongs to before deciding whether to delete it.
+
+Paste the output of the two `Get-ChildItem` commands and Iâ€™ll tell you the safest cleanup step.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-ChildItem "H:\Hyper V Testing Disks" -Recurse -Include *.avhd,*.avhdx | Select-Object FullName, Length, LastWriteTime
+
+FullName                                                                                    Length
+--------                                                                                    ------
+H:\Hyper V Testing Disks\140Gb_BlankDisk_0B442E7F-456A-4865-BB93-7F758CD768B6.avhd       ...631680
+H:\Hyper V Testing Disks\140Gb_BlankDisk_27253172-5BB6-43BF-B8DB-7A94B1AC2B31.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_28388298-6426-4D29-925F-7CB76D2A77B2.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_3B268073-38FE-46DB-AFF0-7338015DF74B.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_3F0E2287-9E3F-4A1A-98DE-B71221AF9712.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_4919EE13-7AA8-4500-B7D5-008A6F3B29BF.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_5C5906FF-EE03-4666-9D56-D8AFC2D202B3.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_685060D1-6FF9-41DA-9ACF-C309AF2AC749.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_8102EAB3-15DD-4D66-B127-567351925170.avhd        10870784
+H:\Hyper V Testing Disks\140Gb_BlankDisk_8C1905E8-CB5A-4F06-8822-2615AD449246.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_96E9E2EF-6487-43A6-96FD-CAEF7BD4AD13.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_9D4E0E29-5BA0-4684-9EC2-947003D9BA8E.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_A42EE5E6-507E-404F-8D99-CA93255C26C4.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_A5D85B41-C10B-461C-83D8-2A0EB56CF73B.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_A9148D8D-D8EC-4642-9B02-143ED6562E6A.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_C63411DE-A5A9-4830-BAA6-CBFF044BFE00.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_E1A1C0EC-29A0-416D-8BBC-472F27C28594.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_E81211BD-667B-45F0-8CD9-8644539435D4.avhd          364544
+H:\Hyper V Testing Disks\140Gb_BlankDisk_F48042D3-6FCF-4CE4-8DFC-D641D7BCDE96.avhd          364544
+H:\Hyper V Testing Disks\40 Gb VHD Disk 2_7190D46D-783B-4B6A-860C-241189EB7F31.avhd         364544
+H:\Hyper V Testing Disks\40 Gb VHD Disk 2_B5AFBE00-A8D1-45F2-9D4C-F825A97B3A9A.avhd         364544
+H:\Hyper V Testing Disks\InvoiceW10_1F0C9349-6292-4712-A278-815DC6F3F696.avhd            855367680
+H:\Hyper V Testing Disks\InvoiceW10_C493BBD2-7DDD-4B22-B767-C8B62734CB2A.avhd               159744
+H:\Hyper V Testing Disks\New Virtual Hard Disk_9DDF0C04-8726-41F1-83C9-A96D717E9A63.avhd  10600448
+H:\Hyper V Testing Disks\New Virtual Hard Disk_F3488F82-DE32-46D1-8AD3-1C1F22C48EC4.avhd   2195456
+
+
+
+## Copilot
+
+Good â€” now we know the issue.
+
+## Direct answer
+Those `.avhd` files are **not part of the currently attached active disks** for `AM-Invoice-Dev-VM`, based on the `Get-VHD` results you already ran.
+
+So for **this VM**, you are already back on normal fixed base disks.
+
+## What these files likely are
+Those files in `H:\Hyper V Testing Disks\` are very likely:
+
+- old checkpoint remnants
+- old test VM artifacts
+- old backup/checkpoint differencing disks
+- possibly from previously attached disks that are no longer in use
+
+The strongest clue is that the filenames do **not** match the three currently attached active disk files:
+
+Current active attached disks:
+- `C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd`
+- `H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx`
+- `C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd`
+
+But the AVHDs are things like:
+- `140Gb_BlankDisk_...avhd`
+- `InvoiceW10_...avhd`
+- `40 Gb VHD Disk 2_...avhd`
+- `New Virtual Hard Disk_...avhd`
+
+That makes them look like **leftover historical differencing disks**, not current live dependencies.
+
+---
+
+# Important caution
+Even though this looks safe-ish, I still would **not mass-delete them blindly yet**.
+
+Because:
+- they may belong to old test VMs
+- they may be parent/child-related to disks not currently attached
+- one or two may still matter for some abandoned VM config
+
+---
+
+# Best cleanup approach
+## Option 1 â€” safest
+Move them into a quarantine folder instead of deleting them immediately.
+
+For example:
+
+```powershell
+New-Item -ItemType Directory -Path "H:\Hyper V Testing Disks\_OldAVHD_Quarantine" -Force
+```
+
+Then move the obvious old AVHDs there.
+
+That way:
+- your current VM remains unaffected
+- you can restore them if something unexpectedly references one later
+
+---
+
+# Before moving them, one more check
+Letâ€™s verify whether any Hyper-V VM on the host is currently using one of those AVHD files.
+
+Run:
+
+```powershell
+Get-VMHardDiskDrive -VMName * | Select-Object VMName, Path
+```
+
+If you only have one VM, this may be simple.  
+If no VM path points to any `.avhd`, thatâ€™s a very strong sign they are stale leftovers.
+
+---
+
+# Also inspect one of the suspicious AVHDs
+Letâ€™s check one representative file, especially a larger one like:
+
+- `H:\Hyper V Testing Disks\InvoiceW10_1F0C9349-6292-4712-A278-815DC6F3F696.avhd`
+
+Run:
+
+```powershell
+Get-VHD -Path "H:\Hyper V Testing Disks\InvoiceW10_1F0C9349-6292-4712-A278-815DC6F3F696.avhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+And maybe also this one:
+
+```powershell
+Get-VHD -Path "H:\Hyper V Testing Disks\140Gb_BlankDisk_0B442E7F-456A-4865-BB93-7F758CD768B6.avhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+That tells us what base disk they think they belong to.
+
+---
+
+# Practical recommendation for you
+Because your real goal is:
+- get back to one reliable disk for active work
+- create a second DOS-only VM later
+
+you are already basically there for the active VM.
+
+So the cleanup can be conservative:
+
+## Safe plan
+1. verify no VM is attached to `.avhd`
+2. inspect 1â€“2 of the bigger AVHD files
+3. move all stale AVHDs to quarantine, not delete
+4. only delete later after a few successful boots/tests
+
+---
+
+# Why I do not want to tell you â€œjust delete themâ€
+Because there are **many** of them, and they clearly came from several older experiments.  
+That means the risk is not with your current active VM â€” the risk is accidentally breaking some forgotten older test setup.
+
+---
+
+# Short answer
+**Your current VM is not using those AVHD files. They appear to be stale leftovers in `H:\Hyper V Testing Disks`. The safest cleanup is to verify no VM is attached to them, then move them to a quarantine folder instead of deleting them outright.**
+
+## Next commands I want you to run:
+```powershell
+Get-VMHardDiskDrive -VMName * | Select-Object VMName, Path
+```
+
+and:
+
+```powershell
+Get-VHD -Path "H:\Hyper V Testing Disks\InvoiceW10_1F0C9349-6292-4712-A278-815DC6F3F696.avhd" | Format-List Path, VhdType, ParentPath, FileSize, Size
+```
+
+Paste those and Iâ€™ll tell you whether itâ€™s safe to quarantine the whole batch.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> Get-VMHardDiskDrive -VMName * | Select-Object VMName, Path
+
+VMName            Path
+------            ----
+AM-Invoice-Dev-VM C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd
+AM-Invoice-Dev-VM H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx
+AM-Invoice-Dev-VM C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd
+
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms>
+
+## Copilot
+
+Good â€” that confirms it.
+
+## Direct answer
+**No current Hyper-V VM is attached to any `.avhd` file.**  
+Your only registered VM, `AM-Invoice-Dev-VM`, is attached only to:
+
+- `C:\Hyper-V Machines\Virtual Hard Disks\40 Gb VHD Disk.vhd`
+- `H:\Hyper V Testing Disks\AM Invoice Clone For Code Testing Win10 Drive.vhdx`
+- `C:\Hyper-V Machines\Virtual Hard Disks\DOS5.vhd`
+
+So the `.avhd` files in `H:\Hyper V Testing Disks\` are **not active attachments for any current VM**.
+
+---
+
+# What that means
+Those `.avhd` files are almost certainly **orphaned leftovers** from:
+- old checkpoints
+- old temporary VM states
+- old test disks
+- old abandoned VM experiments
+
+So for your current working VM, they are **not in use**.
+
+---
+
+# Safest recommendation
+## Do this:
+**Move them to a quarantine folder first, not permanent delete.**
+
+That gives you:
+- cleanup
+- safety
+- rollback if needed
+
+---
+
+# Safe cleanup steps
+
+## 1. Create quarantine folder
+```powershell
+New-Item -ItemType Directory -Path "H:\Hyper V Testing Disks\_OldAVHD_Quarantine" -Force
+```
+
+## 2. Move all `.avhd` files into it
+```powershell
+Get-ChildItem "H:\Hyper V Testing Disks" -File -Include *.avhd,*.avhdx |
+    Move-Item -Destination "H:\Hyper V Testing Disks\_OldAVHD_Quarantine"
+```
+
+If that doesnâ€™t catch them because of PowerShell wildcard behavior, use this safer version:
+
+```powershell
+Get-ChildItem "H:\Hyper V Testing Disks" -File |
+    Where-Object { $_.Extension -in ".avhd", ".avhdx" } |
+    Move-Item -Destination "H:\Hyper V Testing Disks\_OldAVHD_Quarantine"
+```
+
+## 3. Then test
+After moving them:
+- boot `AM-Invoice-Dev-VM`
+- verify DOS boot still works
+- verify Windows boot still works
+- verify your VB test flow still works
+
+If everything is fine after a few days, then you can delete the quarantine folder contents later.
+
+---
+
+# Why this is safe enough
+Because we verified:
+- no visible checkpoints
+- no current VM uses differencing disks
+- no current VM is attached to `.avhd`
+- all attached current disks are fixed base disks
+
+That is the exact combination you wanted to see before cleanup.
+
+---
+
+# Small caution
+If any of those `.avhd` files belong to some **unregistered old VM configuration file** that you might later try to resurrect manually, moving them could affect that old abandoned config.  
+But it will **not** affect your current registered VM.
+
+---
+
+# Best next move after cleanup
+Once you quarantine them and confirm the current VM still works, youâ€™ll be in a much cleaner position to:
+
+- copy `DOS5.vhd`
+- create a second DOS-only VM
+- keep the DOS reference available full-time
+
+---
+
