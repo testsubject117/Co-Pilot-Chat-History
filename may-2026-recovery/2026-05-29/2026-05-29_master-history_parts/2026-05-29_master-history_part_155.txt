@@ -1,0 +1,2000 @@
+﻿
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        ' Wire up events
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+
+        ' Add to form; order determines docking priority
+        Controls.Add(dgv)        ' Fill  (added first)
+        Controls.Add(pnlInvoice) ' Bottom
+        Controls.Add(topPanel)   ' Top   (added last)
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("") ' all
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("") ' all
+        ' We don't know min/max upfront; just provide a reasonable range + all.
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        ' Clear current view so we never display stale data if the file is missing/unreadable.
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2) ' DOS compared last 2 digits
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    ' Invoice details
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                    ' Best-effort; proceed with the empty index built so far.
+                End Try
+
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                    ' Form was closed while the background task was running; ignore.
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+```
+
+---
+
+## What this gives you
+For button **(3)**:
+
+- no more grey popup dialog
+- prompt happens inline on the Checks menu form
+- Enter advances through the 3 DOS-like prompts
+- Esc cancels prompt mode
+- the entered values are actually applied to `FormLedgerView`
+- the ledger view itself is styled darker/DOS-like instead of default Windows grey
+
+---
+
+## One important note
+This is a **full-file replacement** approach, but I have not compiled it here. It is designed to fit the code you showed, but if your local tree has even slight differences, you may need tiny adjustments.
+
+## Recommended test order
+1. press `(3)` on Checks menu
+2. confirm inline prompt appears on same screen
+3. press Enter with blank values
+4. confirm `FormLedgerView` opens
+5. test with:
+   - customer only
+   - check only
+   - year only
+   - Esc during prompt flow
+
+---
+
+If you want, after you test `(3)`, I can do the same thing for **button `(5)`** next.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30037	Character is not valid.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	1	
+Error (active)	BC30627	'Option' statements must precede any declarations or 'Imports' statements.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	2	
+Error (active)	BC30465	'Imports' statements must precede any declarations.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	4	
+Error (active)	BC30465	'Imports' statements must precede any declarations.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	5	
+Error (active)	BC30465	'Imports' statements must precede any declarations.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb	6	
+Error (active)	WFO1000	A property should determine its property content serialization with the DesignerSerializationVisibilityAttribute, DefaultValueAttribute or the ShouldSerializeProperty method.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerView.vb	19	
+Error (active)	WFO1000	A property should determine its property content serialization with the DesignerSerializationVisibilityAttribute, DefaultValueAttribute or the ShouldSerializeProperty method.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerView.vb	20	
+Error (active)	WFO1000	A property should determine its property content serialization with the DesignerSerializationVisibilityAttribute, DefaultValueAttribute or the ShouldSerializeProperty method.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerView.vb	21	
+
+
+## Copilot
+
+Good â€” these errors are straightforward.
+
+## What happened
+
+### 1. `BC30037 Character is not valid` on line 1
+That almost certainly means the file was pasted with a **hidden Unicode/BOM character** at the start of `FormLedgerMenu.vb`.
+
+Specifically, this usually comes from the leading invisible character before:
+
+```vb
+Option Strict Off
+```
+
+In the replacement I gave, line 1 began with:
+
+```vb
+ï»¿Option Strict Off
+```
+
+That invisible character can trigger exactly this error in some paste/edit situations.
+
+### 2. The `Option` / `Imports` errors
+Those are just downstream from line 1 being malformed. Once the hidden character is removed, those usually disappear.
+
+### 3. `WFO1000` on the `Initial...Filter` properties
+Those are WinForms designer warnings because the designer sees public properties on a form and wants serialization guidance.
+
+They are not logic errors, but we should fix them cleanly.
+
+---
+
+# Fixes
+
+## Fix 1: replace the first lines of `FormLedgerMenu.vb`
+Make sure the file begins **exactly** like this, with no hidden leading character:
+
+```vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+If needed:
+- delete line 1 completely
+- retype it manually
+- save as UTF-8 without weird leading characters if your editor allows it
+
+---
+
+## Fix 2: suppress designer serialization warnings cleanly
+In `FormLedgerView.vb`, add these imports:
+
+```vb
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+```
+
+Then decorate the three public properties like this:
+
+```vb
+<Browsable(False)>
+<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+Public Property InitialCustomerFilter As String = ""
+
+<Browsable(False)>
+<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+Public Property InitialCheckFilter As String = ""
+
+<Browsable(False)>
+<DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+Public Property InitialYearFilter As String = ""
+```
+
+That should eliminate the `WFO1000` warnings.
+
+---
+
+# Corrected full replacement: `FormLedgerMenu.vb`
+Use this version and make sure there is **no hidden character before `Option Strict Off`**.
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Private Enum ViewChecksPromptStep
+        None = 0
+        Customer = 1
+        CheckNumber = 2
+        Year = 3
+    End Enum
+
+    Private ReadOnly pnlPromptHost As New Panel()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtPrompt As New TextBox()
+
+    Private _viewChecksPromptStep As ViewChecksPromptStep = ViewChecksPromptStep.None
+    Private _viewChecksCustomer As String = ""
+    Private _viewChecksCheckNumber As String = ""
+    Private _viewChecksYear As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+        BuildInlinePromptUi()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                    Using f As New FormLedgerDoesntBalance()
+                                                                        f.ShowDialog(Me)
+                                                                    End Using
+                                                                End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub BuildInlinePromptUi()
+        pnlPromptHost.Visible = False
+        pnlPromptHost.Dock = DockStyle.Bottom
+        pnlPromptHost.Height = 80
+        pnlPromptHost.BackColor = Color.FromArgb(32, 32, 32)
+        pnlPromptHost.Padding = New Padding(18, 10, 18, 12)
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Dock = DockStyle.Top
+        lblPrompt.Height = 26
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = pnlPromptHost.BackColor
+        lblPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtPrompt.Dock = DockStyle.Top
+        txtPrompt.BorderStyle = BorderStyle.FixedSingle
+        txtPrompt.BackColor = Color.Black
+        txtPrompt.ForeColor = Color.White
+        txtPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtPrompt.MaxLength = 100
+
+        AddHandler txtPrompt.KeyDown, AddressOf OnPromptTextBoxKeyDown
+
+        pnlPromptHost.Controls.Add(txtPrompt)
+        pnlPromptHost.Controls.Add(lblPrompt)
+
+        Controls.Add(pnlPromptHost)
+        pnlPromptHost.BringToFront()
+    End Sub
+
+    Private Sub BeginViewChecksPromptFlow()
+        _viewChecksCustomer = ""
+        _viewChecksCheckNumber = ""
+        _viewChecksYear = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.Customer
+
+        ShowPrompt("Enter customer name [Enter = all customers] ?", "")
+    End Sub
+
+    Private Sub ShowPrompt(promptText As String, currentValue As String)
+        lblPrompt.Text = promptText
+        txtPrompt.Text = currentValue
+        pnlPromptHost.Visible = True
+        txtPrompt.SelectionStart = txtPrompt.TextLength
+        txtPrompt.SelectionLength = 0
+        txtPrompt.Focus()
+    End Sub
+
+    Private Sub HidePrompt()
+        pnlPromptHost.Visible = False
+        lblPrompt.Text = ""
+        txtPrompt.Text = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.None
+        Me.Focus()
+    End Sub
+
+    Private Sub OnPromptTextBoxKeyDown(sender As Object, e As KeyEventArgs)
+        If _viewChecksPromptStep = ViewChecksPromptStep.None Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            e.Handled = True
+            HidePrompt()
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then
+            Return
+        End If
+
+        e.SuppressKeyPress = True
+        e.Handled = True
+
+        Dim value As String = txtPrompt.Text.Trim()
+
+        Select Case _viewChecksPromptStep
+            Case ViewChecksPromptStep.Customer
+                _viewChecksCustomer = value
+                _viewChecksPromptStep = ViewChecksPromptStep.CheckNumber
+                ShowPrompt("Enter Check Number [Enter = All Checks] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.CheckNumber
+                _viewChecksCheckNumber = value
+                _viewChecksPromptStep = ViewChecksPromptStep.Year
+                ShowPrompt("Enter Year [Enter = All Years] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.Year
+                _viewChecksYear = value
+                HidePrompt()
+                OpenLedgerViewWithPromptValues()
+                Return
+        End Select
+    End Sub
+
+    Private Sub OpenLedgerViewWithPromptValues()
+        Using f As New FormLedgerView()
+            f.InitialCustomerFilter = _viewChecksCustomer
+            f.InitialCheckFilter = _viewChecksCheckNumber
+            f.InitialYearFilter = NormalizeYearFilter(_viewChecksYear)
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function NormalizeYearFilter(value As String) As String
+        Dim s As String = If(value, "").Trim()
+
+        If s = "" Then
+            Return ""
+        End If
+
+        Dim yearNum As Integer
+        If Integer.TryParse(s, yearNum) Then
+            If s.Length <= 2 Then
+                If yearNum <= 79 Then
+                    Return (2000 + yearNum).ToString()
+                Else
+                    Return (1900 + yearNum).ToString()
+                End If
+            End If
+
+            If s.Length = 4 Then
+                Return s
+            End If
+        End If
+
+        Return s
+    End Function
+
+End Class
+```
+
+---
+
+# Corrected full replacement: `FormLedgerView.vb`
+
+```vbnet name=AMiOffice/FormLedgerView.vb
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCustomerFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCheckFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialYearFilter As String = ""
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+        ApplyInitialFilters()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        BackColor = Color.FromArgb(32, 32, 32)
+        ForeColor = Color.White
+
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2,
+            .BackColor = Color.FromArgb(32, 32, 32),
+            .Padding = New Padding(8)
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+
+        Dim labelFont As New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        Dim lblCustomer As New Label() With {
+            .Text = "Customer:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblCheck As New Label() With {
+            .Text = "Check #:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblYear As New Label() With {
+            .Text = "Year:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("")
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("")
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2)
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                End Try
+
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+```
+
+---
+
+## What to do right now
+1. re-paste `FormLedgerMenu.vb`, but **manually type the first line**
+2. replace `FormLedgerView.vb` with the corrected version above
+3. rebuild
+
+## If it still errors
+Paste the new error list and Iâ€™ll tighten it up from there.
+
+## @testsubject117
+
+ok, this does look better and feel better, however it's kind of hard to see, the enter customer name field appears at the bottom of the checks menu window and overlaps the (S) button, making it a little hard to see. it would be better if we could shrink those buttons on the checks menu a bit to give more room at the bottom for the text field, and then maybe put a line or separator above enter customer name in light grey to it's easier to see?
+
+## Copilot
+
+Yes â€” that makes sense.
+
+## Direct answer
+The inline prompt approach is the right direction, but the **layout needs refinement**:
+
+- the prompt area should have its own visual space
+- it should **not overlap or crowd the `(S)` button**
+- and a separator above it would make the DOS-style input zone clearer
+
+So the next change should be:
+
+### refine `FormLedgerMenu.vb` layout for the inline prompt area
+
+---
+
+## What to change
+
+### 1. Make the menu buttons shorter
+Right now the buttons are taking too much vertical space.
+
+In `DosMenuFormBase`, menu buttons are created with:
+
+```vb
+btn.Height = 36
+```
+
+Thatâ€™s probably a bit too tall for the Checks menu if you also want a prompt region at the bottom.
+
+For this menu, reducing them to something like:
+- `30`
+or
+- `28`
+
+would likely free enough room.
+
+### Important detail
+You probably **do not** want to change the base class globally yet, because that would affect all menus.
+
+So for now, the best move is:
+
+- after `BuildLedgerMenu()` runs in `FormLedgerMenu`,
+- loop through `flpLeft.Controls`
+- find each button
+- reduce height and maybe tighten margin
+
+That keeps the change local to the Checks menu.
+
+---
+
+### 2. Increase reserved prompt area height slightly
+Your prompt host is currently:
+
+```vb
+pnlPromptHost.Height = 80
+```
+
+Thatâ€™s not bad, but once you add a separator and want a little breathing room, something like:
+- `90`
+or
+- `96`
+
+may work better.
+
+---
+
+### 3. Add a separator line above the prompt
+Yes â€” that would help a lot visually.
+
+Add a small `Panel` above the prompt label:
+- `Height = 1` or `2`
+- `BackColor = Color.Gray` or light gray
+
+That will create a clear division between:
+- menu button area
+- prompt/input area
+
+That is exactly the kind of visual structure youâ€™re asking for.
+
+---
+
+### 4. Add a little more top padding inside the prompt area
+Right now the prompt area is probably too tight.
+
+A bit more padding above the prompt text and textbox will help it feel like its own region.
+
+---
+
+## Best targeted fix
+This is not a logic problem now â€” itâ€™s a **layout tuning pass**.
+
+So I would adjust only `FormLedgerMenu.vb`:
+
+- shrink Checks menu buttons locally
+- add a separator line
+- slightly enlarge and pad the prompt region
+
+---
+
+## Recommended concrete values
+Hereâ€™s the kind of tuning Iâ€™d use:
+
+- button height: `30`
+- button bottom margin: `4` instead of `6`
+- prompt panel height: `92`
+- separator line height: `2`
+- separator color: `Color.Silver` or `Color.Gray`
+
+That should give you:
+- more breathing room
+- clearer separation
+- better readability
+
+---
+
+## Summary
+Yes â€” your requested refinement is exactly right:
+
+- **shrink the Checks menu buttons a bit**
+- **reserve more room for the inline prompt**
+- **add a light grey separator line above it**
+
+That should make `(3)` feel much cleaner.
+
+If you want, I can give you the **full updated replacement for `FormLedgerMenu.vb` only** with those layout improvements.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Itâ€™s a screenshot of a VB.NET WinForms **CHECKS** menu styled to resemble a DOS application.
+
+### Whatâ€™s visible
+- A dark window titled **CHECKS**
+- Large yellow **CHECKS** header at top-left
+- Yellow date/time at top-right:
+  - **Wednesday 05-20-2026**
+  - **11:08:33 AM**
+- A vertical list of black menu buttons with white text on the left:
+  - `(1) Add Checks to ledger cash receipts`
+  - `(2) Delete Checks`
+  - `(3) View Checks`
+  - `(5) View Companys Totals`
+  - `(6) Add OTHER Checks`
+  - `(7) Delete OTHER Checks`
+  - `(8) View OTHER Checks`
+  - `(9) Find a Check #`
+  - `(0) Find an Invoice #`
+  - `(A) Find Checks that don't balance.`
+  - `(S) Sales Employee's checks`
+
+### What is happening
+The form is currently in an **inline prompt state** for option `(3) View Checks`.
+
+At the bottom of the window, instead of a popup dialog, there is:
+- a DOS-style prompt line:
+  - **Enter customer name [Enter = all customers] ?**
+- and beneath it, a black text entry field with a white border/caret
+
+### Overall impression
+The interface looks much closer to the DOS app than before, because:
+- the prompt now appears **inside the same screen**
+- the popup dialog is gone
+- the black/yellow/white color scheme is consistent
+
+### Remaining issue visible in the image
+The prompt area is a little cramped:
+- it sits very close to the bottom of the menu list
+- the `(S) Sales Employee's checks` button is nearly touching/partially crowded by the prompt region
+- there is no strong divider above the prompt area, so it blends into the button list more than ideal
+
+So visually, it looks like a **successful first pass at DOS-style inline prompting**, but still needs some layout breathing room and separation.
+
+## @testsubject117
+
+yes, can you make that change?
+
+## Copilot
+
+Yes â€” make these changes in **`FormLedgerMenu.vb`** only:
+
+## What to change
+1. **Shrink the Checks menu buttons locally**
+2. **Add a light gray separator line above the prompt**
+3. **Give the prompt area a bit more dedicated space**
+
+---
+
+## Replace `AMiOffice/FormLedgerMenu.vb` with this updated version
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Private Enum ViewChecksPromptStep
+        None = 0
+        Customer = 1
+        CheckNumber = 2
+        Year = 3
+    End Enum
+
+    Private ReadOnly pnlPromptHost As New Panel()
+    Private ReadOnly pnlPromptSeparator As New Panel()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtPrompt As New TextBox()
+
+    Private _viewChecksPromptStep As ViewChecksPromptStep = ViewChecksPromptStep.None
+    Private _viewChecksCustomer As String = ""
+    Private _viewChecksCheckNumber As String = ""
+    Private _viewChecksYear As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+        TightenChecksMenuButtons()
+        BuildInlinePromptUi()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                    Using f As New FormLedgerDoesntBalance()
+                                                                        f.ShowDialog(Me)
+                                                                    End Using
+                                                                End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub TightenChecksMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+    Private Sub BuildInlinePromptUi()
+        pnlPromptHost.Visible = False
+        pnlPromptHost.Dock = DockStyle.Bottom
+        pnlPromptHost.Height = 96
+        pnlPromptHost.BackColor = Color.FromArgb(32, 32, 32)
+        pnlPromptHost.Padding = New Padding(12, 8, 12, 10)
+
+        pnlPromptSeparator.Dock = DockStyle.Top
+        pnlPromptSeparator.Height = 2
+        pnlPromptSeparator.BackColor = Color.Silver
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Dock = DockStyle.Top
+        lblPrompt.Height = 28
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = pnlPromptHost.BackColor
+        lblPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblPrompt.Padding = New Padding(0, 8, 0, 0)
+
+        txtPrompt.Dock = DockStyle.Top
+        txtPrompt.Height = 30
+        txtPrompt.BorderStyle = BorderStyle.FixedSingle
+        txtPrompt.BackColor = Color.Black
+        txtPrompt.ForeColor = Color.White
+        txtPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtPrompt.MaxLength = 100
+        txtPrompt.Margin = New Padding(0, 6, 0, 0)
+
+        AddHandler txtPrompt.KeyDown, AddressOf OnPromptTextBoxKeyDown
+
+        pnlPromptHost.Controls.Add(txtPrompt)
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptHost.Controls.Add(pnlPromptSeparator)
+
+        Controls.Add(pnlPromptHost)
+        pnlPromptHost.BringToFront()
+    End Sub
+
+    Private Sub BeginViewChecksPromptFlow()
+        _viewChecksCustomer = ""
+        _viewChecksCheckNumber = ""
+        _viewChecksYear = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.Customer
+
+        ShowPrompt("Enter customer name [Enter = all customers] ?", "")
+    End Sub
+
+    Private Sub ShowPrompt(promptText As String, currentValue As String)
+        lblPrompt.Text = promptText
+        txtPrompt.Text = currentValue
+        pnlPromptHost.Visible = True
+        txtPrompt.SelectionStart = txtPrompt.TextLength
+        txtPrompt.SelectionLength = 0
+        txtPrompt.Focus()
+    End Sub
+
+    Private Sub HidePrompt()
+        pnlPromptHost.Visible = False
+        lblPrompt.Text = ""
+        txtPrompt.Text = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.None
+        Me.Focus()
+    End Sub
+
+    Private Sub OnPromptTextBoxKeyDown(sender As Object, e As KeyEventArgs)
+        If _viewChecksPromptStep = ViewChecksPromptStep.None Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            e.Handled = True
+            HidePrompt()
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then
+            Return
+        End If
+
+        e.SuppressKeyPress = True
+        e.Handled = True
+
+        Dim value As String = txtPrompt.Text.Trim()
+
+        Select Case _viewChecksPromptStep
+            Case ViewChecksPromptStep.Customer
+                _viewChecksCustomer = value
+                _viewChecksPromptStep = ViewChecksPromptStep.CheckNumber
+                ShowPrompt("Enter Check Number [Enter = All Checks] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.CheckNumber
+                _viewChecksCheckNumber = value
+                _viewChecksPromptStep = ViewChecksPromptStep.Year
+                ShowPrompt("Enter Year [Enter = All Years] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.Year
+                _viewChecksYear = value
+                HidePrompt()
+                OpenLedgerViewWithPromptValues()
+                Return
+        End Select
+    End Sub
+
+    Private Sub OpenLedgerViewWithPromptValues()
+        Using f As New FormLedgerView()
+            f.InitialCustomerFilter = _viewChecksCustomer
+            f.InitialCheckFilter = _viewChecksCheckNumber
+            f.InitialYearFilter = NormalizeYearFilter(_viewChecksYear)
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function NormalizeYearFilter(value As String) As String
+        Dim s As String = If(value, "").Trim()
+
+        If s = "" Then
+            Return ""
+        End If
+
+        Dim yearNum As Integer
+        If Integer.TryParse(s, yearNum) Then
+            If s.Length <= 2 Then
+                If yearNum <= 79 Then
+                    Return (2000 + yearNum).ToString()
+                Else
+                    Return (1900 + yearNum).ToString()
+                End If
+            End If
+
+            If s.Length = 4 Then
+                Return s
+            End If
+        End If
+
+        Return s
+    End Function
+
+End Class
+```
+
+---
+
+## What this should improve
+- `(S)` will no longer feel jammed against the prompt
+- the prompt area will feel more intentional
+- the separator line will visually distinguish:
+  - menu choices above
+  - prompt/input area below
+
+## Expected result
+The bottom of the Checks menu should now look more like:
+- menu list ends a little sooner
+- thin silver divider line
+- prompt text
+- input field
+
+That should make button `(3)` feel cleaner and easier to read.
+
+If you want, after you test this, we can move directly to **button `(5)`**.
+
+## @testsubject117
+
+ok, I think that fixed it. Now when I continue and choose enter for all, enter for all, enter for all, a new windows pops up with customer or company names, datetext, checknumber, invoiceDiff, amount and reference, however a few things. first off, does it need to say datetext? can't it just say Date? also, the InvoiceDiff column is not populated. We had noticed that before and worked on it and at one point had actually gotten it working, but now it looks like no invoice numbers are populating except the very last entry which is a fake entry I made yesterday when we were testing button (2), it's PSIBEARI on 5/19/26 check number 7777 invoicediff has a 0, it's the only entry that has anything under InvoiceDiff. amount .72 reference 12345678. my point about this is, I find it interesting that no invoices populate except the test one I did yesterday and it says 0: 
+
+## Copilot
+
+Yes â€” several useful things are visible here.
+
+## What the image shows
+This is the **`Ledger - View Checks`** screen in the VB.NET app after you chose:
+
+- Enter for all customers
+- Enter for all checks
+- Enter for all years
+
+### Top filter bar
+At the top are filters and controls:
+- **Customer:** text box
+- **Check #:** text box
+- **Year:** dropdown
+- **Month:** dropdown
+- **Refresh** button
+
+### Summary
+Under that, the app shows:
+- **Total: `$78,272,967.42`**
+
+### Main grid columns currently visible
+The grid is showing these headers:
+- **Customer**
+- **DateText**
+- **CheckNumber**
+- **InvoiceDiff**
+- **Amount**
+- **Reference**
+
+### Main issue visible
+Most rows have:
+- **blank `InvoiceDiff`**
+- while the rest of the row appears populated
+
+The one exception you pointed out is the manually created test row:
+- **PSIBEARI**
+- **5/19/26**
+- **check 7777**
+- **InvoiceDiff = 0**
+- **Amount = .72**
+- **Reference = 12345678**
+
+That is notable because it suggests:
+- the column itself is not broken universally
+- something about the older imported data is not producing values the same way
+- or the old calculation path is no longer being populated for historical rows
+
+### Bottom invoice details panel
+At the bottom, the selected row currently shows:
+- **â€œNo invoice details available (check predates CHECK.INV coverage or has no invoices).â€**
+
+And below that is a details grid with headers:
+- **Invoice #**
+- **Amount**
+- **Company Code**
+- **Status**
+
+But no detail rows are currently populated for the selected entry.
+
+---
+
+## Observations from the screenshot
+
+### 1. `DateText` should probably be renamed
+Yes â€” from a user-facing standpoint, **`DateText`** looks like an internal field/property name, not a polished column header.
+
+A more natural display label would be:
+- **Date**
+
+Same for:
+- **CheckNumber** â†’ probably **Check #**
+- **InvoiceDiff** â†’ maybe **Invoice Diff** or perhaps something even more meaningful depending on what it is supposed to represent
+
+So your instinct is right: those headers look like raw property names rather than intended UI labels.
+
+---
+
+### 2. `InvoiceDiff` is mostly blank, not fully dead
+Thatâ€™s important.
+
+Because your test row shows:
+- `InvoiceDiff = 0`
+
+that suggests:
+- the field exists
+- the grid can display it
+- but the historical rows are arriving with missing/blank values
+
+That could mean one of several things:
+
+#### Possibility A
+Older `LEDGER.CUR` rows do not actually contain a usable invoice-diff value in the way your reader expects.
+
+#### Possibility B
+The reader/parser used to derive or backfill this value, but that logic was changed or lost.
+
+#### Possibility C
+The manually added test row was written through newer logic that explicitly sets `InvoiceDiff`, while old records rely on legacy parsing behavior that isnâ€™t being reconstructed correctly.
+
+#### Possibility D
+The value is being loaded, but the bound property or display path changed.
+
+But since **one row does populate**, it strongly suggests this is **data-path logic**, not just a DataGridView display issue.
+
+---
+
+### 3. The invoice details message is also a clue
+The bottom panel says:
+
+- **No invoice details available (check predates CHECK.INV coverage or has no invoices).**
+
+That suggests the app is trying to map:
+- `Customer + CheckNumber`
+to
+- `CHECK.INV`
+to
+- invoice list/details
+
+If most historical checks are not matching, then either:
+- historical data genuinely predates `CHECK.INV`
+- or the join key / parsing / trimming / normalization isnâ€™t matching properly
+
+That may be related to the `InvoiceDiff` issue, depending on how that value was originally meant to be derived.
+
+---
+
+## Bottom line from this image
+
+### UI issue
+Yes:
+- **`DateText` should probably become `Date`**
+- other headers likely need friendlier names too
+
+### Data issue
+The bigger issue is:
+- **`InvoiceDiff` is mostly not being populated**
+- but not completely broken, because your test row shows `0`
+
+That makes this look like:
+- either a regression,
+- or a mismatch between legacy rows and the current parser/binding logic.
+
+---
+
+## Direct summary
+This screenshot suggests two separate follow-up tasks for `View Checks`:
+
+### Cosmetic / UI cleanup
+- rename raw/internal column headers to user-facing names
+
+### Functional investigation
+- figure out why **historical rows have blank `InvoiceDiff`**
+- while the newly created test row has a value
+
+That is likely the more important issue.
+
+If you want, I can next help you frame exactly what to inspect in the code for:
+1. column header renaming, and  
+2. why `InvoiceDiff` is blank for old rows but `0` for your test record.
+
+## @testsubject117
+
+Lets fix DateText and CheckNumber and InvoiceDiff first
+
+## Copilot
+
+Yes â€” fix the column headers first.
+
+## What to change
+In `FormLedgerView.vb`, the main grid is using:
+
+```vb
+dgv.AutoGenerateColumns = True
+```
+
+Thatâ€™s why youâ€™re seeing raw property names like:
+- `DateText`
+- `CheckNumber`
+- `InvoiceDiff`
+
+The fastest fix is to keep auto-generated columns, but rename their headers **after** binding.
+
+---
+
+## Replace `AMiOffice/FormLedgerView.vb` with this updated version
+
+This version changes only the user-facing column names for the main grid:
+
+- `DateText` â†’ `Date`
+- `CheckNumber` â†’ `Check #`
+- `InvoiceDiff` â†’ `Invoice Diff`
+
+```vbnet name=AMiOffice/FormLedgerView.vb
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCustomerFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCheckFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialYearFilter As String = ""
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+        ApplyInitialFilters()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        BackColor = Color.FromArgb(32, 32, 32)
+        ForeColor = Color.White
+
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2,
+            .BackColor = Color.FromArgb(32, 32, 32),
+            .Padding = New Padding(8)
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+
+        Dim labelFont As New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        Dim lblCustomer As New Label() With {
+            .Text = "Customer:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblCheck As New Label() With {
+            .Text = "Check #:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblYear As New Label() With {
+            .Text = "Year:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft

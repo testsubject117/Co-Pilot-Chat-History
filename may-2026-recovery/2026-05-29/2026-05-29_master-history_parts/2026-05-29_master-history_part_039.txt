@@ -1,0 +1,2000 @@
+﻿In your current `FormDeleteCheck.vb`, this line is the problem conceptually:
+
+```vbnet
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+That means:
+- first match wins
+- duplicates are not handled
+
+And in a legacy system like this, **check numbers are apparently not globally unique**.
+
+---
+
+## What should happen instead
+For now, the safest behavior is:
+
+### if multiple checks share the same check number
+the delete screen should show the **most recent matching one**, not the first one.
+
+Why?
+Because:
+- your newly added test check was appended
+- append means it is probably the **last** matching record
+- that makes testing and normal recent-entry correction much more reliable
+
+---
+
+## Fast fix
+Change the lookup from:
+- first matching check
+
+to:
+- **last matching check**
+
+---
+
+## Make this one change in `FormDeleteCheck.vb`
+Find this:
+
+```vbnet
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+Replace it with:
+
+```vbnet
+Dim found As LedgerEntry = entries.LastOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+---
+
+## Why this helps
+If there are multiple `7782` checks:
+- old one for ASTROMAT appears earlier
+- your new `.07` one appears later
+
+`LastOrDefault(...)` should select the one you just added.
+
+---
+
+## Important caveat
+This is a **practical fix**, not a perfect long-term solution.
+
+A better legacy-faithful delete flow would probably:
+- show all matching checks for that number
+- or ask for more identifying information:
+  - customer
+  - date
+  - amount
+  - reference
+
+But for right now, using the **last** matching entry is the simplest and most useful correction.
+
+---
+
+## What to do now
+1. change `FirstOrDefault` to `LastOrDefault`
+2. rebuild
+3. try deleting `7782` again
+
+You should then see the `.07` check instead of the old ASTROMAT one.
+
+---
+
+## Short answer
+The bug is that delete is grabbing the **first** `7782` in `LEDGER.CUR`.  
+Change it to grab the **last** one instead.
+
+## @testsubject117
+
+there were lots of entries in ledger.cur that said things like astromat, 427782, so it's probably finding 7782 that's part of a bigger number like 427782. is that possible?
+
+## Copilot
+
+No â€” **not with the code you showed**.
+
+## Direct answer
+Your current delete lookup uses **string equality**, not partial matching.
+
+So it should **not** match:
+- `7782`
+
+against:
+- `427782`
+
+because this code:
+
+```vbnet
+String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase)
+```
+
+only matches if the whole value is exactly the same.
+
+---
+
+## So whatâ€™s more likely?
+The more likely explanation is:
+
+- there is at least one real check in `LEDGER.CUR` whose check number is exactly `7782`
+- your delete screen is finding that older one first
+- your newly added `7782` comes later in the file
+
+That fits what you observed much better.
+
+---
+
+## How to verify quickly
+Search `LEDGER.CUR` for exact `7782` entries.
+
+If the file is in 6-line blocks, look for lines like:
+
+```text
+"7782"
+```
+
+If you find more than one exact `7782`, that confirms it.
+
+---
+
+## One caution
+If your reader is trimming or normalizing weirdly, thereâ€™s a small chance of parsing odd behavior, but based on the code you pasted, **partial substring matching is not whatâ€™s happening**.
+
+---
+
+## Best next fix
+Yes, I still recommend changing:
+
+```vbnet
+FirstOrDefault(...)
+```
+
+to:
+
+```vbnet
+LastOrDefault(...)
+```
+
+because that will pick the most recently added exact `7782`.
+
+---
+
+## Short answer
+No â€” it should **not** be matching `427782` as `7782`.  
+Itâ€™s much more likely there are **multiple exact `7782` checks**, and the form is selecting the first one.
+
+## @testsubject117
+
+geez, you're right, there is an astromat check in there number 7782
+
+## Copilot
+
+Yep â€” that explains it.
+
+## Direct answer
+So the delete screen is not broken in the way you thought â€” itâ€™s just selecting the **first exact `7782`** it finds, and there really is an older ASTROMAT `7782` in the file.
+
+Your newly added `.07` check is a **different record with the same check number**.
+
+---
+
+## What that means
+This confirms an important legacy behavior:
+
+- **check number is not unique**
+- so delete cannot safely identify a record by check number alone
+
+Thatâ€™s actually a very useful discovery.
+
+---
+
+## Best next fix
+Changing to `LastOrDefault(...)` will help for your current testing, but the **real fix** is:
+
+### delete should disambiguate duplicate check numbers
+
+For example:
+- user enters check number
+- if exactly one match â†’ show it
+- if multiple matches â†’ show a selection list with:
+  - customer
+  - date
+  - amount
+  - reference
+
+Then let the user choose the correct one.
+
+---
+
+## Short-term fix
+If you want the fastest improvement right now, change:
+
+```vbnet
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+to:
+
+```vbnet
+Dim found As LedgerEntry = entries.LastOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+That will usually pick the one you just added most recently.
+
+---
+
+## Better fix
+The better design is:
+
+- gather all exact matches for the check number
+- if count = 0 â†’ not found
+- if count = 1 â†’ use it
+- if count > 1 â†’ ask user which one
+
+Thatâ€™s the correct long-term behavior.
+
+---
+
+## Recommendation
+For now:
+
+### do this immediately
+Use `LastOrDefault(...)`
+
+### after that
+We should improve delete to handle duplicate check numbers properly.
+
+---
+
+## Short answer
+Yes â€” now we know for sure:  
+the issue is duplicate real check numbers, not substring matching.
+
+If you want, I can give you the **next revision of `FormDeleteCheck.vb`** that handles duplicate matches properly instead of just picking the first or last.
+
+## @testsubject117
+
+yes, give me the entire code
+
+## Copilot
+
+Replace `FormDeleteCheck.vb` with this version. It handles duplicate check numbers by showing a picker list when more than one exact match exists.
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        SelectMatch
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+    Private _matchingChecks As List(Of LedgerEntry) = New List(Of LedgerEntry)()
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lstMatches As ListBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(940, 560)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 700, 25)
+        lblLine1 = CreateLabel(20, 60, 860, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(220, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lstMatches = New ListBox()
+        lstMatches.Location = New Point(20, 135)
+        lstMatches.Size = New Size(880, 140)
+        lstMatches.Font = New Font("Consolas", 11.0F, FontStyle.Regular)
+        lstMatches.BackColor = Color.Black
+        lstMatches.ForeColor = Color.White
+        lstMatches.BorderStyle = BorderStyle.FixedSingle
+        lstMatches.Visible = False
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
+
+        lblCustomer = CreateLabel(20, 295, 420, 25)
+        lblDate = CreateLabel(520, 295, 250, 25)
+        lblCheckInfo = CreateLabel(20, 325, 820, 25)
+        lblInvoices = CreateLabel(20, 355, 850, 25)
+        lblAmount = CreateLabel(20, 385, 300, 25)
+        lblPrompt = CreateLabel(20, 425, 880, 25)
+        lblStatus1 = CreateLabel(20, 455, 880, 25)
+        lblStatus2 = CreateLabel(20, 485, 880, 25)
+        lblStatus3 = CreateLabel(20, 515, 880, 35)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lstMatches)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+        _matchingChecks = New List(Of LedgerEntry)()
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lstMatches.Visible = False
+        lstMatches.Items.Clear()
+
+        ClearDetailArea()
+    End Sub
+
+    Private Sub ClearDetailArea()
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowMatchSelection(matches As List(Of LedgerEntry), checkNo As String)
+        _state = DeleteCheckState.SelectMatch
+        _matchingChecks = matches
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Multiple checks found for check # " & checkNo & ". Select one and press ENTER."
+
+        txtInput.Visible = False
+        lstMatches.Visible = True
+        lstMatches.Items.Clear()
+
+        For Each entry As LedgerEntry In matches
+            lstMatches.Items.Add(New LedgerEntryListItem(entry))
+        Next
+
+        If lstMatches.Items.Count > 0 Then
+            lstMatches.SelectedIndex = 0
+        End If
+
+        ClearDetailArea()
+        lblPrompt.Text = "ENTER = Select highlighted check   ESC = Cancel"
+        lstMatches.Focus()
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+        lstMatches.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+            Dim matches As List(Of LedgerEntry) = entries.
+                Where(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase)).
+                ToList()
+
+            If matches.Count = 0 Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            If matches.Count = 1 Then
+                ShowCheckDetails(matches(0))
+                Return
+            End If
+
+            matches = matches.
+                OrderByDescending(Function(x) ParseDateForSort(x.DateText)).
+                ThenByDescending(Function(x) x.Amount).
+                ToList()
+
+            ShowMatchSelection(matches, checkNo)
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        SelectHighlightedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.SelectMatch Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            SelectHighlightedMatch()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub SelectHighlightedMatch()
+        If _state <> DeleteCheckState.SelectMatch Then Return
+        If lstMatches.SelectedItem Is Nothing Then Return
+
+        Dim item As LedgerEntryListItem = TryCast(lstMatches.SelectedItem, LedgerEntryListItem)
+        If item Is Nothing OrElse item.Entry Is Nothing Then Return
+
+        ShowCheckDetails(item.Entry)
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N OrElse keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber AndAlso keyData = Keys.Escape Then
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+            Return True
+        End If
+
+        If _state = DeleteCheckState.SelectMatch AndAlso keyData = Keys.Escape Then
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated As List(Of LedgerEntry) = entries.
+            Where(Function(x) Not LedgerEntriesMatch(x, info)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+
+        Dim updated As List(Of CheckInvBlock) = blocks.
+            Where(Function(x) Not CheckInvMatchesLedgerEntry(x, info)).
+            ToList()
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then Return False
+
+        Return String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+               x.Amount = info.Amount
+    End Function
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing OrElse info Is Nothing Then Return False
+
+        Return String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+               block.Amount = info.Amount
+    End Function
+
+    Private Function ParseDateForSort(value As String) As DateTime
+        Dim dt As DateTime
+        If DateTime.TryParse(value, dt) Then
+            Return dt
+        End If
+
+        If DateTime.TryParseExact(value,
+                                  "MM-dd-yyyy",
+                                  Globalization.CultureInfo.InvariantCulture,
+                                  Globalization.DateTimeStyles.None,
+                                  dt) Then
+            Return dt
+        End If
+
+        If DateTime.TryParseExact(value,
+                                  "MM-dd-yy",
+                                  Globalization.CultureInfo.InvariantCulture,
+                                  Globalization.DateTimeStyles.None,
+                                  dt) Then
+            Return dt
+        End If
+
+        Return DateTime.MinValue
+    End Function
+
+    Private NotInheritable Class LedgerEntryListItem
+        Public ReadOnly Property Entry As LedgerEntry
+
+        Public Sub New(entry As LedgerEntry)
+            Me.Entry = entry
+        End Sub
+
+        Public Overrides Function ToString() As String
+            If Entry Is Nothing Then
+                Return ""
+            End If
+
+            Dim customerText As String = If(Entry.Customer, "").PadRight(12)
+            Dim dateText As String = If(Entry.DateText, "").PadRight(12)
+            Dim refText As String = If(Entry.Reference, "").PadRight(12)
+            Dim amountText As String = Entry.Amount.ToString("0.00").PadLeft(10)
+
+            Return customerText &
+                   "  " & dateText &
+                   "  REF " & refText &
+                   "  AMT " & amountText
+        End Function
+    End Class
+End Class
+```
+
+## What this does
+- exact match on check number only
+- if one match exists, it behaves like before
+- if multiple matches exist, it shows a list so you can choose the right record
+- delete still removes from:
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+
+## Next test
+Try again with `7782`:
+1. open delete
+2. enter `7782`
+3. you should get multiple matches
+4. select the `.07` one
+5. confirm delete
+6. verify it disappears from both files
+
+If that works, next we can do `INVOICE.CHK`.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseIntLiteral()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseTerm(Boolean, Boolean)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Syntax.InternalSyntax.Parser.ParseExpressionCore(Microsoft.CodeAnalysis.VisualBasic.Syntax.OperatorPrecedence, Boolean)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.ParseConditionalCompilationExpression(System.String, Int32)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.ParseConditionalCompilationSymbols(System.String, System.Collections.Generic.IEnumerable`1<Microsoft.CodeAnalysis.Diagnostic> ByRef, System.Collections.Generic.IEnumerable`1<System.Collections.Generic.KeyValuePair`2<System.String,System.Object>>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.Parse(System.Collections.Generic.IEnumerable`1<System.String>, System.String, System.String, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler..ctor(Microsoft.CodeAnalysis.CommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompiler..ctor(Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This is **not your delete logic failing** â€” this is the VB compiler crashing again, and the stack trace strongly suggests itâ€™s choking on a **numeric literal / conditional compilation parse issue**.
+
+## Direct answer
+The most likely cause is **something in the code I gave you triggered a Roslyn VB parser bug in .NET 10 again**.
+
+The stack includes:
+
+- `ParseIntLiteral()`
+- `ParseConditionalCompilationExpression()`
+- `ParseConditionalCompilationSymbols()`
+
+So I want to back out the riskiest syntax and give you a **simpler, safer `FormDeleteCheck.vb`**.
+
+---
+
+# Most likely trigger
+The most suspicious pieces in the last version are:
+
+- inline LINQ continuations across lines
+- nested lambdas
+- the nested private class formatting
+- possibly the use of `12.0F`/`11.0F` mixed literals in this environment
+- maybe one weird copied character, though less likely
+
+The key clue is the parser crash itself â€” not a normal compile error.
+
+---
+
+# What to do
+Replace `FormDeleteCheck.vb` with this **simpler version**.
+
+It still supports duplicate check numbers, but avoids the fancier constructs that may be tripping the VB compiler.
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        SelectMatch
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+    Private _matchingChecks As New List(Of LedgerEntry)()
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lstMatches As ListBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.ClientSize = New Size(940, 560)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 700, 25)
+        lblLine1 = CreateLabel(20, 60, 860, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(220, 26)
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lstMatches = New ListBox()
+        lstMatches.Location = New Point(20, 135)
+        lstMatches.Size = New Size(880, 140)
+        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        lstMatches.BackColor = Color.Black
+        lstMatches.ForeColor = Color.White
+        lstMatches.BorderStyle = BorderStyle.FixedSingle
+        lstMatches.Visible = False
+        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+
+        lblCustomer = CreateLabel(20, 295, 420, 25)
+        lblDate = CreateLabel(520, 295, 250, 25)
+        lblCheckInfo = CreateLabel(20, 325, 820, 25)
+        lblInvoices = CreateLabel(20, 355, 850, 25)
+        lblAmount = CreateLabel(20, 385, 300, 25)
+        lblPrompt = CreateLabel(20, 425, 880, 25)
+        lblStatus1 = CreateLabel(20, 455, 880, 25)
+        lblStatus2 = CreateLabel(20, 485, 880, 25)
+        lblStatus3 = CreateLabel(20, 515, 880, 35)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lstMatches)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+        _matchingChecks.Clear()
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Enabled = True
+        txtInput.Text = ""
+        txtInput.Focus()
+
+        lstMatches.Visible = False
+        lstMatches.Items.Clear()
+
+        ClearDetailArea()
+    End Sub
+
+    Private Sub ClearDetailArea()
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowMatchSelection(checkNo As String, matches As List(Of LedgerEntry))
+        _state = DeleteCheckState.SelectMatch
+        _matchingChecks = matches
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Multiple checks found for check # " & checkNo & ". Select one and press ENTER."
+
+        txtInput.Visible = False
+        lstMatches.Visible = True
+        lstMatches.Items.Clear()
+
+        Dim i As Integer
+        For i = 0 To matches.Count - 1
+            lstMatches.Items.Add(FormatMatchText(matches(i)))
+        Next
+
+        If lstMatches.Items.Count > 0 Then
+            lstMatches.SelectedIndex = 0
+        End If
+
+        ClearDetailArea()
+        lblPrompt.Text = "ENTER = Select highlighted check   ESC = Cancel"
+        lstMatches.Focus()
+    End Sub
+
+    Private Function FormatMatchText(entry As LedgerEntry) As String
+        Dim customerText As String = SafePadRight(entry.Customer, 12)
+        Dim dateText As String = SafePadRight(entry.DateText, 12)
+        Dim refText As String = SafePadRight(entry.Reference, 12)
+        Dim amountText As String = entry.Amount.ToString("0.00").PadLeft(10)
+
+        Return customerText & "  " & dateText & "  REF " & refText & "  AMT " & amountText
+    End Function
+
+    Private Function SafePadRight(value As String, width As Integer) As String
+        Dim s As String = ""
+        If value IsNot Nothing Then
+            s = value
+        End If
+
+        If s.Length > width Then
+            s = s.Substring(0, width)
+        End If
+
+        Return s.PadRight(width)
+    End Function
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+        lstMatches.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim matches As New List(Of LedgerEntry)()
+            Dim i As Integer
+
+            For i = 0 To entries.Count - 1
+                If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+                    matches.Add(entries(i))
+                End If
+            Next
+
+            If matches.Count = 0 Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            If matches.Count = 1 Then
+                ShowCheckDetails(matches(0))
+                Return
+            End If
+
+            ShowMatchSelection(checkNo, matches)
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        SelectHighlightedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            SelectHighlightedMatch()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub SelectHighlightedMatch()
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex < 0 Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex >= _matchingChecks.Count Then
+            Return
+        End If
+
+        ShowCheckDetails(_matchingChecks(lstMatches.SelectedIndex))
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N OrElse keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.SelectMatch Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim updated As New List(Of LedgerEntry)()
+        Dim i As Integer
+
+        For i = 0 To entries.Count - 1
+            If Not LedgerEntriesMatch(entries(i), info) Then
+                updated.Add(entries(i))
+            End If
+        Next
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim updated As New List(Of CheckInvBlock)()
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If Not CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                updated.Add(blocks(i))
+            End If
+        Next
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If x.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If block.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+End Class
+```
+
+---
+
+## Why I changed it
+This version removes a lot of the syntax that might be tripping the VB compiler crash:
+
+- no LINQ in critical logic
+- no nested display-item class
+- simpler loops
+- simpler state handling
+- less parser-stressing syntax overall
+
+---
+
+## Do this exactly
+1. replace the whole file
+2. save
+3. close Visual Studio
+4. delete `bin`
+5. delete `obj`
+6. reopen
+7. rebuild
+
+---
+
+## If it still crashes
+Then the next suspect is not this form logic itself, but a hidden project/compiler-state issue again. In that case, Iâ€™ll help you isolate it fast.
+
+But first try this simplified file.
+
+## @testsubject117
+
+ok, I go to (2) delete checks, then when I type in 7782 it finds only astromat and if I choose N for no to delete, it just closes the window and goes back to the checks menu
+
+## Copilot
+
+That means the new duplicate-picker code is **not the version currently running**, or your build didnâ€™t actually pick it up.
+
+## Direct answer
+If entering `7782` immediately shows only ASTROMAT and never shows a multi-match selection list, then one of these is true:
+
+1. **the old `FormDeleteCheck.vb` is still what compiled**
+2. the new file didnâ€™t build and the app is running an older exe
+3. your `LedgerCurReader.ReadAll()` is not actually returning both `7782` entries
+4. the newly added `.07` check is not being parsed back from `LEDGER.CUR` the same way it was written
+
+Given what you described, **#1 or #4** are the most likely.
+
+---
+
+## Also: choosing `N` closing the window
+That part is expected in the current delete flow.
+
+Right now:
+- after showing a selected record
+- pressing `N`
+- cancels and closes the form
+
+So that behavior is not the main bug.
+
+The main bug is:
+- it never shows the duplicate-selection screen
+
+---
+
+# What to verify first
+## 1. Confirm the exact file really saved
+Open `FormDeleteCheck.vb` and search for this exact enum member:
+
+```vbnet
+SelectMatch
+```
+
+If that text is **not** in the file, then you are still on the old version.
+
+Also search for this control:
+
+```vbnet
+lstMatches
+```
+
+If that is missing, you are still on the older version.
+
+---
+
+## 2. Confirm the running code contains the duplicate logic
+Search inside `txtInput_KeyDown` for this pattern:
+
+```vbnet
+Dim matches As New List(Of LedgerEntry)()
+```
+
+and a loop like:
+
+```vbnet
+For i = 0 To entries.Count - 1
+    If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+        matches.Add(entries(i))
+    End If
+Next
+```
+
+If instead you still see something like:
+
+```vbnet
+Dim found As LedgerEntry = ...
+```
+
+then the old code is still there.
+
+---
+
+## 3. Most important quick test
+In your app, open **View Checks** and verify that **both** exact `7782` entries appear in the grid.
+
+If only one `7782` appears there, then the problem is likely in:
+- `LedgerCurReader`
+- or the file format/parsing
+
+If both appear in View Checks, then `FormDeleteCheck` is the part not updated.
+
+---
+
+# My current read
+Based on your description:
+
+> when I type in 7782 it finds only astromat
+
+that sounds **exactly like the old single-match version** is still active.
+
+Because the duplicate-aware version would:
+- not jump straight to ASTROMAT
+- show a list first
+
+---
+
+# Fastest next step
+Paste your **current saved contents** of `FormDeleteCheck.vb` exactly as it exists right now.
+
+Not what you intended to paste before â€” the exact current file on disk.
+
+I want to verify whether:
+- the duplicate-picker version is really in place
+- or the older single-result version is still there
+
+---
+
+## Short answer
+No, that behavior means the duplicate-match code is probably **not the version actually running**.  
+Please paste the current `FormDeleteCheck.vb` exactly as saved now.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated As List(Of LedgerEntry) = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+
+        Dim updated As List(Of CheckInvBlock) = blocks.
+            Where(Function(x) Not CheckInvMatchesLedgerEntry(x, info)).
+            ToList()
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing Then Return False
+
+        Return String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+               block.Amount = info.Amount
+    End Function
+End Class
+```
+heres the contents of formdeletecheck.vb: 
+
+## Copilot
+
+Yep â€” this confirms it.
+
+## Direct answer
+You are **still running the old single-match version** of `FormDeleteCheck.vb`.
+
+This file does **not** contain any duplicate-selection logic.
+
+The smoking gun is this line:
+
+```vbnet
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+That means:
+- it finds the **first exact match only**
+- no list of duplicates
+- no selection screen
+
+So the behavior you saw is exactly what this code would do.
+
+---
+
+## Why it happened
+At some point, the duplicate-picker version I gave you did **not** get fully pasted in, or you reverted to the older version after the compiler crash.
+
+Either way, the current file on disk is still the old one.
+
+---
+
+## What to do now
+Since the more complex duplicate-picker version caused trouble earlier, Iâ€™m going to give you a **simpler full replacement** that still supports duplicate check numbers, but avoids the fancier syntax.
+
+## Replace the entire contents of `FormDeleteCheck.vb` with this:
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        SelectMatch
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+    Private _matchingChecks As New List(Of LedgerEntry)()
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lstMatches As ListBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.ClientSize = New Size(940, 560)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 700, 25)
+        lblLine1 = CreateLabel(20, 60, 860, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(220, 26)
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lstMatches = New ListBox()
+        lstMatches.Location = New Point(20, 135)
+        lstMatches.Size = New Size(880, 140)
+        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        lstMatches.BackColor = Color.Black
+        lstMatches.ForeColor = Color.White
+        lstMatches.BorderStyle = BorderStyle.FixedSingle
+        lstMatches.Visible = False
+        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+
+        lblCustomer = CreateLabel(20, 295, 420, 25)
+        lblDate = CreateLabel(520, 295, 250, 25)
+        lblCheckInfo = CreateLabel(20, 325, 820, 25)
+        lblInvoices = CreateLabel(20, 355, 850, 25)
+        lblAmount = CreateLabel(20, 385, 300, 25)
+        lblPrompt = CreateLabel(20, 425, 880, 25)
+        lblStatus1 = CreateLabel(20, 455, 880, 25)
+        lblStatus2 = CreateLabel(20, 485, 880, 25)
+        lblStatus3 = CreateLabel(20, 515, 880, 35)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lstMatches)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+        _matchingChecks.Clear()
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lstMatches.Visible = False
+        lstMatches.Items.Clear()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowMatchSelection(checkNo As String, matches As List(Of LedgerEntry))
+        _state = DeleteCheckState.SelectMatch
+        _matchingChecks = matches
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Multiple checks found for check # " & checkNo & ". Select one and press ENTER."
+
+        txtInput.Visible = False
+        lstMatches.Visible = True
+        lstMatches.Items.Clear()
+
+        Dim i As Integer
+        For i = 0 To matches.Count - 1
+            lstMatches.Items.Add(FormatMatchText(matches(i)))
+        Next
+
+        If lstMatches.Items.Count > 0 Then
+            lstMatches.SelectedIndex = 0
+        End If
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = "ENTER = Select highlighted check   ESC = Cancel"
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        lstMatches.Focus()
+    End Sub
+
+    Private Function FormatMatchText(entry As LedgerEntry) As String
+        Dim customerText As String = SafePadRight(entry.Customer, 12)
+        Dim dateText As String = SafePadRight(entry.DateText, 12)
+        Dim refText As String = SafePadRight(entry.Reference, 12)
+        Dim amountText As String = entry.Amount.ToString("0.00").PadLeft(10)
+
+        Return customerText & "  " & dateText & "  REF " & refText & "  AMT " & amountText
+    End Function
+
+    Private Function SafePadRight(value As String, width As Integer) As String
+        Dim s As String = ""
+        If value IsNot Nothing Then
+            s = value
+        End If
+
+        If s.Length > width Then
+            s = s.Substring(0, width)
+        End If
+
+        Return s.PadRight(width)
+    End Function
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+        lstMatches.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim matches As New List(Of LedgerEntry)()
+            Dim i As Integer
+
+            For i = 0 To entries.Count - 1
+                If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+                    matches.Add(entries(i))
+                End If
+            Next
+
+            If matches.Count = 0 Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            If matches.Count = 1 Then
+                ShowCheckDetails(matches(0))
+                Return
+            End If
+
+            ShowMatchSelection(checkNo, matches)
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        SelectHighlightedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            SelectHighlightedMatch()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub SelectHighlightedMatch()
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex < 0 Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex >= _matchingChecks.Count Then
+            Return
+        End If
+
+        ShowCheckDetails(_matchingChecks(lstMatches.SelectedIndex))
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N OrElse keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.SelectMatch Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim updated As New List(Of LedgerEntry)()
+        Dim i As Integer
+
+        For i = 0 To entries.Count - 1
+            If Not LedgerEntriesMatch(entries(i), info) Then
+                updated.Add(entries(i))
+            End If
+        Next
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim updated As New List(Of CheckInvBlock)()
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If Not CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                updated.Add(blocks(i))
+            End If
+        Next
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) Then
