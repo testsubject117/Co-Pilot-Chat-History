@@ -1,0 +1,2000 @@
+﻿Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                OpenAreaCodes()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Try
+            Dim zipKeyFolder As String = "\\invoice\mainmenu\data\phone"
+            Dim zipKeyExe As String = IO.Path.Combine(zipKeyFolder, "ZIPKEY.EXE")
+            Dim zipKeyOvl As String = IO.Path.Combine(zipKeyFolder, "ZIPKEY.OVL")
+
+            If Not IO.File.Exists(zipKeyExe) Then
+                MessageBox.Show(
+                    "ZIPKEY executable was not found:" & Environment.NewLine & zipKeyExe,
+                    "ZIPKEY",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error)
+                Return
+            End If
+
+            If Not IO.File.Exists(zipKeyOvl) Then
+                MessageBox.Show(
+                    "ZIPKEY overlay file was not found:" & Environment.NewLine & zipKeyOvl,
+                    "ZIPKEY",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error)
+                Return
+            End If
+
+            Dim psi As New ProcessStartInfo() With {
+                .FileName = zipKeyExe,
+                .WorkingDirectory = zipKeyFolder,
+                .UseShellExecute = True,
+                .WindowStyle = ProcessWindowStyle.Normal
+            }
+
+            Me.Hide()
+
+            Dim proc As Process = Process.Start(psi)
+
+            If proc IsNot Nothing Then
+                proc.WaitForExit()
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show(
+                "Unable to launch ZIPKEY." & Environment.NewLine & Environment.NewLine & ex.Message,
+                "ZIPKEY",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error)
+        Finally
+            If Not Me.IsDisposed Then
+                Me.Show()
+                Me.Activate()
+            End If
+        End Try
+    End Sub
+End Class
+```
+
+---
+
+## What you should do before testing
+Copy these files into:
+
+`\\invoice\mainmenu\data\phone`
+
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+## Then test
+1. Open Rolodex menu
+2. Press `(H)`
+3. Confirm ZIPKEY launches as its own app
+4. Try typing:
+   - a ZIP
+   - a 2-letter state
+   - `?` for city search
+
+---
+
+## Important likely outcome
+Because this is very old software, one of these may happen:
+
+### Best case
+It launches and works.
+
+### Possible case
+It launches but Windows says it canâ€™t run this app.
+That would suggest:
+- 16-bit executable
+- incompatible subsystem
+- needs DOSBox/vDos/NTVDM-style support
+
+### Another possible case
+It launches but cannot find files
+That would usually mean:
+- wrong working directory
+- missing companion files beyond `ZIPKEY.OVL`
+
+---
+
+## One recommendation
+You can leave `FrmZipKeyPopup.vb` in the project for now, but it is no longer needed if this works.
+
+If you want, next I can help you with the **same Path A treatment for Area Codes** if that should also launch the original DOS executable instead of the current VB viewer.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+The image is a Windows error dialog titled **â€œUnsupported 16-Bit Application.â€**
+
+It says that:
+
+- `\\?\UNC\invoice\mainmenu\data\phone\ZIPKEY.EXE`
+- **cannot start or run**
+- because it is incompatible with the **64-bit version of Windows**
+
+## What that means
+`ZIPKEY.EXE` is a **16-bit application**, and 64-bit Windows does not run 16-bit executables directly.
+
+## Practical implication
+So **Path A, as â€œlaunch ZIPKEY.EXE directly,â€ will not work on this machine**.
+
+## What this tells us next
+Your options are now:
+
+1. **Run ZIPKEY through an emulator or compatibility layer**
+   - DOSBox
+   - vDos
+   - similar DOS environment
+
+2. **Reimplement ZIP lookup in VB**
+   - probably the cleaner long-term solution
+
+## Short version
+The image confirms the failure is **not your VB launch code anymore**.  
+Itâ€™s a **Windows platform limitation**: the original ZIPKEY is 16-bit.
+
+## @testsubject117
+
+Reimplement ZIP lookup in VB, but can we make it look similar?
+
+## Copilot
+
+Yes â€” **absolutely**.  
+We can reimplement ZIP lookup in VB **and make it look very similar to the original ZIPKEY screen**.
+
+## Direct answer
+That is now the best path.
+
+Since the screenshot proves `ZIPKEY.EXE` is a **16-bit app** and cannot run on 64-bit Windows, the right move is:
+
+- keep the **same visual style**
+- keep the **same interaction model**
+- but implement the search logic natively in VB
+
+So the user experience can still feel like ZIPKEY, even though the original exe is gone.
+
+---
+
+## What â€œsimilarâ€ can mean
+We can make the VB version mimic the DOS utility in these ways:
+
+### Visual style
+- black background
+- dark red popup panel
+- white monospace text
+- same title text:
+  - `ZIPKEY, V1.07e current to 06/89`
+- same instruction wording
+- same centered popup layout
+
+### Interaction style
+Allow the same kinds of input:
+- a ZIP code
+- a two-letter state code
+- `?` for city-only search
+
+We can also make it feel old-school by:
+- using a single prompt line
+- using Enter to search
+- Esc to exit
+- showing results in a scrollable text area or list
+
+---
+
+## Most important missing piece
+To reimplement it properly, we need the **ZIP code data source**.
+
+## I need to know one thing next
+Do you already have:
+- a ZIPKEY data file
+- a city/state/zip table
+- or any related files that came with ZIPKEY
+
+In your screenshot I only saw:
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+I did **not** obviously see a ZIP database file, but it may be hidden in:
+- another folder
+- a compiled overlay
+- or bundled in the exe/ovl
+
+---
+
+## If there is no reusable ZIPKEY data file
+We can still implement it using a modern ZIP dataset.
+
+That would likely be easier.
+
+Possible sources:
+- USPS-style ZIP datasets
+- public ZIP/city/state CSV
+- your own internal file if you have one
+
+---
+
+## My recommended design
+### Option A â€” best practical solution
+Create a VB form that looks like ZIPKEY and uses a local CSV/data file.
+
+Behavior:
+- type `91304` â†’ show city/state
+- type `CA` â†’ show ZIPs in California
+- type `?` â†’ prompt for city name and show matching ZIPs
+
+### Option B â€” even closer DOS feel
+Make it a small modal popup that:
+- displays the historical ZIPKEY header
+- uses a command-prompt-like input line
+- pages through results with keyboard only
+
+That would feel very close to the original.
+
+---
+
+## My recommendation
+Yes, we should reimplement it in VB, and yes, we should make it **look similar**.
+
+### Best next step:
+I can build:
+1. a **ZIPKEY-style popup form**
+2. a **simple ZIP lookup service**
+3. placeholder/sample data support first
+4. then wire in a real ZIP dataset
+
+---
+
+## What I need from you now
+Please answer one of these:
+
+### A.
+**Do we already have any ZIP code data file somewhere in the old system?**
+
+If yes, show me the file names.
+
+### B.
+If not, I can still proceed by generating:
+- the VB form
+- the lookup service
+- and a sample data file structure
+
+and then we can plug in a real ZIP dataset afterward.
+
+## Short answer
+**Yes â€” we can absolutely make it look similar.**  
+And now that the exe is confirmed 16-bit, **VB reimplementation is the right move.**
+
+If you want, I can next generate:
+- `FrmZipKeyPopup.vb`
+- `ZipKeyService.vb`
+- `ZipKeyEntry.vb`
+
+in a DOS-style look-and-feel.
+
+## @testsubject117
+
+all I have for zipkey is the files shown in the screenshot
+
+## Copilot
+
+Yes â€” thatâ€™s enough to make the decision.
+
+## Direct answer
+If all you have is whatâ€™s in the screenshot, then we should **reimplement ZIP lookup in VB using a new data source**, while keeping the UI styled like ZIPKEY.
+
+Because with only:
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+and no visible external ZIP database file, we should assume the original data is embedded or otherwise unusable from VB.
+
+So the practical plan is:
+
+1. **keep the ZIPKEY-like appearance**
+2. **replace the engine with VB code**
+3. **use a modern ZIP dataset file**
+
+---
+
+## What I recommend building
+A new VB version of ZIPKEY with:
+
+### same feel
+- black background
+- dark red popup panel
+- white monospace text
+- vintage instruction text
+
+### usable input
+- type a ZIP code
+- type a 2-letter state
+- type `?` for city search
+
+### result behavior
+- show matching records in the popup
+- allow Enter/Esc
+- likely allow Up/Down or paging if multiple matches
+
+---
+
+## Best architecture
+### 1. `FrmZipKeyPopup.vb`
+The UI form that looks like ZIPKEY.
+
+### 2. `ZipKeyService.vb`
+Loads/searches ZIP records from a file.
+
+### 3. `ZipKeyEntry.vb`
+Simple model:
+- ZipCode
+- City
+- State
+
+### 4. data file
+Something like:
+- `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+---
+
+## Example supported searches
+### input:
+`91304`
+
+### result:
+- Canoga Park, CA 91304
+
+### input:
+`CA`
+
+### result:
+- list of California ZIP entries
+
+### input:
+`?`
+then city:
+`Van Nuys`
+
+### result:
+- all matching ZIP codes for Van Nuys, CA and other states if present
+
+---
+
+## Recommendation on scope
+To get this working quickly, Iâ€™d implement:
+
+### Phase 1
+- ZIP lookup by exact ZIP
+- state lookup by 2-letter code
+- city lookup after `?`
+- scrollable results
+
+### Phase 2
+- DOS-like keyboard navigation
+- better paging
+- more exact ZIPKEY phrasing/layout
+
+---
+
+## One important note
+Since you donâ€™t have the original ZIPKEY data, the **search results may not exactly match the legacy program** unless we get a dataset that is similar in vintage or scope.
+
+But for usability, a modern ZIP dataset is probably better anyway.
+
+---
+
+## Next step
+If you want, I can now generate the full first-pass implementation for:
+
+- `ZipKeyEntry.vb`
+- `ZipKeyService.vb`
+- `FrmZipKeyPopup.vb`
+
+with the same retro style and a CSV-backed search design.
+
+If I do that, Iâ€™ll also show you the expected CSV format for `zipcodes.csv`.
+
+## @testsubject117
+
+yes please do
+
+## Copilot
+
+Yes â€” hereâ€™s a full first-pass **VB reimplementation of ZIPKEY** with a retro look and CSV-backed search.
+
+## What this gives you
+- a ZIPKEY-style popup form
+- ZIP search by:
+  - exact ZIP
+  - 2-letter state
+  - `?` then city search
+- black/red old-school UI
+- scrollable result area
+- CSV-backed data source
+
+## Expected CSV location
+Put this file at:
+
+```text
+\\invoice\mainmenu\data\phone\zipcodes.csv
+```
+
+## Expected CSV format
+Header row required:
+
+```csv name=zipcodes.csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+10001,New York,NY
+```
+
+---
+
+# 1) Create `ZipKeyEntry.vb`
+
+```vb name=ZipKeyEntry.vb
+Public Class ZipKeyEntry
+    Public Property ZipCode As String
+    Public Property City As String
+    Public Property State As String
+End Class
+```
+
+---
+
+# 2) Create `ZipKeyService.vb`
+
+```vb name=ZipKeyService.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+
+Public Class ZipKeyService
+
+    Private Shared ReadOnly CsvPath As String = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+    Private _entries As List(Of ZipKeyEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function Search(input As String, Optional citySearchText As String = Nothing) As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If String.IsNullOrWhiteSpace(input) Then
+            Return results
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If trimmed = "?" Then
+            If String.IsNullOrWhiteSpace(citySearchText) Then
+                Return results
+            End If
+
+            Dim cityTerm = citySearchText.Trim().ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.City) AndAlso
+                                  x.City.ToUpperInvariant().Contains(cityTerm)).
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim stateCode = trimmed.ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) String.Equals(x.State, stateCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.ZipCode) AndAlso
+                                  x.ZipCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.ZipCode).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.State).
+                ToList()
+
+            Return results
+        End If
+
+        Return results
+    End Function
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(CsvPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return CsvPath
+    End Function
+
+    Private Function LoadEntries() As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If Not File.Exists(CsvPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(CsvPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("ZipCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New ZipKeyEntry With {
+                .ZipCode = parts(0).Trim(),
+                .City = parts(1).Trim(),
+                .State = parts(2).Trim().ToUpperInvariant()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.ZipCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.City) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+# 3) Replace entire `FrmZipKeyPopup.vb`
+
+```vb name=FrmZipKeyPopup.vb
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+
+Public Class FrmZipKeyPopup
+    Inherits Form
+
+    Private pnlPopup As Panel
+    Private lblHeader As Label
+    Private txtInput As TextBox
+    Private txtResults As TextBox
+    Private lblPrompt As Label
+    Private lblFooter As Label
+
+    Private ReadOnly _svc As New ZipKeyService()
+    Private _cityMode As Boolean = False
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "ZipKey"
+
+        pnlPopup = New Panel() With {
+            .Size = New Size(520, 500),
+            .Location = New Point(190, 50),
+            .BackColor = Color.DarkRed,
+            .BorderStyle = BorderStyle.FixedSingle
+        }
+
+        lblHeader = New Label() With {
+            .Location = New Point(12, 12),
+            .Size = New Size(490, 150),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.TopLeft
+        }
+
+        lblPrompt = New Label() With {
+            .Location = New Point(12, 170),
+            .Size = New Size(490, 24),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Bold),
+            .Text = "Enter ZIP / State / ? for city:"
+        }
+
+        txtInput = New TextBox() With {
+            .Location = New Point(12, 198),
+            .Size = New Size(490, 28),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Regular)
+        }
+
+        txtResults = New TextBox() With {
+            .Location = New Point(12, 238),
+            .Size = New Size(490, 210),
+            .Multiline = True,
+            .ReadOnly = True,
+            .ScrollBars = ScrollBars.Vertical,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .Font = New Font("Consolas", 10.5F, FontStyle.Regular)
+        }
+
+        lblFooter = New Label() With {
+            .Location = New Point(12, 458),
+            .Size = New Size(490, 24),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 10.0F, FontStyle.Regular),
+            .Text = "ENTER = Search    ESC = Exit"
+        }
+
+        pnlPopup.Controls.Add(lblHeader)
+        pnlPopup.Controls.Add(lblPrompt)
+        pnlPopup.Controls.Add(txtInput)
+        pnlPopup.Controls.Add(txtResults)
+        pnlPopup.Controls.Add(lblFooter)
+        Me.Controls.Add(pnlPopup)
+
+        AddHandler Me.Load, AddressOf FrmZipKeyPopup_Load
+        AddHandler Me.KeyDown, AddressOf FrmZipKeyPopup_KeyDown
+        AddHandler txtInput.KeyDown, AddressOf TxtInput_KeyDown
+        AddHandler Me.Shown, AddressOf FrmZipKeyPopup_Shown
+    End Sub
+
+    Private Sub FrmZipKeyPopup_Load(sender As Object, e As EventArgs)
+        lblHeader.Text =
+            "ZIPKEY, V1.07e current to 06/89" & Environment.NewLine &
+            "Copyright 1989 Eric Isaacson" & Environment.NewLine & Environment.NewLine &
+            "VB REIMPLEMENTATION" & Environment.NewLine &
+            "Styled after the original ZIPKEY" & Environment.NewLine & Environment.NewLine &
+            "Type a ZIP code, a two-letter" & Environment.NewLine &
+            "state code, or ? for a city-" & Environment.NewLine &
+            "only search:"
+    End Sub
+
+    Private Sub FrmZipKeyPopup_Shown(sender As Object, e As EventArgs)
+        txtInput.Focus()
+
+        If Not _svc.DataFileExists() Then
+            txtResults.Text =
+                "ZIP code data file was not found." & Environment.NewLine & Environment.NewLine &
+                _svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Create zipcodes.csv to enable search."
+        End If
+    End Sub
+
+    Private Sub FrmZipKeyPopup_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub TxtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            RunSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RunSearch()
+        If Not _svc.DataFileExists() Then
+            txtResults.Text =
+                "ZIP code data file was not found." & Environment.NewLine & Environment.NewLine &
+                _svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Create zipcodes.csv to enable search."
+            Return
+        End If
+
+        Dim input = txtInput.Text.Trim()
+
+        If _cityMode Then
+            ShowResults(_svc.Search("?", input), "City search: " & input)
+            _cityMode = False
+            lblPrompt.Text = "Enter ZIP / State / ? for city:"
+            txtInput.Clear()
+            txtInput.Focus()
+            Return
+        End If
+
+        If input = "?" Then
+            _cityMode = True
+            lblPrompt.Text = "Enter city name:"
+            txtInput.Clear()
+            txtResults.Text = "City-only search mode." & Environment.NewLine & "Type a city name and press ENTER."
+            txtInput.Focus()
+            Return
+        End If
+
+        Dim results = _svc.Search(input)
+        ShowResults(results, "Search: " & input)
+        txtInput.SelectAll()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub ShowResults(results As List(Of ZipKeyEntry), heading As String)
+        Dim sb As New StringBuilder()
+
+        sb.AppendLine(heading)
+        sb.AppendLine(New String("-"c, 46))
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            sb.AppendLine("No matches found.")
+            txtResults.Text = sb.ToString()
+            Return
+        End If
+
+        For Each item In results.Take(200)
+            sb.AppendLine(item.ZipCode.PadRight(8) &
+                          item.City.PadRight(24) &
+                          item.State)
+        Next
+
+        If results.Count > 200 Then
+            sb.AppendLine()
+            sb.AppendLine("(Showing first 200 matches)")
+        End If
+
+        txtResults.Text = sb.ToString()
+        txtResults.SelectionStart = 0
+        txtResults.SelectionLength = 0
+    End Sub
+End Class
+```
+
+---
+
+# 4) Update `FrmRolodexMenu.vb`
+Since we are no longer trying to launch the 16-bit exe, change `OpenZipKey()` back to simply opening the VB popup:
+
+```vb name=FrmRolodexMenu_OpenZipKey.vb
+Private Sub OpenZipKey()
+    Using frm As New FrmZipKeyPopup()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## What this first version does
+### Search modes
+- `91304` â†’ ZIP search
+- `91` â†’ ZIP prefix search
+- `CA` â†’ state search
+- `?` â†’ switches to city search mode
+
+### Example output
+```text
+Search: CA
+----------------------------------------------
+90001   Los Angeles             CA
+90002   Los Angeles             CA
+...
+```
+
+---
+
+## Important limitation
+This CSV parser is intentionally simple for phase 1.
+
+So for now:
+- your city names should not contain commas in the CSV
+
+Example good row:
+```csv
+91304,Canoga Park,CA
+```
+
+Example problematic row:
+```csv
+12345,Some City, With Comma,CA
+```
+
+If needed later, I can upgrade it to proper CSV parsing.
+
+---
+
+## What you need to do now
+1. Add these 3 files:
+   - `ZipKeyEntry.vb`
+   - `ZipKeyService.vb`
+   - `FrmZipKeyPopup.vb`
+
+2. Make sure `FrmRolodexMenu.vb` uses the popup version of `OpenZipKey()`
+
+3. Create:
+   - `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+4. Put in a few test rows first
+
+---
+
+## Suggested starter CSV
+Use this to smoke-test it:
+
+```csv name=zipcodes.csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+91342,Sylmar,CA
+10001,New York,NY
+30301,Atlanta,GA
+73301,Austin,TX
+```
+
+---
+
+## After you test this
+If it works, next I can improve it to be even more DOS-like by adding:
+- paging
+- arrow-key selection
+- cleaner result formatting
+- better city/state matching
+- closer ZIPKEY wording/layout
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30456	'DataFileExists' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	115	
+Error (active)	BC30456	'GetDataFilePath' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	118	
+Error (active)	BC30456	'DataFileExists' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	140	
+Error (active)	BC30456	'GetDataFilePath' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	143	
+Error (active)	BC30456	'Search' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	151	
+Error (active)	BC30456	'Search' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	168	
+Warning (active)	BC42025	Access of shared member, constant member, enum member or nested type through an instance; qualifying expression will not be evaluated.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Application.Designer.vb	31	
+
+
+## Copilot
+
+That means your project already has a **different `ZipKeyService` class**, and `FrmZipKeyPopup.vb` is binding to that one instead of the new one I described.
+
+## Direct fix
+Either:
+1. replace your existing `ZipKeyService.vb` with the new one, **or**
+2. give the new service a unique name so thereâ€™s no collision
+
+## Best recommendation
+Use a unique name to avoid conflicts.
+
+---
+
+# Do this instead
+
+## 1) Create `RolodexZipKeyService.vb`
+Use this exact file:
+
+```vb name=RolodexZipKeyService.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+
+Public Class RolodexZipKeyService
+
+    Private Shared ReadOnly CsvPath As String = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+    Private ReadOnly _entries As List(Of ZipKeyEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function Search(input As String, Optional citySearchText As String = Nothing) As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If String.IsNullOrWhiteSpace(input) Then
+            Return results
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If trimmed = "?" Then
+            If String.IsNullOrWhiteSpace(citySearchText) Then
+                Return results
+            End If
+
+            Dim cityTerm = citySearchText.Trim().ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.City) AndAlso
+                                  x.City.ToUpperInvariant().Contains(cityTerm)).
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim stateCode = trimmed.ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) String.Equals(x.State, stateCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.ZipCode) AndAlso
+                                  x.ZipCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.ZipCode).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.State).
+                ToList()
+
+            Return results
+        End If
+
+        Return results
+    End Function
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(CsvPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return CsvPath
+    End Function
+
+    Private Function LoadEntries() As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If Not File.Exists(CsvPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(CsvPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("ZipCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New ZipKeyEntry With {
+                .ZipCode = parts(0).Trim(),
+                .City = parts(1).Trim(),
+                .State = parts(2).Trim().ToUpperInvariant()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.ZipCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.City) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+## 2) Update `FrmZipKeyPopup.vb`
+Change this line:
+
+```vb
+Private ReadOnly _svc As New ZipKeyService()
+```
+
+to:
+
+```vb
+Private ReadOnly _svc As New RolodexZipKeyService()
+```
+
+---
+
+## 3) Keep `ZipKeyEntry.vb` as-is
+If you donâ€™t already have that model, use this:
+
+```vb name=ZipKeyEntry.vb
+Public Class ZipKeyEntry
+    Public Property ZipCode As String
+    Public Property City As String
+    Public Property State As String
+End Class
+```
+
+---
+
+## Why this happened
+Your solution likely already contains another class named `ZipKeyService`, and VB resolved to that one.
+
+So `FrmZipKeyPopup.vb` compiled against the wrong class, which is why it says:
+- `DataFileExists` is not a member
+- `GetDataFilePath` is not a member
+- `Search` is not a member
+
+Thatâ€™s a naming collision, not a logic problem.
+
+---
+
+## Ignore this warning for now
+This one is unrelated:
+
+- `BC42025 Access of shared member... Application.Designer.vb`
+
+Thatâ€™s not from the ZIPKEY feature.
+
+---
+
+## Fastest path
+To get unstuck quickest:
+
+### create:
+- `RolodexZipKeyService.vb`
+
+### change:
+- `_svc` to `New RolodexZipKeyService()`
+
+That should clear all six ZIPKEY compile errors.
+
+If you want, I can also give you the **full corrected `FrmZipKeyPopup.vb`** with the renamed service already applied.
+
+## @testsubject117
+
+ok, it works
+
+## Copilot
+
+Excellent â€” **ZIP lookup is now working in VB**.
+
+## Whatâ€™s now accomplished
+You now have a working replacement for `(H) Look up Zip Codes)` that:
+
+- runs on 64-bit Windows
+- keeps a ZIPKEY-like visual style
+- accepts keyboard input properly
+- no longer depends on the 16-bit executable
+
+## Thatâ€™s a good milestone
+Youâ€™ve now handled one of the harder legacy cases:
+- original DOS utility existed
+- original exe could not run
+- replacement was needed
+- and now the feature works again
+
+## Natural next improvements for ZIPKEY
+If you want to refine it further, the most useful upgrades would be:
+
+1. **make it look even closer to the original**
+   - tighter layout
+   - more DOS-like wording
+   - prompt line behavior
+
+2. **better search behavior**
+   - exact ZIP first, then prefix
+   - city + state filtering
+   - better sorting
+
+3. **paging / keyboard navigation**
+   - PgUp/PgDn
+   - arrow keys
+   - DOS-like result stepping
+
+4. **larger real ZIP dataset**
+   - if the current CSV is just test data
+
+## Best next move overall
+From the Rolodex menu, the next logical item is probably:
+
+- **(G) Look up Area Codes**
+
+because itâ€™s the sister feature to ZIP lookup, and likely should be handled the same way:
+- either launch old executable if possible
+- or reimplement in VB with the same look
+
+## My recommendation
+Letâ€™s do **(G) Look up Area Codes** next and make it visually match the new ZIPKEY-style approach.
+
+## @testsubject117
+
+but wait, don't we need to update the .csv file to contain all known zip codes?
+
+## Copilot
+
+Yes â€” **absolutely**.
+
+## Direct answer
+What you have now is the **working ZIPKEY feature shell**, but to make it truly useful, `zipcodes.csv` needs to contain the ZIP records you want it to search.
+
+So yes, the next practical requirement is:
+
+- populate `\\invoice\mainmenu\data\phone\zipcodes.csv`
+- with a real ZIP dataset
+
+## Right now
+If you only loaded a few sample rows, then the feature works technically, but it is only as complete as that file.
+
+---
+
+## What â€œall known zip codesâ€ means
+Usually that would mean a dataset with entries like:
+
+- `ZipCode`
+- `City`
+- `State`
+
+For all U.S. ZIP codes you want supported.
+
+Depending on the source, you may also get:
+- county
+- latitude/longitude
+- time zone
+- preferred city names
+- multiple acceptable city names per ZIP
+
+But for your current VB implementation, only these 3 columns matter:
+
+```csv
+ZipCode,City,State
+```
+
+---
+
+## Important design note
+A real ZIP dataset may include:
+- multiple rows for the same ZIP
+- multiple cities associated with one ZIP
+- preferred vs acceptable city names
+
+That is normal.
+
+Your current implementation can handle multiple rows fine.
+
+---
+
+## Best next step
+Yes, update the CSV with a full dataset.
+
+## Two good options
+### Option A â€” full U.S. ZIP dataset
+Best if you want this to behave like a real ZIP lookup tool.
+
+### Option B â€” only the states/cities your business actually uses
+Best if you want something smaller and simpler.
+
+---
+
+## My recommendation
+Use a **full U.S. ZIP dataset** if possible.
+
+That way:
+- the feature is broadly useful
+- you wonâ€™t keep discovering missing ZIPs later
+
+---
+
+## One important caution
+Before importing a large CSV, make sure the file format matches exactly:
+
+### Required columns:
+```csv
+ZipCode,City,State
+```
+
+### Example:
+```csv
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+10001,New York,NY
+```
+
+If your source has extra columns, thatâ€™s okay **only if**:
+- the first 3 columns are still `ZipCode,City,State`
+- or we adjust the parser
+
+---
+
+## If you want, I can help with either of these next:
+1. **find a good ZIP dataset format and tell you how to shape it**
+2. **upgrade the importer so it can handle richer CSV files safely**
+3. **generate a script/tool to convert a larger ZIP CSV into the exact format your app needs**
+
+## Short answer
+**Yes â€” the CSV absolutely needs to be populated with the ZIP codes you want searchable.**  
+Right now the UI works; next the data needs to be made complete.
+
+## @testsubject117
+
+yes, lets find a good zip format that we can paste into this file
+
+## Copilot
+
+Yes â€” and the **best format for your app** is still a very simple 3-column CSV:
+
+```csv
+ZipCode,City,State
+```
+
+## Best practical recommendation
+Use a dataset that can be normalized into exactly:
+
+- `ZipCode`
+- `City`
+- `State`
+
+That matches your current VB parser directly, with no code changes needed.
+
+---
+
+## Best source choice
+For your use case, there are two broad choices:
+
+### 1. **USPS/Census-style official sources**
+These are authoritative, but they are **not the easiest drop-in fit** for your app. Also, the Census warns that **ZCTAs are not the same as official USPS ZIP Codes**, so theyâ€™re not ideal if you want true mailing ZIP behavior. ([census.gov](https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html?utm_source=openai))
+
+### 2. **A clean ZIP CSV dataset**
+This is the best practical fit for your VB app. A source like Simplemaps specifically offers a **single CSV file** with ZIP data and state abbreviations, and describes it as one entry per ZIP code. ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+## My recommendation
+Use a **simple ZIP CSV dataset** and convert it to your exact format:
+
+```csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+10001,New York,NY
+```
+
+Thatâ€™s the easiest and safest format for your current implementation. ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+---
+
+## Important caveat
+If you want **true USPS-official ZIP behavior**, official USPS data products exist, but they are generally not as simple as â€œdownload one tiny public CSV and paste it in.â€ USPS points users to products like the **City State Product** for ZIP validation/assignment workflows. ([postalpro.usps.com](https://postalpro.usps.com/address-quality/city-state-product?utm_source=openai))
+
+So for a practical WinForms replacement, the clean CSV approach is better.
+
+---
+
+## Recommended target file format
+Your `zipcodes.csv` should look like this:
+
+```csv
+ZipCode,City,State
+00501,Holtsville,NY
+01001,Agawam,MA
+01002,Amherst,MA
+01003,Amherst,MA
+01005,Barre,MA
+```
+
+### Rules
+- header row required
+- no extra commas in city names unless we upgrade the parser
+- state should be **2-letter USPS abbreviation**
+- ZIP should remain **text**, not numeric, so leading zeroes are preserved
+
+That last part matters a lot for ZIPs like `00501`.
+
+---
+
+## Very important formatting warning
+If you open/edit the CSV in Excel, it may try to:
+- strip leading zeroes
+- reformat ZIP codes as numbers
+
+So the safest way is:
+- edit it in a text editor
+- or import/export carefully as text
+
+---
+
+## Best next move
+I recommend this workflow:
+
+1. get a clean ZIP dataset CSV
+2. map it into exactly:
+   - `ZipCode,City,State`
+3. save it as:
+   - `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+---
+
+## If you want the easiest possible import format
+Use this exact structure only:
+
+```csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+91342,Sylmar,CA
+```
+
+---
+
+## My concrete recommendation
+For now, use a **clean single-CSV ZIP dataset** rather than Census ZCTA files, because:
+- Census ZCTAs are approximations, not USPS ZIP Codes ([census.gov](https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html?utm_source=openai))
+- USPS official products are not the easiest direct paste-in format ([postalpro.usps.com](https://postalpro.usps.com/address-quality/city-state-product?utm_source=openai))
+- a simple ZIP CSV is closest to what your app already expects ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+If you want, next I can help you with one of these:
+
+1. **give you a ready-to-use column mapping** from a common ZIP dataset into `ZipCode,City,State`
+2. **update your VB parser** so it can tolerate richer CSV files with extra columns
+3. **help you choose between â€œone row per ZIPâ€ vs â€œmultiple city names per ZIPâ€ behavior**
+
+## @testsubject117
+
+I downloaded a .csv file, can I upload it to you, have you review it, reformat it to match our target format and send it back to me?
+
+## Copilot
+
+Yes â€” upload the CSV and I can review it, tell you whether it matches `ZipCode,City,State`, and reformat it for you.
+
+## What I can do
+Once you upload it, I can:
+- inspect the columns
+- identify which fields map to ZIP / City / State
+- produce a cleaned version in this target format:
+
+```csv
+ZipCode,City,State
+```
+
+- point out any issues like:
+  - leading zero risk
+  - duplicate rows
+  - extra columns
+  - quoted fields / commas in city names
+
+## One expectation to set
+I can definitely **transform and return the cleaned contents**, but how I â€œsend it backâ€ depends on size:
+
+- if itâ€™s small enough, I can paste the cleaned CSV directly
+- if itâ€™s larger, I can give you:
+  - a transformed sample plus exact conversion rules
+  - or a script to convert the full file locally
+  - or, if you want GitHub repo changes and the repo is explicitly provided, I could help write the file there
+
+## Best next step
+Upload the CSV file and Iâ€™ll review it.
+
+## @testsubject117
+
+zip	lat	lng	city	state_id	state_name	zcta	parent_zcta	population	density	county_fips	county_name	county_weights	county_names_all	county_fips_all	imprecise	military	timezone
+601	18.18027	-66.75266	Adjuntas	PR	Puerto Rico	TRUE		16669	99.9	72001	Adjuntas	"{""72001"": 98.74, ""72141"": 1.26}"	Adjuntas|Utuado	72001|72141	FALSE	FALSE	America/Puerto_Rico
+602	18.36075	-67.17541	Aguada	PR	Puerto Rico	TRUE		37233	474	72003	Aguada	"{""72003"": 100}"	Aguada	72003	FALSE	FALSE	America/Puerto_Rico
+603	18.45744	-67.12225	Aguadilla	PR	Puerto Rico	TRUE		48448	544.6	72005	Aguadilla	"{""72005"": 99.76, ""72099"": 0.24}"	Aguadilla|Moca	72005|72099	FALSE	FALSE	America/Puerto_Rico
+606	18.16585	-66.93716	Maricao	PR	Puerto Rico	TRUE		5163	45	72093	Maricao	"{""72093"": 82.26, ""72153"": 11.67, ""72121"": 6.06}"	Maricao|Yauco|Sabana Grande	72093|72153|72121	FALSE	FALSE	America/Puerto_Rico
+610	18.2911	-67.12243	Anasco	PR	Puerto Rico	TRUE		25357	263.8	72011	AÃ±asco	"{""72011"": 96.8, ""72099"": 2.83, ""72083"": 0.37}"	AÃ±asco|Moca|Las MarÃ­as	72011|72099|72083	FALSE	FALSE	America/Puerto_Rico
+611	18.27698	-66.80688	Angeles	PR	Puerto Rico	TRUE		1383	50.2	72141	Utuado	"{""72141"": 100}"	Utuado	72141	FALSE	FALSE	America/Puerto_Rico
+612	18.41283	-66.7051	Arecibo	PR	Puerto Rico	TRUE		62908	319	72013	Arecibo	"{""72013"": 98.94, ""72065"": 0.96, ""72017"": 0.1}"	Arecibo|Hatillo|Barceloneta	72013|72065|72017	FALSE	FALSE	America/Puerto_Rico
+616	18.41878	-66.6679	Bajadero	PR	Puerto Rico	TRUE		9717	344.7	72013	Arecibo	"{""72013"": 100}"	Arecibo	72013	FALSE	FALSE	America/Puerto_Rico
+617	18.44598	-66.56006	Barceloneta	PR	Puerto Rico	TRUE		22584	475.1	72017	Barceloneta	"{""72017"": 99.47, ""72054"": 0.43, ""72013"": 0.1}"	Barceloneta|Florida|Arecibo	72017|72054|72013	FALSE	FALSE	America/Puerto_Rico
+622	17.98892	-67.1566	Boqueron	PR	Puerto Rico	TRUE		7664	94.9	72023	Cabo Rojo	"{""72023"": 100}"	Cabo Rojo	72023	FALSE	FALSE	America/Puerto_Rico
+623	18.08429	-67.15336	Cabo Rojo	PR	Puerto Rico	TRUE		39212	386.2	72023	Cabo Rojo	"{""72023"": 100}"	Cabo Rojo	72023	FALSE	FALSE	America/Puerto_Rico
+624	18.05905	-66.71932	Penuelas	PR	Puerto Rico	TRUE		21148	173.9	72111	PeÃ±uelas	"{""72111"": 94.94, ""72113"": 5.06}"	PeÃ±uelas|Ponce	72111|72113	FALSE	FALSE	America/Puerto_Rico
+627	18.41905	-66.86037	Camuy	PR	Puerto Rico	TRUE		32734	272.6	72027	Camuy	"{""72027"": 100}"	Camuy	72027	FALSE	FALSE	America/Puerto_Rico
+631	18.1852	-66.83169	Castaner	PR	Puerto Rico	TRUE		1321	163.2	72081	Lares	"{""72081"": 50.63, ""72001"": 49.37}"	Lares|Adjuntas	72081|72001	FALSE	FALSE	America/Puerto_Rico
+637	18.081	-66.94659	Sabana Grande	PR	Puerto Rico	TRUE		22909	251.5	72121	Sabana Grande	"{""72121"": 94.02, ""72125"": 4.18, ""72079"": 1.8}"	Sabana Grande|San GermÃ¡n|Lajas	72121|72125|72079	FALSE	FALSE	America/Puerto_Rico
+638	18.28462	-66.5137	Ciales	PR	Puerto Rico	TRUE		17319	93.7	72039	Ciales	"{""72039"": 91.88, ""72107"": 7.48, ""72091"": 0.64}"	Ciales|Orocovis|ManatÃ­	72039|72107|72091	FALSE	FALSE	America/Puerto_Rico
+641	18.26742	-66.70212	Utuado	PR	Puerto Rico	TRUE		23831	109.4	72141	Utuado	"{""72141"": 100}"	Utuado	72141	FALSE	FALSE	America/Puerto_Rico
+646	18.43251	-66.28429	Dorado	PR	Puerto Rico	TRUE		35998	660.2	72051	Dorado	"{""72051"": 97.18, ""72143"": 2.82}"	Dorado|Vega Alta	72051|72143	FALSE	FALSE	America/Puerto_Rico
+647	17.96667	-66.94266	Ensenada	PR	Puerto Rico	TRUE		4369	106.7	72055	GuÃ¡nica	"{""72055"": 98.2, ""72079"": 1.8}"	GuÃ¡nica|Lajas	72055|72079	FALSE	FALSE	America/Puerto_Rico
+650	18.34487	-66.58347	Florida	PR	Puerto Rico	TRUE		13200	160.7	72054	Florida	"{""72054"": 47.39, ""72141"": 41.9, ""72091"": 4.27, ""72039"": 2.87, ""72013"": 2.5, ""72017"": 1.07}"	Florida|Utuado|ManatÃ­|Ciales|Arecibo|Barceloneta	72054|72141|72091|72039|72013|72017	FALSE	FALSE	America/Puerto_Rico
+652	18.45614	-66.60194	Garrochales	PR	Puerto Rico	TRUE		4504	269.9	72013	Arecibo	"{""72013"": 100}"	Arecibo	72013	FALSE	FALSE	America/Puerto_Rico
+653	17.99413	-66.90266	Guanica	PR	Puerto Rico	TRUE		8495	148.5	72055	GuÃ¡nica	"{""72055"": 97.5, ""72121"": 2.5}"	GuÃ¡nica|Sabana Grande	72055|72121	FALSE	FALSE	America/Puerto_Rico
+656	18.04186	-66.79123	Guayanilla	PR	Puerto Rico	TRUE		17398	159.4	72059	Guayanilla	"{""72059"": 96.77, ""72153"": 3.1, ""72111"": 0.12}"	Guayanilla|Yauco|PeÃ±uelas	72059|72153|72111	FALSE	FALSE	America/Puerto_Rico
+659	18.41036	-66.79691	Hatillo	PR	Puerto Rico	TRUE		37327	351	72065	Hatillo	"{""72065"": 100}"	Hatillo	72065	FALSE	FALSE	America/Puerto_Rico
+660	18.13412	-67.11399	Hormigueros	PR	Puerto Rico	TRUE		15405	525.5	72067	Hormigueros	"{""72067"": 100}"	Hormigueros	72067	FALSE	FALSE	America/Puerto_Rico
+662	18.46622	-67.01508	Isabela	PR	Puerto Rico	TRUE		41090	384.4	72071	Isabela	"{""72071"": 100}"	Isabela	72071	FALSE	FALSE	America/Puerto_Rico
+664	18.21064	-66.59066	Jayuya	PR	Puerto Rico	TRUE		14807	121.9	72073	Jayuya	"{""72073"": 94.96, ""72141"": 5.04}"	Jayuya|Utuado	72073|72141	FALSE	FALSE	America/Puerto_Rico
+667	18.01246	-67.0417	Lajas	PR	Puerto Rico	TRUE		22792	146.2	72079	Lajas	"{""72079"": 98.04, ""72125"": 1.96}"	Lajas|San GermÃ¡n	72079|72125	FALSE	FALSE	America/Puerto_Rico
+669	18.27019	-66.86727	Lares	PR	Puerto Rico	TRUE		27417	165.1	72081	Lares	"{""72081"": 93.38, ""72141"": 3.8, ""72083"": 2.7, ""72131"": 0.12}"	Lares|Utuado|Las MarÃ­as|San SebastiÃ¡n	72081|72141|72083|72131	FALSE	FALSE	America/Puerto_Rico
+670	18.23782	-66.98852	Las Marias	PR	Puerto Rico	TRUE		8512	70.7	72083	Las MarÃ­as	"{""72083"": 95.64, ""72011"": 3.6, ""72097"": 0.45, ""72093"": 0.31}"	Las MarÃ­as|AÃ±asco|MayagÃ¼ez|Maricao	72083|72011|72097|72093	FALSE	FALSE	America/Puerto_Rico
+674	18.42229	-66.4891	Manati	PR	Puerto Rico	TRUE		39093	347.4	72091	ManatÃ­	"{""72091"": 99.45, ""72145"": 0.55}"	ManatÃ­|Vega Baja	72091|72145	FALSE	FALSE	America/Puerto_Rico
+676	18.37897	-67.08098	Moca	PR	Puerto Rico	TRUE		36972	292.2	72099	Moca	"{""72099"": 99.19, ""72003"": 0.81}"	Moca|Aguada	72099|72003	FALSE	FALSE	America/Puerto_Rico
+677	18.33535	-67.23155	Rincon	PR	Puerto Rico	TRUE		15483	410.3	72117	RincÃ³n	"{""72117"": 97.98, ""72011"": 1.2, ""72003"": 0.82}"	RincÃ³n|AÃ±asco|Aguada	72117|72011|72003	FALSE	FALSE	America/Puerto_Rico
+678	18.42949	-66.93016	Quebradillas	PR	Puerto Rico	TRUE		24595	325.9	72115	Quebradillas	"{""72115"": 77.04, ""72071"": 17.18, ""72131"": 5.79}"	Quebradillas|Isabela|San SebastiÃ¡n	72115|72071|72131	FALSE	FALSE	America/Puerto_Rico
+680	18.16307	-67.36122	Mayaguez	PR	Puerto Rico	TRUE		42689	256.3	72097	MayagÃ¼ez	"{""72097"": 94.1, ""72125"": 3.46, ""72011"": 2.44}"	MayagÃ¼ez|San GermÃ¡n|AÃ±asco	72097|72125|72011	FALSE	FALSE	America/Puerto_Rico
+682	18.22415	-67.15309	Mayaguez	PR	Puerto Rico	TRUE		28977	686	72097	MayagÃ¼ez	"{""72097"": 99.83, ""72067"": 0.17}"	MayagÃ¼ez|Hormigueros	72097|72067	FALSE	FALSE	America/Puerto_Rico
+683	18.10926	-67.03803	San German	PR	Puerto Rico	TRUE		29490	231	72125	San GermÃ¡n	"{""72125"": 100}"	San GermÃ¡n	72125	FALSE	FALSE	America/Puerto_Rico
+685	18.33656	-66.97518	San Sebastian	PR	Puerto Rico	TRUE		39988	196.2	72131	San SebastiÃ¡n	"{""72131"": 87.74, ""72071"": 11.31, ""72099"": 0.95}"	San SebastiÃ¡n|Isabela|Moca	72131|72071|72099	FALSE	FALSE	America/Puerto_Rico
+687	18.31707	-66.42029	Morovis	PR	Puerto Rico	TRUE		28397	282.1	72101	Morovis	"{""72101"": 100}"	Morovis	72101	FALSE	FALSE	America/Puerto_Rico
+688	18.3807	-66.62496	Sabana Hoyos	PR	Puerto Rico	TRUE		10028	119.1	72013	Arecibo	"{""72013"": 100}"	Arecibo	72013	FALSE	FALSE	America/Puerto_Rico
+690	18.49363	-67.09734	San Antonio	PR	Puerto Rico	TRUE		5870	1002.4	72005	Aguadilla	"{""72005"": 100}"	Aguadilla	72005	FALSE	FALSE	America/Puerto_Rico
+692	18.40905	-66.33768	Vega Alta	PR	Puerto Rico	TRUE		32802	477.4	72143	Vega Alta	"{""72143"": 99.87, ""72145"": 0.13}"	Vega Alta|Vega Baja	72143|72145	FALSE	FALSE	America/Puerto_Rico
+693	18.42633	-66.39811	Vega Baja	PR	Puerto Rico	TRUE		55387	481.5	72145	Vega Baja	"{""72145"": 98.29, ""72143"": 1.43, ""72091"": 0.28}"	Vega Baja|Vega Alta|ManatÃ­	72145|72143|72091	FALSE	FALSE	America/Puerto_Rico
+694	18.48327	-66.39269	Vega Baja	PR	Puerto Rico	TRUE		125	60.4	72145	Vega Baja	"{""72145"": 100}"	Vega Baja	72145	FALSE	FALSE	America/Puerto_Rico
+698	18.07274	-66.85519	Yauco	PR	Puerto Rico	TRUE		32535	200.5	72153	Yauco	"{""72153"": 97.77, ""72059"": 2.23}"	Yauco|Guayanilla	72153|72059	FALSE	FALSE	America/Puerto_Rico
+703	18.24739	-66.13143	Aguas Buenas	PR	Puerto Rico	TRUE		24263	302	72007	Aguas Buenas	"{""72007"": 93.06, ""72041"": 3.61, ""72045"": 3.33}"	Aguas Buenas|Cidra|ComerÃ­o	72007|72041|72045	FALSE	FALSE	America/Puerto_Rico
+704	17.97442	-66.22888	Aguirre	PR	Puerto Rico	TRUE		6256	268.5	72123	Salinas	"{""72123"": 97.38, ""72057"": 2.62}"	Salinas|Guayama	72123|72057	FALSE	FALSE	America/Puerto_Rico
+705	18.1294	-66.26653	Aibonito	PR	Puerto Rico	TRUE		24471	310.8	72009	Aibonito	"{""72009"": 97.19, ""72043"": 2.81}"	Aibonito|Coamo	72009|72043	FALSE	FALSE	America/Puerto_Rico
+707	18.01752	-65.92127	Maunabo	PR	Puerto Rico	TRUE		10319	190.4	72095	Maunabo	"{""72095"": 100}"	Maunabo	72095	FALSE	FALSE	America/Puerto_Rico
+714	17.9981	-66.05635	Arroyo	PR	Puerto Rico	TRUE		15341	394.8	72015	Arroyo	"{""72015"": 100}"	Arroyo	72015	FALSE	FALSE	America/Puerto_Rico
+715	17.99738	-66.56104	Mercedita	PR	Puerto Rico	TRUE		2082	63.3	72113	Ponce	"{""72113"": 99.05, ""72075"": 0.95}"	Ponce|Juana DÃ­az	72113|72075	FALSE	FALSE	America/Puerto_Rico
+716	17.99942	-66.59868	Ponce	PR	Puerto Rico	TRUE		27945	1244.8	72113	Ponce	"{""72113"": 100}"	Ponce	72113	FALSE	FALSE	America/Puerto_Rico
+717	18.00272	-66.61146	Ponce	PR	Puerto Rico	TRUE		14577	2372	72113	Ponce	"{""72113"": 100}"	Ponce	72113	FALSE	FALSE	America/Puerto_Rico
+718	18.23145	-65.76067	Naguabo	PR	Puerto Rico	TRUE		23026	188.3	72103	Naguabo	"{""72103"": 99.88, ""72037"": 0.12}"	Naguabo|Ceiba	72103|72037	FALSE	FALSE	America/Puerto_Rico
+719	18.28879	-66.25316	Naranjito	PR	Puerto Rico	TRUE		29932	409.7	72105	Naranjito	"{""72105"": 96.91, ""72047"": 2.23, ""72045"": 0.46, ""72135"": 0.4}"	Naranjito|Corozal|ComerÃ­o|Toa Alta	72105|72047|72045|72135	FALSE	FALSE	America/Puerto_Rico
+720	18.21559	-66.42421	Orocovis	PR	Puerto Rico	TRUE		21037	144.7	72107	Orocovis	"{""72107"": 99.28, ""72043"": 0.72}"	Orocovis|Coamo	72107|72043	FALSE	FALSE	America/Puerto_Rico
+723	18.03139	-66.01122	Patillas	PR	Puerto Rico	TRUE		15643	131.3	72109	Patillas	"{""72109"": 99.5, ""72095"": 0.5}"	Patillas|Maunabo	72109|72095	FALSE	FALSE	America/Puerto_Rico
+725	18.22052	-66.03962	Caguas	PR	Puerto Rico	TRUE		73462	685.7	72025	Caguas	"{""72025"": 86.58, ""72061"": 4.45, ""72129"": 2.77, ""72127"": 2.23, ""72139"": 2.07, ""72007"": 1.9}"	Caguas|Guaynabo|San Lorenzo|San Juan|Trujillo Alto|Aguas Buenas	72025|72061|72129|72127|72139|72007	FALSE	FALSE	America/Puerto_Rico
+727	18.21142	-66.07374	Caguas	PR	Puerto Rico	TRUE		55191	944.4	72025	Caguas	"{""72025"": 100}"	Caguas	72025	FALSE	FALSE	America/Puerto_Rico
+728	18.00697	-66.65995	Ponce	PR	Puerto Rico	TRUE		36532	916.1	72113	Ponce	"{""72113"": 100}"	Ponce	72113	FALSE	FALSE	America/Puerto_Rico
+729	18.33524	-65.88677	Canovanas	PR	Puerto Rico	TRUE		47067	508.3	72029	CanÃ³vanas	"{""72029"": 91.45, ""72087"": 8.55}"	CanÃ³vanas|LoÃ­za	72029|72087	FALSE	FALSE	America/Puerto_Rico
+730	18.03256	-66.61384	Ponce	PR	Puerto Rico	TRUE		31081	1808	72113	Ponce	"{""72113"": 100}"	Ponce	72113	FALSE	FALSE	America/Puerto_Rico
+731	18.09914	-66.63279	Ponce	PR	Puerto Rico	TRUE		9724	76.7	72113	Ponce	"{""72113"": 97.11, ""72001"": 2.89}"	Ponce|Adjuntas	72113|72001	FALSE	FALSE	America/Puerto_Rico
+735	18.2525	-65.67534	Ceiba	PR	Puerto Rico	TRUE		10949	154.4	72037	Ceiba	"{""72037"": 94.58, ""72103"": 5.42}"	Ceiba|Naguabo	72037|72103	FALSE	FALSE	America/Puerto_Rico
+736	18.10736	-66.14994	Cayey	PR	Puerto Rico	TRUE		45306	318.6	72035	Cayey	"{""72035"": 92.47, ""72041"": 7.53}"	Cayey|Cidra	72035|72041	FALSE	FALSE	America/Puerto_Rico
+738	18.31793	-65.66793	Fajardo	PR	Puerto Rico	TRUE		29980	390.8	72053	Fajardo	"{""72053"": 99.58, ""72037"": 0.42}"	Fajardo|Ceiba	72053|72037	FALSE	FALSE	America/Puerto_Rico
+739	18.17543	-66.16198	Cidra	PR	Puerto Rico	TRUE		34578	433.8	72041	Cidra	"{""72041"": 100}"	Cidra	72041	FALSE	FALSE	America/Puerto_Rico
+740	18.33251	-65.63419	Puerto Real	PR	Puerto Rico	TRUE		1583	1463.9	72053	Fajardo	"{""72053"": 100}"	Fajardo	72053	FALSE	FALSE	America/Puerto_Rico
+741	18.16569	-65.75506	Punta Santiago	PR	Puerto Rico	TRUE		3716	630.2	72069	Humacao	"{""72069"": 100}"	Humacao	72069	FALSE	FALSE	America/Puerto_Rico
+745	18.3466	-65.81382	Rio Grande	PR	Puerto Rico	TRUE		46739	297.1	72119	RÃ­o Grande	"{""72119"": 99.78, ""72029"": 0.22}"	RÃ­o Grande|CanÃ³vanas	72119|72029	FALSE	FALSE	America/Puerto_Rico
+751	18.01205	-66.25871	Salinas	PR	Puerto Rico	TRUE		19343	123	72123	Salinas	"{""72123"": 99.82, ""72035"": 0.18}"	Salinas|Cayey	72123|72035	FALSE	FALSE	America/Puerto_Rico
+754	18.1447	-65.97565	San Lorenzo	PR	Puerto Rico	TRUE		36728	283.7	72129	San Lorenzo	"{""72129"": 100}"	San Lorenzo	72129	FALSE	FALSE	America/Puerto_Rico
+757	17.9933	-66.39056	Santa Isabel	PR	Puerto Rico	TRUE		19853	236.3	72133	Santa Isabel	"{""72133"": 100}"	Santa Isabel	72133	FALSE	FALSE	America/Puerto_Rico
+765	18.12365	-65.43013	Vieques	PR	Puerto Rico	TRUE		8078	66	72147	Vieques	"{""72147"": 100}"	Vieques	72147	FALSE	FALSE	America/Puerto_Rico
+766	18.13039	-66.4757	Villalba	PR	Puerto Rico	TRUE		21572	218.2	72149	Villalba	"{""72149"": 93.28, ""72107"": 6.49, ""72075"": 0.23}"	Villalba|Orocovis|Juana DÃ­az	72149|72107|72075	FALSE	FALSE	America/Puerto_Rico
+767	18.07033	-65.89618	Yabucoa	PR	Puerto Rico	TRUE		29962	209.7	72151	Yabucoa	"{""72151"": 99.33, ""72069"": 0.67}"	Yabucoa|Humacao	72151|72069	FALSE	FALSE	America/Puerto_Rico
+769	18.09459	-66.3607	Coamo	PR	Puerto Rico	TRUE		33602	168.3	72043	Coamo	"{""72043"": 98.05, ""72133"": 1.95}"	Coamo|Santa Isabel	72043|72133	FALSE	FALSE	America/Puerto_Rico
+771	18.18797	-65.86916	Las Piedras	PR	Puerto Rico	TRUE		35094	403.3	72085	Las Piedras	"{""72085"": 99.0, ""72069"": 1.0}"	Las Piedras|Humacao	72085|72069	FALSE	FALSE	America/Puerto_Rico
+772	18.43048	-65.90377	Loiza	PR	Puerto Rico	TRUE		16829	397.6	72087	LoÃ­za	"{""72087"": 100}"	LoÃ­za	72087	FALSE	FALSE	America/Puerto_Rico
+773	18.34073	-65.72756	Luquillo	PR	Puerto Rico	TRUE		17532	280.9	72089	Luquillo	"{""72089"": 100}"	Luquillo	72089	FALSE	FALSE	America/Puerto_Rico
+775	18.31387	-65.28618	Culebra	PR	Puerto Rico	TRUE		1387	46	72049	Culebra	"{""72049"": 100}"	Culebra	72049	FALSE	FALSE	America/Puerto_Rico
+777	18.22365	-65.90904	Juncos	PR	Puerto Rico	TRUE		37446	538.4	72077	Juncos	"{""72077"": 98.5, ""72129"": 0.81, ""72085"": 0.43, ""72029"": 0.14, ""72063"": 0.12}"	Juncos|San Lorenzo|Las Piedras|CanÃ³vanas|Gurabo	72077|72129|72085|72029|72063	FALSE	FALSE	America/Puerto_Rico
+778	18.26319	-65.97938	Gurabo	PR	Puerto Rico	TRUE		40203	525.8	72063	Gurabo	"{""72063"": 94.08, ""72129"": 5.92}"	Gurabo|San Lorenzo	72063|72129	FALSE	FALSE	America/Puerto_Rico
+780	18.09998	-66.57032	Coto Laurel	PR	Puerto Rico	TRUE		13446	271.3	72113	Ponce	"{""72113"": 97.93, ""72075"": 2.07}"	Ponce|Juana DÃ­az	72113|72075	FALSE	FALSE	America/Puerto_Rico
+782	18.22501	-66.22452	Comerio	PR	Puerto Rico	TRUE		18128	250.2	72045	ComerÃ­o	"{""72045"": 97.39, ""72019"": 2.61}"	ComerÃ­o|Barranquitas	72045|72019	FALSE	FALSE	America/Puerto_Rico
+783	18.30348	-66.32851	Corozal	PR	Puerto Rico	TRUE		34259	314.1	72047	Corozal	"{""72047"": 99.06, ""72019"": 0.94}"	Corozal|Barranquitas	72047|72019	FALSE	FALSE	America/Puerto_Rico
+784	18.00558	-66.13651	Guayama	PR	Puerto Rico	TRUE		34981	202.4	72057	Guayama	"{""72057"": 97.13, ""72035"": 1.63, ""72109"": 1.24}"	Guayama|Cayey|Patillas	72057|72035|72109	FALSE	FALSE	America/Puerto_Rico
+786	18.1357	-66.22881	La Plata	PR	Puerto Rico	TRUE		165	36.1	72009	Aibonito	"{""72009"": 100}"	Aibonito	72009	FALSE	FALSE	America/Puerto_Rico
+791	18.14391	-65.81398	Humacao	PR	Puerto Rico	TRUE		45455	411.6	72069	Humacao	"{""72069"": 97.87, ""72085"": 1.16, ""72151"": 0.96}"	Humacao|Las Piedras|Yabucoa	72069|72085|72151	FALSE	FALSE	America/Puerto_Rico
+794	18.19934	-66.31179	Barranquitas	PR	Puerto Rico	TRUE		28668	322.5	72019	Barranquitas	"{""72019"": 96.51, ""72043"": 3.49}"	Barranquitas|Coamo	72019|72043	FALSE	FALSE	America/Puerto_Rico
+795	18.05128	-66.49485	Juana Diaz	PR	Puerto Rico	TRUE		43367	280.3	72075	Juana DÃ­az	"{""72075"": 100}"	Juana DÃ­az	72075	FALSE	FALSE	America/Puerto_Rico
+802	18.34349	-64.9287	St Thomas	VI	Virgin Islands	TRUE				78030	St. Thomas	"{""78030"": 100}"	St. Thomas	78030	FALSE	FALSE	America/St_Thomas
+820	17.7388	-64.70695	Christiansted	VI	Virgin Islands	TRUE				78010	St. Croix	"{""78010"": 100}"	St. Croix	78010	FALSE	FALSE	America/St_Thomas
+830	18.33857	-64.73802	St John	VI	Virgin Islands	TRUE				78020	St. John	"{""78020"": 100}"	St. John	78020	FALSE	FALSE	America/St_Thomas
+840	17.72649	-64.84717	Frederiksted	VI	Virgin Islands	TRUE				78010	St. Croix	"{""78010"": 100}"	St. Croix	78010	FALSE	FALSE	America/St_Thomas
+850	17.72763	-64.79122	Kingshill	VI	Virgin Islands	TRUE				78010	St. Croix	"{""78010"": 100}"	St. Croix	78010	FALSE	FALSE	America/St_Thomas
+851	17.74757	-64.78737	Kingshill	VI	Virgin Islands	TRUE				78010	St. Croix	"{""78010"": 100}"	St. Croix	78010	FALSE	FALSE	America/St_Thomas
+901	18.46478	-66.10277	San Juan	PR	Puerto Rico	TRUE		6398	2434.5	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+907	18.45287	-66.08381	San Juan	PR	Puerto Rico	TRUE		15817	2989	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+909	18.44131	-66.06866	San Juan	PR	Puerto Rico	TRUE		5633	3331.3	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+911	18.45133	-66.05636	San Juan	PR	Puerto Rico	TRUE		7297	5920.5	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+912	18.44503	-66.05995	San Juan	PR	Puerto Rico	TRUE		5845	6085.5	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+913	18.45024	-66.04275	San Juan	PR	Puerto Rico	TRUE		6943	8274.4	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+915	18.43673	-66.04576	San Juan	PR	Puerto Rico	TRUE		24607	6777.8	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+917	18.4208	-66.04989	San Juan	PR	Puerto Rico	TRUE		17116	4840.4	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+918	18.42139	-66.06774	San Juan	PR	Puerto Rico	TRUE		16172	2314.5	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+920	18.41904	-66.09023	San Juan	PR	Puerto Rico	TRUE		15900	1700.7	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+921	18.39206	-66.0871	San Juan	PR	Puerto Rico	TRUE		33119	4166.8	72127	San Juan	"{""72127"": 99.88, ""72061"": 0.12}"	San Juan|Guaynabo	72127|72061	FALSE	FALSE	America/Puerto_Rico
+923	18.41146	-66.03715	San Juan	PR	Puerto Rico	TRUE		24551	4716	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+924	18.39987	-66.01344	San Juan	PR	Puerto Rico	TRUE		49922	4133.4	72127	San Juan	"{""72127"": 96.5, ""72031"": 3.5}"	San Juan|Carolina	72127|72031	FALSE	FALSE	America/Puerto_Rico
+925	18.40028	-66.05058	San Juan	PR	Puerto Rico	TRUE		4882	4229.1	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+926	18.34691	-66.05434	San Juan	PR	Puerto Rico	TRUE		92284	1535	72127	San Juan	"{""72127"": 83.48, ""72139"": 15.69, ""72061"": 0.83}"	San Juan|Trujillo Alto|Guaynabo	72127|72139|72061	FALSE	FALSE	America/Puerto_Rico
+927	18.38884	-66.07149	San Juan	PR	Puerto Rico	TRUE		13868	2210	72127	San Juan	"{""72127"": 100}"	San Juan	72127	FALSE	FALSE	America/Puerto_Rico
+934	18.41372	-66.11998	Fort Buchanan	PR	Puerto Rico	TRUE		38	10.3	72061	Guaynabo	"{""72061"": 69.04, ""72021"": 30.96}"	Guaynabo|BayamÃ³n	72061|72021	FALSE	FALSE	America/Puerto_Rico
+949	18.43166	-66.21349	Toa Baja	PR	Puerto Rico	TRUE		65867	1235.7	72137	Toa Baja	"{""72137"": 96.11, ""72033"": 2.93, ""72135"": 0.96}"	Toa Baja|CataÃ±o|Toa Alta	72137|72033|72135	FALSE	FALSE	America/Puerto_Rico
+950	18.46201	-66.23917	Toa Baja	PR	Puerto Rico	TRUE		0	0	72051	Dorado	"{""72051"": 99.69, ""72137"": 0.31}"	Dorado|Toa Baja	72051|72137	FALSE	FALSE	America/Puerto_Rico
+951	18.43175	-66.25628	Toa Baja	PR	Puerto Rico	TRUE		389	140.2	72137	Toa Baja	"{""72137"": 100}"	Toa Baja	72137	FALSE	FALSE	America/Puerto_Rico
+952	18.42874	-66.18897	Sabana Seca	PR	Puerto Rico	TRUE		8165	1421.8	72137	Toa Baja	"{""72137"": 100}"	Toa Baja	72137	FALSE	FALSE	America/Puerto_Rico
+953	18.36319	-66.24764	Toa Alta	PR	Puerto Rico	TRUE		66156	957.1	72135	Toa Alta	"{""72135"": 98.42, ""72047"": 0.81, ""72137"": 0.77}"	Toa Alta|Corozal|Toa Baja	72135|72047|72137	FALSE	FALSE	America/Puerto_Rico
+956	18.32121	-66.17185	Bayamon	PR	Puerto Rico	TRUE		66734	939.7	72021	BayamÃ³n	"{""72021"": 97.91, ""72007"": 1.4, ""72135"": 0.69}"	BayamÃ³n|Aguas Buenas|Toa Alta	72021|72007|72135	FALSE	FALSE	America/Puerto_Rico
+957	18.36696	-66.18857	Bayamon	PR	Puerto Rico	TRUE		40194	3575	72021	BayamÃ³n	"{""72021"": 93.14, ""72135"": 6.86}"	BayamÃ³n|Toa Alta	72021|72135	FALSE	FALSE	America/Puerto_Rico
+959	18.3852	-66.15583	Bayamon	PR	Puerto Rico	TRUE		46260	2931.4	72021	BayamÃ³n	"{""72021"": 98.7, ""72061"": 0.83, ""72137"": 0.31, ""72135"": 0.16}"	BayamÃ³n|Guaynabo|Toa Baja|Toa Alta	72021|72061|72137|72135	FALSE	FALSE	America/Puerto_Rico
+960	18.41674	-66.14365	Bayamon	PR	Puerto Rico	TRUE		3025	832.8	72021	BayamÃ³n	"{""72021"": 100}"	BayamÃ³n	72021	FALSE	FALSE	America/Puerto_Rico
+961	18.40987	-66.16415	Bayamon	PR	Puerto Rico	TRUE		28888	2091.4	72021	BayamÃ³n	"{""72021"": 99.0, ""72033"": 1.0}"	BayamÃ³n|CataÃ±o	72021|72033	FALSE	FALSE	America/Puerto_Rico
+962	18.43514	-66.13949	Catano	PR	Puerto Rico	TRUE		18947	1519	72033	CataÃ±o	"{""72033"": 85.97, ""72061"": 13.72, ""72021"": 0.2, ""72137"": 0.11}"	CataÃ±o|Guaynabo|BayamÃ³n|Toa Baja	72033|72061|72021|72137	FALSE	FALSE	America/Puerto_Rico
+965	18.42853	-66.11175	Guaynabo	PR	Puerto Rico	TRUE		5848	2494.4	72061	Guaynabo	"{""72061"": 100}"	Guaynabo	72061	FALSE	FALSE	America/Puerto_Rico
+966	18.39784	-66.11394	Guaynabo	PR	Puerto Rico	TRUE		18791	2879	72061	Guaynabo	"{""72061"": 85.34, ""72127"": 8.07, ""72021"": 6.59}"	Guaynabo|San Juan|BayamÃ³n	72061|72127|72021	FALSE	FALSE	America/Puerto_Rico
+968	18.40609	-66.10123	Guaynabo	PR	Puerto Rico	TRUE		3633	3076.8	72061	Guaynabo	"{""72061"": 99.73, ""72127"": 0.27}"	Guaynabo|San Juan	72061|72127	FALSE	FALSE	America/Puerto_Rico
+969	18.36696	-66.11	Guaynabo	PR	Puerto Rico	TRUE		42231	3236.4	72061	Guaynabo	"{""72061"": 85.12, ""72127"": 11.05, ""72021"": 3.83}"	Guaynabo|San Juan|BayamÃ³n	72061|72127|72021	FALSE	FALSE	America/Puerto_Rico
+971	18.32067	-66.11751	Guaynabo	PR	Puerto Rico	TRUE		24367	587.1	72061	Guaynabo	"{""72061"": 100}"	Guaynabo	72061	FALSE	FALSE	America/Puerto_Rico
+976	18.33903	-65.99286	Trujillo Alto	PR	Puerto Rico	TRUE		60620	1342.4	72139	Trujillo Alto	"{""72139"": 94.65, ""72031"": 2.57, ""72127"": 2.08, ""72063"": 0.7}"	Trujillo Alto|Carolina|San Juan|Gurabo	72139|72031|72127|72063	FALSE	FALSE	America/Puerto_Rico
+979	18.43734	-66.0089	Carolina	PR	Puerto Rico	TRUE		14776	1467.1	72031	Carolina	"{""72031"": 100}"	Carolina	72031	FALSE	FALSE	America/Puerto_Rico
+982	18.40961	-65.99143	Carolina	PR	Puerto Rico	TRUE		14050	3760.2	72031	Carolina	"{""72031"": 100}"	Carolina	72031	FALSE	FALSE	America/Puerto_Rico
+983	18.41788	-65.98104	Carolina	PR	Puerto Rico	TRUE		31472	2812	72031	Carolina	"{""72031"": 99.88, ""72127"": 0.12}"	Carolina|San Juan	72031|72127	FALSE	FALSE	America/Puerto_Rico
+985	18.40628	-65.94767	Carolina	PR	Puerto Rico	TRUE		30497	1275.1	72031	Carolina	"{""72031"": 100}"	Carolina	72031	FALSE	FALSE	America/Puerto_Rico
+987	18.34115	-65.94257	Carolina	PR	Puerto Rico	TRUE		55747	830.1	72031	Carolina	"{""72031"": 99.83, ""72139"": 0.17}"	Carolina|Trujillo Alto	72031|72139	FALSE	FALSE	America/Puerto_Rico
+1001	42.06262	-72.62521	Agawam	MA	Massachusetts	TRUE		16234	555.1	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1002	42.37633	-72.46462	Amherst	MA	Massachusetts	TRUE		26370	191.2	25015	Hampshire	"{""25015"": 93.26, ""25011"": 6.74}"	Hampshire|Franklin	25015|25011	FALSE	FALSE	America/New_York
+1005	42.42117	-72.10655	Barre	MA	Massachusetts	TRUE		5204	46.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1007	42.28163	-72.40009	Belchertown	MA	Massachusetts	TRUE		15419	108.5	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1008	42.18234	-72.95819	Blandford	MA	Massachusetts	TRUE		1327	8.4	25013	Hampden	"{""25013"": 94.36, ""25003"": 5.64}"	Hampden|Berkshire	25013|25003	FALSE	FALSE	America/New_York
+1009	42.21133	-72.34189	Bondsville	MA	Massachusetts	TRUE		804	445.1	25013	Hampden	"{""25013"": 99.06, ""25015"": 0.94}"	Hampden|Hampshire	25013|25015	FALSE	FALSE	America/New_York
+1010	42.12904	-72.20597	Brimfield	MA	Massachusetts	TRUE		3705	40.6	25013	Hampden	"{""25013"": 98.73, ""25027"": 1.27}"	Hampden|Worcester	25013|25027	FALSE	FALSE	America/New_York
+1011	42.30233	-72.96448	Chester	MA	Massachusetts	TRUE		1175	13.8	25013	Hampden	"{""25013"": 77.54, ""25015"": 22.46}"	Hampden|Hampshire	25013|25015	FALSE	FALSE	America/New_York
+1012	42.38495	-72.84675	Chesterfield	MA	Massachusetts	TRUE		397	12.7	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1013	42.16059	-72.60788	Chicopee	MA	Massachusetts	TRUE		23284	1588.4	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1020	42.17618	-72.56538	Chicopee	MA	Massachusetts	TRUE		30167	934.7	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1022	42.19721	-72.54249	Chicopee	MA	Massachusetts	TRUE		1844	147.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1026	42.46858	-72.92296	Cummington	MA	Massachusetts	TRUE		1014	14	25015	Hampshire	"{""25015"": 90.46, ""25003"": 9.54}"	Hampshire|Berkshire	25015|25003	FALSE	FALSE	America/New_York
+1027	42.29506	-72.74303	Easthampton	MA	Massachusetts	TRUE		17716	168.5	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1028	42.05967	-72.49899	East Longmeadow	MA	Massachusetts	TRUE		16321	487.7	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1029	42.19402	-73.05067	East Otis	MA	Massachusetts	TRUE		539	20.9	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1030	42.06869	-72.67967	Feeding Hills	MA	Massachusetts	TRUE		12305	394.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1031	42.32782	-72.19191	Gilbertville	MA	Massachusetts	TRUE		1676	96.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1032	42.45313	-72.81965	Goshen	MA	Massachusetts	TRUE		509	20.4	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1033	42.26082	-72.50361	Granby	MA	Massachusetts	TRUE		6080	84.4	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1034	42.0826	-72.95611	Granville	MA	Massachusetts	TRUE		2332	13.3	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1035	42.35563	-72.5692	Hadley	MA	Massachusetts	TRUE		5306	88.7	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1036	42.0638	-72.4157	Hampden	MA	Massachusetts	TRUE		4946	97.4	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1037	42.37063	-72.19466	Hardwick	MA	Massachusetts	TRUE		572	11.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1038	42.38466	-72.60559	Hatfield	MA	Massachusetts	TRUE		2491	104.3	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1039	42.41049	-72.69188	Haydenville	MA	Massachusetts	TRUE		1506	35.3	25015	Hampshire	"{""25015"": 58.67, ""25011"": 41.33}"	Hampshire|Franklin	25015|25011	FALSE	FALSE	America/New_York
+1040	42.21251	-72.64109	Holyoke	MA	Massachusetts	TRUE		37813	689.8	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1050	42.29092	-72.87526	Huntington	MA	Massachusetts	TRUE		2529	23.6	25015	Hampshire	"{""25015"": 68.98, ""25013"": 31.02}"	Hampshire|Hampden	25015|25013	FALSE	FALSE	America/New_York
+1053	42.35205	-72.71032	Leeds	MA	Massachusetts	TRUE		2304	154.7	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1054	42.47381	-72.48768	Leverett	MA	Massachusetts	TRUE		1608	27.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1056	42.19211	-72.45805	Ludlow	MA	Massachusetts	TRUE		20904	296.8	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1057	42.09118	-72.32392	Monson	MA	Massachusetts	TRUE		8176	70.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1060	42.32218	-72.63126	Northampton	MA	Massachusetts	TRUE		16492	585.9	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1062	42.32146	-72.69244	Florence	MA	Massachusetts	TRUE		9816	217.2	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1066	42.40742	-72.64032	North Hatfield	MA	Massachusetts	TRUE		115	35.2	25015	Hampshire	"{""25015"": 99.4, ""25011"": 0.6}"	Hampshire|Franklin	25015|25011	FALSE	FALSE	America/New_York
+1068	42.35125	-72.04776	Oakham	MA	Massachusetts	TRUE		1639	29.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1069	42.18798	-72.30578	Palmer	MA	Massachusetts	TRUE		8821	121.4	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1070	42.51958	-72.92504	Plainfield	MA	Massachusetts	TRUE		575	11.2	25015	Hampshire	"{""25015"": 99.4, ""25003"": 0.6}"	Hampshire|Berkshire	25015|25003	FALSE	FALSE	America/New_York
+1071	42.16029	-72.8598	Russell	MA	Massachusetts	TRUE		1054	25.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1072	42.46327	-72.41893	Shutesbury	MA	Massachusetts	TRUE		1521	30.8	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1073	42.23084	-72.73856	Southampton	MA	Massachusetts	TRUE		6230	85.4	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1074	42.3837	-72.10021	South Barre	MA	Massachusetts	TRUE		368	547.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1075	42.25672	-72.57928	South Hadley	MA	Massachusetts	TRUE		17754	386.8	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1077	42.05441	-72.77851	Southwick	MA	Massachusetts	TRUE		9217	115.3	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1079	42.18508	-72.33406	Thorndike	MA	Massachusetts	TRUE		438	105.2	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1080	42.18228	-72.36515	Three Rivers	MA	Massachusetts	TRUE		2454	569	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1081	42.06232	-72.23085	Wales	MA	Massachusetts	TRUE		1747	46.6	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1082	42.29816	-72.27676	Ware	MA	Massachusetts	TRUE		10392	85.4	25015	Hampshire	"{""25015"": 73.12, ""25027"": 26.75, ""25013"": 0.13}"	Hampshire|Worcester|Hampden	25015|25027|25013	FALSE	FALSE	America/New_York
+1083	42.20652	-72.19906	Warren	MA	Massachusetts	TRUE		2858	86.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1084	42.38589	-72.88165	West Chesterfield	MA	Massachusetts	TRUE		97	4.5	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1085	42.15375	-72.76961	Westfield	MA	Massachusetts	TRUE		41102	265.7	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1089	42.12532	-72.65025	West Springfield	MA	Massachusetts	TRUE		28772	664	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1092	42.20008	-72.23715	West Warren	MA	Massachusetts	TRUE		1200	68.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1093	42.44335	-72.65099	Whately	MA	Massachusetts	TRUE		225	20.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1094	42.36481	-72.13548	Wheelwright	MA	Massachusetts	TRUE		52	27.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1095	42.12763	-72.42994	Wilbraham	MA	Massachusetts	TRUE		14618	251	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1096	42.40968	-72.77213	Williamsburg	MA	Massachusetts	TRUE		2580	27.8	25015	Hampshire	"{""25015"": 92.01, ""25011"": 7.99}"	Hampshire|Franklin	25015|25011	FALSE	FALSE	America/New_York
+1097	42.17722	-72.83175	Woronoco	MA	Massachusetts	TRUE		143	31.7	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1098	42.39551	-72.94315	Worthington	MA	Massachusetts	TRUE		979	11.9	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1103	42.10443	-72.58997	Springfield	MA	Massachusetts	TRUE		2477	2199.6	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1104	42.13326	-72.56733	Springfield	MA	Massachusetts	TRUE		23209	1712.7	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1105	42.09911	-72.57865	Springfield	MA	Massachusetts	TRUE		11843	3791.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1106	42.04877	-72.57163	Longmeadow	MA	Massachusetts	TRUE		15853	638.6	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1107	42.12116	-72.60642	Springfield	MA	Massachusetts	TRUE		12009	3006.3	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1108	42.0814	-72.55866	Springfield	MA	Massachusetts	TRUE		27405	3074.9	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1109	42.11839	-72.54876	Springfield	MA	Massachusetts	TRUE		31124	2208.5	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1118	42.09476	-72.5253	Springfield	MA	Massachusetts	TRUE		14839	1593.4	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1119	42.12452	-72.51126	Springfield	MA	Massachusetts	TRUE		13616	1489	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1128	42.09497	-72.48806	Springfield	MA	Massachusetts	TRUE		2896	1008.3	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1129	42.1211	-72.4877	Springfield	MA	Massachusetts	TRUE		5672	637.3	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1151	42.15294	-72.50883	Indian Orchard	MA	Massachusetts	TRUE		9606	1565.8	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1201	42.45614	-73.28114	Pittsfield	MA	Massachusetts	TRUE		44848	286.8	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1220	42.62686	-73.11873	Adams	MA	Massachusetts	TRUE		8074	136.2	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1222	42.06242	-73.32146	Ashley Falls	MA	Massachusetts	TRUE		664	55.8	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1223	42.31118	-73.09835	Becket	MA	Massachusetts	TRUE		2495	13.9	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1224	42.50622	-73.19841	Berkshire	MA	Massachusetts	TRUE		228	189.2	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1225	42.56385	-73.1512	Cheshire	MA	Massachusetts	TRUE		3216	46.3	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1226	42.47954	-73.15329	Dalton	MA	Massachusetts	TRUE		6256	111	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1229	42.29411	-73.35227	Glendale	MA	Massachusetts	TRUE		263	40.9	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1230	42.18197	-73.34244	Great Barrington	MA	Massachusetts	TRUE		8826	35.1	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1235	42.43181	-73.07336	Hinsdale	MA	Massachusetts	TRUE		2489	20.6	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1236	42.26923	-73.37999	Housatonic	MA	Massachusetts	TRUE		1458	85.1	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1237	42.5529	-73.25373	Lanesborough	MA	Massachusetts	TRUE		2302	18	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1238	42.30072	-73.22553	Lee	MA	Massachusetts	TRUE		5944	83.1	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1240	42.37567	-73.26466	Lenox	MA	Massachusetts	TRUE		5111	82.5	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1242	42.3334	-73.24967	Lenox Dale	MA	Massachusetts	TRUE		29	24.4	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1243	42.34752	-73.03467	Middlefield	MA	Massachusetts	TRUE		173	4.7	25015	Hampshire	"{""25015"": 100}"	Hampshire	25015	FALSE	FALSE	America/New_York
+1244	42.10924	-73.27475	Mill River	MA	Massachusetts	TRUE		271	18.2	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1245	42.19043	-73.21579	Monterey	MA	Massachusetts	TRUE		692	10.3	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1247	42.69813	-73.09264	North Adams	MA	Massachusetts	TRUE		14794	124.4	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1253	42.20751	-73.1118	Otis	MA	Massachusetts	TRUE		936	17	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1254	42.37972	-73.36608	Richmond	MA	Massachusetts	TRUE		1036	27.7	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1255	42.1068	-73.12213	Sandisfield	MA	Massachusetts	TRUE		994	7.6	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1257	42.0976	-73.37241	Sheffield	MA	Massachusetts	TRUE		2348	26.7	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1258	42.09396	-73.46616	South Egremont	MA	Massachusetts	TRUE		193	3.3	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1259	42.07316	-73.23282	Southfield	MA	Massachusetts	TRUE		688	11.6	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1260	42.26663	-73.2712	South Lee	MA	Massachusetts	TRUE		20	3	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1262	42.30433	-73.32013	Stockbridge	MA	Massachusetts	TRUE		1778	34.8	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1264	42.23997	-73.19686	Tyringham	MA	Massachusetts	TRUE		188	5	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1266	42.30264	-73.39846	West Stockbridge	MA	Massachusetts	TRUE		1000	19.1	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1267	42.66593	-73.24209	Williamstown	MA	Massachusetts	TRUE		9633	62.7	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1270	42.51297	-73.04859	Windsor	MA	Massachusetts	TRUE		1036	12.4	25003	Berkshire	"{""25003"": 100}"	Berkshire	25003	FALSE	FALSE	America/New_York
+1301	42.62375	-72.60379	Greenfield	MA	Massachusetts	TRUE		17876	272.3	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1330	42.51772	-72.81556	Ashfield	MA	Massachusetts	TRUE		1704	19.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1331	42.56793	-72.18324	Athol	MA	Massachusetts	TRUE		13922	99.2	25027	Worcester	"{""25027"": 99.71, ""25011"": 0.29}"	Worcester|Franklin	25027|25011	FALSE	FALSE	America/New_York
+1337	42.69512	-72.57731	Bernardston	MA	Massachusetts	TRUE		2589	26.7	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1338	42.5814	-72.80309	Buckland	MA	Massachusetts	TRUE		95	28	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1339	42.61099	-72.88846	Charlemont	MA	Massachusetts	TRUE		1313	8.7	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1340	42.68805	-72.73205	Colrain	MA	Massachusetts	TRUE		1759	13.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1341	42.50734	-72.70221	Conway	MA	Massachusetts	TRUE		1622	18.7	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1342	42.54384	-72.6058	Deerfield	MA	Massachusetts	TRUE		1267	26.6	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1344	42.60756	-72.42916	Erving	MA	Massachusetts	TRUE		1703	47.7	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1346	42.6706	-72.81323	Heath	MA	Massachusetts	TRUE		454	13.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1347	42.56027	-72.51321	Lake Pleasant	MA	Massachusetts	TRUE		165	178.3	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1349	42.56656	-72.47045	Millers Falls	MA	Massachusetts	TRUE		741	29	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1351	42.54162	-72.52069	Montague	MA	Massachusetts	TRUE		2636	51.9	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1354	42.63282	-72.51136	Gill	MA	Massachusetts	TRUE		1740	48.9	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1355	42.45101	-72.33141	New Salem	MA	Massachusetts	TRUE		958	7.8	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1360	42.67575	-72.446	Northfield	MA	Massachusetts	TRUE		2872	32.3	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1364	42.60449	-72.29263	Orange	MA	Massachusetts	TRUE		7658	82.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1366	42.48858	-72.18564	Petersham	MA	Massachusetts	TRUE		1185	12.4	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1367	42.69674	-72.91387	Rowe	MA	Massachusetts	TRUE		563	8.8	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1368	42.67815	-72.18557	Royalston	MA	Massachusetts	TRUE		1455	12.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1370	42.59607	-72.72915	Shelburne Falls	MA	Massachusetts	TRUE		3878	31.1	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1373	42.47292	-72.61516	South Deerfield	MA	Massachusetts	TRUE		4860	81.4	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1375	42.46475	-72.55489	Sunderland	MA	Massachusetts	TRUE		3641	99.8	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1376	42.59273	-72.54591	Turners Falls	MA	Massachusetts	TRUE		4976	471	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1379	42.54149	-72.3989	Wendell	MA	Massachusetts	TRUE		778	13.9	25011	Franklin	"{""25011"": 100}"	Franklin	25011	FALSE	FALSE	America/New_York
+1420	42.58559	-71.81693	Fitchburg	MA	Massachusetts	TRUE		41839	537.4	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1430	42.66069	-71.9232	Ashburnham	MA	Massachusetts	TRUE		6481	68.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1431	42.67652	-71.82322	Ashby	MA	Massachusetts	TRUE		3211	52.4	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1432	42.56351	-71.57059	Ayer	MA	Massachusetts	TRUE		8521	386.2	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1434	42.53149	-71.61663	Devens	MA	Massachusetts	TRUE		1564	92.7	25027	Worcester	"{""25027"": 82.26, ""25017"": 17.74}"	Worcester|Middlesex	25027|25017	FALSE	FALSE	America/New_York
+1436	42.60579	-72.08958	Baldwinville	MA	Massachusetts	TRUE		3720	159.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1438	42.56028	-72.03583	East Templeton	MA	Massachusetts	TRUE		330	392.4	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1440	42.58797	-71.98649	Gardner	MA	Massachusetts	TRUE		21276	335.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1450	42.61368	-71.56139	Groton	MA	Massachusetts	TRUE		11356	133.8	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1451	42.50005	-71.57754	Harvard	MA	Massachusetts	TRUE		5487	100.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1452	42.48378	-72.00514	Hubbardston	MA	Massachusetts	TRUE		4371	41.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1453	42.51961	-71.76583	Leominster	MA	Massachusetts	TRUE		43851	642.3	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1460	42.53503	-71.4891	Littleton	MA	Massachusetts	TRUE		10280	240.3	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1462	42.58994	-71.72036	Lunenburg	MA	Massachusetts	TRUE		11919	172.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1463	42.67126	-71.60429	Pepperell	MA	Massachusetts	TRUE		11697	200	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1464	42.57411	-71.6475	Shirley	MA	Massachusetts	TRUE		6976	178	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1468	42.55324	-72.06879	Templeton	MA	Massachusetts	TRUE		4183	73.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1469	42.66514	-71.69161	Townsend	MA	Massachusetts	TRUE		6820	121.8	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1473	42.55122	-71.90266	Westminster	MA	Massachusetts	TRUE		8374	91.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1474	42.67088	-71.7508	West Townsend	MA	Massachusetts	TRUE		2280	79.4	25017	Middlesex	"{""25017"": 100}"	Middlesex	25017	FALSE	FALSE	America/New_York
+1475	42.66675	-72.04902	Winchendon	MA	Massachusetts	TRUE		10265	92.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1501	42.19689	-71.84549	Auburn	MA	Massachusetts	TRUE		16877	427.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1503	42.38378	-71.63552	Berlin	MA	Massachusetts	TRUE		3378	100.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1504	42.0399	-71.53125	Blackstone	MA	Massachusetts	TRUE		9255	321.6	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1505	42.35633	-71.72123	Boylston	MA	Massachusetts	TRUE		4948	119	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1506	42.19364	-72.10441	Brookfield	MA	Massachusetts	TRUE		3460	86	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1507	42.13509	-71.96803	Charlton	MA	Massachusetts	TRUE		13435	123	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1510	42.4119	-71.68883	Clinton	MA	Massachusetts	TRUE		15563	1063	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1515	42.20328	-72.04669	East Brookfield	MA	Massachusetts	TRUE		2166	84.8	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1516	42.0528	-71.75106	Douglas	MA	Massachusetts	TRUE		9376	98.8	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1518	42.11342	-72.11632	Fiskdale	MA	Massachusetts	TRUE		2598	82	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1519	42.20077	-71.67892	Grafton	MA	Massachusetts	TRUE		8058	291.3	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1520	42.33685	-71.85181	Holden	MA	Massachusetts	TRUE		16912	346.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1521	42.06012	-72.16592	Holland	MA	Massachusetts	TRUE		2583	81.2	25013	Hampden	"{""25013"": 100}"	Hampden	25013	FALSE	FALSE	America/New_York
+1522	42.38142	-71.87111	Jefferson	MA	Massachusetts	TRUE		3152	77.6	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1523	42.48176	-71.68079	Lancaster	MA	Massachusetts	TRUE		8606	121.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1524	42.24919	-71.91989	Leicester	MA	Massachusetts	TRUE		6327	153.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1525	42.09899	-71.64296	Linwood	MA	Massachusetts	TRUE		0	0	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1527	42.19228	-71.77397	Millbury	MA	Massachusetts	TRUE		13961	346	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1529	42.03906	-71.57767	Millville	MA	Massachusetts	TRUE		3160	250.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1531	42.31929	-72.12794	New Braintree	MA	Massachusetts	TRUE		973	18.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1532	42.32314	-71.64621	Northborough	MA	Massachusetts	TRUE		15750	329.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1534	42.13991	-71.64433	Northbridge	MA	Massachusetts	TRUE		6230	252.8	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1535	42.2695	-72.07794	North Brookfield	MA	Massachusetts	TRUE		4760	86.4	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1536	42.23189	-71.69219	North Grafton	MA	Massachusetts	TRUE		6860	309.4	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1537	42.16177	-71.89217	North Oxford	MA	Massachusetts	TRUE		2278	129.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1540	42.11649	-71.85819	Oxford	MA	Massachusetts	TRUE		10979	221.9	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1541	42.45649	-71.88128	Princeton	MA	Massachusetts	TRUE		3529	38.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1542	42.20241	-71.90995	Rochdale	MA	Massachusetts	TRUE		2615	239.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1543	42.38482	-71.96726	Rutland	MA	Massachusetts	TRUE		9353	102.8	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1545	42.28419	-71.71558	Shrewsbury	MA	Massachusetts	TRUE		38876	723.3	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1550	42.06039	-72.03377	Southbridge	MA	Massachusetts	TRUE		17928	342	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1560	42.17496	-71.67762	South Grafton	MA	Massachusetts	TRUE		4984	540.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1561	42.44581	-71.68845	South Lancaster	MA	Massachusetts	TRUE		0	0	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1562	42.24715	-71.99189	Spencer	MA	Massachusetts	TRUE		12008	141.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1564	42.44124	-71.77297	Sterling	MA	Massachusetts	TRUE		8183	103.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1566	42.1047	-72.07745	Sturbridge	MA	Massachusetts	TRUE		7362	113.7	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1568	42.17694	-71.60516	Upton	MA	Massachusetts	TRUE		8011	145.8	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1569	42.05895	-71.63741	Uxbridge	MA	Massachusetts	TRUE		14304	188	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1570	42.05206	-71.8485	Webster	MA	Massachusetts	TRUE		17748	554.5	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1571	42.05501	-71.93519	Dudley	MA	Massachusetts	TRUE		11929	221.1	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York
+1581	42.26815	-71.61402	Westborough	MA	Massachusetts	TRUE		21944	411.2	25027	Worcester	"{""25027"": 100}"	Worcester	25027	FALSE	FALSE	America/New_York

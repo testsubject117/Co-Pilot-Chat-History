@@ -1,0 +1,2000 @@
+﻿            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a 1px white border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, 1.0F)
+            Dim r As Rectangle = p.ClientRectangle
+            r.Width -= 1
+            r.Height -= 1
+            e.Graphics.DrawRectangle(pen, r)
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.White
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+If you decide you want the **prompt text** itself to switch to yellow while active (but keep border white), say so and Iâ€™ll regenerate the full file accordingly.
+
+## @testsubject117
+
+perfect, but can you bold the sentence that appears in the text field at the bottom it doesn't stand out as much since the main menu buttons are bolded
+
+## Copilot
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (white per request)
+    Private _promptBorderColor As Color = Color.White
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    Private Const PromptLiftPx As Integer = 8
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a 1px white border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, 1.0F)
+            Dim r As Rectangle = p.ClientRectangle
+            r.Width -= 1
+            r.Height -= 1
+            e.Graphics.DrawRectangle(pen, r)
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.White
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+can you move it up another 10 pixels?
+
+## Copilot
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (white per request)
+    Private _promptBorderColor As Color = Color.White
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Moved up another 10px: was 8, now 18.
+    Private Const PromptLiftPx As Integer = 18
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a 1px white border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, 1.0F)
+            Dim r As Rectangle = p.ClientRectangle
+            r.Width -= 1
+            r.Height -= 1
+            e.Graphics.DrawRectangle(pen, r)
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.White
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+Can you increase the border size, and move the entire text field up another 5 pixels, and go ahead and change the border color again back to yellow
+
+## Copilot
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow per request)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels) - increased per request
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Was 18; moved up another 5px -> 23
+    Private Const PromptLiftPx As Integer = 23
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a thicker border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            ' Keep border inside bounds so it is fully visible; account for pen thickness
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+ok, thats it. let's leave it like that. what next?
+
+## Copilot
+
+Next steps to lock this in and make sure you donâ€™t regress it:
+
+1) **Do a clean test pass**
+   - Launch app â†’ press `J` â†’ confirm prompt shows with lifted position + thicker yellow border.
+   - Press random keys (should be ignored while prompt is up).
+   - Press `Q` (prompt disappears, menu still works).
+   - Press `J` then `P` (viewer opens; when viewer closes youâ€™re back at menu and prompt is gone).
+   - Press `J` then `Esc` (prompt disappears).
+
+2) **Verify layout across sizes/DPI**
+   - Resize the main window larger/smaller and confirm:
+     - prompt stays lifted
+     - border doesnâ€™t clip
+     - text isnâ€™t cut off
+   - If you use Windows scaling (125%/150%), quickly verify it still looks OK.
+
+3) **Commit the changes**
+   - If youâ€™re using git: commit `FormMainMenu.vb` (and `ActualCustomerNamesService.vb` if you applied the control-char fix there).
+   - Suggested commit message: `Match DOS J flow with prompt bar and actual names viewer`
+
+4) **Decide if â€œPrintâ€ should truly print**
+   - Right now, `P` likely opens the paged viewer (which *has* a Print button).
+   - If you want DOS parity, we can make `P` immediately send to the printer (and still optionally show the viewer).
+
+If you tell me which repo/branch youâ€™re working on (e.g., `owner/repo`), I can also generate a PR-ready set of changesâ€”but if youâ€™re just working locally, the checklist above is the right â€œwhat next.â€
+
+## @testsubject117
+
+lets not push or commit until end of day later today. So are we done with J? if so, what's next on the list?
+
+## Copilot
+
+Yesâ€”based on what you said (â€œthatâ€™s it, leave it like thatâ€), **weâ€™re done with J for now**: the WinForms flow now matches the DOS two-step prompt (`J` â†’ prompt, then `P`/`Q`/`Esc`), and the prompt styling/positioning is where you want it.
+
+## Whatâ€™s next?
+I donâ€™t have your prioritized â€œtoâ€‘portâ€ list in this chat, so I need you to pick the next target. Here are the natural next items (based on your menu):
+
+1) **(I) Backup Price List & Rolodex**  
+   - Verify it matches DOS behavior (prompts, status messages, destination folder, overwrites, etc.)
+
+2) **(C) Checks and Cash Receipts (FormLedgerMenu)**  
+   - Often the next â€œcore workflowâ€ after the menu shell.
+
+3) **(N) Rolodex**  
+   - Usually lots of legacy file parsing and UI parity issues.
+
+4) **Make the DOS prompt system reusable**  
+   - If more DOS options use â€œPress P to â€¦ or Q to Quitâ€, we can factor this into a small helper so future items are fast and consistent (K, O, etc., if they have prompts).
+
+### Quick question so we donâ€™t thrash:
+What do you want to tackle nextâ€”**C, I, or N**?  
+If you paste a screenshot (or describe) what the DOS app does for that option, Iâ€™ll match the flow the same way we did for J.
+
+## @testsubject117
+
+you said this previously: My practical recommendation
+If you want the quickest visible wins, Iâ€™d choose this order:
+
+Best next targets
+(J) Print out Actual Customer Names
+(E) View Log Book
+(Q) Word Processor
+(R) Rind Word Processor Test
+(T) Change Date and Time
+(P) Entire Ledger Viewing
+(D) View Sales Journal
+Why (J) stands out
+Because based on what we already learned:
+
+customer names come from REALNAME.DAT
+you now already have customer-name loading logic
+printing/viewing is already solved with FrmPagedTextViewer
+print button is already implemented
+So (J) may be one of the fastest to complete using code you effectively already have.
+
+Best single recommendation
+If you want the easiest likely next button, Iâ€™d pick:
+
+(J) Print out Actual Customer Names
+It has the highest chance of being:
+
+read-only
+easy to verify against DOS
+reusable from existing Rolodex customer code
+quick to wire
+If you want, next I can help you choose between:
+
+(J) Print out Actual Customer Names
+(E) View Log Book
+(Q) Word Processor
+and tell you which is probably fastest once we look at the DOS code.
+
+## Copilot
+
+Yesâ€”given that earlier plan, **J is now in the â€œdone for todayâ€ bucket** (we can revisit later if you want the prompt color/text tweaked again, or if â€œPâ€ should print directly instead of opening the viewer).
+
+### Next on that list: **(E) View Log Book**
+
+Thatâ€™s the best next target because itâ€™s typically:
+- read-only (safe),
+- easy to compare to DOS output,
+- and likely â€œjustâ€ file parsing + a paged viewer (which you already have).
+
+---
+
+## What I need from you to implement (E) to match DOS
+Please provide one of these:
+
+1) **A DOS screenshot** of what happens when you press `E` (ideal), including:
+   - what prompt (if any) appears at the bottom,
+   - what file name is shown (if any),
+   - any key choices like `P/Q`, paging keys, search, date filters, etc.
+
+or
+
+2) Answer these quick questions:
+- When you press **E** in DOS, does it:
+  - open a scrollable viewer immediately, or
+  - show a prompt first (like J), or
+  - ask for a date / keyword?
+- What file is it reading (common guesses: `LOGBOOK`, `LOGBOOK.DAT`, `LOGBOOK.TXT`)â€”do you know the exact DOS filename?
+- Is it **paged** (PageUp/PageDown) or line-by-line, and what keys exit?
+
+---
+
+## What Iâ€™ll do once you send that
+- Reproduce the DOS flow exactly (prompt, keys, viewer layout).
+- Wire `Case "E"` to the new handler (same way we did J).
+- Reuse `FrmPagedTextViewer` so you get fast progress and consistent UI.
+
+---
+
+### One more detail
+Do you want to keep using the same â€œbottom prompt barâ€ style for E *if* DOS uses a prompt (border, lifted position), or should E behave differently?
+
+Send the DOS screenshot/behavior for **E**, and Iâ€™ll generate the full-file replacement like you prefer.
+
+## @testsubject117
+
+after hitting (E): 
+
+## Copilot
+
+Youâ€™ve now shown the key DOS detail for **(E) View Log Book**:
+
+- Press `E`
+- DOS shows an **inline bottom prompt** (same area as J) asking:
+  > `What year do you want to use [Enter = 2026] ?`
+
+So the WinForms match should be:
+
+1) Press `E` â†’ show bottom prompt asking for year (default = current year, e.g. **2026** today)
+2) User types digits (`2 0 2 5`) â†’ they appear in the prompt line
+3) `Enter` accepts:
+   - blank input = default year
+   - numeric input = chosen year
+4) `Esc` or maybe `Q` cancels (DOS usually supports Esc; we can also allow Q consistently)
+5) After year accepted â†’ open the log book for that year in your paged viewer
+
+Below is a **full replacement** for `FormMainMenu.vb` that keeps your current J behavior and adds the E â€œyear promptâ€ flow using the same bottom prompt UI. Iâ€™m intentionally not guessing the logbook filename yetâ€”I stub `OpenLogBookForYear(year)` to show a â€œNot yetâ€ until you confirm the file path/naming.
+
+Once you tell me the logbook file naming convention (or paste the relevant DOS directory listing / your VB project paths), Iâ€™ll finish `OpenLogBookForYear` to actually load the file.
+
+---
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.IO
+Imports System.Text
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' =========================
+    ' Prompt/UI state
+    ' =========================
+
+    Private Enum PromptMode
+        None = 0
+        ActualNames_PQ = 1
+        LogBook_Year = 2
+    End Enum
+
+    Private _promptMode As PromptMode = PromptMode.None
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels)
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    Private Const PromptLiftPx As Integer = 23
+
+    ' =========================
+    ' E (Log Book) prompt state
+    ' =========================
+    Private _logBookDefaultYear As Integer = 0
+    Private _logBookYearInput As New StringBuilder()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
