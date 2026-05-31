@@ -1,0 +1,2000 @@
+﻿        Dim progress As IProgress(Of ProgressInfo) =
+            New Progress(Of ProgressInfo)(
+                Sub(p As ProgressInfo)
+                    If token.IsCancellationRequested Then Return
+
+                    lblStatusTop.Text = p.Message
+
+                    If p.Total > 0 Then
+                        lblStatusBottom.Text = $"{p.Current:N0}/{p.Total:N0}"
+                    Else
+                        lblStatusBottom.Text = ""
+                    End If
+                End Sub
+            )
+
+        Try
+            Dim rows As List(Of BalanceRow) =
+                Await Task.Run(Function() ComputeRows(ledgerPath, checkInvPath, invoiceChkPath, token, progress), token)
+
+            If token.IsCancellationRequested Then
+                lblStatusTop.Text = "Cancelled"
+                lblStatusBottom.Text = ""
+                Return
+            End If
+
+            allRows = rows
+            ApplyFilterAndBind()
+        Catch ex As OperationCanceledException
+            lblStatusTop.Text = "Cancelled"
+            lblStatusBottom.Text = ""
+        Catch ex As Exception
+            lblStatusTop.Text = "Error running report"
+            lblStatusBottom.Text = ""
+            MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+
+            Dim current As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+            btnExportCsv.Enabled = (current IsNot Nothing AndAlso current.Count > 0)
+        End Try
+    End Function
+
+    Private Sub ApplyFilterAndBind()
+        Dim mode As String = TryCast(cboFilter.SelectedItem, String)
+        If String.IsNullOrWhiteSpace(mode) Then mode = FilterMode.AllUnbalanced
+
+        Dim filtered As IEnumerable(Of BalanceRow) = allRows
+
+        Select Case mode
+            Case FilterMode.NoMapping
+                filtered = filtered.Where(Function(r) r.IsNoMapping)
+            Case FilterMode.DeltaOnly
+                filtered = filtered.Where(Function(r) Not r.IsNoMapping)
+            Case Else
+        End Select
+
+        Dim sorted As List(Of BalanceRow) =
+            filtered.OrderByDescending(Function(r) If(r.IsNoMapping, Decimal.MaxValue, Math.Abs(r.DeltaValue))).ToList()
+
+        dgv.DataSource = sorted
+
+        lblStatusTop.Text = "Report complete"
+        lblStatusBottom.Text = $"{allRows.Count:N0} checked"
+
+        btnExportCsv.Enabled = (sorted.Count > 0)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Shared Function ComputeRows(
+        ledgerPath As String,
+        checkInvPath As String,
+        invoiceChkPath As String,
+        token As CancellationToken,
+        progress As IProgress(Of ProgressInfo)
+    ) As List(Of BalanceRow)
+
+        token.ThrowIfCancellationRequested()
+        progress?.Report(New ProgressInfo("Loading ledger...", 0, 0))
+
+        Dim ledger As List(Of LedgerEntry) = LedgerCurReader.ReadAll(ledgerPath)
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Loading CHECK.INV...", 0, 0))
+
+        Dim invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+        If IO.File.Exists(checkInvPath) Then
+            Try
+                Dim blocks = CheckInvReader.ReadAll(checkInvPath)
+                Dim i As Integer = 0
+                For Each b In blocks
+                    token.ThrowIfCancellationRequested()
+                    i += 1
+                    If (i Mod 250) = 0 Then
+                        progress?.Report(New ProgressInfo("Indexing CHECK.INV...", i, blocks.Count))
+                    End If
+
+                    Dim key = BuildKey(b.CustomerCode, b.CheckNumber)
+                    Dim lst As List(Of Long) = Nothing
+                    If Not invIndex.TryGetValue(key, lst) Then
+                        lst = New List(Of Long)()
+                        invIndex(key) = lst
+                    End If
+
+                    If b.Invoices IsNot Nothing Then
+                        For Each s In b.Invoices
+                            Dim n As Long
+                            If Long.TryParse(If(s, "").Trim(), n) Then
+                                lst.Add(n)
+                            End If
+                        Next
+                    End If
+                Next
+            Catch
+                ' Best effort; keep what we have.
+            End Try
+        End If
+
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Computing rows...", 0, ledger.Count))
+
+        Dim amtCache As New Dictionary(Of Long, Decimal)()
+        Dim rows As New List(Of BalanceRow)()
+
+        Dim idx As Integer = 0
+        For Each e In ledger
+            token.ThrowIfCancellationRequested()
+
+            idx += 1
+            If (idx Mod 250) = 0 Then
+                progress?.Report(New ProgressInfo("Computing rows...", idx, ledger.Count))
+            End If
+
+            Dim key = BuildKey(e.Customer, e.CheckNumber)
+
+            Dim invNos As List(Of Long) = Nothing
+            Dim hasMapping As Boolean = invIndex.TryGetValue(key, invNos)
+
+            If Not hasMapping OrElse invNos Is Nothing OrElse invNos.Count = 0 Then
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = 0,
+                    .InvoiceSumValue = 0D,
+                    .DeltaValue = 0D,
+                    .Note = "No CHECK.INV mapping",
+                    .IsNoMapping = True
+                })
+                Continue For
+            End If
+
+            Dim sum As Decimal = 0D
+            Dim foundAny As Boolean = False
+
+            For Each invNo In invNos
+                token.ThrowIfCancellationRequested()
+
+                Dim a As Decimal = 0D
+                If amtCache.TryGetValue(invNo, a) Then
+                    sum += a
+                    foundAny = True
+                Else
+                    Dim rec = InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)
+                    If rec.IsFound Then
+                        a = rec.Amount
+                        amtCache(invNo) = a
+                        sum += a
+                        foundAny = True
+                    Else
+                        amtCache(invNo) = 0D
+                    End If
+                End If
+            Next
+
+            Dim delta As Decimal = sum - e.Amount
+            Dim unbalanced As Boolean = (Not foundAny) OrElse (Math.Abs(delta) >= Tolerance)
+
+            If unbalanced Then
+                Dim note As String = If(Not foundAny, "Invoices not found in INVOICE.CHK", "")
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = invNos.Count,
+                    .InvoiceSumValue = sum,
+                    .DeltaValue = delta,
+                    .Note = note,
+                    .IsNoMapping = False
+                })
+            End If
+        Next
+
+        ' Final exact progress update so the live counter reaches the true final row count.
+        progress?.Report(New ProgressInfo("Computing rows...", ledger.Count, ledger.Count))
+        progress?.Report(New ProgressInfo("Done.", ledger.Count, ledger.Count))
+
+        Return rows
+    End Function
+
+    Private Shared Sub FireAndForget(t As Task)
+        If t Is Nothing Then Return
+
+        t.ContinueWith(
+            Sub(completed As Task)
+                Dim ignored = completed.Exception
+            End Sub,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default
+        )
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrim(s As String) As String
+        Return If(s, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrimEnd(s As String) As String
+        Return If(s, "").TrimEnd()
+    End Function
+
+    Private Shared Function Csv(s As String) As String
+        Dim v As String = If(s, "")
+        Dim mustQuote As Boolean =
+            (v.Contains(","c) OrElse v.Contains(ControlChars.Quote) OrElse v.Contains(ControlChars.Cr) OrElse v.Contains(ControlChars.Lf))
+
+        If mustQuote Then
+            v = v.Replace("""", """""")
+            v = """" & v & """"
+        End If
+
+        Return v
+    End Function
+
+    Private NotInheritable Class FilterMode
+        Public Const AllUnbalanced As String = "All unbalanced"
+        Public Const NoMapping As String = "No CHECK.INV mapping"
+        Public Const DeltaOnly As String = "Delta rows (has mapping)"
+    End Class
+
+    Private NotInheritable Class ProgressInfo
+        Public ReadOnly Property Message As String
+        Public ReadOnly Property Current As Integer
+        Public ReadOnly Property Total As Integer
+
+        Public Sub New(message As String, current As Integer, total As Integer)
+            Me.Message = message
+            Me.Current = current
+            Me.Total = total
+        End Sub
+    End Class
+
+    Private Class BalanceRow
+        Public Property Customer As String
+        Public Property DateText As String
+        Public Property CheckNumber As String
+
+        Public Property CheckAmountValue As Decimal
+        Public Property InvoiceCountValue As Integer
+        Public Property InvoiceSumValue As Decimal
+        Public Property DeltaValue As Decimal
+
+        Public Property Note As String
+        Public Property IsNoMapping As Boolean
+
+        Public ReadOnly Property CheckAmount As String
+            Get
+                Return CheckAmountValue.ToString("C")
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceCount As String
+            Get
+                Return InvoiceCountValue.ToString()
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceSum As String
+            Get
+                Return If(IsNoMapping, "", InvoiceSumValue.ToString("C"))
+            End Get
+        End Property
+
+        Public ReadOnly Property Delta As String
+            Get
+                Return If(IsNoMapping, "", DeltaValue.ToString("C"))
+            End Get
+        End Property
+    End Class
+End Class
+```
+
+## What changed for the font
+Only this title styling line is different from the working version:
+
+```vb
+lblHeaderTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+```
+
+So now `FormLedgerDoesntBalance` matches:
+- `DosMenuFormBase`
+- `FormMainMenu`
+
+If you want, next I can help you do the **real global cleanup** by creating one shared title-font helper so all three places stop hardcoding Castellar separately.
+
+## @testsubject117
+
+we will be creating more menus that use this same sort of title and font, so yes, let's make it global so moving forward any new menu we create uses this default attribute
+
+## Copilot
+
+Yes â€” thatâ€™s the right cleanup to do now.
+
+## Best approach
+Create **one shared UI theme module** that owns the DOS title font/style, then update:
+
+- `DosMenuFormBase`
+- `FormMainMenu`
+- `FormLedgerDoesntBalance`
+
+to use it.
+
+That way, any new menu/form can just call the same helper instead of hardcoding Castellar again.
+
+---
+
+# Step 1: add a new shared file
+Create a new file named:
+
+```text
+AMiOffice/UiTheme.vb
+```
+
+with this content:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Friend Module UiTheme
+
+    Friend ReadOnly Property DosTitleForeColor As Color
+        Get
+            Return Color.Yellow
+        End Get
+    End Property
+
+    Friend ReadOnly Property DosTitleBackColor As Color
+        Get
+            Return Color.Black
+        End Get
+    End Property
+
+    Friend Function CreateDosTitleFont() As Font
+        Return New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+    End Function
+
+    Friend Sub ApplyDosTitleStyle(lbl As Label)
+        If lbl Is Nothing Then Return
+
+        lbl.ForeColor = DosTitleForeColor
+        lbl.BackColor = DosTitleBackColor
+        lbl.Font = CreateDosTitleFont()
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+    End Sub
+
+End Module
+```
+
+---
+
+# Step 2: update `DosMenuFormBase.vb`
+Replace the title styling block in `BuildLayout()`.
+
+## Find this:
+```vb
+lblMainMenu.AutoSize = True
+lblMainMenu.TextAlign = ContentAlignment.MiddleLeft
+lblMainMenu.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+lblMainMenu.ForeColor = Color.Yellow
+lblMainMenu.BackColor = _bgBlack
+lblMainMenu.Margin = New Padding(0)
+```
+
+## Replace with:
+```vb
+lblMainMenu.AutoSize = True
+lblMainMenu.Margin = New Padding(0)
+UiTheme.ApplyDosTitleStyle(lblMainMenu)
+```
+
+That keeps the same appearance, but centralizes the style.
+
+---
+
+# Step 3: update `FormLedgerDoesntBalance.vb`
+In `BuildUi()` replace the title styling block.
+
+## Find this:
+```vb
+lblHeaderTitle.AutoSize = False
+lblHeaderTitle.Left = 18
+lblHeaderTitle.Top = 8
+lblHeaderTitle.Width = 420
+lblHeaderTitle.Height = 70
+lblHeaderTitle.BackColor = Color.Black
+lblHeaderTitle.ForeColor = Color.Yellow
+lblHeaderTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+lblHeaderTitle.Text = "CHECKS"
+lblHeaderTitle.TextAlign = ContentAlignment.MiddleLeft
+```
+
+## Replace with:
+```vb
+lblHeaderTitle.AutoSize = False
+lblHeaderTitle.Left = 18
+lblHeaderTitle.Top = 8
+lblHeaderTitle.Width = 420
+lblHeaderTitle.Height = 70
+UiTheme.ApplyDosTitleStyle(lblHeaderTitle)
+lblHeaderTitle.Text = "CHECKS"
+```
+
+---
+
+# Step 4: update `FormMainMenu.vb`
+Because this formâ€™s title font is currently set in the designer, the cleanest approach is to re-apply the shared style in `OnLoad()`.
+
+## Add this line after:
+```vb
+BuildMenu()
+```
+
+### so it becomes:
+```vb
+BuildMenu()
+UiTheme.ApplyDosTitleStyle(lblMainMenu)
+```
+
+That way even if the designer still has font settings, runtime uses the shared global style.
+
+---
+
+# Why this is the best pattern
+## Benefits
+- one place to change title font later
+- all future DOS-style menus can reuse it
+- no need to remember exact font/size/color every time
+- avoids drift between forms
+
+## For future forms
+Youâ€™ll just do:
+
+```vb
+UiTheme.ApplyDosTitleStyle(lblYourTitle)
+```
+
+and youâ€™re done.
+
+---
+
+# Recommended order
+Do it in this sequence:
+
+1. add `UiTheme.vb`
+2. update `DosMenuFormBase.vb`
+3. update `FormLedgerDoesntBalance.vb`
+4. update `FormMainMenu.vb`
+
+---
+
+# Important note
+If you want **every new menu** to get this automatically, then the best long-term pattern is:
+
+- any menu-style form should inherit `DosMenuFormBase`
+
+Because then the title style is already applied centrally there.
+
+So really:
+- **base form inheritance** = best for menu screens
+- `UiTheme.ApplyDosTitleStyle(...)` = best for standalone non-base forms
+
+---
+
+If you want, I can now generate the **full replacement code** for:
+1. `UiTheme.vb`
+2. `DosMenuFormBase.vb`
+3. `FormMainMenu.vb`
+4. `FormLedgerDoesntBalance.vb`
+
+all ready to paste in.
+
+## @testsubject117
+
+is this a class or form file
+
+## Copilot
+
+It should be a **regular code module file**, not a form.
+
+## Direct answer
+Create:
+
+```text
+UiTheme.vb
+```
+
+as a **standard VB code file** in the project.
+
+It is **not**:
+- a Windows Form
+- a Designer file
+- a class that inherits `Form`
+
+## What it is
+Itâ€™s just a shared VB module:
+
+```vb
+Friend Module UiTheme
+    ...
+End Module
+```
+
+## In Visual Studio
+Add:
+
+- **Project**
+- **Add Class** or **Add New Item**
+- name it:
+
+```text
+UiTheme.vb
+```
+
+Then replace the contents with the module code.
+
+Even if you use **Add Class**, you can still change the contents so the file contains a `Module` instead of a `Class`.
+
+## Short answer
+**It is a standard code file/module file, not a form file.**
+
+If you want, I can now give you the exact contents for `UiTheme.vb` first.
+
+## @testsubject117
+
+Expression does not produce a value.
+
+## Copilot
+
+That error is most likely from this line I suggested earlier:
+
+```vb
+UiTheme.ApplyDosTitleStyle(lblMainMenu)
+```
+
+inside a place where VB expected an expression-capable lambda or inline statement context. In VB, this often happens when a `Sub` call is used in the wrong syntax position.
+
+## Direct answer
+Letâ€™s avoid piecemeal edits now.
+
+Iâ€™ll give you the **exact complete contents** for the new shared module first, because that part is safe and simple.
+
+Create a regular code file named:
+
+```text
+UiTheme.vb
+```
+
+with exactly this content:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Friend Module UiTheme
+
+    Friend ReadOnly Property DosTitleForeColor As Color
+        Get
+            Return Color.Yellow
+        End Get
+    End Property
+
+    Friend ReadOnly Property DosTitleBackColor As Color
+        Get
+            Return Color.Black
+        End Get
+    End Property
+
+    Friend Function CreateDosTitleFont() As Font
+        Return New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+    End Function
+
+    Friend Sub ApplyDosTitleStyle(lbl As Label)
+        If lbl Is Nothing Then Return
+
+        lbl.ForeColor = DosTitleForeColor
+        lbl.BackColor = DosTitleBackColor
+        lbl.Font = CreateDosTitleFont()
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+    End Sub
+
+End Module
+```
+
+## Important
+That file by itself should compile.
+
+## Likely reason for your error
+The most common cause is this kind of VB situation:
+
+```vb
+Me.BeginInvoke(New Action(Sub()
+    BuildMenu()
+    UiTheme.ApplyDosTitleStyle(lblMainMenu)
+End Sub))
+```
+
+Usually that is valid, but if the surrounding code got slightly malformed, VB can throw:
+- **Expression does not produce a value**
+
+So the safest way forward is:
+1. add `UiTheme.vb` first
+2. then Iâ€™ll give you **full-file replacements**
+   - not line edits
+   - so we avoid syntax drift
+
+## Best next step
+If you want, I will now generate the full replacement for:
+
+- `DosMenuFormBase.vb`
+
+first, already wired to `UiTheme`, so you can paste it cleanly.
+
+## @testsubject117
+
+ok
+
+## Copilot
+
+Yes â€” here is the full replacement for `DosMenuFormBase.vb`, updated to use the shared `UiTheme` module for the DOS-style title.
+
+Replace the entire file with this:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class DosMenuFormBase
+    Inherits Form
+
+    Protected ReadOnly lblMainMenu As New Label()
+    Protected ReadOnly lblDateTime As New Label()
+    Protected ReadOnly tmrClock As New Timer()
+
+    Protected ReadOnly flpLeft As New FlowLayoutPanel()
+    Protected ReadOnly flpRight As New FlowLayoutPanel()
+
+    ' NEW: bottom bar + close button
+    Private ReadOnly pnlBottom As New Panel()
+    Private ReadOnly btnEscClose As New Button()
+
+    ' Header behavior
+    Protected Property ShowVersionInHeader As Boolean = False
+
+    ' Button sizing behavior (default matches Main Menu: stretch to panel width)
+    Protected Property StretchButtonsToPanelWidth As Boolean = True
+    Protected Property ButtonFixedWidthPx As Integer = 620
+
+    ' Theme colors
+    Private ReadOnly _bgDarkGray As Color = Color.FromArgb(32, 32, 32)
+    Private ReadOnly _bgBlack As Color = Color.Black
+
+    Private _displayVersion As String = ""
+    Private _keyHandlers As New Dictionary(Of String, Action)(StringComparer.OrdinalIgnoreCase)
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Me.KeyPreview = True
+        Me.BackColor = _bgDarkGray
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+
+        _displayVersion = ""
+        Try
+            _displayVersion = BuildInfo.DisplayVersion
+        Catch
+            _displayVersion = ""
+        End Try
+
+        BuildLayout()
+        UpdateHeaderClock()
+
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, Sub() UpdateHeaderClock()
+        tmrClock.Start()
+
+        AddHandler Me.KeyPress, AddressOf OnBaseKeyPress
+        AddHandler flpLeft.SizeChanged, Sub() ResizeButtonsToPanel(flpLeft)
+        AddHandler flpRight.SizeChanged, Sub() ResizeButtonsToPanel(flpRight)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        MyBase.OnFormClosed(e)
+        Try
+            tmrClock.Stop()
+        Catch
+        End Try
+    End Sub
+
+    Private Sub BuildLayout()
+        ' Root host panel so we can Dock bottom bar and fill content above it
+        Dim host As New Panel() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = _bgDarkGray,
+            .Padding = New Padding(12)
+        }
+
+        ' Bottom bar with small gray ESC Close at bottom-right
+        pnlBottom.Dock = DockStyle.Bottom
+        pnlBottom.Height = 52
+        pnlBottom.BackColor = _bgDarkGray
+        pnlBottom.Padding = New Padding(0, 10, 0, 0)
+
+        btnEscClose.Text = "(ESC) Close"
+        btnEscClose.AutoSize = False
+        btnEscClose.Width = 160
+        btnEscClose.Height = 30
+        btnEscClose.Anchor = AnchorStyles.Right Or AnchorStyles.Bottom
+        btnEscClose.Left = pnlBottom.ClientSize.Width - btnEscClose.Width
+        btnEscClose.Top = pnlBottom.Height - btnEscClose.Height
+        btnEscClose.Margin = New Padding(0)
+
+        ' Grey button styling (smaller than menu buttons)
+        btnEscClose.UseVisualStyleBackColor = False
+        btnEscClose.ForeColor = Color.White
+        btnEscClose.FlatStyle = FlatStyle.Flat
+        btnEscClose.BackColor = Color.Silver
+        btnEscClose.ForeColor = Color.Black
+        btnEscClose.FlatAppearance.BorderColor = Color.Gainsboro
+        btnEscClose.FlatAppearance.MouseOverBackColor = Color.Gainsboro
+        btnEscClose.FlatAppearance.MouseDownBackColor = Color.DarkGray
+        btnEscClose.FlatAppearance.BorderSize = 1
+        btnEscClose.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        AddHandler btnEscClose.Click, Sub() Me.Close()
+        pnlBottom.Controls.Clear()
+        pnlBottom.Controls.Add(btnEscClose)
+        AddHandler pnlBottom.Resize,
+            Sub()
+                btnEscClose.Left = pnlBottom.ClientSize.Width - btnEscClose.Width
+                btnEscClose.Top = pnlBottom.ClientSize.Height - btnEscClose.Height
+            End Sub
+
+        ' Main content (header + body) fills above bottom bar
+        Dim root As New TableLayoutPanel() With {
+            .Dock = DockStyle.Fill,
+            .ColumnCount = 1,
+            .RowCount = 2,
+            .BackColor = _bgDarkGray,
+            .Margin = New Padding(0)
+        }
+        root.RowStyles.Add(New RowStyle(SizeType.AutoSize)) ' header row
+        root.RowStyles.Add(New RowStyle(SizeType.Percent, 100.0F)) ' body
+
+        ' Header row: title left, clock right (same line)
+        Dim header As New TableLayoutPanel() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = _bgBlack,
+            .ColumnCount = 2,
+            .RowCount = 1,
+            .Margin = New Padding(0),
+            .Padding = New Padding(8, 6, 8, 6)
+        }
+        header.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        header.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100.0F))
+
+        lblMainMenu.AutoSize = True
+        lblMainMenu.Margin = New Padding(0)
+        UiTheme.ApplyDosTitleStyle(lblMainMenu)
+
+        lblDateTime.AutoSize = False
+        lblDateTime.Dock = DockStyle.Fill
+        lblDateTime.TextAlign = ContentAlignment.MiddleRight
+        lblDateTime.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblDateTime.ForeColor = Color.Yellow
+        lblDateTime.BackColor = _bgBlack
+        lblDateTime.Margin = New Padding(0)
+        lblDateTime.Padding = New Padding(0)
+
+        header.Controls.Add(lblMainMenu, 0, 0)
+        header.Controls.Add(lblDateTime, 1, 0)
+
+        ' Body: dark gray background so black buttons contrast
+        Dim body As New TableLayoutPanel() With {
+            .Dock = DockStyle.Fill,
+            .ColumnCount = 2,
+            .RowCount = 1,
+            .BackColor = _bgDarkGray
+        }
+        body.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+        body.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50.0F))
+
+        ConfigureMenuPanel(flpLeft, _bgDarkGray)
+        ConfigureMenuPanel(flpRight, _bgDarkGray)
+
+        body.Controls.Add(flpLeft, 0, 0)
+        body.Controls.Add(flpRight, 1, 0)
+
+        root.Controls.Add(header, 0, 0)
+        root.Controls.Add(body, 0, 1)
+
+        host.Controls.Clear()
+        host.Controls.Add(root)
+        host.Controls.Add(pnlBottom)
+
+        Controls.Clear()
+        Controls.Add(host)
+
+        ' Register ESC handler globally
+        _keyHandlers("ESC") = Sub() Me.Close()
+    End Sub
+
+    Private Shared Sub ConfigureMenuPanel(panel As FlowLayoutPanel, bg As Color)
+        panel.Dock = DockStyle.Fill
+        panel.FlowDirection = FlowDirection.TopDown
+        panel.WrapContents = False
+        panel.AutoScroll = True
+        panel.BackColor = bg
+        panel.Padding = New Padding(0)
+        panel.Margin = New Padding(0, 10, 0, 0)
+    End Sub
+
+    Protected Sub SetMenuTitle(title As String)
+        lblMainMenu.Text = title
+        Me.Text = title
+    End Sub
+
+    Protected Sub ClearMenu()
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Keep ESC close handler
+        Dim esc = _keyHandlers("ESC")
+        _keyHandlers = New Dictionary(Of String, Action)(StringComparer.OrdinalIgnoreCase)
+        _keyHandlers("ESC") = esc
+    End Sub
+
+    Protected Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String, handler As Action)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub() handler()
+
+        panel.Controls.Add(btn)
+
+        If Not String.IsNullOrWhiteSpace(key) Then
+            _keyHandlers(key) = handler
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        If StretchButtonsToPanelWidth Then
+            Dim targetWidth As Integer =
+                panel.ClientSize.Width -
+                panel.Padding.Left - panel.Padding.Right -
+                SystemInformation.VerticalScrollBarWidth - 6
+
+            If targetWidth < 150 Then targetWidth = 150
+
+            For Each c As Control In panel.Controls
+                Dim btn = TryCast(c, Button)
+                If btn IsNot Nothing Then btn.Width = targetWidth
+            Next
+        Else
+            For Each c As Control In panel.Controls
+                Dim btn = TryCast(c, Button)
+                If btn IsNot Nothing Then btn.Width = ButtonFixedWidthPx
+            Next
+        End If
+    End Sub
+
+    Private Sub OnBaseKeyPress(sender As Object, e As KeyPressEventArgs)
+        ' ESC
+        If e.KeyChar = ChrW(27) Then
+            Dim escAct As Action = Nothing
+            If _keyHandlers IsNot Nothing AndAlso _keyHandlers.TryGetValue("ESC", escAct) Then
+                escAct()
+            Else
+                Me.Close()
+            End If
+            Return
+        End If
+
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then up = up.ToUpperInvariant()
+
+        Dim act As Action = Nothing
+        If _keyHandlers IsNot Nothing AndAlso _keyHandlers.TryGetValue(up, act) Then
+            act()
+        End If
+    End Sub
+
+    Protected Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        Dim verPrefix As String = ""
+        If ShowVersionInHeader AndAlso Not String.IsNullOrWhiteSpace(_displayVersion) Then
+            verPrefix = "   " & _displayVersion & "          "
+        End If
+
+        lblDateTime.Text = verPrefix &
+                           now.ToString("dddd") & "  " &
+                           now.ToString("MM-dd-yyyy") & "          " &
+                           now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Protected Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+
+## What this does
+It changes the title styling from hardcoded Castellar in this file to:
+
+```vb
+UiTheme.ApplyDosTitleStyle(lblMainMenu)
+```
+
+So from now on, any menu inheriting from `DosMenuFormBase` automatically uses the shared title styling.
+
+## Next files to update
+Still remaining:
+1. `FormMainMenu.vb`
+2. `FormLedgerDoesntBalance.vb`
+
+If you want, Iâ€™ll send the next full replacement for `FormMainMenu.vb`.
+
+## @testsubject117
+
+I think I already pasted in the replacements for those files. I compiled and it's all working
+
+## Copilot
+
+Great â€” then youâ€™re in good shape.
+
+## Whatâ€™s now accomplished
+Youâ€™ve effectively made the DOS-style title treatment reusable moving forward:
+
+- shared `UiTheme.vb`
+- `DosMenuFormBase` now uses the shared title styling
+- existing forms still compile and run
+- future menu forms can inherit the same look automatically
+
+## Practical result
+For new menu-style screens:
+
+- if they inherit `DosMenuFormBase`, they get the shared title styling behavior
+- if theyâ€™re standalone forms, you can apply:
+  ```vb
+  UiTheme.ApplyDosTitleStyle(yourTitleLabel)
+  ```
+
+## That means your default is now established
+So going forward, the â€œdefault attributeâ€ for these DOS-style menu titles is basically centralized.
+
+## Recommended next tiny cleanup
+At some point, if you want to reduce duplication even more, you could also move any repeated DOS header colors/sizing into `UiTheme`, not just the font. But that is optional now.
+
+## Short answer
+**Perfect â€” if it compiles and everything is working, then this task is done.**
+
+If you want, the next thing we can do is either:
+1. clean up one more UI consistency issue, or  
+2. move on to the next functional screen.
+
+## @testsubject117
+
+ok, now, for the whole gw basic main menu app, which of the not yet implemented buttons on the main menu itself are easiest to get wired up and working in vb?
+
+## Copilot
+
+The easiest main-menu buttons to wire up next are **A, N, and 3** â€” with **F** also a strong candidate if you want a simple file/grid viewer first. Thatâ€™s based on what already exists in the repo: you already have working patterns for simple picker forms, data-grid views, text-file editors, and DOS-style submenus. The search results are capped, so this may be incomplete; you can view more repo code-search results in the GitHub UI. îˆ€citeîˆ‚turn0commentary7îˆ‚turn0commentary8îˆ‚turn0commentary9îˆ
+
+## Best â€œeasy winsâ€ in order
+
+### 1. **A â€” Shop Card Generator**
+This is probably the easiest **useful** next feature if you keep scope narrow:
+- start with a customer lookup / selector
+- allow basic field entry
+- preview or save a simple text/printable output
+- skip full DOS parity on first pass
+
+Why itâ€™s easy:
+- you already have a company lookup pattern in `FormAddChecks` using `CompanyLookupService` and a simple form-based workflow. îˆ€citeîˆ‚turn0commentary9îˆ
+- this kind of screen is mostly UI + file lookup + output formatting, which maps well to WinForms
+
+### 2. **N â€” Rolodex**
+This is likely one of the easiest to make genuinely usable quickly:
+- read records
+- show searchable list/grid
+- add/edit/delete later if needed
+
+Why itâ€™s easy:
+- rolodex-style data usually ports well to CRUD forms
+- WinForms is a good fit for search/edit screens
+- low printer / low external dependency risk compared with invoice or payroll flows
+
+### 3. **3 â€” Miscellaneous Menu**
+This is often the easiest structural win:
+- build the submenu shell first
+- wire any items that already have forms
+- stub the rest inside that submenu instead of on the main menu
+
+Why itâ€™s easy:
+- you already have a clean reusable submenu pattern with `DosMenuFormBase` and `AddMenuButton`. îˆ€citeîˆ‚turn0commentary8îˆ‚turn0commentary7îˆ
+- this gives you a place to organize future ports without tackling a complex business process immediately
+
+### 4. **F â€” Price List Program**
+This is a strong candidate **if** you start as read-only:
+- load price-list data
+- searchable grid
+- maybe export / print later
+
+Why itâ€™s easier than things like invoices:
+- often file-driven, tabular, less transactional
+- similar in complexity to the ledger viewers you already have working. îˆ€citeîˆ‚turn0commentary8îˆ‚turn0commentary9îˆ
+
+### 5. **H â€” Quick Message Flashing**
+Potentially very easy if you reinterpret it simply:
+- modal message entry
+- big display form
+- optional timer / blink effect
+
+Why itâ€™s easy:
+- mostly UI
+- minimal data dependencies
+- no heavy accounting logic
+
+## Medium difficulty
+These are doable, but not my first pick for speed.
+
+### **D â€” View Sales Journal**
+Could be straightforward **if** the underlying file format is already understood.
+- likely read-only first
+- grid, filter, maybe totals
+
+### **E â€” View Log Book**
+Often similar to Sales Journal:
+- read-only listing first
+- then append/edit later
+
+### **O â€” Copy Spec Index**
+Could be easy or annoying depending on file layout and destination behavior.
+
+### **R â€” Find Word Processor Text**
+Could be easy if implemented as:
+- browse text files in the word folder
+- grep/search across files
+But harder if the old DOS logic had custom formats.
+
+## Harder / more risk
+These are the ones I would avoid first.
+
+### **B â€” Invoice Generator**
+Likely harder than it sounds:
+- transaction logic
+- file updates
+- numbering
+- printing
+- correctness matters
+
+### **G â€” Print Records / Void Invoices**
+Higher risk because â€œvoidâ€ changes business state and print workflows are always fiddly.
+
+### **K â€” Cash Disbursements**
+Financial logic + persistence + reporting = more room for subtle bugs.
+
+### **M â€” Quotation Form Generator**
+Could be moderate, but tends to sprawl once formatting/output requirements appear.
+
+### **2 â€” Product Purchasing**
+Usually involves inventory/vendor/receiving logic.
+
+### **4 â€” Add Entries to Log Book**
+Could be easy if itâ€™s append-only, but if there are DOS rules/format constraints, it becomes medium.
+
+### **6 â€” Cadmium Cards**
+Unknown domain usually means hidden complexity.
+
+### **7 â€” Emergency PAYROLL System**
+Definitely not an â€œeasy next port.â€
+
+### **L â€” Business Expenses Account**
+Potentially finance-heavy and likely more stateful than it first appears.
+
+### **Q â€” Word Processor**
+Not a good early target unless you intentionally scope it down to â€œopen/edit plain text files.â€
+
+### **T â€” Change Date or Time**
+Technically easy to make a UI, but bad candidate because changing system time is privileged/risky and may not be desirable in the VM.
+
+### **Y â€” Ed Deanâ€™s Personal Backup**
+Could be easy technically, but unclear business value and probably environment-specific.
+
+### **J â€” Print Out Customers Actual Names**
+Could be easy if you reduce it to:
+- read `REALNAME.DAT`
+- show/export/print list
+But if printer behavior matters, it becomes more annoying.
+
+## My recommendation
+If your goal is **fastest visible progress**, Iâ€™d do:
+
+1. **3 â€” Miscellaneous Menu**
+2. **N â€” Rolodex**
+3. **A â€” Shop Card Generator**
+4. **F â€” Price List Program**
+5. **H â€” Quick Message Flashing**
+
+If your goal is **most useful practical business value soonest**, Iâ€™d do:
+
+1. **A â€” Shop Card Generator**
+2. **N â€” Rolodex**
+3. **F â€” Price List Program**
+4. **D â€” View Sales Journal**
+5. **J â€” Print Out Customers Actual Names**
+
+## Why Iâ€™m ranking them this way
+You already have working repo patterns for:
+- DOS-style menu shells via `DosMenuFormBase` and menu button wiring. îˆ€citeîˆ‚turn0commentary8îˆ‚turn0commentary7îˆ
+- simple editor-style forms like `FormEmpNameEditor`. îˆ€citeîˆ‚turn0commentary9îˆ
+- lookup/entry forms like `FormAddChecks`. îˆ€citeîˆ‚turn0commentary9îˆ
+- data viewing forms like `FormLedgerView`, `FormFindByInvoiceNumber`, `FormMileageTracking`, and the checks reports. îˆ€citeîˆ‚turn0commentary9îˆ‚turn0commentary8îˆ
+
+That strongly suggests the easiest next wins are features that look like:
+- submenu
+- search/view grid
+- simple text editor
+- simple form-driven generator
+
+## One caveat
+My answer may be incomplete because GitHub code search results here are limited to a small number of matches. If you want a more confident ranking, I can do a deeper repo pass focused on:
+- what legacy data files already have readers
+- what service classes already exist
+- which â€œnot yetâ€ buttons already have 30â€“70% of the plumbing in place
+
+If you want, I can do that next and give you a **ranked implementation shortlist with exact reasons for each main-menu button**.
+
+## @testsubject117
+
+of all the ones you just reviewed and listed, which one would take the least time and which would take the most time? How fast do you think we could get the items you listed 1 - 5 done?
+
+## Copilot
+
+**Least time:** **3 â€” Miscellaneous Menu**  
+**Most time:** **A â€” Shop Card Generator** out of the top 5 I listed.  
+Thatâ€™s because `3` is mostly menu-shell wiring using patterns you already have, while `A` is the most likely to involve new workflow logic, lookup rules, and output generation. This estimate is based on the code patterns already present, but the search results I used are capped, so the repo picture may be incomplete; you can inspect more code-search results in the GitHub UI. îˆ€citeîˆ‚turn0commentary8îˆ‚turn0commentary7îˆ‚turn0commentary9îˆ
+
+## Direct ranking of the 5 I listed
+From **fastest** to **slowest**:
+
+1. **3 â€” Miscellaneous Menu**
+2. **H â€” Quick Message Flashing**
+3. **N â€” Rolodex**
+4. **F â€” Price List Program**
+5. **A â€” Shop Card Generator** îˆ€citeîˆ‚turn0commentary7îˆ‚turn0commentary8îˆ‚turn0commentary9îˆ
+
+## Why
+
+### 1. **3 â€” Miscellaneous Menu** = least time
+Likely the fastest because:
+- you already have a reusable DOS submenu framework with `DosMenuFormBase`
+- adding a new submenu is mostly layout + button wiring
+- it can ship even if many submenu items are still placeholders. îˆ€citeîˆ‚turn0commentary8îˆ
+
+**Very rough time:**  
+- **basic working shell:** 30â€“90 minutes  
+- **polished shell with proper sizing/hotkeys/title:** 1â€“2 hours
+
+### 2. **H â€” Quick Message Flashing**
+If scoped simply, itâ€™s mostly:
+- one input screen or prompt
+- one display form
+- optional timer/blink behavior
+
+**Very rough time:**  
+- **simple usable version:** 1â€“3 hours  
+- **more DOS-like / nicer behavior:** 3â€“5 hours
+
+### 3. **N â€” Rolodex**
+If this is just:
+- load records
+- search
+- display/edit basics
+
+then it should be fairly manageable. It gets slower if the file format is awkward or if add/edit/delete must exactly preserve legacy formatting.
+
+**Very rough time:**  
+- **read-only searchable viewer:** 3â€“6 hours  
+- **basic editor:** 1â€“2 days
+
+### 4. **F â€” Price List Program**
+If started as a viewer:
+- probably similar to other grid-based screens
+- but depends on existing file readers/parsers
+
+**Very rough time:**  
+- **read-only browser/filter:** 4â€“8 hours  
+- **editable useful version:** 1â€“2 days
+
+### 5. **A â€” Shop Card Generator** = most time of this group
+This is the most open-ended:
+- likely customer/item lookup
+- business rules
+- output formatting
+- maybe printing or saved output
+
+Thatâ€™s why Iâ€™d expect the most uncertainty and back-and-forth.
+
+**Very rough time:**  
+- **minimal first working version:** 1â€“2 days  
+- **good/useful version:** 2â€“4 days
+
+## Combined estimate for items 1â€“5
+If by â€œitems 1â€“5â€ you mean:
+
+1. Miscellaneous Menu  
+2. Rolodex  
+3. Shop Card Generator  
+4. Price List Program  
+5. Quick Message Flashing
+
+then Iâ€™d estimate:
+
+### Fastest realistic path
+If we aim for **working first-pass versions**, not perfect DOS parity:
+- **2 to 5 working days**
+
+### More comfortable estimate
+If we want:
+- decent UI
+- reasonable testing
+- basic polish
+- fewer regressions
+
+then:
+- **about 1 to 2 weeks**
+
+## If we sequence them smartly
+Iâ€™d do them in this order for momentum:
+
+1. **3 â€” Miscellaneous Menu**  
+   quick win, establishes structure
+
+2. **H â€” Quick Message Flashing**  
+   another fast win
+
+3. **N â€” Rolodex**  
+   useful, likely manageable
+
+4. **F â€” Price List Program**  
+   good business value, likely table-driven
+
+5. **A â€” Shop Card Generator**  
+   do last because it likely has the most hidden requirements
+
+That order gets you visible progress fast and delays the most ambiguous one.
+
+## Short answer
+- **Least time:** `3 â€” Miscellaneous Menu`
+- **Most time:** `A â€” Shop Card Generator`
+- **Top 5 total:**  
+  - **aggressive first-pass:** 2â€“5 days  
+  - **more realistic/polished:** 1â€“2 weeks
+
+If you want, I can next give you a **recommended exact build order with â€œday 1 / day 2 / day 3â€ milestones**.
+
+## @testsubject117
+
+of all the buttons that have not yet been wired for the main menu, which outside of those 5 will take the longest?
+
+## Copilot
+
+Outside those 5, the one most likely to take the **longest** is **7 â€” Emergency PAYROLL System**.
+
+## Why
+Compared with the other unwired main-menu buttons, payroll is the one most likely to involve:
+
+- multiple related data files
+- calculations and business rules
+- high accuracy expectations
+- report / print output
+- edge cases around dates, rates, deductions, and totals
+- much more risk if behavior is wrong
+
+That makes it much heavier than simpler viewer/editor/menu items.
+
+## Likely next hardest after that
+Roughly after payroll, Iâ€™d put these among the heaviest:
+
+1. **7 â€” Emergency PAYROLL System**
+2. **B â€” Invoice Generator**
+3. **K â€” Cash Disbursements**
+4. **L â€” Business Expenses Account**
+5. **Q â€” Word Processor**
+
+## Why those are heavy
+### 7 â€” Emergency PAYROLL System
+Probably the hardest overall:
+- calculation-heavy
+- stateful
+- potentially many reports/files
+- correctness matters a lot
+
+### B â€” Invoice Generator
+Also very large:
+- document generation
+- numbering
+- customer/product logic
+- printing/output
+- maybe ledger integration
+
+### K â€” Cash Disbursements
+Usually accounting workflows are more complex than they first appear:
+- entry
+- balancing
+- persistence
+- reports
+
+### L â€” Business Expenses Account
+Likely another finance/accounting feature with rules and summaries.
+
+### Q â€” Word Processor
+Could be big if you try to match real DOS word-processor behavior instead of making a simplified text editor.
+
+## Short answer
+**The longest outside those 5 is almost certainly `7 â€” Emergency PAYROLL System`.**
+
+If you want, I can also rank **all remaining unwired main-menu buttons from hardest to easiest**.
+
+## @testsubject117
+
+lets start on the 1 - 5 you mentioned with #1 first
+
+## Copilot
+
+Yes â€” start with **3: Miscellaneous Menu** first.
+
+## Best first step
+Wire the main menuâ€™s **`3`** key/button to open a new DOS-style submenu form, even if most of that submenu is initially placeholder buttons.
+
+That gives you:
+- a quick visible win
+- a reusable pattern for future submenu ports
+- very low risk
+
+## What to build
+Create:
+
+- `FormMiscMenu.vb`
+- `FormMiscMenu.Designer.vb`
+
+and wire main menu option `3` to open it instead of `NotYet("Miscellaneous Menu")`.
+
+## Suggested initial submenu contents
+Even if you donâ€™t know all final items yet, you can ship a shell like:
+
+- A â€” placeholder
+- B â€” placeholder
+- C â€” placeholder
+- ESC â€” Close
+
+or whatever matches your old GW-BASIC structure.
+
+## Why this is the right move
+You already have a proven pattern:
+- `DosMenuFormBase`
+- `SetMenuTitle(...)`
+- `AddMenuButton(...)`
+- one-column or two-column menu layout
+
+So this should be fast and safe.
+
+## Recommended implementation plan
+### Step 1
+Add a new form:
+
+- `FormMiscMenu`
+
+that:
+
+- inherits `DosMenuFormBase`
+- sets title to `"MISCELLANEOUS"`
+- uses one or two columns
+- adds placeholder buttons for now
+
+### Step 2
+Change main menu case `3` from:
+
+```vb
+Case "3" : NotYet("Miscellaneous Menu")
+```
+
+to:
+
+```vb
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+## Fastest safe version
+Here is a good starter implementation for `FormMiscMenu.vb`:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A", Sub() NotYet("Placeholder Item A"))
+        AddMenuButton(flpLeft, "B", "Placeholder Item B", Sub() NotYet("Placeholder Item B"))
+        AddMenuButton(flpLeft, "C", "Placeholder Item C", Sub() NotYet("Placeholder Item C"))
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D", Sub() NotYet("Placeholder Item D"))
+        AddMenuButton(flpRight, "E", "Placeholder Item E", Sub() NotYet("Placeholder Item E"))
+        AddMenuButton(flpRight, "F", "Placeholder Item F", Sub() NotYet("Placeholder Item F"))
+    End Sub
+End Class
+```
+
+## And the designer file
+`FormMiscMenu.Designer.vb` can be minimal:
+
+```vbnet
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        components = New System.ComponentModel.Container()
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.ClientSize = New System.Drawing.Size(800, 450)
+        Me.Text = "FormMiscMenu"
+    End Sub
+End Class
+```
+
+## Then update main menu
+In `FormMainMenu.vb`, change:
+
+```vb
+Case "3" : NotYet("Miscellaneous Menu")
+```
+
+to:
+
+```vb
+Case "3"
+    Using f As New FormMiscMenu()
+        f.ShowDialog(Me)
+    End Using
+```
+
+## Short answer
+Yes â€” letâ€™s start with #1 by creating the **Miscellaneous Menu submenu shell** and wiring main-menu button `3` to open it.
+
+If you want, I can now send you the **full ready-to-paste code for all 3 pieces**:
+1. `FormMiscMenu.vb`
+2. `FormMiscMenu.Designer.vb`
+3. updated `FormMainMenu.vb`
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” here are the 3 full ready-to-paste pieces.
+
+---
+
+## 1) `FormMiscMenu.vb`
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("MISCELLANEOUS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 420
+
+        flpLeft.Padding = New Padding(24, 0, 12, 0)
+        flpRight.Padding = New Padding(12, 0, 24, 0)
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildMiscMenu()
+    End Sub
+
+    Private Sub BuildMiscMenu()
+        ClearMenu()
+
+        AddMenuButton(flpLeft, "A", "Placeholder Item A", Sub() NotYet("Placeholder Item A"))
+        AddMenuButton(flpLeft, "B", "Placeholder Item B", Sub() NotYet("Placeholder Item B"))
+        AddMenuButton(flpLeft, "C", "Placeholder Item C", Sub() NotYet("Placeholder Item C"))
+
+        AddMenuButton(flpRight, "D", "Placeholder Item D", Sub() NotYet("Placeholder Item D"))
+        AddMenuButton(flpRight, "E", "Placeholder Item E", Sub() NotYet("Placeholder Item E"))
+        AddMenuButton(flpRight, "F", "Placeholder Item F", Sub() NotYet("Placeholder Item F"))
+    End Sub
+End Class
+```
+
+---
+
+## 2) `FormMiscMenu.Designer.vb`
+
+```vbnet
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMiscMenu
+    Inherits DosMenuFormBase
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        components = New System.ComponentModel.Container()
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.ClientSize = New System.Drawing.Size(800, 450)
+        Me.Text = "FormMiscMenu"
+    End Sub
+End Class
+```
+
+---
+
+## 3) Updated `FormMainMenu.vb`
+
+Replace your entire `FormMainMenu.vb` with this:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        Select Case up
+            Case "A" : NotYet("Shop Card Generator")
+            Case "B" : NotYet("Invoice Generator")
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "D" : NotYet("View Sales Journal (SALES)")
+            Case "E" : NotYet("View Log Book (LOGBOOK)")
+            Case "F" : NotYet("Price List Program (plist)")
+            Case "G" : NotYet("Print/Void Invoices (BOOT)")
+            Case "H" : NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J" : NotYet("Print Out Customers Actual Names (spool real names)")
+            Case "K" : NotYet("Cash Disbursements (BILL)")
+            Case "L" : NotYet("Business Expenses Account (password)")
+            Case "M" : NotYet("Quotation Form Generator (QUOTE)")
+            Case "N" : NotYet("Rolodex (PHONE)")
+
+            Case "O" : NotYet("Copy Spec Index")
+            Case "P" : NotYet("Entire Ledger Viewing (ENTIRE)")
+            Case "Q" : NotYet("Word Processor")
+            Case "R" : NotYet("Find Word Processor Text")
+
+            Case "T" : NotYet("Change Date or Time")
+            Case "X" : NotYet("Typewriter Mode")
+            Case "Y" : NotYet("Ed Dean's Personal Backup")
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+            Case "2" : NotYet("Product Purchasing")
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "4" : NotYet("Add Entries to Log Book")
+            Case "6" : NotYet("Cadmium Cards")
+            Case "7" : NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+
+---
+
+## What this gives you
+After pasting these in:
+
+- main menu option **3**
+- now opens **Miscellaneous Menu**
+- using the same DOS-style shared base form
+- with placeholder submenu buttons ready for future wiring
+
+## Next best step
+Compile and test:
+
+- click button `3`
+- press keyboard `3`
+- confirm submenu opens
+- confirm ESC closes it
+
+If you want, after that I can help you do **#2 next: Quick Message Flashing**.
+
+## @testsubject117
+
+what types of vb files are each?
+
+## Copilot
+
+Hereâ€™s the breakdown:
+
+## 1. `FormMiscMenu.vb`
+This is a **Windows Form code-behind file**.
+
+- Type: **Form file**
+- Contains:
+  - form logic
+  - `OnLoad`
+  - button wiring
+  - menu-building code
+
+It goes with the form class:
+
+```vb
+Public Class FormMiscMenu
+    Inherits DosMenuFormBase
+```
+
+---
+
+## 2. `FormMiscMenu.Designer.vb`
+This is the **designer partial class file** for the form.
+
+- Type: **Designer file**
+- Contains:
+  - `InitializeComponent()`
+  - component container
+  - form initialization boilerplate
+
+This pairs with `FormMiscMenu.vb`.
+
+---
+
+## 3. `FormMainMenu.vb`
+This is also a **Windows Form code-behind file**.
+
+- Type: **Form file**
+- Contains:
+  - main menu logic
+  - `HandleMenuKey`
+  - UI event handlers
+  - button creation logic
+
+It is **not** a designer file.
+
+---
+
+## Short version
+- `FormMiscMenu.vb` = **form code file**
+- `FormMiscMenu.Designer.vb` = **designer file**
+- `FormMainMenu.vb` = **form code file**
+
+## In Visual Studio terms
+If you add a new Windows Form named `FormMiscMenu`, Visual Studio usually creates:
+
+- `FormMiscMenu.vb`
+- `FormMiscMenu.Designer.vb`
+- possibly `FormMiscMenu.resx`

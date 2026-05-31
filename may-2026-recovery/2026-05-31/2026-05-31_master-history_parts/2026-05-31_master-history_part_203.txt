@@ -1,0 +1,2000 @@
+﻿            txtInline.Clear()
+            Return
+        End If
+
+        Dim results = svc.Search(trimmed)
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            txtInline.Text =
+                "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+                "No matches found." & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        ResetInlineMode()
+
+        Using frm As New FrmPagedTextViewer
+```
+hey, this file is not complete: 
+
+## Copilot
+
+You're right â€” that file was cut off. Here is the **complete full replacement** for `FrmRolodexMenu.vb`.
+
+```vbnet name=AMiOffice/FrmRolodexMenu.vb
+Imports System.Diagnostics
+Imports System.Drawing
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+    Private _areaCodeInput As String = ""
+
+    Private _printPhoneBookCustomersOnly As Boolean = False
+    Private _printPhoneBookHighQuality As Boolean = False
+    Private _printPhoneBookLetterInput As String = ""
+
+    Private _printLabelsCustomersOnly As Boolean = False
+    Private _printLabelsStartLetterInput As String = ""
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                StartAreaCodeFlow()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.AreaCodes_Prompt
+                If e.KeyCode = Keys.Back Then
+                    If _areaCodeInput.Length > 0 Then
+                        _areaCodeInput = _areaCodeInput.Substring(0, _areaCodeInput.Length - 1)
+                        RenderAreaCodePrompt()
+                    End If
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Enter Then
+                    ExecuteAreaCodeLookup()
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Escape Then
+                    ResetInlineMode()
+                    e.SuppressKeyPress = True
+                    Return
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                If e.KeyCode = Keys.Back Then
+                    If _printPhoneBookLetterInput.Length > 0 Then
+                        _printPhoneBookLetterInput = ""
+                        RenderPrintPhoneBookFirstLetterPrompt()
+                    End If
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Enter Then
+                    ExecutePrintPhoneBook()
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Escape Then
+                    ResetInlineMode()
+                    e.SuppressKeyPress = True
+                    Return
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                If e.KeyCode = Keys.Back Then
+                    If _printLabelsStartLetterInput.Length > 0 Then
+                        _printLabelsStartLetterInput = ""
+                        RenderPrintLabelsFirstLetterPrompt()
+                    End If
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Enter Then
+                    ExecutePrintLabels()
+                    e.SuppressKeyPress = True
+                    Return
+                ElseIf e.KeyCode = Keys.Escape Then
+                    ResetInlineMode()
+                    e.SuppressKeyPress = True
+                    Return
+                End If
+        End Select
+
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                ResetInlineMode()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        If _inlineMode = RolodexMenuInlineMode.AreaCodes_Prompt Then
+            If Char.IsControl(ch) Then
+                Return True
+            End If
+
+            If Char.IsLetterOrDigit(ch) Then
+                _areaCodeInput &= Char.ToUpperInvariant(ch)
+                RenderAreaCodePrompt()
+            End If
+
+            Return True
+        End If
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    _printPhoneBookCustomersOnly = (up = "Y"c)
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    RenderPrintPhoneBookHighQualityPrompt()
+                    Return True
+                End If
+                Return True
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    _printPhoneBookHighQuality = (up = "Y"c)
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    _printPhoneBookLetterInput = ""
+                    RenderPrintPhoneBookFirstLetterPrompt()
+                    Return True
+                End If
+                Return True
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                If Char.IsControl(ch) Then
+                    Return True
+                End If
+
+                If Char.IsLetterOrDigit(ch) Then
+                    _printPhoneBookLetterInput = Char.ToUpperInvariant(ch).ToString()
+                    RenderPrintPhoneBookFirstLetterPrompt()
+                End If
+
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    _printLabelsCustomersOnly = (up = "Y"c)
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    _printLabelsStartLetterInput = ""
+                    RenderPrintLabelsFirstLetterPrompt()
+                    Return True
+                End If
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                If Char.IsControl(ch) Then
+                    Return True
+                End If
+
+                If Char.IsLetterOrDigit(ch) Then
+                    _printLabelsStartLetterInput = Char.ToUpperInvariant(ch).ToString()
+                    RenderPrintLabelsFirstLetterPrompt()
+                End If
+
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _printPhoneBookCustomersOnly = False
+        _printPhoneBookHighQuality = False
+        _printPhoneBookLetterInput = ""
+
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub RenderPrintPhoneBookHighQualityPrompt()
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ? " & If(_printPhoneBookCustomersOnly, "Yes", "No") &
+            Environment.NewLine & Environment.NewLine &
+            "Do you want High Quality but slow print (Y/N) ?"
+    End Sub
+
+    Private Sub RenderPrintPhoneBookFirstLetterPrompt()
+        Dim suffix As String = If(_printPhoneBookLetterInput = "", "_", _printPhoneBookLetterInput)
+
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ? " & If(_printPhoneBookCustomersOnly, "Yes", "No") &
+            Environment.NewLine & Environment.NewLine &
+            "Do you want High Quality but slow print (Y/N) ? " & If(_printPhoneBookHighQuality, "Yes", "No") &
+            Environment.NewLine & Environment.NewLine &
+            "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)" & Environment.NewLine &
+            suffix
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _printLabelsCustomersOnly = False
+        _printLabelsStartLetterInput = ""
+
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub RenderPrintLabelsFirstLetterPrompt()
+        Dim suffix As String = If(_printLabelsStartLetterInput = "", "_", _printLabelsStartLetterInput)
+
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ? " & If(_printLabelsCustomersOnly, "Yes", "No") &
+            Environment.NewLine & Environment.NewLine &
+            "Enter 1st Letter to start with [Enter = A]" & Environment.NewLine &
+            suffix
+    End Sub
+
+    Private Sub ExecutePrintPhoneBook()
+        Dim repo As New RolodexRepository()
+        Dim customerSvc As New RolodexCustomerService()
+
+        Dim customerNames As HashSet(Of String) = Nothing
+        If _printPhoneBookCustomersOnly Then
+            If Not customerSvc.DataFileExists() Then
+                txtInline.Text =
+                    "E" & Environment.NewLine & Environment.NewLine &
+                    "REALNAME.DAT was not found:" & Environment.NewLine &
+                    customerSvc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                    "Press ESC to return."
+                Return
+            End If
+
+            customerNames = customerSvc.LoadCustomerNames()
+        End If
+
+        Dim targetLetter As String = _printPhoneBookLetterInput.Trim().ToUpperInvariant()
+        Dim allMode As Boolean = (targetLetter = "")
+
+        Dim sb As New StringBuilder()
+
+        If _printPhoneBookCustomersOnly Then
+            sb.AppendLine("Print Customers Only.")
+            sb.AppendLine()
+        End If
+
+        Dim anyPrinted As Boolean = False
+
+        For Each ch In GetShardKeys()
+            If Not allMode AndAlso Not String.Equals(ch.ToString(), targetLetter, StringComparison.OrdinalIgnoreCase) Then
+                Continue For
+            End If
+
+            Dim records = repo.ReadAllRecordsForLetter(ch)
+            If records Is Nothing OrElse records.Count = 0 Then
+                Continue For
+            End If
+
+            Dim filtered As New List(Of RolodexPersonRecord)
+
+            For Each r In records
+                If r Is Nothing Then Continue For
+                If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+
+                If _printPhoneBookCustomersOnly Then
+                    If Not customerSvc.IsCustomerName(r.PersonName, customerNames) Then
+                        Continue For
+                    End If
+                End If
+
+                filtered.Add(r)
+            Next
+
+            If filtered.Count = 0 Then
+                Continue For
+            End If
+
+            If anyPrinted Then
+                sb.AppendLine()
+                sb.AppendLine(New String("="c, 70))
+                sb.AppendLine()
+            End If
+
+            sb.AppendLine("<<< " & ch & " >>>")
+            sb.AppendLine()
+
+            For Each r In filtered
+                AppendPhoneBookRecord(sb, r)
+                sb.AppendLine()
+            Next
+
+            anyPrinted = True
+        Next
+
+        If Not anyPrinted Then
+            txtInline.Text =
+                "E" & Environment.NewLine & Environment.NewLine &
+                "No matching entries found." & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        ResetInlineMode()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(New List(Of String) From {sb.ToString()})
+            frm.ShowDialog(Me)
+        End Using
+
+        txtInline.Clear()
+    End Sub
+
+    Private Sub ExecutePrintLabels()
+        Dim repo As New RolodexRepository()
+        Dim customerSvc As New RolodexCustomerService()
+
+        Dim customerNames As HashSet(Of String) = Nothing
+        If _printLabelsCustomersOnly Then
+            If Not customerSvc.DataFileExists() Then
+                txtInline.Text =
+                    "F" & Environment.NewLine & Environment.NewLine &
+                    "REALNAME.DAT was not found:" & Environment.NewLine &
+                    customerSvc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                    "Press ESC to return."
+                Return
+            End If
+
+            customerNames = customerSvc.LoadCustomerNames()
+        End If
+
+        Dim startChar As Char = "0"c
+        If Not String.IsNullOrWhiteSpace(_printLabelsStartLetterInput) Then
+            startChar = Char.ToUpperInvariant(_printLabelsStartLetterInput(0))
+        End If
+
+        Dim started As Boolean = False
+        Dim sb As New StringBuilder()
+        Dim anyPrinted As Boolean = False
+
+        For Each ch In GetShardKeys()
+            If Not started Then
+                If ch = startChar Then
+                    started = True
+                Else
+                    Continue For
+                End If
+            End If
+
+            Dim records = repo.ReadAllRecordsForLetter(ch)
+            If records Is Nothing OrElse records.Count = 0 Then
+                Continue For
+            End If
+
+            For Each r In records
+                If r Is Nothing Then Continue For
+                If String.IsNullOrWhiteSpace(r.PersonName) Then Continue For
+                If String.IsNullOrWhiteSpace(r.Street) Then Continue For
+
+                If _printLabelsCustomersOnly Then
+                    If Not customerSvc.IsCustomerName(r.PersonName, customerNames) Then
+                        Continue For
+                    End If
+                End If
+
+                sb.AppendLine(r.PersonName.Trim())
+                sb.AppendLine(If(r.Street, "").Trim())
+                sb.AppendLine(BuildCityStateZipLine(r))
+                sb.AppendLine()
+                sb.AppendLine()
+
+                anyPrinted = True
+            Next
+        Next
+
+        If Not anyPrinted Then
+            txtInline.Text =
+                "F" & Environment.NewLine & Environment.NewLine &
+                "No matching label entries found." & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        ResetInlineMode()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(New List(Of String) From {sb.ToString()})
+            frm.ShowDialog(Me)
+        End Using
+
+        txtInline.Clear()
+    End Sub
+
+    Private Sub AppendPhoneBookRecord(sb As StringBuilder, record As RolodexPersonRecord)
+        sb.AppendLine(record.PersonName.Trim())
+
+        If Not String.IsNullOrWhiteSpace(record.Street) Then
+            sb.AppendLine("     " & record.Street.Trim() & "   " & BuildCompactCityStateZipLine(record))
+        End If
+
+        Dim phoneLine As String =
+            "     (" & SafeAreaCode(record.AreaCode) & ")" &
+            BuildSevenDigitPhone(record.PhoneNumber) &
+            "    "
+
+        If String.IsNullOrWhiteSpace(record.Misc) Then
+            sb.AppendLine(phoneLine)
+            Return
+        End If
+
+        Dim misc As String = record.Misc.Trim()
+
+        If misc.Length <= 55 Then
+            sb.AppendLine(phoneLine & misc)
+        Else
+            sb.AppendLine(phoneLine & misc.Substring(0, 55))
+            sb.AppendLine(New String(" "c, 23) & misc.Substring(55))
+        End If
+    End Sub
+
+    Private Function BuildCompactCityStateZipLine(record As RolodexPersonRecord) As String
+        Dim city As String = If(record.City, "").Trim()
+        Dim stateCode As String = If(record.StateCode, "").Trim()
+        Dim zipCode As String = If(record.ZipCode, "").Trim()
+
+        If city = "" AndAlso stateCode = "" AndAlso zipCode = "" Then
+            Return ""
+        End If
+
+        Return city & "," & stateCode & zipCode
+    End Function
+
+    Private Function BuildCityStateZipLine(record As RolodexPersonRecord) As String
+        Dim city As String = If(record.City, "").Trim()
+        Dim stateCode As String = If(record.StateCode, "").Trim()
+        Dim zipCode As String = If(record.ZipCode, "").Trim()
+
+        Return city & " , " & stateCode & "  " & zipCode
+    End Function
+
+    Private Function SafeAreaCode(value As String) As String
+        Dim digits = New String((If(value, "")).Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digits.Length >= 3 Then
+            Return digits.Substring(digits.Length - 3)
+        End If
+
+        Return digits.PadLeft(3, "0"c)
+    End Function
+
+    Private Function BuildSevenDigitPhone(value As String) As String
+        Dim digits = New String((If(value, "")).Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digits.Length >= 7 Then
+            digits = digits.Substring(digits.Length - 7)
+            Return digits.Substring(0, 3) & "-" & digits.Substring(3, 4)
+        End If
+
+        Return value
+    End Function
+
+    Private Iterator Function GetShardKeys() As IEnumerable(Of Char)
+        For i As Integer = AscW("0"c) To AscW("9"c)
+            Yield ChrW(i)
+        Next
+
+        For i As Integer = AscW("A"c) To AscW("Z"c)
+            Yield ChrW(i)
+        Next
+    End Function
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub StartAreaCodeFlow()
+        _inlineMode = RolodexMenuInlineMode.AreaCodes_Prompt
+        _areaCodeInput = ""
+        RenderAreaCodePrompt()
+    End Sub
+
+    Private Sub RenderAreaCodePrompt()
+        txtInline.Text =
+            "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+            "Enter Area Code to find city or 2 letter abreviation of state to find area code" & Environment.NewLine &
+            " Example: California = CA" & Environment.NewLine & Environment.NewLine &
+            "[A = All] [Q = Quit] ? " & _areaCodeInput & "_"
+
+        txtInline.SelectionStart = txtInline.TextLength
+        txtInline.ScrollToCaret()
+    End Sub
+
+    Private Sub ExecuteAreaCodeLookup()
+        Dim svc As New RolodexAreaCodeService()
+        Dim trimmed As String = _areaCodeInput.Trim()
+
+        If String.IsNullOrWhiteSpace(trimmed) Then
+            RenderAreaCodePrompt()
+            Return
+        End If
+
+        If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+            ResetInlineMode()
+            Return
+        End If
+
+        If Not svc.DataFileExists() Then
+            txtInline.Text =
+                "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+                "Area code data file not found:" & Environment.NewLine &
+                svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            ResetInlineMode()
+
+            Using frm As New FrmPagedTextViewer()
+                frm.SetPages(svc.GetAllPages())
+                frm.ShowDialog(Me)
+            End Using
+
+            txtInline.Clear()
+            Return
+        End If
+
+        Dim results = svc.Search(trimmed)
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            txtInline.Text =
+                "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+                "No matches found." & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        ResetInlineMode()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(New List(Of String) From {svc.FormatGroupedResults(results)})
+            frm.ShowDialog(Me)
+        End Using
+
+        txtInline.Clear()
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub ResetInlineMode()
+        _inlineMode = RolodexMenuInlineMode.None
+        _areaCodeInput = ""
+        _printPhoneBookLetterInput = ""
+        _printLabelsStartLetterInput = ""
+        txtInline.Clear()
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+ok, that fixed it
+
+## Copilot
+
+Great.
+
+## Current status
+That means:
+- `FrmRolodexMenu.vb` is now complete and pastable
+- the truncation issue is fixed
+- you should be in a good spot to test `(E)` and `(F)`
+
+## Next thing to do
+If you havenâ€™t already, also add the new file:
+
+- `AMiOffice/RolodexCustomerService.vb`
+
+because `FrmRolodexMenu.vb` now depends on it.
+
+## What to test now
+In the Rolodex menu:
+
+### `(E) Print Phone Book`
+- `Y` / `N` for customers only
+- `Y` / `N` for high quality
+- letter input
+- `Enter = All`
+- `Esc = Quit`
+- viewer opens with formatted phone-book output
+
+### `(F) Print Labels`
+- `Y` / `N` for customers only
+- letter input
+- `Enter = A/start from beginning`
+- viewer opens with label-style output
+
+## Expected known limitation
+Right now:
+- this is **preview-style behavior**
+- not actual printer output
+- â€œhigh qualityâ€ is collected but not meaningfully used yet
+
+Thatâ€™s intentional for the first working pass.
+
+## If you want the next step
+The next likely thing is:
+- test results
+- then fix any compile/runtime issues
+- then refine formatting to look more DOS-faithful
+
+If you want, after you test, send me:
+- compile errors, or
+- screenshots / behavior notes
+
+and Iâ€™ll continue with full-file replacements only.
+
+## @testsubject117
+
+I'm testing the dos functions here and it might be because it's not connected to a printer, but when I follow the steps for testing you outline while using the dos app, after y, y, enter for all, it goes to Please wait.... then path not found in 199. any idea what that means?
+
+## Copilot
+
+Yes â€” `path not found in 199` has a pretty specific meaning in that DOS program.
+
+## Short answer
+It likely means the program hit its **generic error handler at line 199** because one of the required DOS paths/files for the print flow does not exist in the current working directory/environment.
+
+In the de-tokenized listing, line 199 is the error-log write: the actual failure happened **before** that, and then the handler fell through to line 199. Based on the E flow, the most likely missing path is related to this section:
+
+- `SHELL "CD .."`
+- `OPEN "REALNAME.DAT" FOR INPUT AS 1`
+- `SHELL "cd phone"`
+
+or later:
+- opening `CHR$(CT)+".LST"`
+
+## Why I think that
+The E flow does this after `Y, Y, Enter`: it tries to leave the `PHONE` directory, open `REALNAME.DAT`, then return to `PHONE`. If your DOS session is not launched from the expected folder structure, one of those relative paths can fail. The relevant code is:  
+
+- print flow starts at `1840`
+- customer-only loads `REALNAME.DAT` after `SHELL "CD .."` at `2010`
+- generic error log handler is at `199`
+
+So â€œpath not found in 199â€ usually means:
+- not that line 199 itself is bad,
+- but that the handler reported an earlier path error and resumed into the generic logger.
+
+## Most likely causes
+### 1. You are not running from the expected `PHONE` directory
+The DOS logic assumes:
+- current directory starts in `PHONE`
+- `CD ..` moves to parent containing `REALNAME.DAT`
+- `cd phone` returns to the child folder
+
+If your folder structure is different, that breaks.
+
+### 2. `REALNAME.DAT` is not in the parent directory
+The DOS code expects `REALNAME.DAT` one level above `PHONE`, not inside `PHONE`.
+
+### 3. The `PHONE` folder name/path isnâ€™t what the DOS app expects
+Because it literally does:
+- `cd phone`
+
+So if the folder is named differently, mounted differently, or you started elsewhere, it fails.
+
+### 4. Less likely: a `.LST` file path problem
+If it gets past `REALNAME.DAT`, it later opens:
+- `0.LST` through `Z.LST`
+from inside `PHONE`
+
+If current directory is wrong, those also fail.
+
+## Important printer note
+This probably is **not primarily a printer issue**.
+
+Printer-not-ready is explicitly handled by:
+- `ERR=24 OR ERR=57 OR ERR=68`
+
+and that handler prints:
+- `PRINTER IS NOT READY!, Get it ready and hit [ENTER]`
+
+So if you're seeing:
+- `path not found in 199`
+
+that points more to **filesystem/path setup** than printer setup.
+
+## Best quick checks
+In the DOS environment, verify:
+
+1. **What directory are you in before launching the Rolodex app?**
+2. Is there a sibling structure like:
+   - `...\PHONE\`
+   - `...\REALNAME.DAT`
+3. Inside `PHONE`, do files like:
+   - `A.LST`
+   - `B.LST`
+   - etc.
+   exist?
+4. If you manually:
+   - `CD ..`
+   - then `DIR REALNAME.DAT`
+   does it find it?
+5. Then:
+   - `CD PHONE`
+   does that succeed?
+
+## Practical interpretation
+If your DOS test app is being launched from a modern wrapper, emulator, shortcut, or different mapped drive than the original app expected, the relative path assumptions are probably wrong.
+
+## Most likely diagnosis
+**The DOS Rolodex print flow expects to start inside the `PHONE` directory, with `REALNAME.DAT` located in the parent directory. Your current DOS runtime layout probably doesnâ€™t match that assumption.**
+
+## Best next step
+If you want, I can help you debug this precisely.
+
+The most useful thing you could send next is:
+- the folder layout around where the DOS app is actually running, or
+- the output of:
+```bat
+CD
+DIR
+CD ..
+DIR REALNAME.DAT
+CD PHONE
+DIR *.LST
+```
+
+Then I can tell you exactly which path assumption is failing.
+
+## @testsubject117
+
+OK, SO IN the dos app, if I choose E, then yes, then yes, then enter for all that's when I get the path not found in 199. it I choose y, y, then type a letter it goes to a printer not ready message. basically any other choices I pick I get a printer not ready dialogue, but when i choose y, y, then enter for all, I get the 199. so it is working in dos, but there is an issue apparently. maybe corruption?
+
+## Copilot
+
+Yes â€” that pattern is very informative.
+
+## Direct answer
+This does **not** look like general corruption.
+
+It looks like a **specific DOS bug/path edge case in the â€œEnter = Allâ€ branch of `(E) Print Phone Book`**.
+
+## Why
+You said:
+
+- `E` â†’ `Y` â†’ `Y` â†’ **letter** â†’ printer-not-ready
+- `E` â†’ `Y` â†’ `Y` â†’ **Enter for all** â†’ path not found in 199
+
+That means:
+
+- the overall print flow is alive
+- the printer path is being reached in normal cases
+- the special failure is tied to the **All letters** path only
+
+So the bug is probably in the branch that handles `Enter = All`, not in the general printer setup.
+
+---
+
+# What the DOS code suggests
+
+In the DOS logic for `(E)`:
+
+- `Enter` means `Q$ = CHR$(13)`
+- then the code goes into the â€œall lettersâ€ mode
+- it later loops across all shard files from `0` through `Z`
+
+The suspicious part is this block:
+
+```basic
+2050 CT=64:PRINT:PRINT"Esc = Quit       ";:IF Q$<>CHR$(13) THEN PRINT "Printing All People Beginning with ";Q$:PRINT:PRINT ELSE PRINT:PRINT:PRINT
+2060 PG=0:CT=CT+1:IF CT=91 THEN CT=48
+2070 IF CT=58 THEN RESET:LPRINT CHR$(27);"@":GOTO 210
+2080 IF Q$<>CHR$(13) AND Q$<>CHR$(CT) THEN 2060
+2081 GOTO 2090:PRINT"Sorting ";CHR$(CT):SRT$="BIGSORT /B /S 1,20 <"+CHR$(CT)+".LST >PHONESRT.TMP":SHELL SRT$
+2084 TST=0:OPEN "PHONESRT.TMP" FOR INPUT AS 3:TST=LOF(3):CLOSE 3
+2085 IF TST>10 THEN SRT$="COPY PHONESRT.TMP "+CHR$(CT)+".LST":SHELL SRT$
+2090 OPEN CHR$(CT)+".LST" FOR INPUT AS 1:PRINT CHR$(30);"Printing the letter ";CHR$(CT)
+```
+
+## Important observation
+Line `2081` is very strange:
+
+```basic
+2081 GOTO 2090:PRINT"Sorting ";CHR$(CT):SRT$="BIGSORT /B /S 1,20 <"+CHR$(CT)+".LST >PHONESRT.TMP":SHELL SRT$
+```
+
+Because of the `GOTO 2090`, everything after it on that same line is effectively skipped.
+
+So:
+
+- sorting never runs
+- `PHONESRT.TMP` may never be created
+- yet the later error handling still has a special branch for `ERL=2084`
+
+That strongly suggests this code may already be a little hacked / partially modified / historically inconsistent.
+
+---
+
+# Why â€œEnter for allâ€ is special
+
+When you choose **a single letter**:
+- the program only has to reach one `.LST` file
+- then it hits printer output and complains printer not ready
+
+When you choose **Enter for all**:
+- it starts scanning from `0` through `Z`
+- one of those shard files or path transitions likely triggers a path failure before the printer logic gets to be the main blocker
+
+So the â€œallâ€ mode is more likely to expose:
+- a missing shard file
+- a bad relative path
+- a weird control-flow bug around `0`â€“`9` / `A`â€“`Z`
+- or a bad assumption in the `PHONESRT.TMP` / BIGSORT section
+
+---
+
+# Most likely explanations
+
+## 1. One of the shard files is missing in all-mode
+In all-mode, it tries:
+- `0.LST`
+- `1.LST`
+- ...
+- `9.LST`
+- `A.LST`
+- ...
+- `Z.LST`
+
+If one expected file/path is missing in the DOS environment, all-mode will hit it; single-letter mode may not.
+
+This is the **most practical** explanation.
+
+## 2. The weird `2081` / `2084` logic is buggy
+That block looks suspicious enough that â€œEnter = Allâ€ may be triggering a broken path around:
+- `PHONESRT.TMP`
+- `BIGSORT`
+- file copy logic
+- or a stale assumption from old code revisions
+
+## 3. Numeric shard handling may be inconsistent
+All-mode starts at ASCII 48 after rolling past 90/91 logic.
+If one of the numeric shards is absent or malformed, all-mode would fail there while letter mode would not.
+
+---
+
+# Why I do **not** think â€œcorruptionâ€ is the first explanation
+Because if the file/program were generally corrupted, you'd expect broader failures.
+
+Instead you have a very consistent pattern:
+- specific choice path fails
+- other choices behave predictably
+
+That feels more like:
+- **a latent logic bug**
+- **or a missing file/path in one branch**
+than random corruption.
+
+---
+
+# Best diagnosis
+**The DOS appâ€™s `(E)` â€œEnter = Allâ€ branch is hitting a path-dependent bug or missing-file condition that the single-letter branch avoids.**
+
+So yes, there is an issue in DOS â€” but it looks like a **real legacy code/path bug**, not necessarily data corruption.
+
+---
+
+# What this means for your WinForms implementation
+Honestly, this is useful:
+
+## Recommendation
+For WinForms, you should **not reproduce this DOS bug**.
+
+Instead:
+- preserve the DOS user-facing prompt flow
+- but make â€œEnter = Allâ€ work reliably
+
+That matches your existing philosophy:
+- preserve DOS behavior where visible
+- improve hidden/broken legacy behavior where needed
+
+So in WinForms:
+- `(E)` Enter = All should simply mean â€œiterate all shards safelyâ€
+- missing shard files should be skipped cleanly
+- no shelling, no `BIGSORT`, no temporary file dependency
+
+---
+
+# Best next DOS check, if you want to confirm
+If you want to verify exactly whatâ€™s failing in DOS, inspect whether all shard files exist:
+
+- `0.LST` through `9.LST`
+- `A.LST` through `Z.LST`
+
+Especially the numeric ones.
+
+If even one is missing or oddly named, all-mode could choke there.
+
+---
+
+# Bottom line
+No â€” I would **not** call this corruption yet.
+
+I would call it:
+- a **legacy DOS bug/path issue**
+- likely in the **all-letters branch**
+- probably exposed by missing shard file(s) or the odd `2081`/`2084` control flow
+
+If you want, next I can turn that into a concrete implementation rule for the WinForms version:
+
+## Proposed rule
+- `(E)` single letter: print only that shard
+- `(E)` Enter: print all shards safely, skipping missing ones
+- `(F)` start letter: print from that shard forward, skipping missing ones
+- never fail because a single shard file is absent
+
+If you want, I can then generate the next full replacement file(s) to harden the WinForms behavior around that.
+
+## @testsubject117
+
+ALL NUMBERED AND ALL LETTERED .LST FILES EXIST 0-9 AND a-z
+
+## Copilot
+
+Then yes â€” that makes the DOS bug look even more like **program logic**, not missing data.
+
+## Direct answer
+If **all** `0.LST`â€“`9.LST` and `A.LST`â€“`Z.LST` files exist, then the most likely cause is **not** missing shard files.
+
+That pushes suspicion onto the DOS code path itself â€” especially the weird logic around the â€œall lettersâ€ branch in `(E)`.
+
+## Most likely culprit now
+The strongest suspect is this section:
+
+```basic
+2080 IF Q$<>CHR$(13) AND Q$<>CHR$(CT) THEN 2060
+2081 GOTO 2090:PRINT"Sorting ";CHR$(CT):SRT$="BIGSORT /B /S 1,20 <"+CHR$(CT)+".LST >PHONESRT.TMP":SHELL SRT$
+2084 TST=0:OPEN "PHONESRT.TMP" FOR INPUT AS 3:TST=LOF(3):CLOSE 3
+2085 IF TST>10 THEN SRT$="COPY PHONESRT.TMP "+CHR$(CT)+".LST":SHELL SRT$
+2090 OPEN CHR$(CT)+".LST" FOR INPUT AS 1
+```
+
+## Why this is suspicious
+`2081` has:
+
+```basic
+GOTO 2090:PRINT ... : SHELL ...
+```
+
+So the `GOTO 2090` jumps past:
+- the sort command
+- `PHONESRT.TMP` creation
+- the temp-file logic setup
+
+But the surrounding code still clearly expects that temp-file path to exist sometimes, because there is special error handling for `ERL=2084`.
+
+That is not normal clean logic. It looks like:
+- partially disabled code
+- old debugging/edit residue
+- or an old patch that changed control flow but left the rest behind
+
+## Why only â€œEnter = Allâ€ triggers it
+Because with `Enter = All`, the code iterates across the full ASCII sequence and repeatedly passes through that branch logic in a broader way than the single-letter path.
+
+Single-letter mode:
+- gets into one file quickly
+- then printer readiness becomes the dominant issue
+
+All-mode:
+- exercises the looping/control-flow path more deeply
+- so the broken branch is more likely to surface
+
+## So what does â€œpath not found in 199â€ probably mean now?
+At this point, the most plausible explanation is:
+
+- the DOS program is attempting a file/path operation in that all-mode branch
+- the line-number report winds up landing in the generic error logger at 199
+- but the root cause is a bug in the print-all control flow, not bad data
+
+## My updated diagnosis
+**This is very likely a legacy bug in the DOS `Print Phone Book -> All letters` logic.**
+
+Not:
+- missing `.LST` files
+- not likely printer hardware
+- not likely general corruption
+
+More likely:
+- dead/half-disabled sort-temp-file code
+- a brittle control-flow bug that only shows up in all-mode
+
+---
+
+# What this means for WinForms
+This is actually good news for the port:
+
+## Recommendation
+Do **not** copy this exact DOS failure mode.
+
+Instead, WinForms should preserve the visible behavior:
+- same prompts
+- same all-vs-letter meaning
+- same customers-only logic
+
+But internally:
+- skip the broken DOS temp-file/shell/sort path entirely
+- just enumerate records directly from repository files
+
+That means WinForms can be:
+- DOS-faithful in user experience
+- better than DOS in hidden implementation correctness
+
+---
+
+# Best practical takeaway
+Youâ€™ve now established:
+
+1. DOS `(E)` single-letter mode reaches printer flow
+2. DOS `(E)` all-letter mode has a genuine legacy bug
+3. the bug is not caused by missing shard files
+4. WinForms should intentionally fix this
+
+---
+
+# Short conclusion
+No, this no longer smells like corruption.  
+It smells like **a real DOS program bug in the `Enter = All` branch of Print Phone Book**.
+
+That means our WinForms behavior should be:
+
+- **follow DOS prompts**
+- **follow DOS output semantics**
+- **do not reproduce DOSâ€™s internal broken all-mode branch**
+
+If you want, the next thing I should do is review your current WinForms print-all logic and make sure it is explicitly robust in exactly this area.
+
+## @testsubject117
+
+OK, i REMOTED into the real production dos machines and ran E, then y, y, enter. it said please wait.... then changed to a screen like this: 
+
+## Copilot
+
+That is a **huge clue**.
+
+## Direct answer
+This is **not corruption**. It is almost certainly a bug in the DOS code at the `REALNAME.DAT` read loop.
+
+`ERR 9` in GW-BASIC / QuickBASIC is typically **Subscript out of range**.
+
+And line **2020** is this line in the de-tokenized listing:
+
+```vbnet name=PHONE.ASC url=https://github.com/testsubject117/AMiDataStore/blob/fc7a4fc2af045364b6d717e3031e74cd9266f82c/PHONE.ASC#L224-L227
+2010 Y=0:PRINT"Please Wait...":SHELL "CD ..":OPEN "REALNAME.DAT" FOR INPUT AS 1
+2020 Y=Y+1:INPUT#1,A$:INPUT#1,FULL$(Y):IF EOF(1) THEN RESET:SHELL"cd phone":GOTO 2040
+2030 GOTO 2020
+```
+
+And earlier the array is declared as:
+
+```vbnet name=PHONE.ASC url=https://github.com/testsubject117/AMiDataStore/blob/fc7a4fc2af045364b6d717e3031e74cd9266f82c/PHONE.ASC#L11-L13
+110 ON ERROR GOTO 140
+120 DIM FULL$(700)
+130 GOTO 210
+```
+
+## What that means
+The DOS program only allocated:
+
+- `FULL$(700)`
+
+But during customer-only print, it keeps doing:
+
+- `Y = Y + 1`
+- `INPUT#1, A$`
+- `INPUT#1, FULL$(Y)`
+
+So if `REALNAME.DAT` contains **more than 700 customer names**, then:
+- `FULL$(701)` blows up
+- producing `ERR 9 IN LINE 2020`
+
+That matches your production screenshot perfectly.
+
+---
+
+# So the actual DOS bug is now identified
+## Root cause
+**Customer-only print in `(E)` assumes at most 700 customer names in `REALNAME.DAT`, but production now has more than that.**
+
+## Why only this path fails
+Because this happens only when:
+
+- `(E) Print Phone Book`
+- customers only = **Yes**
+
+And especially in your test:
+- `Y`
+- `Y`
+- `Enter`
+
+The second `Y` is not the real cause â€” the first `Y` is.
+The crash occurs while loading customer names before printing all records.
+
+If you choose a letter and reach printer-not-ready, then that suggests:
+- either the file size / environment differed in prior tests,
+- or you were testing on a different machine/data copy,
+- or printer handling masked later behavior.
+
+But the production screenshot is much more trustworthy:
+- it directly shows the failing line.
+
+---
+
+# Why the screen repeats `ERR 9 IN LINE 2020`
+Because the programâ€™s error handler is not safely recovering from that condition.
+
+It hits:
+
+```basic
+200 PRINT"ERR ";ERR;"   IN LINE ";ERL:RESUME NEXT
+```
+
+So instead of exiting cleanly, it likely resumes into the same broken logic and keeps tripping repeatedly.
+
+Thatâ€™s why you get the vertical flood of identical errors.
+
+---
+
+# What this means for the WinForms port
+This is excellent information.
+
+## We should absolutely fix this in WinForms
+The WinForms version should **not** mimic this bug.
+
+Instead:
+- load all customer names from `REALNAME.DAT` dynamically
+- no fixed-size 700-entry limit
+- use `HashSet(Of String)` or `List(Of String)`
+
+Which is exactly what the `RolodexCustomerService.vb` approach is already doing.
+
+So this confirms the WinForms direction is correct.
+
+---
+
+# Important conclusion about DOS fidelity
+If your goal is:
+- match DOS behavior where users see it
+- but avoid DOS crashes and hidden limitations
+
+Then the correct WinForms behavior is:
+
+- same prompt sequence
+- same customer-only meaning
+- same output filtering concept
+- **without** the 700-name hard limit
+
+That is faithful in the right way.
+
+---
+
+# Practical interpretation of production behavior
+Your production DOS data has likely grown over time to exceed the original array sizing assumption from decades ago.
+
+Thatâ€™s a classic legacy bug:
+- code written with a â€œlarge enoughâ€ fixed array
+- real business data eventually outgrows it
+
+---
+
+# Final diagnosis
+## The bug is:
+**`DIM FULL$(700)` is too small for current production `REALNAME.DAT`, causing `ERR 9` at line 2020 during customer-only print.**
+
+## It is not:
+- missing `.LST` files
+- printer problem
+- general corruption
+
+---
+
+# What this means for our next steps
+We now know the WinForms app should:
+
+1. use dynamic customer-name loading
+2. not use a fixed-size array assumption
+3. handle large `REALNAME.DAT` files safely
+
+Your current new service design already does that.
+
+## So the DOS investigation succeeded
+We found a real production bug and learned exactly how not to reproduce it.
+
+If you want, next I can help you verify whether:
+- the new WinForms `RolodexCustomerService.vb`
+- and current `FrmRolodexMenu.vb`
+
+fully avoid this issue, and if needed I can generate the next full replacement file to make the implementation even closer to DOS while still safe.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” based on what we found, your current WinForms direction **does avoid** the DOS `ERR 9 / FULL$(700)` bug.
+
+## Direct answer
+The new WinForms approach is safer because:
+
+- it loads customer names dynamically from `REALNAME.DAT`
+- it does **not** use a fixed-size array like `FULL$(700)`
+- so it should not fail when production has more than 700 customers
+
+## Why the new service avoids the DOS bug
+Your new `RolodexCustomerService.vb` uses:
+
+- `File.ReadAllLines(...)`
+- a `HashSet(Of String)`
+- a `While i < lines.Length` loop
+
+So the number of customer names is limited only by available memory, not by a hardcoded 700-element array.
+
+That directly fixes the production DOS failure mode.
+
+---
+
+# What I think should be improved next
+The current `FrmRolodexMenu.vb` is functionally on the right track, but there are a few things I would tighten up so it is both:
+
+- safer
+- closer to DOS
+- easier to test
+
+## Main improvements I recommend
+1. make shard iteration more DOS-faithful for `(E)` and `(F)`
+2. validate first-letter inputs a bit more explicitly
+3. keep missing shard files harmless
+4. make phone-book output formatting a little closer to DOS
+5. make label start-letter behavior exactly match DOS semantics
+
+---
+
+# Important behavior check against DOS
+
+## `(E) Print Phone Book`
+DOS behavior:
+- customers only? Y/N
+- high quality? Y/N
+- first letter:
+  - `Enter = All`
+  - otherwise print only the matching shard
+
+Your current WinForms code does that correctly in principle.
+
+## `(F) Print Labels`
+DOS behavior:
+- customers only? Y/N
+- enter starting letter
+  - `Enter = A`
+  - start at that letter and continue through `Z`
+
+Your current WinForms code also does that correctly in principle.
+
+So **the major DOS logic is already aligned**.
+
+---
+
+# What I would still change
+## 1. Better missing-file tolerance
+`RolodexRepository.ReadAllRecordsForLetter()` already returns an empty list if the shard is missing, so that part is fine.
+
+## 2. Customer name matching
+Right now matching is exact by trimmed name, which is faithful to DOS:
+
+```basic
+2417 Q=Q+1:IF N$=FULL$(Q) THEN ...
+```
+
+So that is actually good and should stay exact for now.
+
+## 3. Phone book formatting
+Your current formatting is good enough for first pass, but DOS did this style:
+
+- name
+- address line with city/state/zip on same line if address exists
+- phone line
+- misc line / wrapped misc
+
+Thatâ€™s mostly what you already do.
+
+## 4. â€œHigh qualityâ€ option
+Right now WinForms stores it but doesnâ€™t use it. Thatâ€™s okay for preview-only mode.
+
+I would leave it that way for now instead of inventing fake behavior.
+
+---
+
+# My recommendation
+At this point, I would **not** rewrite everything again immediately.
+
+Instead, Iâ€™d suggest:
+
+## Step 1
+Confirm that these two files compile and run:
+
+- `RolodexCustomerService.vb`
+- `FrmRolodexMenu.vb`
+
+## Step 2
+Test these WinForms scenarios:
+
+### `(E)`
+- `N, N, Enter`
+- `Y, N, Enter`
+- `Y, Y, Enter`
+- `Y, Y, A`
+- `Y, Y, Z`
+
+### `(F)`
+- `N, Enter`
+- `Y, Enter`
+- `Y, A`
+- `Y, Z`
+
+## Step 3
+If anything fails, send me:
+- compile errors
+- runtime exception text
+- unexpected screen behavior
+
+Then Iâ€™ll give you the next full replacement file.
+
+---
+
+# My current confidence level
+## On the customer-over-700 issue:
+High confidence â€” the new service avoids it.
+
+## On overall E/F logic:
+Moderately high confidence â€” the structure matches DOS well enough for first-pass preview behavior.
+
+## On first-run compile success:
+Medium confidence â€” only because I havenâ€™t seen your local compiler output yet.
+
+---
+
+# Bottom line
+Yes:
+- the WinForms version is now designed in a way that **should avoid the real production DOS `ERR 9 IN LINE 2020` bug**
+- because it does **not** use a fixed-size `FULL$(700)` style structure
+
+## Best next move
+Try compiling and running with:
+- `RolodexCustomerService.vb`
+- the completed `FrmRolodexMenu.vb`
+
+Then send me whatever happens next, and Iâ€™ll keep responding with **full replacement files only**.
+
+## @testsubject117
+
+in the app, click (N) then (E) Then N, then N, Then typed the letter K. I got results of all customers with letter K, including myself. then I did E, Y, N and they typed the letter J. I got results of all customers with letter J. (E) then Y, Y, and Enter, produces a window that lists all customers. seems to be working fine.
+
+## Copilot
+
+Excellent â€” thatâ€™s very good news.
+
+## Direct answer
+That means the WinForms implementation is basically working, and more importantly:
+
+- it is **not reproducing the DOS crash**
+- customer-only mode is functioning
+- all-letters mode is functioning
+- single-letter mode is functioning
+
+## What your test results tell us
+
+### Test 1
+- `(N)` then `(E)`
+- `N`
+- `N`
+- `K`
+
+Result:
+- all K entries printed, including non-customers
+
+That is correct for:
+- customers only = No
+
+### Test 2
+- `(E)`
+- `Y`
+- `N`
+- `J`
+
+Result:
+- customer-only J entries printed
+
+That suggests:
+- `REALNAME.DAT` filtering is working
+
+### Test 3
+- `(E)`
+- `Y`
+- `Y`
+- `Enter`
+
+Result:
+- all customers listed
+
+That confirms:
+- the DOS production bug caused by `FULL$(700)` is fixed in WinForms
+- all-mode works safely
+- high-quality prompt does not break the flow
+
+---
+
+# My conclusion
+## The important part
+Your new WinForms `(E)` implementation is already better than DOS in the right way:
+
+- same user flow
+- same business meaning
+- no 700-customer crash
+- no broken all-mode
+
+That is a successful porting decision.
+
+---
+
+# What I think next
+Now that `(E)` appears to work, the next most important thing is to verify `(F) Print Labels)` with the same care.
+
+## Recommended next tests
+### `(F)` non-customer-filtered
+- `F`
+- `N`
+- `Enter`
+
+Expected:
+- labels from start of list
+- only entries with nonblank addresses
+- no phone/misc
+
+### `(F)` customer-only
+- `F`
+- `Y`
+- `Enter`
+
+Expected:
+- only customer names with addresses
+
+### `(F)` starting at a letter
+- `F`
+- `Y`
+- `M`
+
+Expected:
+- start from `M`
+- continue through `Z`
+- only customers
+- blank-address records skipped
+
+---
+
+# Likely refinement after that
+If `(F)` works too, the next thing Iâ€™d probably improve is **format polish**, not core logic.
+
+Examples:
+- cleaner page grouping in preview
+- better label spacing
+- maybe clearer section headings
+- maybe make phone-book output look a little more DOS-like
+
+But those are refinement steps, not core fixes.
+
+---
+
+# Short version
+This is a strong success:
+- `(E)` works
+- customer-only filtering works
+- all-customer print works
+- DOS overflow bug is avoided
+
+## Best next move
+Test `(F)` now.
+
+When you do, send me:
+- what worked
+- what looked off
+- what didnâ€™t match DOS
+
+and Iâ€™ll continue with full replacement files only if changes are needed.
+
+## @testsubject117
+
+I just realized something. what was the method to activate the printer? what actually sent the code to the printer to be printed? how did the users send to the printer in dos from the phone book? did they hit print screen? was there a print dialogue? I'm going to check and let you know. The reason I bring this up is because I still have the windows with all customers listed and open. if I want to print that, how do I do it? there is no print dialogue or button on this window.
+
+## Copilot
+
+In DOS, printing was usually immediate; there was no dialog.
+
+## How DOS likely printed
+In `PHONE.BAS`, the actual print output is done with `LPRINT`, which sends text directly to the default printer device. So for `(E)` and `(F)`:
+
+- choosing the menu option
+- answering the prompts
+- then confirming the final selection
+
+would start printing automatically via `LPRINT`
+
+It was **not** using Print Screen for the phone-book print flow.  
+`Print Screen` was mentioned in the **lookup** flow, not the phone-book print flow.
+
+### Evidence
+The phone-book and labels sections use `LPRINT` repeatedly:
+- `LPRINT CHR$(27); ...`
+- `LPRINT N$`
+- etc.
+
+That means once the flow got past the prompts, the program was already trying to print.
+
+## What that means for your WinForms version
+Right now, your WinForms `(E)` and `(F)` are only doing a **preview in `FrmPagedTextViewer`**.
+
+So at the moment:
+
+- there is **no print dialog**
+- there is **no print button**
+- there is **no actual printer output path yet**
+
+The viewer is just displaying generated text pages.
+
+## So your question is exactly right
+If the preview window shows all customers and you want to print it, the app currently has **no implemented way to do that**.
+
+## Current state
+Right now the feature is:
+
+- generate DOS-like output
+- show it in a viewer
+
+But **not yet**:
+- print to a printer
+- export
+- open a print dialog
+
+## Best next step
+You should definitely check the DOS behavior and confirm exactly what the users did, but from the code we already saw, the answer is almost certainly:
+
+- `(E)` and `(F)` printed automatically through `LPRINT`
+- there was no printer dialog
+- printer readiness errors were handled by the DOS error trap
+
+## What we need next in WinForms
+We probably need to add one of these:
+
+1. **Print button in `FrmPagedTextViewer`**
+2. **Ctrl+P / P hotkey**
+3. **Print dialog + PrintDocument**
+4. maybe also **Preview first, then Print**
+
+## My recommendation
+For WinForms, the best design is probably:
+
+- keep the current preview window
+- add a **Print** button
+- open a standard Windows print dialog
+- print the displayed text content
+
+That would preserve usability while fitting Windows better than raw DOS-style automatic printing.
+
+## Short answer
+- In DOS, the phone book used **`LPRINT`**, so printing was automatic once the flow started.
+- In your WinForms version, the output is currently **preview-only**.
+- So right now, **you cannot print from that window yet** because no print feature has been added.
+
+If you want, the next thing I can do is generate the full replacement file for `FrmPagedTextViewer.vb` to add:
+- a Print button
+- print dialog
+- actual printing of the displayed text.
+
+## @testsubject117
+
+yes add a print button please
+
+## Copilot
+
+Here is the **full replacement** for `AMiOffice/FrmPagedTextViewer.vb` with a **Print** button added.
+
+It includes:
+- a top button bar
+- **Print**
+- **Close**
+- `Ctrl+P` shortcut
+- standard Windows print dialog
+- plain text printing of the viewer contents
+
+```vbnet name=AMiOffice/FrmPagedTextViewer.vb
+Imports System.Drawing
+Imports System.Drawing.Printing
+Imports System.Windows.Forms
+
+Public Class FrmPagedTextViewer
+    Inherits Form
+
+    Private pnlTop As Panel
+    Private btnPrint As Button
+    Private btnClose As Button
+    Private txtPage As TextBox
+
+    Private _content As String = ""
+    Private _printDocument As PrintDocument
+    Private _printText As String = ""
+    Private _printCharIndex As Integer = 0
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Public Sub SetPages(pages As List(Of String))
+        If pages Is Nothing OrElse pages.Count = 0 Then
+            _content = ""
+        Else
+            _content = String.Join(Environment.NewLine & Environment.NewLine, pages)
+        End If
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Paged Viewer"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        pnlTop = New Panel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .BackColor = Color.Black
+        }
+
+        btnPrint = New Button() With {
+            .Text = "Print",
+            .Width = 100,
+            .Height = 30,
+            .Location = New Point(10, 7),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .FlatStyle = FlatStyle.Flat,
+            .TabStop = False
+        }
+        btnPrint.FlatAppearance.BorderColor = Color.White
+
+        btnClose = New Button() With {
+            .Text = "Close",
+            .Width = 100,
+            .Height = 30,
+            .Location = New Point(120, 7),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .FlatStyle = FlatStyle.Flat,
+            .TabStop = False
+        }
+        btnClose.FlatAppearance.BorderColor = Color.White
+
+        txtPage = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        _printDocument = New PrintDocument()
+
+        pnlTop.Controls.Add(btnPrint)
+        pnlTop.Controls.Add(btnClose)
+
+        Me.Controls.Add(txtPage)
+        Me.Controls.Add(pnlTop)
+
+        AddHandler Me.Load, AddressOf FrmPagedTextViewer_Load
+        AddHandler Me.Shown, AddressOf FrmPagedTextViewer_Shown
+        AddHandler Me.KeyDown, AddressOf FrmPagedTextViewer_KeyDown
+        AddHandler btnPrint.Click, AddressOf btnPrint_Click
+        AddHandler btnClose.Click, AddressOf btnClose_Click
+        AddHandler _printDocument.BeginPrint, AddressOf PrintDocument_BeginPrint
+        AddHandler _printDocument.PrintPage, AddressOf PrintDocument_PrintPage
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs)
+        txtPage.Text = _content
+        ClearTextSelection()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Shown(sender As Object, e As EventArgs)
+        Me.ActiveControl = Nothing
+        ClearTextSelection()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        ElseIf e.Control AndAlso e.KeyCode = Keys.P Then
+            ShowPrintDialogAndPrint()
+            e.SuppressKeyPress = True
+        End If
+    End Sub
+
+    Private Sub btnPrint_Click(sender As Object, e As EventArgs)
+        ShowPrintDialogAndPrint()
+    End Sub
+
+    Private Sub btnClose_Click(sender As Object, e As EventArgs)
+        Me.Close()
+    End Sub
+
+    Private Sub ShowPrintDialogAndPrint()
+        If String.IsNullOrWhiteSpace(_content) Then
+            MessageBox.Show("There is nothing to print.",
+                            "Print",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using dlg As New PrintDialog()
+            dlg.AllowSomePages = False
+            dlg.ShowHelp = False
+            dlg.UseEXDialog = True
+            dlg.Document = _printDocument
+
+            If dlg.ShowDialog(Me) = DialogResult.OK Then
+                Try
+                    _printDocument.Print()
+                Catch ex As Exception
+                    MessageBox.Show("Printing failed:" & Environment.NewLine & ex.Message,
+                                    "Print",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Error)
+                End Try
+            End If
+        End Using
+    End Sub
+
+    Private Sub PrintDocument_BeginPrint(sender As Object, e As PrintEventArgs)
+        _printText = If(_content, "")
+        _printCharIndex = 0
+    End Sub
+
+    Private Sub PrintDocument_PrintPage(sender As Object, e As PrintPageEventArgs)
+        Dim printFont As Font = New Font("Consolas", 10.0F, FontStyle.Regular)
+        Dim leftMargin As Single = e.MarginBounds.Left
+        Dim topMargin As Single = e.MarginBounds.Top
+        Dim printableArea As New SizeF(e.MarginBounds.Width, e.MarginBounds.Height)
+
+        If _printCharIndex >= _printText.Length Then
+            e.HasMorePages = False
+            Return
+        End If
+
+        Dim format As New StringFormat(StringFormatFlags.LineLimit)
+        Dim charactersFitted As Integer = 0
+        Dim linesFilled As Integer = 0
+
+        Dim remainingText As String = _printText.Substring(_printCharIndex)
+
+        e.Graphics.MeasureString(remainingText,
+                                 printFont,
+                                 printableArea,
+                                 format,
+                                 charactersFitted,
+                                 linesFilled)
+
+        If charactersFitted > 0 Then
+            Dim textToPrint As String = remainingText.Substring(0, charactersFitted)
+
+            e.Graphics.DrawString(textToPrint,
+                                  printFont,
+                                  Brushes.Black,
+                                  New RectangleF(leftMargin, topMargin, printableArea.Width, printableArea.Height),
+                                  format)
+
+            _printCharIndex += charactersFitted
+        End If
+
+        e.HasMorePages = (_printCharIndex < _printText.Length)
+    End Sub
+
+    Private Sub ClearTextSelection()
+        txtPage.SelectionStart = 0
+        txtPage.SelectionLength = 0
+        txtPage.HideSelection = True
+        txtPage.ScrollToCaret()
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+ok, that worked. lets do print labels now
+
+## Copilot
+
+Yes â€” next letâ€™s verify and refine `(F) Print Labels`.
+
+## Direct answer
+Since printing from `FrmPagedTextViewer` now works, the next logical step is to make sure the **labels content** is right before changing anything.
+
