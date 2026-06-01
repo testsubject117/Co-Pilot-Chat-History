@@ -1,0 +1,2000 @@
+﻿        Public Property DateText As String
+        Public Property InvoiceDiffText As String
+        Public Property AmountValue As Decimal
+        Public Property AmountDisplay As String
+    End Class
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+End Class
+```
+
+## Copilot
+
+This file looks **valid overall**. I do **not** see an obvious syntax problem or attribute issue here.
+
+## Direct answer
+`FormLedgerView.vb` is **probably not the cause** of the Roslyn internal compiler crash.
+
+It looks structurally okay.
+
+---
+
+## Small fixes I would still make
+These are cleanup/safety fixes, not likely crash fixes.
+
+### 1. Explicit type declarations
+Change these two lines to be explicit:
+
+```vbnet
+Dim allChecks = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim q = allChecks.AsEnumerable()
+```
+
+to:
+
+```vbnet
+Dim allChecks As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim q As IEnumerable(Of LedgerEntry) = allChecks.AsEnumerable()
+```
+
+This makes VB happier and removes ambiguity.
+
+---
+
+### 2. Add missing imports
+Since you are using `List(Of ...)` and `IEnumerable(Of ...)`, add:
+
+```vbnet
+Imports System.Collections.Generic
+```
+
+So the imports become:
+
+```vbnet
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+```
+
+---
+
+### 3. Make `YearMatches` Shared
+It doesnâ€™t use instance state, so this is cleaner:
+
+```vbnet
+Private Shared Function YearMatches(dateText As String, requestedYear As String) As Boolean
+```
+
+Not required, just cleaner.
+
+---
+
+## Revised safer version
+Use this version:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+    Inherits Form
+
+    Private ReadOnly _customerFilter As String
+    Private ReadOnly _checkFilter As String
+    Private ReadOnly _yearFilter As String
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblFilterLine As New Label()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+        MyBase.New()
+
+        _customerFilter = If(customerFilter, "").Trim()
+        _checkFilter = If(checkFilter, "").Trim()
+        _yearFilter = If(yearFilter, "").Trim()
+
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "View Checks"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** View Checks *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblFilterLine.AutoSize = False
+        lblFilterLine.ForeColor = Color.White
+        lblFilterLine.BackColor = Color.Black
+        lblFilterLine.SetBounds(24, 70, 920, 28)
+
+        dgv.SetBounds(24, 110, 920, 420)
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.Gray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.MultiSelect = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.RowHeadersVisible = False
+        dgv.AutoGenerateColumns = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Navy
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Customer",
+            .DataPropertyName = "Customer",
+            .Width = 220
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Check #",
+            .DataPropertyName = "CheckNumber",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Reference",
+            .DataPropertyName = "Reference",
+            .Width = 140
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Date",
+            .DataPropertyName = "DateText",
+            .Width = 130
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Amount",
+            .DataPropertyName = "AmountDisplay",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Difference",
+            .DataPropertyName = "InvoiceDiffText",
+            .Width = 170,
+            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        })
+
+        lblTotal.AutoSize = False
+        lblTotal.ForeColor = Color.White
+        lblTotal.BackColor = Color.Black
+        lblTotal.SetBounds(24, 545, 500, 28)
+
+        btnClose.Text = "Close"
+        btnClose.SetBounds(834, 545, 110, 34)
+        AddHandler btnClose.Click, Sub() Me.Close()
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblFilterLine)
+        Me.Controls.Add(dgv)
+        Me.Controls.Add(lblTotal)
+        Me.Controls.Add(btnClose)
+
+        AddHandler Me.Load, AddressOf FormLedgerView_Load
+    End Sub
+
+    Private Sub FormLedgerView_Load(sender As Object, e As EventArgs)
+        LoadFilteredChecks()
+    End Sub
+
+    Private Sub LoadFilteredChecks()
+        Dim allChecks As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim q As IEnumerable(Of LedgerEntry) = allChecks.AsEnumerable()
+
+        If _customerFilter <> "" Then
+            q = q.Where(Function(x) x.Customer IsNot Nothing AndAlso
+                                    x.Customer.IndexOf(_customerFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _checkFilter <> "" Then
+            q = q.Where(Function(x) x.CheckNumber IsNot Nothing AndAlso
+                                    x.CheckNumber.IndexOf(_checkFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _yearFilter <> "" Then
+            q = q.Where(Function(x) YearMatches(x.DateText, _yearFilter))
+        End If
+
+        Dim rows = q.
+            Select(Function(x) New LedgerViewRow With {
+                .Customer = x.Customer,
+                .CheckNumber = x.CheckNumber,
+                .Reference = x.Reference,
+                .DateText = x.DateText,
+                .InvoiceDiffText = x.InvoiceDiffText,
+                .AmountValue = x.Amount,
+                .AmountDisplay = x.Amount.ToString("0.00")
+            }).
+            OrderBy(Function(x) x.Customer).
+            ThenBy(Function(x) x.CheckNumber).
+            ToList()
+
+        dgv.DataSource = rows
+
+        Dim total As Decimal = rows.Sum(Function(x) x.AmountValue)
+        lblTotal.Text = "Total Amount: $" & total.ToString("0.00")
+
+        Dim custDisplay As String = If(_customerFilter = "", "ALL", _customerFilter)
+        Dim chkDisplay As String = If(_checkFilter = "", "ALL", _checkFilter)
+        Dim yearDisplay As String = If(_yearFilter = "", "ALL", _yearFilter)
+
+        lblFilterLine.Text = "Customer: " & custDisplay & "   Check #: " & chkDisplay & "   Year: " & yearDisplay
+
+        If rows.Count = 0 Then
+            MessageBox.Show("No checks found for the selected criteria.",
+                            "View Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Shared Function YearMatches(dateText As String, requestedYear As String) As Boolean
+        If String.IsNullOrWhiteSpace(requestedYear) Then Return True
+        If String.IsNullOrWhiteSpace(dateText) Then Return False
+
+        Dim normalizedRequested As String = requestedYear.Trim()
+
+        If normalizedRequested.Length = 2 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase)
+        End If
+
+        If normalizedRequested.Length = 4 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase) OrElse
+                   dateText.Trim().EndsWith(normalizedRequested.Substring(2), StringComparison.OrdinalIgnoreCase)
+        End If
+
+        Return dateText.IndexOf(normalizedRequested, StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Class LedgerViewRow
+        Public Property Customer As String
+        Public Property CheckNumber As String
+        Public Property Reference As String
+        Public Property DateText As String
+        Public Property InvoiceDiffText As String
+        Public Property AmountValue As Decimal
+        Public Property AmountDisplay As String
+    End Class
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+End Class
+```
+
+---
+
+## Conclusion on this file
+- **No obvious fatal syntax problem**
+- **No attribute issue**
+- **Probably not the crash source**
+
+## Next file
+Send **`FormDeleteCheck.vb`** next.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+        Threading.Thread.Sleep(750)
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+This file also looks **mostly valid**, but I do see a couple things to fix.
+
+## Direct answer
+`FormDeleteCheck.vb` is **probably not the Roslyn crash source either**, but I would still correct it before building again.
+
+---
+
+## Fix 1: add missing imports
+You are using:
+- `StringComparison`
+- likely `List(Of ...)` inference through LINQ
+- `Threading.Thread.Sleep`
+
+So add these imports at the top:
+
+```vbnet
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+```
+
+Replace your current imports:
+
+```vbnet
+Imports System.Linq
+Imports System.Windows.Forms
+Imports System.Drawing
+```
+
+with the set above.
+
+---
+
+## Fix 2: donâ€™t use `Threading.Thread.Sleep(750)` fully-qualified without import
+This line is not wrong:
+
+```vbnet
+Threading.Thread.Sleep(750)
+```
+
+but Iâ€™d change it to:
+
+```vbnet
+Thread.Sleep(750)
+```
+
+after adding:
+
+```vbnet
+Imports System.Threading
+```
+
+Cleaner and less weird for VB.
+
+---
+
+## Fix 3: explicit typing for readability/safety
+These are not required, but I would make them explicit:
+
+Change:
+
+```vbnet
+Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim found = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+to:
+
+```vbnet
+Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+```
+
+And later:
+
+```vbnet
+Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim updated = entries...
+```
+
+to:
+
+```vbnet
+Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim updated As List(Of LedgerEntry) = entries...
+```
+
+Again, not crash fixes, but safer.
+
+---
+
+## One functional note
+This is not a compile problem, but it matters:
+
+### Current delete behavior:
+You remove **all** matching entries by:
+- customer
+- date
+- check #
+- reference
+- amount
+
+If duplicate identical records exist, this could delete more than one.
+
+If DOS only deletes one exact check instance, we may later want to remove only the first matching record instead of filtering all matches.
+
+But that is a behavior refinement, not the current compiler issue.
+
+---
+
+## Corrected version
+Use this:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found As LedgerEntry = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated As List(Of LedgerEntry) = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+        Thread.Sleep(750)
+    End Sub
+End Class
+```
+
+---
+
+## Conclusion on this file
+- Looks syntactically okay
+- Not likely the compiler crash source
+- Needs cleanup, but not a smoking gun
+
+## Next file
+Send the changed part of **`FormAddChecks.vb`** next â€” especially:
+- `FinishFlow()`
+- `SaveCheckToLedgerCur()` or whatever is there now.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblLine6 As Label
+    Private lblLine7 As Label
+    Private lblLine8 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+    Private enteredDateText As String
+    Private enteredCheckReference As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.SetBounds(24, 80, 920, 28)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.SetBounds(24, 112, 920, 28)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.SetBounds(24, 144, 920, 28)
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.SetBounds(24, 176, 920, 28)
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.SetBounds(24, 208, 920, 28)
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+
+        lblLine6 = New Label()
+        lblLine6.AutoSize = False
+        lblLine6.SetBounds(24, 240, 920, 28)
+        lblLine6.ForeColor = Color.White
+        lblLine6.BackColor = Color.Black
+
+        lblLine7 = New Label()
+        lblLine7.AutoSize = False
+        lblLine7.SetBounds(24, 272, 920, 28)
+        lblLine7.ForeColor = Color.White
+        lblLine7.BackColor = Color.Black
+
+        lblLine8 = New Label()
+        lblLine8.AutoSize = False
+        lblLine8.SetBounds(24, 304, 920, 28)
+        lblLine8.ForeColor = Color.White
+        lblLine8.BackColor = Color.Black
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.SetBounds(24, 372, 920, 28)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 407, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(820, 540, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblLine6)
+        Me.Controls.Add(lblLine7)
+        Me.Controls.Add(lblLine8)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+        lblLine6.Text = ""
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub ShowInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub HideInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub PopulateReviewLines()
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+        lblLine6.Text = "(Q) Quit to Main Menu"
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub PopulateEntrySummaryLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        lblLine8.Text = "Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ? " & enteredDateText
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        ShowInputPrompt("Company Name [Q = Quit] ?")
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        ShowInputPrompt("Check Amount ?")
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        ShowInputPrompt("Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?")
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        ShowInputPrompt("Enter the HIGHEST invoice number to be paid ?")
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+        PopulateReviewLines()
+        HideInputPrompt("")
+    End Sub
+
+    Private Sub ShowCheckNumberPrompt()
+        currentStep = 6
+        ClearLines()
+        PopulateReviewLines()
+        ShowInputPrompt("Check # (Top Right)?")
+    End Sub
+
+    Private Sub ShowDatePrompt()
+        currentStep = 7
+        ClearLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        ShowInputPrompt("Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ?")
+    End Sub
+
+    Private Sub ShowCheckReferencePrompt()
+        currentStep = 8
+        ClearLines()
+        PopulateEntrySummaryLines()
+        ShowInputPrompt("Check Reference (numbers on bottom right of check) ?")
+    End Sub
+
+    Private Sub ShowEverythingCorrectPrompt()
+        currentStep = 9
+        ClearLines()
+        PopulateEntrySummaryLines()
+        lblPrompt.Text = "Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]"
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub FinishFlow()
+        SaveCheckToLedgerCur()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub SaveCheckToLedgerCur()
+        Dim amountValue As Decimal = 0D
+        Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+
+        Dim entry As New LedgerEntry()
+        entry.Customer = enteredCompany
+        entry.DateText = enteredDateText
+        entry.CheckNumber = enteredCheckNumber
+        entry.InvoiceDiffText = "0"
+        entry.Amount = amountValue
+        entry.Reference = enteredCheckReference
+
+        LedgerCurWriter.Append(LegacyDataPaths.LedgerCur, entry)
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If e.KeyCode = Keys.C Then
+                ShowCheckNumberPrompt()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.P Then
+                MessageBox.Show("Print list of invoices is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.Q Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If currentStep = 9 Then
+            If e.KeyCode = Keys.Y Then
+                FinishFlow()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.N Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D1 OrElse e.KeyCode = Keys.NumPad1 Then
+                MessageBox.Show("Discount flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D2 OrElse e.KeyCode = Keys.NumPad2 Then
+                MessageBox.Show("Debit flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            ShowDatePrompt()
+            Return
+        End If
+
+        If currentStep = 7 Then
+            If value = "" Then
+                enteredDateText = DateTime.Now.ToString("MM-dd-yyyy")
+            Else
+                enteredDateText = value
+            End If
+
+            ShowCheckReferencePrompt()
+            Return
+        End If
+
+        If currentStep = 8 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckReference = value
+            ShowEverythingCorrectPrompt()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+This file looks **fine enough structurally**, and I do **not** think it is the compiler-crash source.
+
+## Direct answer
+Your `FormAddChecks.vb` changes are basically okay.
+
+The `SaveCheckToLedgerCur()` method itself looks valid.
+
+---
+
+## What I would fix
+### 1. Change `Option Strict Off` to `Option Strict On`
+You currently have:
+
+```vbnet
+Option Strict Off
+```
+
+Change it to:
+
+```vbnet
+Option Strict On
+```
+
+Since the rest of your newer files are using strict typing, keep this consistent unless thereâ€™s a very specific reason not to.
+
+---
+
+### 2. Add `Imports System.Linq` only if needed
+Right now this file does not need it, so no action there.
+
+---
+
+### 3. Safer amount parse
+This line is okay:
+
+```vbnet
+Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+```
+
+But if users may enter something like `.30`, this is usually okay already. So Iâ€™d leave it unless testing proves otherwise.
+
+---
+
+## Important: this file does not contain attributes either
+That matters because your crash stack is still pointing more toward:
+- attribute binding
+- generated/designer/project metadata
+- or a compiler issue unrelated to these files
+
+So while this file is worth cleaning up, itâ€™s still **not a smoking gun**.
+
+---
+
+## Cleaned version of just the important top part
+Change only this:
+
+```vbnet
+Option Strict Off
+Option Explicit On
+```
+
+to:
+
+```vbnet
+Option Strict On
+Option Explicit On
+```
+
+Everything else can stay for now.
+
+---
+
+## Current status
+So far:
+
+- `LedgerCurWriter.vb` â†’ okay, add `System.Collections.Generic`
+- `FormLedgerView.vb` â†’ okay, not likely crash source
+- `FormDeleteCheck.vb` â†’ okay, minor cleanup
+- `FormAddChecks.vb` â†’ okay, change `Option Strict On`
+
+---
+
+## Most likely remaining culprit
+At this point, the compiler crash is increasingly likely to be in one of these:
+
+1. **`AssemblyInfo.vb`**
+2. **`Application.Designer.vb`**
+3. **another Designer file**
+4. **project metadata / obj/bin corruption**
+5. **Roslyn/.NET SDK 10 issue with VB**
+
+Because the stack trace is specifically about **attribute binding**, and none of the files you sent contain suspicious attributes.
+
+---
+
+## Next thing I need
+Please send:
+
+- **`My Project\AssemblyInfo.vb`**
+
+If you donâ€™t have one, then send:
+- **`My Project\Application.Designer.vb`**
+
+Thatâ€™s the next most likely place to look.
+
+---
+
+## Also do this now
+Before sending the next file, do this cleanup once:
+
+1. close Visual Studio
+2. delete:
+   - `bin`
+   - `obj`
+3. reopen solution
+4. rebuild
+
+If it still crashes, send `AssemblyInfo.vb`.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CompilationOptions.<.ctor>b__121_0()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at System.Lazy`1[[System.Collections.Immutable.ImmutableArray`1[[System.__Canon, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].ViaFactory(System.Threading.LazyThreadSafetyMode)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at System.Lazy`1[[System.Collections.Immutable.ImmutableArray`1[[System.__Canon, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].ExecutionAndPublication(System.LazyHelper, Boolean)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at System.Lazy`1[[System.Collections.Immutable.ImmutableArray`1[[System.__Canon, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]], System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a]].CreateValue()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser.Parse(System.Collections.Generic.IEnumerable`1<System.String>, System.String, System.String, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler..ctor(Microsoft.CodeAnalysis.CommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompiler..ctor(Microsoft.CodeAnalysis.VisualBasic.VisualBasicCommandLineParser, System.String, System.String[], Microsoft.CodeAnalysis.BuildPaths, System.String, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader, Microsoft.CodeAnalysis.GeneratorDriverCache, Roslyn.Utilities.ICommonCompilerFileSystem)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This new stack trace changes the diagnosis.
+
+## Direct answer
+This now looks **much more like an SDK / compiler configuration problem** than a problem in your VB code files.
+
+The key clue is this part:
+
+- `CompilationOptions..ctor`
+- `VisualBasicCommandLineParser.Parse(...)`
+- `CommonCompiler..ctor`
+- `VisualBasicCompiler..ctor`
+
+That means the crash is happening **before normal code compilation**, while Roslyn is parsing compiler options / project settings.
+
+So the likely problem is in one of these:
+
+1. the **project file** (`.vbproj`)
+2. a bad build property in Visual Studio/project settings
+3. a broken analyzer/source generator/reference
+4. the **.NET 10 SDK / VB compiler itself**
+5. stale `obj` metadata generated from previous builds
+
+This is **less likely** to be caused by `FormLedgerView.vb`, `FormDeleteCheck.vb`, etc.
+
+---
+
+## What to do now
+### 1. Send me the `.vbproj` file
+That is now the most important file.
+
+Please paste the full contents of your project file, something like:
+
+```text
+AMiOffice.vbproj
+```
+
+Thatâ€™s where compiler options live.
+
+---
+
+## 2. Very likely culprit: .NET 10 SDK + VB
+I also need to say this plainly:
+
+You are building with:
+
+```text
+C:\Program Files\dotnet\sdk\10.0.300\
+```
+
+VB on newer SDKs can sometimes be rough, especially with older WinForms-style projects.
+
+So this may be caused by:
+- a preview/new SDK issue
+- mismatch between old VB WinForms project style and SDK-style build tooling
+
+---
+
+## 3. Immediate sanity checks
+Please check these in your project properties / `.vbproj`:
+
+- `LangVersion`
+- `AnalysisLevel`
+- `Nullable`
+- `DefineConstants`
+- `NoWarn`
+- `WarningsAsErrors`
+- `Features`
+- custom `<Vbc>` arguments
+- analyzers/package references
+
+A malformed or inherited property can crash command-line parsing.
+
+---
+
+## 4. Try this isolation step
+If you can, run this:
+
+- close Visual Studio
+- delete `bin`
+- delete `obj`
+- reopen
+- **build from command line** if possible:
+  ```powershell
+  dotnet build
+  ```
+
+If command-line build gives the same crash, that strongly confirms project/SDK configuration.
+
+---
+
+## 5. Likely non-code fixes
+Depending on the `.vbproj`, the fix may be one of these:
+
+- remove unsupported compiler option
+- remove malformed `NoWarn` or `WarningsAsErrors`
+- remove bad analyzer reference
+- pin to an earlier SDK via `global.json`
+- build with .NET 8 SDK instead of 10
+- disable problematic source generator/analyzer
+
+---
+
+## Important conclusion
+At this point, I do **not** think the files you pasted are the root cause of this fatal compiler crash.
+
+They may still have normal compile errors later, but this crash is happening **too early** for that.
+
+---
+
+## Next thing to send
+Please paste:
+
+1. **`AMiOffice.vbproj`**
+2. if present, **`global.json`**
+3. if easy, any `Directory.Build.props` or `Directory.Build.targets`
+
+Start with **`AMiOffice.vbproj`**.
+
+## @testsubject117
+
+```
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <!-- Versioning policy:
+         - AssemblyVersion: changes rarely (typically major releases only)
+         - FileVersion: changes every Publish (uses BuildNumber)
+         - InformationalVersion: semver + build metadata -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Ensure BuildNumber is never blank for normal builds -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <!-- Update every Publish -->
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+
+    <!-- What Windows shows as "Product version" -->
+    <ProductVersion>$(Version)</ProductVersion>
+
+    <!-- Human-facing / marketing version -->
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+<PropertyGroup Condition="'$(Configuration)'=='Release'">
+  <DebugType>portable</DebugType>
+  <DebugSymbols>true</DebugSymbols>
+</PropertyGroup>
+
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+  </ItemGroup>
+
+  <Target Name="IncrementBuildCounter" BeforeTargets="Publish">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)'))</BuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(BuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- Convert first line item into a real property -->
+    <PropertyGroup>
+      <BuildNumber>$([System.String]::Copy('%(BuildCounterLines2.Identity)'))</BuildNumber>
+    </PropertyGroup>
+    <Message Text="GenerateBuildInfo: BuildCounterFile=$(BuildCounterFile) BuildNumber=$(BuildNumber)" Importance="high" />
+
+    <!-- Trim + fallback -->
+    <PropertyGroup>
+      <BuildNumber>$([System.String]::Copy('$(BuildNumber)').Trim())</BuildNumber>
+      <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## Copilot
+
+Yes â€” **this project file is the most likely source of the compiler crash**.
+
+## Direct answer
+The biggest suspect is:
+
+```xml
+<TargetFramework>net10.0-windows</TargetFramework>
+```
+
+For a VB WinForms app like this, **.NET 10 SDK / VB compiler is very likely the problem**. Your crash is happening in Roslyn compiler setup, not in your form code.
+
+## What I would change first
+Change:
+
+```xml
+<TargetFramework>net10.0-windows</TargetFramework>
+```
+
+to:
+
+```xml
+<TargetFramework>net8.0-windows</TargetFramework>
+```
+
+That is my **#1 recommendation**.
+
+---
+
+## Why
+Your stack trace shows the crash happening during:
+- compiler option parsing
+- compiler initialization
+
+That strongly suggests:
+- SDK/compiler bug
+- project/SDK incompatibility
+
+And your project is:
+- VB.NET
+- WinForms
+- SDK-style
+- using generated `My Project` files
+- custom build targets
+
+That is exactly the kind of project that can hit rough edges in newer SDKs.
+
+---
+
+## Second likely problem
+This part is also suspicious:
+
+```xml
+<Compile Remove="$(BuildInfoFile)" />
+```
+
+inside the project, and then later:
+
+```xml
+<ItemGroup>
+  <Compile Remove="$(BuildInfoFile)" />
+  <Compile Include="$(BuildInfoFile)" Visible="false" />
+</ItemGroup>
+```
+
+inside a target.
+
+That may be okay, but itâ€™s a bit unusual and can contribute to weird compile item state.
+
+Still, the **first thing to change is the target framework**.
+
+---
+
+# Exact fix to try first
+
+## Replace this line:
+```xml
+<TargetFramework>net10.0-windows</TargetFramework>
+```
+
+## With:
+```xml
+<TargetFramework>net8.0-windows</TargetFramework>
+```
+
+---
+
+# Then do this
+1. save the `.vbproj`
+2. close Visual Studio
+3. delete:
+   - `bin`
+   - `obj`
+4. reopen solution
+5. rebuild
+
+---
+
+## If you want the safest version, use this project file
+You do **not** need to rewrite everything, just make this one change first.
+
+### Minimal change:
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+```
+
+Everything else can remain for the first test.
+
+---
+
+## If it still crashes after switching to net8
+Then the next suspect is your dynamic compile item manipulation here:
+
+```xml
+<Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+```
+
+especially this part:
+
+```xml
+<ItemGroup>
+  <Compile Remove="$(BuildInfoFile)" />
+  <Compile Include="$(BuildInfoFile)" Visible="false" />
+</ItemGroup>
+```
+
+If we need to, I can simplify that next.
+
+But donâ€™t change both things at once unless necessary â€” isolate one variable first.
+
+---
+
+## My recommendation order
+### Try in this order:
+1. switch to **`net8.0-windows`**
+2. clean `bin/obj`
+3. rebuild
+
+### If still broken:
+4. Iâ€™ll simplify the `GenerateBuildInfo` target next
+
+---
+
+## Short answer
+Yes â€” I think the real issue is in the project configuration, and the most likely culprit is **`net10.0-windows`**.  
+Change it to **`net8.0-windows`** first and rebuild.
+
+## @testsubject117
+
+can you just send me the whole file?
+
+## Copilot
+
+Yes â€” hereâ€™s the full `.vbproj` file with the **main fix applied**: target framework changed from **`net10.0-windows`** to **`net8.0-windows`**.
+
+Use this as your full replacement:
+
+```xml name=AMiOffice.vbproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>

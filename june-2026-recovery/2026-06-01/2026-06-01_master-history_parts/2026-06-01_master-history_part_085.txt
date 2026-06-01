@@ -1,0 +1,2000 @@
+﻿
+    $previousFile = Get-ChildItem -Path $previousFolder.FullName -File -Filter "*_master-history.md" -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    return $previousFile
+}
+
+$now = Get-Date
+$today = $now.ToString("yyyy-MM-dd")
+$todayFolder = Join-Path $BasePath $today
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+$historyFile = Join-Path $todayFolder "${today}_master-history.md"
+$previousHistory = Get-LatestPreviousHistoryFile -BasePath $BasePath -Today $today
+
+$todayExports = Get-TodayExportFiles -Paths $ScanPaths
+$latestGroup = Get-LatestExportGroup -Files $todayExports
+$importSource = Get-BestImportSourceFromGroup -GroupFiles $latestGroup -TodayFolder $todayFolder
+
+$latestImportSource = if ($importSource) { $importSource.ImportFile.FullName } else { "None" }
+
+$content = @()
+$content += "# Daily Copilot Running History"
+$content += ""
+$content += "- Date: $($now.ToString('yyyy-MM-dd'))"
+$content += "- Last Updated: $($now.ToString('HH:mm:ss'))"
+$content += "- Latest Import Source: $latestImportSource"
+$content += ""
+
+if ($importSource) {
+    $content += "- Import Source Type: $($importSource.SourceType)"
+    if ($importSource.ContainerFile) {
+        $content += "- Source Archive: $($importSource.ContainerFile.FullName)"
+    }
+    if ($importSource.ExtractPath) {
+        $content += "- Extracted To: $($importSource.ExtractPath)"
+    }
+    $content += ""
+}
+
+$content += "---"
+$content += ""
+
+$content += "## Previous Running History"
+$content += ""
+
+if ($previousHistory) {
+    $content += Get-Content -Path $previousHistory.FullName
+}
+else {
+    $content += "_No previous running history file was found._"
+}
+
+$content += ""
+$content += "---"
+$content += ""
+
+$content += "## Today's Latest Export"
+$content += ""
+
+if ($importSource) {
+    $detectedVersionSource = if ($importSource.ContainerFile) { $importSource.ContainerFile.Name } else { $importSource.ImportFile.Name }
+
+    $content += "- Source File: $($importSource.ImportFile.FullName)"
+    $content += "- Last Write Time: $($importSource.ImportFile.LastWriteTime)"
+    $content += "- File Type: $($importSource.ImportFile.Extension)"
+    $content += "- Detected Version: $(Get-VersionNumber $detectedVersionSource)"
+    $content += ""
+    $content += "===== BEGIN IMPORTED EXPORT ====="
+    $content += ""
+
+    try {
+        $raw = Get-Content -Path $importSource.ImportFile.FullName -Raw -ErrorAction Stop
+        $content += $raw
+    }
+    catch {
+        $content += "[ERROR] Failed to read import file: $($importSource.ImportFile.FullName)"
+        $content += $_.Exception.Message
+    }
+
+    $content += ""
+    $content += "===== END IMPORTED EXPORT ====="
+}
+else {
+    $content += "_No export file for today was found in the scan paths._"
+}
+
+$content += ""
+$content += "---"
+$content += ""
+$content += "## New Notes"
+$content += ""
+$content += "_Add today's notes below._"
+$content += ""
+
+Set-Content -Path $historyFile -Value $content -Encoding UTF8
+
+if (-not $Silent) {
+    Start-Process notepad.exe $historyFile
+}
+
+Write-Host "Updated: $historyFile"
+if ($importSource) {
+    Write-Host "Imported from: $($importSource.ImportFile.FullName)"
+    Write-Host "Import type: $($importSource.SourceType)"
+    if ($importSource.ContainerFile) {
+        Write-Host "Archive source: $($importSource.ContainerFile.FullName)"
+    }
+}
+else {
+    Write-Host "No export found for today."
+}
+```
+
+---
+
+## 3) `Sync-ChatHistoryToRepo.ps1`
+
+This is the one I updated to also create split `.txt` chunks for all `.md` files copied into the repo folder.
+
+```powershell name=Sync-ChatHistoryToRepo.ps1
+param(
+    [switch]$Silent
+)
+
+$DailyBasePath = "H:\AM\DailyConversations"
+$RepoPath = "E:\Co-Pilot-Chat-History"
+$BranchName = "upload-chat-history"
+$ChunkLineCount = 2000
+
+function Split-TextFileIntoParts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputRoot,
+
+        [int]$LinesPerPart = 2000
+    )
+
+    if (-not (Test-Path $SourceFile)) {
+        return
+    }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($SourceFile)
+    $partsFolder = Join-Path $OutputRoot ($baseName + "_parts")
+
+    New-Item -ItemType Directory -Path $partsFolder -Force | Out-Null
+
+    Get-ChildItem -Path $partsFolder -File -Filter "${baseName}_part_*.txt" -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    $chunk = New-Object System.Collections.Generic.List[string]
+    $partNumber = 1
+
+    Get-Content -Path $SourceFile | ForEach-Object {
+        $chunk.Add($_)
+
+        if ($chunk.Count -ge $LinesPerPart) {
+            $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+            $chunk | Set-Content -Path $partPath -Encoding UTF8
+            $chunk = New-Object System.Collections.Generic.List[string]
+            $partNumber++
+        }
+    }
+
+    if ($chunk.Count -gt 0) {
+        $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+        $chunk | Set-Content -Path $partPath -Encoding UTF8
+    }
+}
+
+$today = Get-Date -Format "yyyy-MM-dd"
+$monthFolder = (Get-Date).ToString("MMM-yyyy").ToLower()
+$monthFolder = switch -Regex ($monthFolder) {
+    '^jan-' { $monthFolder -replace '^jan', 'january' }
+    '^feb-' { $monthFolder -replace '^feb', 'february' }
+    '^mar-' { $monthFolder -replace '^mar', 'march' }
+    '^apr-' { $monthFolder -replace '^apr', 'april' }
+    '^may-' { $monthFolder -replace '^may', 'may' }
+    '^jun-' { $monthFolder -replace '^jun', 'june' }
+    '^jul-' { $monthFolder -replace '^jul', 'july' }
+    '^aug-' { $monthFolder -replace '^aug', 'august' }
+    '^sep-' { $monthFolder -replace '^sep', 'september' }
+    '^oct-' { $monthFolder -replace '^oct', 'october' }
+    '^nov-' { $monthFolder -replace '^nov', 'november' }
+    '^dec-' { $monthFolder -replace '^dec', 'december' }
+    default { $monthFolder }
+}
+
+$RepoSubfolder = "${monthFolder}-recovery\$today"
+$TodayFolder = Join-Path $DailyBasePath $today
+$RepoTargetFolder = Join-Path $RepoPath $RepoSubfolder
+
+if (-not (Test-Path $TodayFolder)) {
+    Write-Host "Today's source folder not found: $TodayFolder"
+    exit 1
+}
+
+if (-not (Test-Path $RepoPath)) {
+    Write-Host "Repo path not found: $RepoPath"
+    exit 1
+}
+
+Push-Location $RepoPath
+
+try {
+    git checkout $BranchName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to checkout branch $BranchName"
+    }
+
+    git pull origin $BranchName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to pull branch $BranchName"
+    }
+
+    New-Item -ItemType Directory -Path $RepoTargetFolder -Force | Out-Null
+
+    $masterHistory = Join-Path $TodayFolder "${today}_master-history.md"
+    if (Test-Path $masterHistory) {
+        Copy-Item -Path $masterHistory -Destination $RepoTargetFolder -Force
+    }
+
+    $ExtractedRoot = Join-Path $TodayFolder "extracted"
+    if (Test-Path $ExtractedRoot) {
+        $filesToCopy = Get-ChildItem -Path $ExtractedRoot -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object {
+                $_.Extension.ToLower() -in ".md", ".json", ".txt"
+            }
+
+        foreach ($file in $filesToCopy) {
+            Copy-Item -Path $file.FullName -Destination $RepoTargetFolder -Force
+        }
+    }
+
+    $markdownFiles = Get-ChildItem -Path $RepoTargetFolder -File -Filter *.md -ErrorAction SilentlyContinue
+    foreach ($mdFile in $markdownFiles) {
+        Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $RepoTargetFolder -LinesPerPart $ChunkLineCount
+    }
+
+    git add $RepoSubfolder
+
+    $status = git status --porcelain
+    if (-not $status) {
+        Write-Host "No changes to commit."
+        exit 0
+    }
+
+    $commitMessage = "Add chat history files for $today"
+    git commit -m $commitMessage
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git commit failed."
+    }
+
+    git push origin $BranchName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Git push failed."
+    }
+
+    Write-Host "Synced chat history to repo: $RepoSubfolder"
+}
+finally {
+    Pop-Location
+}
+```
+
+---
+
+## What changed
+The only functional enhancement is in `Sync-ChatHistoryToRepo.ps1`:
+
+- every `.md` copied into the repo target folder is also split into:
+  - `<basename>_parts\<basename>_part_001.txt`
+  - `<basename>_parts\<basename>_part_002.txt`
+  - etc.
+
+## Example result
+If today is `2026-05-20`, you may get:
+
+```text
+E:\Co-Pilot-Chat-History\may-2026-recovery\2026-05-20\
+  2026-05-20_master-history.md
+  2026-05-20_master-history_parts\
+    2026-05-20_master-history_part_001.txt
+    2026-05-20_master-history_part_002.txt
+```
+
+---
+
+## Recommended test
+After replacing the scripts, Iâ€™d test manually in this order:
+
+1. run:
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-DailyConversationHistory.ps1"
+```
+
+2. verify todayâ€™s folder exists under:
+```text
+H:\AM\DailyConversations\YYYY-MM-DD
+```
+
+3. then run:
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-ChatHistoryToRepo.ps1"
+```
+
+4. verify in the repo that:
+- original `.md` exists
+- `*_parts` folder exists
+- split `.txt` files exist
+
+---
+
+## One final note
+Your current repo-sync script still copies extracted files **flat into the target date folder**, which means files from different extracted subfolders could overwrite each other if they share names.
+
+I did **not** change that because you asked for a replacement that preserves the current workflow. If you want, next I can give you a **safer v2** that preserves extracted subfolder structure too.
+
+## @testsubject117
+
+no, it's fine as is
+
+## Copilot
+
+Sounds good â€” then these replacements should fit your current workflow without changing its structure.
+
+## What to do now
+1. replace the existing `.ps1` files with the versions above
+2. manually test:
+   - `Sync-DailyConversationHistory.ps1`
+   - then `Sync-ChatHistoryToRepo.ps1`
+3. confirm that todayâ€™s repo folder now contains:
+   - the normal `.md`
+   - and the new `*_parts` folder with split `.txt` files
+
+## What should happen going forward
+Each day, your scheduled flow should continue to:
+- detect/export/import the latest chat files
+- build the daily master history
+- sync it to the repo
+- and now also generate split `.txt` companion files automatically
+
+## Practical expectation
+If all goes well, this should give us much better repo-readable continuity going forward.
+
+If anything fails when you test it, paste:
+- the PowerShell output,
+- and which script you ran,
+and Iâ€™ll help you fix it quickly.
+
+## @testsubject117
+
+Researching WinForms VB.NET application structure and workflows
+
+4m 32s
+
+Setting up environment
+
+Clone repository testsubject117/AmiWinForms
+
+Start 'github-mcp-server' MCP server
+
+Start 'playwright' MCP server
+
+Find files **/*.{vb,bas,frm,cls,md,txt,sln,csproj,vbproj}
+
+Search FormMainMenu|FormLedgerMenu|DosMenuFormBase|FormAddChecks|CompanyInfo|CompanyLookupService|Sub Main|Startup|Application.Run|PRC|Sales Employee|Add Check|check
+
+View repository
+
+Search AMiDataStore|GW-BASIC|BASIC|DOS|DATASTORE|LEDGER|CHECK.INV|REALNAME|PRC
+
+Find files **/*.{BAS,bas,TXT,txt,MD,md,FRM,frm,VB,cls}
+
+View 7 files
+
+AMiOffice/AMiOffice.vbproj
+
+AMiOffice/My Project/Application.Designer.vb
+
+AMiOffice/ApplicationEvents.vb
+
+AMiOffice/FormMainMenu.vb
+
+AMiOffice/DosMenuFormBase.vb
+
+AMiOffice/FormLedgerMenu.vb
+
+AMiOffice/FormSalesEmployeesChecksMenu.vb
+
+View 7 files
+
+AMiOffice/LegacyDataPaths.vb
+
+AMiOffice/AppPaths.vb
+
+AMiOffice/FormAddChecks.vb
+
+AMiOffice/CompanyInfo.vb
+
+AMiOffice/CompanyLookupService.vb
+
+AMiOffice/FormSalesEmployeeCheckWizard.vb
+
+AMiOffice/FormEmpNameEditor.vb
+
+Search 7 times
+
+Sub |Function |Class |Enum |Structure |EMPNAME|Write|Save|Print|MessageBox|TODO|NotYet|PRC|company|check|invoice|ledger
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+Sub |Function |Class |NotYet|ShowDialog|CHECK.INV|LEDGER.CUR|INVOICE.CHK|OTHER.CHK|Load|Save|Write|Export|Delete|Add
+
+View 9 files
+
+AMiOffice/FormSalesEmployeeCheckWizard.vb:1-220
+
+AMiOffice/FormSalesEmployeeCheckWizard.vb:221-460
+
+AMiOffice/FormSalesEmployeeCheckWizard.vb:461-760
+
+AMiOffice/FormLedgerView.vb:1-220
+
+AMiOffice/FormLedgerView.vb:221-420
+
+AMiOffice/FormOtherChecksView.vb
+
+AMiOffice/FormLedgerCompanyTotals.vb
+
+AMiOffice/FormFindByCheckNumber.vb
+
+AMiOffice/FormFindByInvoiceNumber.vb
+
+View 7 files
+
+AMiOffice/LedgerCurReader.vb
+
+AMiOffice/CheckInvReader.vb:1-260
+
+AMiOffice/InvoiceChkReader.vb
+
+AMiOffice/OtherChkReader.vb
+
+AMiOffice/UiFileErrors.vb
+
+AMiOffice/MigrationService.vb
+
+AMiOffice/BackupService.vb
+
+Search 2 times
+
+New FormSalesEmployeeCheckWizard|FormSalesEmployeeCheckWizard|New FormAddChecks|FormAddChecks|CompanyLookupService|CompanyInfo
+
+NotYet\(|ShowDialog\(|MessageBox\.Show\(|TODO|stub|placeholder
+
+Search AMiDataStore|AMi Office|Main Menu|Sales Employee's checks|Add Checks to ledger|View Checks|Delete Checks|OTHER Checks|Cash Receipts|GW-BASIC|BASIC
+
+Find files
+
+**/*AMiDataStore*
+
+**/*.{bas,BAS,frm,FRM,txt,TXT,md,MD}
+
+View 2 files
+
+AMiOffice/FormLedgerDoesntBalance.vb:1-220
+
+AMiOffice/FormLedgerDoesntBalance.vb:221-560
+
+Search 2 times
+
+^(Partial\s+)?Public Class Form|^Public Class Form
+
+NotYet\("([^"]+)"\)|Case ".*" : NotYet
+
+Search FormAboutNew|FormAbout\(
+
+View 2 files
+
+AMiOffice/FormAboutNew.vb
+
+AMiOffice/FormAbout.vb
+
+Search 2 times
+
+File\.WriteAllText|File\.WriteAllLines|File\.WriteAllBytes|Write#|Save|Delete|CreateDirectory|FileStream\(|OpenOrCreate|AppendAllText
+
+LegacyDataPaths\.|AppPaths\.|\\invoice\\MainMenu\\Data|\\invoice\\word
+
+Search 2 times
+
+SelectedCompany|FindExact\(|FindByPrefix\(|FindByFirstLetter\(|PrcFileName|CompanyCode|CompanyName
+
+DialogResult\s*=\s*DialogResult\.OK|ShowDialog\(Me\)|Using f As New FormSalesEmployeesChecksMenu|Using f As New FormLedgerView|Using f As New FormAddChecks|Using f As New FormSalesEmployeeCheckWizard
+
+View 4 files
+
+AMiOffice/FormMileageTracking.vb:1-140
+
+AMiOffice/FormMileageTracking.vb:492-530
+
+AMiOffice/FormPersonalCalendar.vb:360-420
+
+AMiOffice/FormPersonalCalendar.vb:576-740
+0.9 premium requests Â· GPT-5.4
+This is an analysis request; no code changes are needed.
+
+Bottom line: the port is menu-complete only at the shell level, strong on read-side ledger/check inquiry, light on write-side accounting, and has orphaned groundwork for future add-check workflows. The current checkout appears to contain only the WinForms project, not the original DOS/GW-BASIC source tree, so parity has to be inferred from menu labels, file formats, and DOS/GW-BASIC compatibility comments. /home/runner/work/AmiWinForms/AmiWinForms:1-4, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/InvoiceChkReader.vb:6-15, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CheckInvReader.vb:27-36,182-236
+
+1) Startup flow and overall structure
+The app is a VB WinForms executable targeting net10.0-windows; startup is the VB â€œMyApplicationâ€ path, not a manual Sub Main. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/AMiOffice.vbproj:4-10
+MyApplication.OnCreateMainForm() sets the startup form to FormMainMenu, and ApplicationEvents.vb is effectively empty, so there is no global startup initialization layer beyond the form itself. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/My Project/Application.Designer.vb:25-37, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/ApplicationEvents.vb:26-28
+FormMainMenu.OnLoad() builds the visible main menu, enables KeyPreview, starts the clock, and shows build/version info in the title/header. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:12-42
+The project is centered in AMiOffice/, with forms, legacy readers, backup/migration helpers, and a few new company-lookup/add-check files. /home/runner/work/AmiWinForms/AmiWinForms:1-4
+2) Main menu routing: what actually works
+FormMainMenu builds a DOS-inspired menu surface, but most entries still route to NotYet(...). The only clearly implemented top-level branches are:
+
+C â†’ Checks / cash receipts submenu (FormLedgerMenu)
+I â†’ backup/migration flow
+Z â†’ Personal Calendar
+1 â†’ Mileage Tracking
+? â†’ About
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:62-100,186-249
+Everything else on the main menu is still stubbed with a port-status message, including Invoice Generator, Sales Journal, Log Book, Price List, Rolodex, Product Purchasing, payroll, etc. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:186-249
+
+So overall repository progress is not broad DOS-app parity; it is deepest around a few isolated subsystems.
+
+3) DOS shell behavior and shared base classes
+FormMainMenu
+FormMainMenu is not based on DosMenuFormBase; it has its own menu-building code and resizing logic. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:8-10,62-170
+It still preserves DOS-ish behavior: black buttons, white text, keyboard hotkeys via KeyPress, yellow header text, and a live date/time strip. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:114-140,172-249
+DosMenuFormBase
+This is the reusable DOS-style submenu shell:
+
+builds a black/yellow header, clock, two menu columns, and a bottom (ESC) Close button
+keeps a key-to-action dictionary for menu hotkeys
+provides SetMenuTitle, ClearMenu, AddMenuButton, NotYet
+globally handles ESC to close
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/DosMenuFormBase.vb:37-67,77-120,202-245,270-310
+Forms using the base
+FormLedgerMenu
+FormSalesEmployeesChecksMenu
+FormEmpNameEditor
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:7-8, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeesChecksMenu.vb:8-9, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormEmpNameEditor.vb:12-13
+Important parity observation
+The DOS look-and-feel is preserved mainly in the menu shells. Most inquiry/report forms (FormLedgerView, FormOtherChecksView, FormLedgerCompanyTotals, FormFindByCheckNumber, FormFindByInvoiceNumber, FormLedgerDoesntBalance) are standard WinForms data-grid screens, not DOS shell forms. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerView.vb:7-8,48-181, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormOtherChecksView.vb:6-8,17-56
+
+4) Checks / ledger submenu: implemented vs stubbed
+FormLedgerMenu is the main accounting/checks submenu. It is the strongest DOS-parity area in navigation terms. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:10-36,38-78
+
+Implemented menu items
+3 View Checks â†’ FormLedgerView
+5 View Companys Totals â†’ FormLedgerCompanyTotals
+8 View OTHER Checks â†’ FormOtherChecksView
+9 Find a Check # â†’ FormFindByCheckNumber
+0 Find an Invoice # â†’ FormFindByInvoiceNumber
+A Find Checks that don't balance â†’ FormLedgerDoesntBalance
+S Sales Employee's checks â†’ FormSalesEmployeesChecksMenu
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:45-77
+Still stubbed
+1 Add Checks to ledger & cash receipts
+2 Delete Checks
+6 Add OTHER Checks
+7 Delete OTHER Checks
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:43-44,51-52
+Meaning: the port has progressed substantially on read-side ledger/check inquiry, but the core write-side accounting actions are still missing from the actual routed menu.
+
+5) Legacy file readers/parsers: current state
+These are the main bridge to DOS/GW-BASIC data formats:
+
+LedgerCurReader reads LEDGER.CUR as 6-line grouped records. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/LedgerCurReader.vb:11-79
+CheckInvReader parses CHECK.INV, including GW-BASIC WRITE#-style quoted headers and invoice lists. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CheckInvReader.vb:12-80,114-236
+InvoiceChkReader reads random-access binary INVOICE.CHK records, including MBF float decoding and DOS-era record addressing (FILNUM = InvoiceNumber - 75000). /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/InvoiceChkReader.vb:6-15,19-116
+OtherChkReader reads OTHER.CHK as 6-line grouped records. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/OtherChkReader.vb:11-77
+LegacyDataPaths centralizes UNC-share legacy filenames. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/LegacyDataPaths.vb:7-19
+This part is reasonably mature. The port clearly understands legacy storage formats and has built multiple read-side features on top of them.
+
+6) Read-side ledger/check workflows: status
+A. View Checks (FormLedgerView) â€” implemented, useful
+Reads LEDGER.CUR
+Filters by customer, check number, year, month
+Computes total
+Asynchronously indexes CHECK.INV
+On row selection, looks up matching invoices and reads invoice details from INVOICE.CHK
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerView.vb:32-46,48-181,200-305,307-358
+This is the strongest single inquiry form in the accounting area.
+
+B. View Company Totals (FormLedgerCompanyTotals) â€” implemented
+Reads LEDGER.CUR
+Groups by customer
+Shows customer totals and grand total
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerCompanyTotals.vb:44-82
+C. View OTHER Checks (FormOtherChecksView) â€” implemented
+Reads OTHER.CHK
+Filters by company substring
+Computes total
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormOtherChecksView.vb:17-95
+D. Find by Check / Invoice (FormFindByCheckNumber, FormFindByInvoiceNumber) â€” implemented
+Both load CHECK.INV
+One finds a check and lists invoices
+The other reverse-maps an invoice to the paying check
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormFindByCheckNumber.vb:19-132, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormFindByInvoiceNumber.vb:18-115
+E. Doesn't Balance report (FormLedgerDoesntBalance) â€” implemented and fairly advanced
+Reads LEDGER.CUR
+Builds a CHECK.INV index
+Re-reads INVOICE.CHK amounts
+Flags â€œno mappingâ€ and delta rows
+Supports filtering, highlighting, copy-row, CSV export
+Uses DOS-like tolerance < 1 as okay
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerDoesntBalance.vb:12-17,32-45,217-317,319-549
+Assessment: read-side ledger parity is already meaningful. A user can inspect ledger entries, totals, reverse lookup check/invoice relationships, and audit mismatches.
+
+7) Sales Employee checks: current state
+This area is partial and split across three pieces.
+
+FormSalesEmployeesChecksMenu â€” submenu exists, but incomplete
+A opens EMPNAME.DAT editor
+B is labeled â€œMake a check for an Employee.â€ but only closes the submenu and re-activates the owner
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeesChecksMenu.vb:29-48
+FormEmpNameEditor â€” implemented
+Edits EMPNAME.DAT
+Preserves DOS employee/customer indentation rules
+Normalizes customer lines to a single leading space on save
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormEmpNameEditor.vb:23-46,48-106,136-207,209-223
+FormSalesEmployeeCheckWizard â€” substantial groundwork, but orphaned
+It does real work:
+
+loads/parses EMPNAME.DAT
+steps through employees
+asks for invoice range
+scans INVOICE.CHK
+filters invoices by company-code prefix vs employee customer list
+totals invoices and computes commission
+renders a DOS-ish text report in a textbox
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeeCheckWizard.vb:64-104,173-203,270-399,409-559,564-627
+But it stops at displaying results:
+
+no ledger write
+no check creation
+no print/spool/output integration
+no menu route currently launches it
+So Sales Employee checks are more than a stub, but not a completed production workflow.
+
+8) Add Check groundwork / company lookup / PRC handling
+FormAddChecks.vb â€” present, partial, not integrated
+This newly added form exists and does:
+
+load REALNAME.DAT
+validate a typed company code
+show prefix/first-letter matches
+expose SelectedCompany
+return DialogResult.OK after selection
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAddChecks.vb:37-55,58-149,155-166,187-246
+But it does not:
+
+create a check
+write LEDGER.CUR
+write CHECK.INV
+write INVOICE.CHK
+update cash receipts
+open a .PRC file
+CompanyInfo.vb and CompanyLookupService.vb â€” good lookup primitives
+CompanyInfo is just code / PRC filename / display name. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyInfo.vb:4-8
+CompanyLookupService parses REALNAME.DAT entries like COMPANY.PRC,Company Name, normalizes the code, strips .PRC, and derives PrcFileName = code & ".PRC". /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyLookupService.vb:18-42,50-89,91-140
+PRC handling status
+PRC support is currently name-resolution only:
+
+the lookup service derives PRC filenames
+backup/migration include .PRC files in data movement
+/home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyLookupService.vb:107-140, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/BackupService.vb:45-49, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/MigrationService.vb:19-22
+I found no evidence of actual PRC file parsing/editing/rendering yet.
+
+9) Likely defects / integration gaps
+1. Prompt values are dropped before opening View Checks
+FormLedgerMenu.OpenViewChecksPromptFlow() prompts for customer, check number, and year, but then just opens a plain FormLedgerView() without passing any of them. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:80-93 FormLedgerView has only local controls and no constructor/property path for receiving startup filters. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerView.vb:17-30,32-46
+
+This is exactly the kind of prompt-routing bug you flagged.
+
+2. Sales Employee submenu option B is effectively a dead end
+Button B says â€œMake a check for an Employee.â€ but only closes the submenu. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeesChecksMenu.vb:39-48 The parent FormLedgerMenu simply does f.ShowDialog(Me) and ignores the dialog result. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:73-77
+
+So the visible workflow says â€œmake a check,â€ but no check flow actually starts.
+
+3. Sales wizard status text is inconsistent with shared flag semantics
+FormSalesEmployeeCheckWizard maps flag J to UNpaid, else mostly paid. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeeCheckWizard.vb:451-458 But InvoiceChkReader.FlagDescription says J = Journal, P = Paid, C = Credit, V = Void. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/InvoiceChkReader.vb:127-138
+
+That looks like a likely semantic bug.
+
+4. FormAddChecks uses a hardcoded REALNAME path instead of shared path helpers
+FormAddChecks hardcodes \\invoice\MainMenu\Data\REALNAME.DAT directly. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAddChecks.vb:37-42 Other accounting forms use LegacyDataPaths. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/LegacyDataPaths.vb:11-19
+
+5. DOS report text formatting in sales wizard is rough/incomplete
+The report line is built as ... Invoice #<low>to<high> with no space before to, and the final output only lands in a textbox. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeeCheckWizard.vb:539-556
+
+10) Implemented forms, partial forms, and stubs
+Clearly implemented
+FormMainMenu shell /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:12-42,62-249
+FormLedgerMenu shell /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:10-101
+FormLedgerView /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerView.vb:32-358
+FormLedgerCompanyTotals /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerCompanyTotals.vb:44-82
+FormOtherChecksView /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormOtherChecksView.vb:17-95
+FormFindByCheckNumber /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormFindByCheckNumber.vb:19-132
+FormFindByInvoiceNumber /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormFindByInvoiceNumber.vb:18-115
+FormLedgerDoesntBalance /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerDoesntBalance.vb:32-549
+FormEmpNameEditor /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormEmpNameEditor.vb:23-223
+FormPersonalCalendar and FormMileageTracking are also materially implemented, including real file writes, but they are outside the accounting-check parity track. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormPersonalCalendar.vb:374-403,576-738, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMileageTracking.vb:55-78,492-524
+Partial / groundwork
+FormSalesEmployeesChecksMenu /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeesChecksMenu.vb:29-48
+FormSalesEmployeeCheckWizard /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeeCheckWizard.vb:64-627
+FormAddChecks /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAddChecks.vb:37-246
+CompanyLookupService + CompanyInfo /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyLookupService.vb:18-140, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyInfo.vb:4-8
+Pure stubs
+Main-menu branches still calling NotYet(...) /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormMainMenu.vb:186-249
+Check-submenu add/delete actions /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:43-44,51-52
+FormAboutNew is an empty shell. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAboutNew.vb:1-3
+11) Current parity with the DOS/GW-BASIC accounting app
+Best characterization:
+Read-side parity is moderate; write-side parity is low.
+
+What appears reasonably ported
+legacy file access
+DOS-era data formats
+check/invoice cross-reference browsing
+ledger totals and discrepancy analysis
+employee/customer list editing
+DOS-style menu framing and hotkeys for submenu shells
+What is still missing for real accounting parity
+add checks â†’ ledger + cash receipts
+delete checks
+add/delete OTHER checks
+write/update CHECK.INV
+write/update INVOICE.CHK
+company/PRC workflow beyond name lookup
+end-to-end Sales Employee check creation
+integration between add-check groundwork and menu routes
+12) Best next implementation steps
+Finish the actual CHECKS write path first
+Wire menu item 1 in FormLedgerMenu to a real add-check workflow, likely using FormAddChecks as the first step. Then implement DOS-compatible writers for LEDGER.CUR, CHECK.INV, and any required INVOICE.CHK updates. This is the biggest parity gap. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:43-45, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAddChecks.vb:37-246
+
+Fix routing defects before adding more UI
+Pass prompt values into FormLedgerView, and make Sales Employee option B actually launch the sales wizard or add-check flow. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:80-93, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeesChecksMenu.vb:39-48
+
+Promote the orphaned groundwork into the real workflow
+
+FormAddChecks â†’ company selection / validation step
+CompanyLookupService â†’ code/name/PRC lookup
+FormSalesEmployeeCheckWizard â†’ invoice-selection / commission-calculation step
+These pieces exist; they just are not yet composed into the production path. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormAddChecks.vb:37-246, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyLookupService.vb:18-140, /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormSalesEmployeeCheckWizard.vb:64-627
+Implement PRC read-side next The code already understands PRC filenames conceptually, but not contents. Real PRC parsing/display would likely unblock company-centric DOS workflows. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/CompanyLookupService.vb:107-140
+
+Only after add flows exist, implement delete flows Menu items 2/6/7 are still pure stubs; they should probably come after add/write parity is stable. /home/runner/work/AmiWinForms/AmiWinForms/AMiOffice/FormLedgerMenu.vb:43-52
+
+If you want, I can turn this into a workflow-by-workflow parity matrix next (DOS menu option â†’ current WinForms route â†’ status â†’ missing pieces).
+
+## Copilot
+
+Excellent â€” this gives us the missing WinForms-side deep scan, and it lines up very well with the continuity Iâ€™d already been reconstructing.
+
+## Best combined conclusion now
+
+### Short version
+The project is:
+
+- **strong on read-side ledger/check inquiry**
+- **partial on Sales Employee support**
+- **just beginning Add Check groundwork**
+- **still missing the real write-side accounting pipeline**
+
+That is now the clearest, highest-confidence statement of current status.
+
+---
+
+# Unified project picture
+
+## 1) Startup / shell architecture in VB
+The WinForms app starts through the standard VB application startup path and lands in:
+
+- `FormMainMenu`
+
+From there:
+- top-level DOS-style shell exists
+- keyboard/hotkey feel is intentionally DOS-inspired
+- `DosMenuFormBase` is used for submenu-style forms
+- the DOS look/feel is strongest in the menu shell layer, not in every detailed inquiry form
+
+## 2) What is actually implemented today
+### Strongest implemented area: checks / ledger read-side
+These are materially implemented:
+
+- `FormLedgerView`
+- `FormLedgerCompanyTotals`
+- `FormOtherChecksView`
+- `FormFindByCheckNumber`
+- `FormFindByInvoiceNumber`
+- `FormLedgerDoesntBalance`
+
+And the readers underneath are real and important:
+
+- `LedgerCurReader`
+- `CheckInvReader`
+- `InvoiceChkReader`
+- `OtherChkReader`
+
+This confirms the project is not just a shell. It has substantial DOS-data reading and inquiry behavior.
+
+---
+
+## 3) What is stubbed vs partial
+### Stubbed in the Checks menu
+Still stubbed:
+- Add Checks to ledger & cash receipts
+- Delete Checks
+- Add OTHER Checks
+- Delete OTHER Checks
+
+That is highly significant because those are the **write-side accounting actions**.
+
+### Partial
+#### Sales Employee checks
+- submenu exists
+- EMPNAME editor exists
+- Sales Employee wizard exists and does meaningful analysis
+- but option B does not actually launch a real production flow
+- no check-writing/output integration exists
+
+#### Add Check groundwork
+- `FormAddChecks.vb` exists
+- `CompanyInfo.vb` exists
+- `CompanyLookupService.vb` exists
+- but no real check creation / posting / writer pipeline exists yet
+
+So yes: Add Check has started, but only at groundwork level.
+
+---
+
+## 4) Biggest confirmed defects / integration gaps
+The deep scan confirmed exactly the sort of issues we suspected:
+
+### A. Prompt values are not passed into View Checks
+`FormLedgerMenu.OpenViewChecksPromptFlow()` collects values but then opens `FormLedgerView()` without actually passing those values through.
+
+That is a real routing/integration bug.
+
+### B. Sales Employee option B is effectively dead
+It says:
+- â€œMake a check for an Employee.â€
+
+But it just exits/returns instead of launching the actual wizard or a real check flow.
+
+### C. Semantic inconsistency in invoice flag meaning
+The Sales Employee wizardâ€™s interpretation of invoice flags appears inconsistent with `InvoiceChkReader`.
+
+That could become a real business-logic bug.
+
+### D. `FormAddChecks` hardcodes `REALNAME.DAT`
+Instead of using shared path helpers, it uses a hardcoded path.
+
+That is not fatal, but itâ€™s a design inconsistency and future maintenance problem.
+
+---
+
+## 5) How this fits with the DOS scan
+The DOS scan told us that the real accounting heart is a coordinated update across:
+- `INVOICE.CHK`
+- `LEDGER.CUR`
+- `CHECK.INV`
+- and sometimes `OTHER.CHK`
+
+The WinForms scan now confirms:
+- readers exist for those files
+- inquiry/report UI exists for those files
+- but **writers do not**
+
+That means the exact missing milestone is now unmistakable:
+
+# The main missing parity is a write-side accounting transaction engine
+
+Not another reader.  
+Not another report form.  
+Not just another menu shell.
+
+A real coordinated writer pipeline.
+
+---
+
+## 6) Most accurate current state
+If I had to summarize where the project really is right now in one clean hierarchy:
+
+### Fully or substantially implemented
+- DOS-style main shell/menu framing
+- checks/ledger read-side inquiry
+- legacy file reading/parsing
+- company totals / reverse lookups / balance audits
+- EMPNAME editor
+- some non-accounting modules like Mileage Tracking and Personal Calendar
+
+### Partially implemented
+- Sales Employee check workflow
+- Add Check company lookup groundwork
+- DOS shell/menu routing parity in some areas
+
+### Not yet truly implemented
+- Add Check transaction flow
+- Delete Check flow
+- Add/Delete OTHER checks
+- coordinated write/update of:
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+  - `INVOICE.CHK`
+  - `OTHER.CHK`
+- full PRC operational usage beyond name lookup
+
+---
+
+## 7) Best next implementation steps
+The deep scanâ€™s recommendations are solid, and I agree with them.
+
+### Priority 1: build the actual Add Check write path
+This now looks like the single best next milestone.
+
+That means:
+- wire menu item 1 in `FormLedgerMenu`
+- use `FormAddChecks` as the company-selection / validation starting point
+- implement DOS-compatible write/update logic for:
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+  - `INVOICE.CHK`
+
+### Priority 2: fix routing defects first
+Before or during that:
+- pass prompt values into `FormLedgerView`
+- make Sales Employee option B actually launch the wizard or the intended flow
+
+### Priority 3: decide the role of the Sales Employee wizard
+This is important.
+
+Based on all current evidence, the most likely architectural answer is:
+
+- **Add Check** should be the canonical accounting transaction workflow
+- **Sales Employee wizard** should probably remain a specialized report/support workflow
+
+Unless older notes explicitly show it was intended to become the main check-creation path.
+
+### Priority 4: implement PRC read-side and validation more fully
+The code understands PRC filename concepts, but not real PRC operational behavior yet.
+
+That likely matters for true DOS parity.
+
+### Priority 5: only after add-flow stability, implement delete flows
+Delete flows are important, but they should probably come after Add Check is real and stable.
+
+---
+
+# Final answer to â€œwhere are we now?â€
+Here is the strongest version I can now give:
+
+**The AMiWinForms project is substantially ahead on DOS-style shelling and read-side ledger/check inquiry, has partial Sales Employee and Add Check groundwork, but still lacks the core write-side accounting transaction engine needed for true DOS parity.**
+
+And the best next move is:
+
+**promote Add Check from groundwork into the real writer-backed accounting workflow.**
+
+---
+
+If you want, I can now turn all of this into one of these:
+
+1. a **single authoritative resume note**,  
+2. a **priority roadmap: Now / Next / Later**, or  
+3. a **DOS menu option â†’ WinForms route â†’ status â†’ missing pieces parity matrix**.
+
+## @testsubject117
+
+at the end of the day yes, not now. Right now I want to pickup where we left off and get that checks menu to the point where all buttons are completed and working so we can move on to the next set of buttons on the main menu
+
+## Copilot
+
+Yes â€” that should be the focus now.
+
+## Direct recommendation
+To pick up where you left off and make real progress, the goal should be:
+
+**finish the entire Checks menu first**, especially by completing the currently stubbed write-side actions:
+
+- Add Checks to ledger & cash receipts
+- Delete Checks
+- Add OTHER Checks
+- Delete OTHER Checks
+
+That is the most coherent next milestone before moving on to other main-menu branches.
+
+---
+
+## Why this is the right move
+From everything weâ€™ve reconstructed:
+
+- the Checks menu is already the strongest and most advanced accounting area
+- the read-side functions are largely in place
+- the missing pieces are concentrated there
+- the DOS architecture makes checks/cash receipts one of the most important business cores
+- finishing this menu gives you a complete vertical slice, not just more shell scaffolding
+
+So yes â€” rather than jumping to new main-menu branches, the best move is to **finish the Checks menu end-to-end**.
+
+---
+
+## Recommended order inside the Checks menu
+If the objective is â€œall buttons completed and working,â€ I would do them in this order:
+
+### 1. Fix existing routing/integration defects
+Do these first because they are small and unblock confidence:
+
+- pass prompt values from `FormLedgerMenu` into `FormLedgerView`
+- make Sales Employee option B actually launch the intended wizard/flow
+- normalize any obvious invoice-flag meaning mismatch
+- make `FormAddChecks` use shared path helpers instead of hardcoded path if practical
+
+These are cleanup tasks, but they remove false dead-ends.
+
+---
+
+### 2. Complete **Add Checks to ledger & cash receipts**
+This should be the first major implementation target.
+
+Why first:
+- it is the heart of the DOS customer-receipt flow
+- it creates the write-side pattern you will reuse for other buttons
+- it likely defines the shared accounting transaction engine
+
+This should eventually:
+- validate/select company
+- choose/apply invoices
+- update `INVOICE.CHK`
+- append to `LEDGER.CUR`
+- append to `CHECK.INV`
+- preserve DOS semantics and balancing expectations
+
+---
+
+### 3. Complete **Delete Checks**
+This should come right after Add Check because it is logically the reversal path.
+
+It should:
+- locate the target check
+- remove or rebuild related `LEDGER.CUR` / `CHECK.INV` entries
+- restore invoice flags in `INVOICE.CHK`
+- preserve consistency
+
+This is the natural counterpart to Add Check.
+
+---
+
+### 4. Complete **Add OTHER Checks**
+Once the normal customer check path is real, implement the separate non-invoice check workflow.
+
+This likely centers around:
+- `OTHER.CHK`
+- separate storage rules
+- separate UI path
+- no invoice-linking logic like normal checks
+
+---
+
+### 5. Complete **Delete OTHER Checks**
+This should come last inside the Checks menu because itâ€™s the least foundational once add-flow exists.
+
+---
+
+## Best architecture approach
+The most important thing is to avoid building each button as totally separate one-off code.
+
+### What you really want
+A shared accounting write layer or service set that can handle:
+
+- reading and validating legacy file state
+- invoice selection and status changes
+- writing `LEDGER.CUR`
+- writing `CHECK.INV`
+- writing `OTHER.CHK`
+- rollback / backup / failure safety
+
+Then the menu buttons become UI entry points into that shared logic.
+
+That will make the whole Checks menu much more maintainable.
+
+---
+
+## Practical â€œresume nowâ€ plan
+If I were resuming exactly now, Iâ€™d do this:
+
+### Step 1
+Inspect `FormLedgerMenu.vb` and identify all current button handlers and stubs.
+
+### Step 2
+Fix the prompt-routing bug for View Checks and wire Sales Employee option B properly.
+
+### Step 3
+Decide the flow for **Add Checks to ledger & cash receipts**:
+- whether `FormAddChecks` is the first dialog
+- how invoice selection should happen
+- how write operations should be sequenced
+
+### Step 4
+Implement the write pipeline for Add Check.
+
+### Step 5
+Reuse/adapt that logic for Delete Check.
+
+### Step 6
+Then complete Add/Delete OTHER checks.
+
+---
+
+## Best immediate priority
+If you want the shortest answer:
+
+**The immediate next coding target should be completing â€œAdd Checks to ledger & cash receipts,â€ while also fixing the small routing defects already identified in the Checks menu.**
+
+That is the anchor task for finishing the whole Checks submenu.
+
+---
+
+## Important caution
+If you define success as â€œall buttons are completed and working,â€ be careful not to count a button as â€œdoneâ€ just because:
+- it opens a form
+- it shows a report
+- or it accepts input
+
+For the Checks menu, â€œworkingâ€ should really mean:
+- it performs the DOS-equivalent business operation,
+- updates the correct legacy files,
+- and leaves the legacy data in a consistent state.
+
+---
+
+## My recommendation for the exact working order
+### Now
+- fix menu routing defects
+- complete Add Check
+
+### Next
+- complete Delete Check
+
+### Then
+- complete Add OTHER Check
+- complete Delete OTHER Check
+
+### After that
+- revisit whether Sales Employee is just reporting or should integrate further
+
+---
+
+If you want, the next thing I can do is help you turn this into a **concrete implementation checklist for the Checks menu only**, broken into:
+- quick fixes,
+- Add Check tasks,
+- Delete Check tasks,
+- OTHER check tasks.
+
+## @testsubject117
+
+ok, lets pickup finishing the wiring we were working on
+
+## Copilot
+
+Yes â€” letâ€™s pick up with the wiring first.
+
+## Best immediate target
+Based on everything we recovered, the most likely â€œresume exactly where we left offâ€ wiring task is:
+
+### **finish the Checks-menu wiring that is already partially present**
+Specifically:
+1. **Sales Employee option B**
+2. **View Checks prompt handoff**
+3. then the stubbed Add/Delete check actions
+
+The first two are the cleanest â€œfinish the wiringâ€ tasks before deeper write-side implementation.
+
+---
+
+# What we should wire first
+
+## 1. Sales Employee option B
+This is the clearest unfinished wiring issue.
+
+Right now:
+- `FormSalesEmployeesChecksMenu` exists
+- `FormSalesEmployeeCheckWizard` exists
+- but option **B** does not actually launch the wizard
+
+So the first likely resume point is:
+
+### make menu option B launch `FormSalesEmployeeCheckWizard`
+
+That matches the recovered Friday notes very closely.
+
+---
+
+## 2. View Checks prompt flow
+Right now the Checks menu prompts for filter values, but those values are not actually passed into `FormLedgerView`.
+
+So the second wiring task is:
+
+### pass the entered prompt values into `FormLedgerView`
+
+That is a true wiring/integration fix and probably small enough to finish quickly.
+
+---
+
+# Best order right now
+If we are resuming the wiring work specifically, Iâ€™d do it in this order:
+
+1. wire Sales Employee option B â†’ wizard  
+2. wire prompt values into View Checks  
+3. wire Add Check menu item 1 â†’ `FormAddChecks` entry flow  
+4. leave deeper write logic for the next stage
+
+That keeps us aligned with â€œfinish the wiring we were working on.â€
+
+---
+
+# What I need next
+To help you do this properly, I need to inspect the current code for the relevant forms/files.
+
+Please give me the repo and Iâ€™ll read:
+
+- `AMiOffice/FormSalesEmployeesChecksMenu.vb`
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/FormLedgerView.vb`
+- `AMiOffice/FormAddChecks.vb`
+
+Since we already know the repo is:
+
+- `testsubject117/AmiWinForms`
+
+I can work from that.
+
+## My immediate recommendation
+Let me inspect those files and Iâ€™ll tell you the exact code changes needed to resume the wiring cleanly.
+
+## @testsubject117
+
+that's incorrect. in the dos app, option b when chosen, drops back to the checks menu. both a and b are working on that menu in the vb app.
+
+## Copilot
+
+Got it â€” then thatâ€™s an important correction.
+
+## Direct correction
+Youâ€™re right:
+
+- **Sales Employee option B is not supposed to launch the wizard**
+- in the DOS app, choosing **B** drops back to the Checks menu
+- so if the VB app already does that, then **A and B are already behaving correctly**
+
+So I should **not** treat option B as an unwired defect anymore.
+
+That means the earlier reconstruction from the recovered notes was incomplete or slightly misleading on that specific point, and your clarification overrides it.
+
+---
+
+## Updated understanding
+For the **Sales Employee checks** submenu:
+
+- **A** = working
+- **B** = working, if it returns/backs out to the Checks menu just like DOS
+
+So the â€œfinish the wiringâ€ work we should resume is **not** on that submenu item.
+
+---
+
+## What that implies
+The real unfinished wiring is more likely elsewhere in the Checks area, especially things like:
+
+- **View Checks prompt flow**
+- **Add Checks to ledger & cash receipts**
+- **Delete Checks**
+- **Add OTHER Checks**
+- **Delete OTHER Checks**
+
+And possibly wiring of forms that exist but are not yet connected into the actual intended workflow.
+
+---
+
+## Most likely current wiring target
+Given your correction, the next likely â€œfinish the wiringâ€ focus is:
+
+### 1. `FormLedgerMenu`
+especially:
+- menu option 1
+- menu option 2
+- menu option 6
+- menu option 7
+- and possibly prompt-to-form handoff for option 3
+
+### 2. `FormAddChecks`
+if it exists but is not yet reachable from the menu
+
+### 3. View Checks filter handoff
+if prompts are collected but not passed into `FormLedgerView`
+
+---
+
+## Best next move
+To resume accurately, I should inspect the relevant current files and identify exactly what is wired and what is not.
+
+The key files are still:
+
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/FormLedgerView.vb`
+- `AMiOffice/FormAddChecks.vb`
+- possibly `AMiOffice/FormOtherChecksView.vb`
+
+---
+
+## Updated working assumption
+Until we inspect the code directly, my best current assumption is:
+
+- Sales Employee submenu behavior is already correct
+- the unfinished wiring is likely the **Checks menu main actions**, not the Sales Employee submenu
+
+If you want, I can now help you reconstruct the **most likely exact next wiring target in the Checks menu** from the recovered context and repo behavior.
+
+## @testsubject117
+
+ok, one of the things I wanted to mention yesterday, and I think I already did mention it, was that some of the choices on the checks menu work as they should, but look too much like windows. Right now I clicked view checks and the window that popped up is grey and doesn't match the dos look and feel: 
+
+## Copilot
+
+Yes â€” thatâ€™s a real issue, and the screenshot makes it clear.
+
+## Direct answer
+The problem is **not just whether View Checks works**.  
+Itâ€™s that the prompt flow is currently using a **standard Windows dialog**, which breaks the DOS-style experience youâ€™ve been preserving elsewhere.
+
+So if weâ€™re resuming the wiring/finishing work on the Checks menu, one immediate task should be:
+
+### replace the grey Windows-style prompt with a DOS-style in-app prompt flow
+
+---
+
+## What the screenshot tells us
+From the image:
+
+- the **Checks menu shell** looks close to the intended DOS-like style
+  - black background
+  - yellow header
+  - black buttons
+  - white text
+- but the popup prompt is a **default Windows dialog**
+  - grey form
+  - normal textbox
+  - Windows buttons
+  - standard title bar
+
+That creates a visual break in the middle of an otherwise DOS-styled flow.
+
+---
+
+## Why this matters
+You already said some Checks menu choices:
+- **work functionally**
+- but **look too much like Windows**
+
+That means we should treat this as a parity/usability issue, not just a cosmetic nitpick.
+
+For this menu, DOS fidelity includes:
+- the shell
+- the prompts
+- the transitions
+- and the detailed screens
+
+So yes, this is something we should fix.
+
+---
+
+## Best interpretation
+This likely means:
+- `FormLedgerMenu` is using either:
+  - an `InputBox`
+  - a standard modal form
+  - or some simple Windows prompt helper
+- instead of using a custom DOS-styled prompt form
+
+---
+
+## Best next move
+For the Checks menu, Iâ€™d now refine the immediate goal to:
+
+### **finish the DOS-style wiring and presentation of the Checks menu**
+not just the business logic.
+
+That means:
+1. preserve correct DOS behavior
+2. preserve DOS look-and-feel during prompts
+3. then finish any remaining missing button flows
+
+---
+
+## Recommended immediate task
+The first concrete thing I would tackle from your screenshot is:
+
+### create or use a DOS-style prompt dialog for View Checks
+It should match the existing menu shell visually:
+- black/dark background
+- yellow/white DOS-like text
+- keyboard-first usage
+- Enter/Esc behavior
+- no grey stock Windows popup styling
+
+---
+
+## Likely follow-up
+Once that is fixed, we should inspect other Checks-menu flows for the same issue:
+- View Company Totals
+- View OTHER Checks
+- Find by Check #
+- Find by Invoice #
+- Doesnâ€™t Balance
+- maybe Add/Delete flows later
+
+Because if one uses stock Windows prompts, others may too.
+
+---
+
+## Important clarification
+Given your correction about Sales Employee option B, the likely â€œpickup pointâ€ is now less about that submenu and more about:
+
+- **DOS-style prompt fidelity**
+- **View Checks flow**
+- and then broader Checks-menu completion
+
+That fits your screenshot very well.
+
+---
+
+## Best next action
+If you want to resume from this exact issue, the right target is:
+
+### **replace the View Checks grey Windows prompt with a DOS-style prompt that matches the Checks menu**
+
+If you want, I can next help you define exactly what that DOS-style prompt should look like and how it should behave before you change code.
+
+## @testsubject117
+
+lets start from the top on the checks menu, (1) works, (2) works, but (3) looks odd, let's fix it, then move to the next button (5)
+
+## Copilot
+
+Yes â€” thatâ€™s the right approach.
+
+## Plan
+Weâ€™ll go **top-down through the Checks menu**:
+
+- `(1)` works
+- `(2)` works
+- `(3)` works but **looks wrong**
+- so we fix **(3) View Checks** first
+- then move to **(5)**
+
+Thatâ€™s a clean, practical way to proceed.
+
+---
+
+## What â€œfix (3)â€ appears to mean
+From your screenshot, the problem with **(3) View Checks** is primarily:
+
+### the prompt UI breaks the DOS look-and-feel
+The Checks menu itself is DOS-like, but the prompt popup is standard Windows grey.
+
+So for button **(3)**, the likely goal is:
+
+- keep the existing functionality
+- but make the prompt and/or resulting screen visually consistent with the DOS-style app
+
+---
+
+## Most likely things to fix for `(3) View Checks`
+Based on what we know, there are probably **two separate issues**:
+
+### A. Prompt appearance issue
+The current customer-name prompt is a stock Windows dialog.
+
+### B. Possible prompt wiring issue
+Earlier repo analysis suggested prompt values may not actually be passed through cleanly into `FormLedgerView`.
+
+Since you said `(3)` works, that may mean:
+- functionality is mostly there,
+- but visual presentation is wrong,
+- and possibly the prompt flow still needs cleanup.
+
+So we should treat `(3)` as:
+- **first a UI parity fix**
+- then verify behavior
+
+---
+
+## Best next task definition
+### For button `(3) View Checks`
+We should:
+
+1. identify where the prompt dialog is being created
+2. replace that stock prompt with a DOS-style/custom prompt
+3. verify that entered values are actually used by `FormLedgerView`
+4. make sure the opened form also feels visually aligned enough with the rest of the Checks menu
+
+---
+
+## Then after `(3)`
+We move to:
+### `(5) View Company Totals`
+
+And review it with the same standard:
+- does it function?
+- does it match DOS look-and-feel?
+- does it need prompt cleanup or styling cleanup?
+
+---
+
+## Best immediate next step
+To fix `(3)` correctly, I need to inspect the relevant code path:
+
+- `FormLedgerMenu.vb`
+- `FormLedgerView.vb`
+- and any helper used for the current popup prompt
+
+## What I expect to find
+Probably one of:
+- `Interaction.InputBox`
+- a small standard modal form
+- or a custom prompt helper that still uses Windows default styling
+
+---
+
+## Direct recommendation
+Letâ€™s now focus specifically on:
+
+### **Checks menu option (3): View Checks**
+Goal:
+- preserve current behavior
+- replace odd/Windows-looking prompt behavior
+- make it match the DOS-style app flow better
+
+If you want, next I can help you work out the exact desired behavior for `(3)` before code changes:
+- what prompts should appear
+- in what order
+- and what DOS-style appearance they should have.
+
+## @testsubject117
+
+THIS IS WHAT HAPPENS IN THE DOS APP WHEN (3) IS CHOSEN: 
+
+## Copilot
+
+Perfect â€” that screenshot clarifies exactly what needs to change.
+
+## Direct answer
+For **Checks menu option (3) View Checks**, the VB app should **not** open a separate grey Windows prompt dialog at all.
+
+It should behave like the DOS app:
+
+- stay on the **same Checks screen**
+- show the prompt inline at the bottom:
+  - `Enter customer name [Enter = all customers] ?`
+- accept input right there in the DOS-style surface
+- then continue from there
+
+So the problem is bigger than â€œmake the popup darker.â€  
+The real fix is:
+
+# **remove the popup-style prompt flow and replace it with an inline DOS-style prompt inside the Checks menu form**
+
+---
+
+## What the DOS screenshot proves
+In DOS, when `(3)` is chosen:
+
+- the menu remains visible
+- no modal dialog appears
+- the prompt is rendered directly on the screen
+- input happens in-context
+- the whole interaction stays in one continuous DOS visual mode
+
+That means the current VB behavior is structurally wrong for DOS fidelity.
+
+---
+
+## What we should change
+### Current VB behavior
+- choose `(3)`
+- separate Windows-style dialog appears
+- visual flow is interrupted
+
+### Desired VB behavior
+- choose `(3)`
+- Checks menu remains on screen
+- prompt appears inline on the Checks form
+- user types in a DOS-style input line
+- Enter submits
+- Esc cancels / returns to idle menu state
+
+---
+
+## Best interpretation of the task
+So for button `(3)`, the right fix is **not**:
+
+- recolor the popup
+- or lightly restyle a modal prompt
+
+The right fix is:
+
+### **build an inline prompt mode inside `FormLedgerMenu` / `DosMenuFormBase`**
+
+---
+
+## Why this is the right foundation
+This is likely reusable for other menu options too.
+
+If you implement inline DOS-style prompt handling once, you can reuse it for:
+- `(3) View Checks`
+- `(5) View Company Totals` if needed
+- `(8) View OTHER Checks`
+- `(9)` / `(0)` find prompts
+- other DOS-like menu interactions later
+
+So this is probably the right architectural move, not just a one-off patch.
+
+---
+
+## Best immediate design
+For `(3)` specifically, the Checks menu should gain something like:
+
+- a prompt label near the bottom of the form
+- an inline textbox or custom input line styled to blend into the DOS screen
+- hidden by default
+- shown when `(3)` is selected
+- Enter confirms
+- Esc cancels
+- then launch the next step using the typed value
+
+### Visually
+It should look as close as possible to:
+- black background
+- DOS-style white prompt text
+- no grey panel
+- no standard dialog chrome
+- the prompt integrated into the existing form
+
+---
+
+## Recommended behavior for `(3)`
+### On selecting `(3)`
+Show inline prompt:
+
+`Enter customer name [Enter = all customers] ?`
+
+### User actions
+- **Enter with blank input** â†’ all customers
+- **Enter with text** â†’ use text filter
+- **Esc** â†’ cancel and return to menu
+- likely keep keyboard-only flow
+
+---
+
+## Strong recommendation
+For this fix, I would not try to â€œimprove the popup.â€
+I would:
+
+### **replace the popup flow entirely**
+
+because the DOS screenshot shows clearly that the interaction belongs inside the menu screen itself.
+
+---
+
+## Updated top-down plan
+### Checks menu
+- `(1)` works
+- `(2)` works
+- `(3)` = replace popup with inline DOS-style prompt
+- then move to `(5)`
+
+That now feels exactly aligned with your stated approach.
+
+---
+
+## Best next step
+Before any code, the target behavior for `(3)` is now clear enough:
+
+### **same-form inline prompt, not modal dialog**
+
+If you want, next I can help you define the exact VB behavior in detail for `(3)`:
+- where the prompt should appear,
+- whether it should reuse a generic prompt area,
+- and how Enter/Esc should behave,
+so the implementation stays DOS-faithful and reusable.
+
+## @testsubject117
+
+ok, what do you need from me in order to review the code and change it
+
+## Copilot
+
+Please give me the repo and the specific files. Iâ€™ll review them and tell you the exact edits.
+
+## What I need
+Since this is code in GitHub, the fastest path is for you to provide the repo explicitly:
+
+- `testsubject117/AmiWinForms`
+
+And for this task, I need to inspect these files first:
+
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/DosMenuFormBase.vb`
+- `AMiOffice/FormLedgerView.vb`
+
+Possibly also:
+- any custom prompt/helper form if one exists
+
+## Best way to proceed
+If you want me to actually make the change in the repo, then explicitly ask me to create a PR in:
+
+- `testsubject117/AmiWinForms`
+
+If you just want me to review the code and tell you what to change, I can do that too.
+
+## Since you asked what I need
+### Option A â€” review only
+Just say:
+- â€œReview `testsubject117/AmiWinForms` and tell me what to change for button (3).â€
+
+### Option B â€” make the change
+Just say:
+- â€œCreate a PR in `testsubject117/AmiWinForms` to replace the popup prompt for Checks menu option (3) with an inline DOS-style prompt.â€
+
+If you want me to proceed now, the cleanest instruction is:
+
+**Create a PR in `testsubject117/AmiWinForms` to make Checks menu option (3) use an inline DOS-style prompt instead of a Windows popup.**
+
+Then I can take it from there.
+
+## @testsubject117
+
+Option A â€” review only
+Just say:
+
+â€œReview testsubject117/AmiWinForms and tell me what to change for button (3).â€
+
+## Copilot
+
+Change button **(3)** by replacing the modal prompt with an inline prompt area on `FormLedgerMenu`, and pass the collected values into `FormLedgerView`. Right now the odd look comes from the nested `FormLedgerPrompt` dialog at lines 95â€“152, which is a normal Windows form, not a DOS-style in-form prompt. Also, the values you collect in `OpenViewChecksPromptFlow()` are currently discarded before opening the ledger view. îˆ€citeîˆ‚turn0fetch0îˆ
+
+## What is wrong now
+
+In `FormLedgerMenu.vb`, option `(3)` calls `OpenViewChecksPromptFlow()`. That method asks 3 questions with `ShowPromptDialog(...)`, which opens `FormLedgerPrompt`, a stock grey modal dialog with a `TextBox` and OK/Cancel buttons. That is exactly what your screenshot shows and why it feels wrong compared to DOS. Then, after collecting `cust`, `chk`, and `yr`, it opens `New FormLedgerView()` without using any of them. îˆ€citeîˆ‚turn0fetch0îˆ‚turn0fetch2îˆ
+
+The DOS screenshot shows the correct behavior: the menu stays on-screen and the prompt appears inline at the bottom. So the right fix is not â€œrestyle the popupâ€; it is â€œremove the popup flow for this menu path.â€ îˆ€citeîˆ‚turn0fetch0îˆ
+
+## What to change for button (3)
+
+### 1. Remove the modal prompt flow from `FormLedgerMenu`
+Delete or stop using:
+
+```vb name=AMiOffice/FormLedgerMenu.vb url=https://github.com/testsubject117/AmiWinForms/blob/cb8271fe1d8e3f3e52b5f279dc027bcc97fe513f/AMiOffice/FormLedgerMenu.vb#L95-L152
+Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+...
+End Function
+
+Private NotInheritable Class FormLedgerPrompt
+...
+End Class
+```
+
+That code is the Windows-looking interruption. îˆ€citeîˆ‚turn0fetch0îˆ
+
+### 2. Add an inline prompt area to `FormLedgerMenu`
+Keep the menu visible and add, near the bottom of the form:
+- a prompt label
+- a single-line textbox
+- optional state tracking for which prompt step is active
+
+You can do this either:
+- directly in `FormLedgerMenu`, or
+- more cleanly, as reusable support in `DosMenuFormBase`.
+
+For just button `(3)`, the fastest path is to do it in `FormLedgerMenu`. `DosMenuFormBase` currently only supports menu buttons and ESC handling; it has no built-in prompt region yet. îˆ€citeîˆ‚turn0fetch1îˆ
+
+### 3. Implement a 3-step inline prompt sequence
+When `(3)` is chosen:
+1. show inline prompt: `Enter customer name [Enter = all customers] ?`
+2. on Enter, store value and prompt: `Enter Check Number [Enter = All Checks] ?`
+3. on Enter, store value and prompt: `Enter Year [Enter = All Years] ?`
+4. on final Enter, open `FormLedgerView` with those values
+
+On Esc during prompt mode:
+- cancel prompt mode
+- return to normal Checks menu state
+
+That matches the DOS interaction much more closely than a modal dialog. The base class already has global ESC handling, so youâ€™ll need to intercept/override that while prompt mode is active. îˆ€citeîˆ‚turn0fetch1îˆ
+
+### 4. Add startup filter support to `FormLedgerView`
+Right now `FormLedgerView` has no constructor or properties for startup filters. It only reads from its own controls on load. Add public properties like:
+- `InitialCustomerFilter As String`
+- `InitialCheckFilter As String`
+- `InitialYearFilter As String`
+
+Then in `OnLoad`, after `BuildUi()` and `PopulatePicklists()`, prefill:
+- `txtCustomer.Text`
+- `txtCheck.Text`
+- `cmbYear.SelectedItem`
+
+Then let `LoadData()` + `ApplyFilters()` run normally. That makes button `(3)` not only look right, but also actually honor the entered values. îˆ€citeîˆ‚turn0fetch2îˆ‚turn0fetch0îˆ
+
+---
+
+## Suggested implementation shape
+
+### In `FormLedgerMenu.vb`
+Add fields like:
+- `_promptPanel`
+- `_promptLabel`
+- `_promptTextBox`
+- `_promptMode`
+- `_viewChecksCustomer`
+- `_viewChecksCheck`
+- `_viewChecksYear`
+- `_viewChecksStep`
+
+Then:
+- change button `(3)` to call something like `BeginViewChecksPromptFlow()`
+- show the inline prompt controls
+- capture Enter/Esc in prompt mode
+- finish by opening `FormLedgerView` with initial values
+
+### In `FormLedgerView.vb`
+Add:
+
+```vb name=AMiOffice/FormLedgerView.vb
+Public Property InitialCustomerFilter As String = ""
+Public Property InitialCheckFilter As String = ""
+Public Property InitialYearFilter As String = ""
+```
+
+Then in `OnLoad` after UI setup:
+
+```vb name=AMiOffice/FormLedgerView.vb
+txtCustomer.Text = InitialCustomerFilter.Trim()
+txtCheck.Text = InitialCheckFilter.Trim()
+
+If Not String.IsNullOrWhiteSpace(InitialYearFilter) Then
+    Dim yearText = InitialYearFilter.Trim()
+    If cmbYear.Items.Contains(yearText) Then
+        cmbYear.SelectedItem = yearText
+    End If
+End If
+```
+
+Because `ApplyFilters()` already uses those controls, you donâ€™t need a separate filtering path. îˆ€citeîˆ‚turn0fetch2îˆ
+
+---
+
+## Practical styling guidance for the inline prompt
+
+To match the DOS screen better:
+- prompt background: same dark/black area as the menu
+- prompt text: white
+- input textbox:
+  - black background
+  - white or yellow text
+  - fixed border or none
+- use a monospaced or DOS-feeling font if available
+- place it above the bottom bar, left-aligned, not centered
+
+`DosMenuFormBase` currently builds:
+- black header
+- dark gray body
+- bottom close bar
+
+So place the prompt in the body area near the bottom, not in a popup. îˆ€citeîˆ‚turn0fetch1îˆ
+
+---
+
+## Minimal review conclusion
+
+For button `(3)`, you should change **two things**:
+
+1. **UI flow**: replace `FormLedgerPrompt` modal popup with an inline prompt area on `FormLedgerMenu`. îˆ€citeîˆ‚turn0fetch0îˆ‚turn0fetch1îˆ  
+2. **Data flow**: pass the entered customer/check/year values into `FormLedgerView` through startup properties and prefill its filter controls. îˆ€citeîˆ‚turn0fetch0îˆ‚turn0fetch2îˆ
+
+If you want, next I can give you the exact code edits file-by-file for `FormLedgerMenu.vb` and `FormLedgerView.vb`.
+
+## @testsubject117
+
+please generate the entire file replacement code for each file
+
+## Copilot
+
+Yes â€” here are the **full replacement files** for button **(3) View Checks**.
+
+This version does two things:
+
+1. removes the grey modal popup prompt  
+2. replaces it with an **inline DOS-style prompt flow** on the Checks menu itself
+
+It also passes the entered values into `FormLedgerView`, so the prompt actually affects the opened screen.
+
+---
+
+# Replace `AMiOffice/FormLedgerMenu.vb`
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+ï»¿Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Private Enum ViewChecksPromptStep
+        None = 0
+        Customer = 1
+        CheckNumber = 2
+        Year = 3
+    End Enum
+
+    Private ReadOnly pnlPromptHost As New Panel()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtPrompt As New TextBox()
+
+    Private _viewChecksPromptStep As ViewChecksPromptStep = ViewChecksPromptStep.None
+    Private _viewChecksCustomer As String = ""
+    Private _viewChecksCheckNumber As String = ""
+    Private _viewChecksYear As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+        BuildInlinePromptUi()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
