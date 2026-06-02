@@ -1,0 +1,2000 @@
+﻿- a filterable browse form
+
+Itâ€™s supposed to be:
+- batch calculation
+- DOS-style progress/loading phase
+- paged text output
+- Enter-to-continue navigation
+
+So yes, if VB is currently wired differently, then item `(5)` also needs a **flow correction**, not just color changes.
+
+---
+
+# My recommendation
+## Treat item (5) the same way we treated item (8):
+1. match DOS behavior first
+2. then match DOS appearance
+
+---
+
+# What I think the VB version should become
+For `(5) View Company Totals`, a DOS-faithful WinForms version should probably have:
+
+## Phase 1: loading screen
+- black background
+- monospace text
+- display:
+  - `LOADING ENTRY # n`
+- iterate through all records while computing totals by company
+
+## Phase 2: paged output
+- show one page of totals at a time in a read-only monospaced area
+- display:
+  - a page of company totals
+  - `Hit [ENTER]` at top and bottom
+- Enter advances to next page
+- Esc exits
+- maybe Backspace or Up/Down later, but DOS fidelity says Enter is the key behavior
+
+---
+
+# What I need next
+To tell you exactly how item `(5)` is wired now, I need the current VB file(s) for it.
+
+Please send the current VB screenshots in your next message as you said, **and then the code** for the item `(5)` form.
+
+Most likely relevant files are something like:
+- `FormCompanyTotals.vb`
+- `FormViewCompanyTotals.vb`
+- or similar
+
+If youâ€™re unsure which file it is, send:
+1. the screenshot of the current VB form
+2. the file/class name you think opens for item `(5)`
+
+Then I can help identify the right code target fast.
+
+---
+
+# Preliminary design recommendation
+Assuming we rewrite it, Iâ€™d likely implement it with:
+- one form
+- one read-only multiline text area
+- a loading phase
+- then paginated output with page index state
+
+That will feel much closer to DOS than a grid.
+
+---
+
+# Short answer
+Youâ€™re right again:
+**(5) View Company Totals is a DOS-style paged report flow, not a modern Windows browse screen.**
+
+Send the current VB screenshots next, then the code, and weâ€™ll map the mismatch exactly.
+
+## @testsubject117
+
+here's what hitting (5) does in the vb app: 
+
+## Copilot
+
+Yes â€” this confirms it clearly.
+
+## Direct answer
+The current VB implementation of **(5) View Company Totals** is **not DOS-like in either flow or presentation**.
+
+Right now it is:
+- instant summary
+- grid of customer totals
+- close button
+- standard Windows report form
+
+But DOS is:
+- loading/counting phase first
+- text-only output
+- one page at a time
+- `Hit [ENTER]` paging
+
+So item **(5)** needs the same kind of rework item **(8)** needed.
+
+---
+
+# Exact mismatch
+## Current VB screen
+What it does now:
+- opens `Ledger - Company Totals`
+- shows `Grand total` and customer count immediately
+- uses `DataGridView`
+- allows visual scrolling
+- standard form/button layout
+
+## DOS behavior
+What it should do:
+1. show loading message:
+   - `LOADING ENTRY # n`
+2. compute all company totals
+3. display one text page at a time
+4. top and bottom prompt:
+   - `Hit [ENTER]`
+5. Enter advances to next page
+6. repeat until end
+
+So this is not just a â€œthemeâ€ issue. Itâ€™s a **report-sequencing issue**.
+
+---
+
+# Recommendation
+## Yes, this one should be rewritten to match DOS flow.
+
+I would not spend time restyling that grid.  
+The grid is the wrong UX for this item.
+
+---
+
+# What the replacement should probably look like
+A DOS-style `FormCompanyTotalsView` or equivalent:
+
+## Phase 1
+Black form with monospaced text:
+```text
+LOADING ENTRY # 7856
+```
+
+## Phase 2
+Paged output like:
+```text
+                         Hit [ENTER]
+
+CBSFASTE $-160161.56
+MAGNAAIR $ -79522.76
+...
+CALIFORN $   -224.88
+
+                         Hit [ENTER]
+```
+
+---
+
+# What I need next
+Please paste the code for the VB form that currently produces this window.
+
+The likely file name is something like:
+- `FormLedgerCompanyTotals.vb`
+- `FormCompanyTotals.vb`
+- `FormViewCompanyTotals.vb`
+
+If youâ€™re unsure, paste the file whose window title is:
+- `Ledger - Company Totals`
+
+Thatâ€™s almost certainly the one we need to replace.
+
+---
+
+# What I expect in that file
+Probably something like:
+- load ledger/check entries
+- group by customer/company
+- bind results to `DataGridView`
+- show total label
+
+Weâ€™ll keep the **aggregation logic**, but replace the **grid UI** with:
+- loading message
+- paginated DOS report display
+- Enter-to-continue
+
+---
+
+# Short version
+Yes â€” `(5)` is another one that is **wired wrong for DOS**, not just styled wrong.
+
+Send me the code for the current Company Totals form and Iâ€™ll help convert it the same way we did item `(8)`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerCompanyTotals
+
+    Private Const ScreenTitle As String = "Company Totals"
+
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblGrandTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New()
+        InitializeComponent()
+
+        Text = "Ledger - Company Totals"
+        Width = 900
+        Height = 700
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 40}
+        lblGrandTotal.AutoSize = True
+        lblGrandTotal.Padding = New Padding(10, 10, 0, 0)
+        top.Controls.Add(lblGrandTotal)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+
+        btnClose.Text = "Close"
+        btnClose.Dock = DockStyle.Bottom
+        btnClose.Height = 40
+        AddHandler btnClose.Click, Sub() Close()
+
+        Controls.Add(dgv)
+        Controls.Add(btnClose)
+        Controls.Add(top)
+    End Sub
+
+    Protected Overrides Sub OnShown(e As EventArgs)
+        MyBase.OnShown(e)
+
+        Dim path = LegacyDataPaths.LedgerCur
+
+        ' Clear view first so we never display stale totals if load fails.
+        dgv.DataSource = Nothing
+        lblGrandTotal.Text = "Grand total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            lblGrandTotal.Text = "LEDGER.CUR was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            Dim entries = LedgerCurReader.ReadAll(path)
+
+            Dim totals =
+                entries.
+                GroupBy(Function(x) (If(x.Customer, "")).Trim()).
+                Select(Function(g) New With {
+                    .Customer = g.Key,
+                    .Total = g.Sum(Function(x) x.Amount),
+                    .Count = g.Count()
+                }).
+                OrderBy(Function(x) x.Customer).
+                ToList()
+
+            dgv.DataSource = totals
+
+            Dim grand = totals.Sum(Function(x) x.Total)
+            lblGrandTotal.Text = $"Grand total: {grand:C}   (Customers: {totals.Count})"
+        Catch ex As Exception
+            dgv.DataSource = Nothing
+            lblGrandTotal.Text = "Unable to read LEDGER.CUR from: " & path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this confirms exactly what we expected.
+
+## Direct answer
+`FormLedgerCompanyTotals.vb` is currently a **group-and-show-grid summary form**.  
+To match DOS, it should be changed into a **loading + paged text report** form.
+
+So yes: this file should be rewritten similarly to how we rewrote item `(8)`.
+
+---
+
+# What the current file does
+It currently:
+- reads `LEDGER.CUR`
+- groups by customer
+- computes totals + count
+- sorts by customer
+- binds to `DataGridView`
+- shows grand total label
+- gives a Close button
+
+That is perfectly reasonable WinForms behavior â€” but it is **not DOS behavior**.
+
+---
+
+# What DOS appears to do
+From your screenshots, item `(5)` behaves like this:
+
+1. read/process all ledger entries
+2. show progress:
+   - `LOADING ENTRY # n`
+3. aggregate totals by company
+4. paginate the results
+5. show one page at a time
+6. top and bottom say:
+   - `Hit [ENTER]`
+7. Enter advances page-by-page until the end
+
+So the aggregation logic is useful, but the UI/flow needs to change.
+
+---
+
+# Recommendation
+## Replace the grid form with a DOS-style paginated report form.
+
+Keep:
+- file path usage
+- file existence handling
+- read logic
+- grouping logic
+
+Replace:
+- `DataGridView`
+- top summary label
+- close button
+- instant whole-report view
+
+---
+
+# Full replacement for `FormLedgerCompanyTotals.vb`
+
+```vb name=FormLedgerCompanyTotals.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormLedgerCompanyTotals
+
+    Private Const ScreenTitle As String = "Company Totals"
+    Private Const LinesPerPage As Integer = 20
+
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _pages As New List(Of String)()
+    Private _currentPageIndex As Integer = -1
+
+    Public Sub New()
+        InitializeComponent()
+        BuildScreen()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Ledger - Company Totals"
+        Width = 900
+        Height = 700
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Dock = DockStyle.Fill
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 12.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(txtOutput)
+    End Sub
+
+    Protected Overrides Sub OnShown(e As EventArgs)
+        MyBase.OnShown(e)
+        LoadAndBuildPages()
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Enter Then
+            ShowNextPage()
+            Return True
+        End If
+
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub LoadAndBuildPages()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        txtOutput.Clear()
+        _pages = New List(Of String)()
+        _currentPageIndex = -1
+
+        If Not System.IO.File.Exists(path) Then
+            txtOutput.Text = "LEDGER.CUR was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            Dim entries = LedgerCurReader.ReadAll(path)
+            ShowLoadingProgress(entries.Count)
+
+            Dim totals =
+                entries.
+                Select(Function(x, index) New With {
+                    .Index = index,
+                    .Customer = (If(x.Customer, "")).Trim(),
+                    .Amount = x.Amount
+                }).
+                GroupBy(Function(x) x.Customer).
+                Select(Function(g) New With {
+                    .Customer = g.Key,
+                    .Total = g.Sum(Function(x) x.Amount),
+                    .Count = g.Count()
+                }).
+                OrderBy(Function(x) x.Customer).
+                ToList()
+
+            BuildPages(totals)
+            ShowNextPage()
+        Catch ex As Exception
+            txtOutput.Text = "Unable to read LEDGER.CUR from: " & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ShowLoadingProgress(entryCount As Integer)
+        If entryCount <= 0 Then Return
+
+        For i As Integer = 1 To entryCount
+            txtOutput.Text = "LOADING ENTRY # " & i.ToString()
+            txtOutput.Refresh()
+            Application.DoEvents()
+        Next
+    End Sub
+
+    Private Sub BuildPages(totals As List(Of Object))
+        _pages.Clear()
+
+        Dim currentLines As New List(Of String)()
+
+        For i As Integer = 0 To totals.Count - 1
+            Dim item = totals(i)
+            Dim itemType = item.GetType()
+
+            Dim customer As String = CStr(itemType.GetProperty("Customer").GetValue(item, Nothing))
+            Dim total As Decimal = CDec(itemType.GetProperty("Total").GetValue(item, Nothing))
+
+            currentLines.Add(FormatCompanyTotalLine(customer, total))
+
+            If currentLines.Count >= LinesPerPage Then
+                _pages.Add(BuildPageText(currentLines, False))
+                currentLines = New List(Of String)()
+            End If
+        Next
+
+        If currentLines.Count > 0 Then
+            _pages.Add(BuildPageText(currentLines, True))
+        End If
+
+        If _pages.Count = 0 Then
+            _pages.Add(BuildPageText(New List(Of String) From {"No company totals found."}, True))
+        End If
+    End Sub
+
+    Private Function BuildPageText(lines As List(Of String), isLastPage As Boolean) As String
+        Dim sb As New StringBuilder()
+
+        sb.AppendLine(Space(35) & "Hit [ENTER]")
+        sb.AppendLine()
+
+        For Each line In lines
+            sb.AppendLine(line)
+        Next
+
+        sb.AppendLine()
+        sb.AppendLine(Space(35) & If(isLastPage, "End of List [ESC = Exit]", "Hit [ENTER]"))
+
+        Return sb.ToString()
+    End Function
+
+    Private Function FormatCompanyTotalLine(customer As String, total As Decimal) As String
+        Dim namePart As String = If(customer, "").Trim().ToUpperInvariant()
+        If namePart.Length > 9 Then
+            namePart = namePart.Substring(0, 9)
+        End If
+
+        namePart = namePart.PadRight(9)
+
+        Dim amountPart As String = total.ToString("0.00")
+        If total >= 0 Then
+            amountPart = " " & amountPart
+        End If
+
+        Return $"{namePart} $ {amountPart,12}"
+    End Function
+
+    Private Sub ShowNextPage()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then Return
+
+        If _currentPageIndex >= _pages.Count - 1 Then
+            Close()
+            Return
+        End If
+
+        _currentPageIndex += 1
+        txtOutput.Text = _pages(_currentPageIndex)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+End Class
+```
+
+---
+
+# What this changes
+## Behavior
+- no grid
+- no Close button
+- shows loading progress
+- builds totals
+- displays paged text output
+- Enter advances page
+- Esc exits
+- Enter on last page closes
+
+## Look
+- black background
+- monospaced text
+- DOS-like page display
+- `Hit [ENTER]` prompt at top and bottom
+
+---
+
+# One thing I want to improve next
+The above version uses `List(Of Object)` in `BuildPages`, which works, but Iâ€™d prefer making it strongly typed and cleaner.
+
+So if you want the cleaner version, I can give you a polished second pass with:
+- a small private totals class
+- cleaner formatting
+- better page footer behavior
+
+I kept this version straightforward so you can test it fast.
+
+---
+
+# Expected differences from DOS
+These may need tuning after you run it:
+
+- exact page length
+- exact company-name truncation width
+- exact amount alignment
+- whether final page should close on Enter or only Esc
+- whether loading progress should update every entry or every N entries for performance
+
+---
+
+# My recommendation
+Use this now as the first DOS-style conversion for item `(5)`, test it, then weâ€™ll tighten the formatting to match the screenshots more exactly.
+
+If you want, I can immediately give you the **cleaner strongly-typed version** before you paste it in.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC36756	'List(Of <anonymous type: Customer As String, Total As Decimal, Count As Integer>)' cannot be converted to 'List(Of Object)'. Consider using 'IEnumerable(Of Object)' instead.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerCompanyTotals.vb	99	
+Warning (active)	BC42025	Access of shared member, constant member, enum member or nested type through an instance; qualifying expression will not be evaluated.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Application.Designer.vb	31	
+
+
+## Copilot
+
+Good catch. The warning is unrelated; the real issue is the anonymous-type list.
+
+## Direct fix
+Yes â€” letâ€™s clean that up properly.
+
+Instead of passing a `List(Of <anonymous type>)` into `BuildPages(List(Of Object))`, define a small private class for the totals.
+
+---
+
+# Replace your `FormLedgerCompanyTotals.vb` with this corrected version
+
+```vb name=FormLedgerCompanyTotals.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormLedgerCompanyTotals
+
+    Private Const ScreenTitle As String = "Company Totals"
+    Private Const LinesPerPage As Integer = 20
+
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _pages As New List(Of String)()
+    Private _currentPageIndex As Integer = -1
+
+    Private NotInheritable Class CompanyTotalLine
+        Public Property Customer As String
+        Public Property Total As Decimal
+        Public Property Count As Integer
+    End Class
+
+    Public Sub New()
+        InitializeComponent()
+        BuildScreen()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Ledger - Company Totals"
+        Width = 900
+        Height = 700
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Dock = DockStyle.Fill
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 12.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(txtOutput)
+    End Sub
+
+    Protected Overrides Sub OnShown(e As EventArgs)
+        MyBase.OnShown(e)
+        LoadAndBuildPages()
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Enter Then
+            ShowNextPage()
+            Return True
+        End If
+
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub LoadAndBuildPages()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        txtOutput.Clear()
+        _pages = New List(Of String)()
+        _currentPageIndex = -1
+
+        If Not System.IO.File.Exists(path) Then
+            txtOutput.Text = "LEDGER.CUR was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            Dim entries = LedgerCurReader.ReadAll(path)
+            ShowLoadingProgress(entries.Count)
+
+            Dim totals As List(Of CompanyTotalLine) =
+                entries.
+                GroupBy(Function(x) (If(x.Customer, "")).Trim()).
+                Select(Function(g) New CompanyTotalLine With {
+                    .Customer = g.Key,
+                    .Total = g.Sum(Function(x) x.Amount),
+                    .Count = g.Count()
+                }).
+                OrderBy(Function(x) x.Customer).
+                ToList()
+
+            BuildPages(totals)
+            ShowNextPage()
+        Catch ex As Exception
+            txtOutput.Text = "Unable to read LEDGER.CUR from: " & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ShowLoadingProgress(entryCount As Integer)
+        If entryCount <= 0 Then Return
+
+        For i As Integer = 1 To entryCount
+            txtOutput.Text = "LOADING ENTRY # " & i.ToString()
+            txtOutput.Refresh()
+            Application.DoEvents()
+        Next
+    End Sub
+
+    Private Sub BuildPages(totals As List(Of CompanyTotalLine))
+        _pages.Clear()
+
+        Dim currentLines As New List(Of String)()
+
+        For Each item In totals
+            currentLines.Add(FormatCompanyTotalLine(item.Customer, item.Total))
+
+            If currentLines.Count >= LinesPerPage Then
+                _pages.Add(BuildPageText(currentLines, False))
+                currentLines = New List(Of String)()
+            End If
+        Next
+
+        If currentLines.Count > 0 Then
+            _pages.Add(BuildPageText(currentLines, True))
+        End If
+
+        If _pages.Count = 0 Then
+            _pages.Add(BuildPageText(New List(Of String) From {"No company totals found."}, True))
+        End If
+    End Sub
+
+    Private Function BuildPageText(lines As List(Of String), isLastPage As Boolean) As String
+        Dim sb As New StringBuilder()
+
+        sb.AppendLine(Space(35) & "Hit [ENTER]")
+        sb.AppendLine()
+
+        For Each line In lines
+            sb.AppendLine(line)
+        Next
+
+        sb.AppendLine()
+        sb.AppendLine(Space(35) & If(isLastPage, "End of List [ESC = Exit]", "Hit [ENTER]"))
+
+        Return sb.ToString()
+    End Function
+
+    Private Function FormatCompanyTotalLine(customer As String, total As Decimal) As String
+        Dim namePart As String = If(customer, "").Trim().ToUpperInvariant()
+        If namePart.Length > 9 Then
+            namePart = namePart.Substring(0, 9)
+        End If
+
+        namePart = namePart.PadRight(9)
+
+        Dim amountPart As String = total.ToString("0.00")
+        If total >= 0D Then
+            amountPart = " " & amountPart
+        End If
+
+        Return $"{namePart} $ {amountPart,12}"
+    End Function
+
+    Private Sub ShowNextPage()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then Return
+
+        If _currentPageIndex >= _pages.Count - 1 Then
+            Close()
+            Return
+        End If
+
+        _currentPageIndex += 1
+        txtOutput.Text = _pages(_currentPageIndex)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+End Class
+```
+
+---
+
+# What changed
+The important change is this:
+
+## Added private typed class
+```vb
+Private NotInheritable Class CompanyTotalLine
+    Public Property Customer As String
+    Public Property Total As Decimal
+    Public Property Count As Integer
+End Class
+```
+
+## Changed totals creation to:
+```vb
+Dim totals As List(Of CompanyTotalLine) = ...
+```
+
+## Changed `BuildPages` signature to:
+```vb
+Private Sub BuildPages(totals As List(Of CompanyTotalLine))
+```
+
+That removes the anonymous-type conversion problem cleanly.
+
+---
+
+# About the warning
+## `BC42025` in `My Project\Application.Designer.vb`
+Still ignore that for now unless it starts causing a real problem.  
+Itâ€™s not the blocker here.
+
+---
+
+# Next
+Rebuild and run item `(5)`.
+
+Then tell me:
+- does it compile
+- does loading show
+- do pages advance with Enter
+- does the formatting feel close enough to DOS
+
+If needed, I can then help you tune:
+- number of lines per page
+- company width
+- amount alignment
+- exact placement of `Hit [ENTER]`
+
+## @testsubject117
+
+```
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	MSB4018	The "CreateAppHost" task failed unexpectedly.
+System.UnauthorizedAccessException: Access to the path 'C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Debug\net10.0-windows\AMiOffice.dll' is denied.
+   at System.IO.__Error.WinIOError(Int32 errorCode, String maybeFullPath)
+   at System.IO.FileStream.Init(String path, FileMode mode, FileAccess access, Int32 rights, Boolean useRights, FileShare share, Int32 bufferSize, FileOptions options, SECURITY_ATTRIBUTES secAttrs, String msgPath, Boolean bFromProxy, Boolean useLongPath, Boolean checkHost)
+   at System.IO.FileStream..ctor(String path, FileMode mode, FileAccess access, FileShare share)
+   at Microsoft.NET.HostModel.ResourceUpdater.AddResourcesFromPEImage(String peFile)
+   at Microsoft.NET.HostModel.AppHost.HostWriter.<>c__DisplayClass8_0.<CreateAppHost>b__1()
+   at Microsoft.NET.HostModel.RetryUtil.RetryOnIOError(Action func)
+   at Microsoft.NET.HostModel.AppHost.HostWriter.CreateAppHost(String appHostSourceFilePath, String appHostDestinationFilePath, String appBinaryFilePath, Boolean windowsGraphicalUserInterface, String assemblyToCopyResourcesFrom, Boolean enableMacOSCodeSign, Boolean disableCetCompat, DotNetSearchOptions dotNetSearchOptions)
+   at Microsoft.NET.Build.Tasks.CreateAppHost.ExecuteCore()
+   at Microsoft.NET.Build.Tasks.TaskBase.Execute()
+   at Microsoft.Build.BackEnd.TaskExecutionHost.Execute()
+   at Microsoft.Build.BackEnd.TaskBuilder.<ExecuteInstantiatedTask>d__26.MoveNext()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.Sdk.targets	850	
+
+```
+
+## Copilot
+
+This is **not a code error**. Itâ€™s a **file-lock/build-output access** problem.
+
+## Direct answer
+The build is failing because Visual Studio / the running app / another process still has this file locked:
+
+```text
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Debug\net10.0-windows\AMiOffice.dll
+```
+
+The key part is:
+
+> `UnauthorizedAccessException: Access to the path ... AMiOffice.dll is denied`
+
+and it happens during `CreateAppHost`, which usually means the build is trying to overwrite output files while they are still in use.
+
+---
+
+# What to do right now
+Do these in order:
+
+## 1. stop the app if it is still running
+If your program is open, close it completely.
+
+Also close any launched test windows.
+
+---
+
+## 2. stop debugging in Visual Studio
+Make sure debugging is fully stopped:
+- click **Stop Debugging**
+- or press `Shift+F5`
+
+---
+
+## 3. close any Explorer window preview / external process touching output
+Sometimes:
+- Explorer preview
+- antivirus
+- indexing
+- terminal running from output folder
+- another launched EXE instance
+
+can hold files open.
+
+---
+
+## 4. delete `bin` and `obj`
+From the project folder, delete:
+
+- `bin`
+- `obj`
+
+Especially:
+```text
+AMiOffice\bin
+AMiOffice\obj
+```
+
+Then rebuild.
+
+---
+
+## 5. if deletion fails, close Visual Studio and try again
+If Windows says files are still in use:
+
+- close Visual Studio
+- open Task Manager
+- kill any `AMiOffice.exe`
+- kill any lingering `dotnet.exe` related to the build if needed
+- then delete `bin` and `obj`
+- reopen solution
+- rebuild
+
+---
+
+# Why this happens
+This usually occurs when one of these is true:
+
+- the app is still running from a prior debug session
+- a previous crash left the file locked
+- Visual Studio design-time build is stuck
+- antivirus temporarily locked the file
+- output file is read-only or permissions got weird
+
+But in your case, the most likely cause is simply:
+**the app or build artifacts are still in use.**
+
+---
+
+# Fastest recovery sequence
+If you want the shortest path:
+
+1. close app
+2. stop debugging
+3. close Visual Studio
+4. delete `bin` and `obj`
+5. reopen solution
+6. build again
+
+---
+
+# Important note
+This error does **not** mean the `FormLedgerCompanyTotals` code is wrong.  
+It means the compiler/build pipeline couldnâ€™t overwrite the output file.
+
+---
+
+# If it still happens after clean/delete
+Then weâ€™d check:
+- file attributes/read-only
+- antivirus interference
+- whether a published copy is running from same folder
+- whether Windows permissions got stuck on that file
+
+But usually `bin/obj` cleanup fixes it.
+
+---
+
+# Short version
+You hit a **locked build output file**, not a coding failure.
+
+Do:
+- stop app
+- close VS
+- delete `bin` and `obj`
+- rebuild
+
+If you want, after you retry, paste whether `(5)` now runs and what the DOS-style page looks like.
+
+## @testsubject117
+
+ok, I'm running into errors that say the amioffice.dll was not found, however I also had a popup from bitdefender that said it found a virus "Amioffice.dll" was quarantined. I restored it. Closed visual basic, deleted bin but when I try to delete obj I get a message that says: you'll need to provide administrator permission to delete this folder, then if I click continue, it says: you need permission to perform this action, and it doesn't let me delete.
+
+## Copilot
+
+This is now a **Windows permissions / antivirus quarantine** problem, not a VB code problem.
+
+## Direct recommendation
+Do **not** keep fighting the current `obj` folder in place.
+
+The safest next move is:
+
+1. make sure Bitdefender stops quarantining the build output
+2. get the repo out of the stuck-permissions state
+3. rebuild from a clean folder if needed
+
+---
+
+# What likely happened
+Bitdefender quarantined `AMiOffice.dll`, and that can leave behind:
+
+- locked files
+- broken permissions on `obj`
+- build artifacts owned by elevated/system processes
+- partial build output state
+
+Thatâ€™s why:
+- `dll not found`
+- `obj` cannot be deleted
+- build output is unstable
+
+---
+
+# Do this in this order
+
+## 1. Add an antivirus exclusion first
+Before rebuilding again, make Bitdefender stop eating your build output.
+
+Exclude at least:
+- your project folder:
+  ```text
+  C:\Users\CapnKirk\source\repos\AmiWinForms\
+  ```
+or at minimum:
+- the specific solution/project folder
+- `bin`
+- `obj`
+
+If you donâ€™t do this first, the next rebuild may just get quarantined again.
+
+---
+
+## 2. Restart Windows
+Because youâ€™ve got:
+- quarantined/restored DLL
+- undeletable `obj`
+- permission weirdness
+
+a restart is the cleanest way to release any lingering file handles.
+
+After restart:
+- do **not** open the app yet
+- confirm Bitdefender exclusion is in place
+- then try again
+
+---
+
+## 3. Try deleting `obj` again after restart
+Delete:
+- `bin`
+- `obj`
+
+If `obj` still refuses, try deleting it from an elevated terminal.
+
+### Open Command Prompt as Administrator and run:
+```bat
+cd /d C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice
+rmdir /s /q obj
+```
+
+If that still fails, run:
+
+```bat
+takeown /f obj /r /d y
+icacls obj /grant %username%:F /t
+rmdir /s /q obj
+```
+
+---
+
+# If that still fails
+Then donâ€™t waste time fighting the folder.
+
+## Use the practical workaround:
+Create a fresh working copy of the repo folder.
+
+For example:
+- copy `AmiWinForms` to something like:
+  ```text
+  C:\Users\CapnKirk\source\repos\AmiWinForms_clean\
+  ```
+
+Then open the solution from the copied folder and build there.
+
+This often bypasses corrupted permissions in `obj` entirely.
+
+---
+
+# Why this is safe
+Your source code is what matters.  
+`bin` and `obj` are disposable generated folders.
+
+If one of them gets poisoned by AV/permissions, moving to a fresh folder is often faster than repairing it.
+
+---
+
+# Best path in your situation
+## I recommend this exact plan:
+
+### First
+- add Bitdefender exclusion for the repo/build folders
+
+### Then
+- restart Windows
+
+### Then
+try:
+- delete `obj`
+
+### If still blocked
+- use Admin Command Prompt with:
+```bat
+takeown /f obj /r /d y
+icacls obj /grant %username%:F /t
+rmdir /s /q obj
+```
+
+### If still blocked after that
+- copy the project to a fresh folder
+- open the copy
+- rebuild there
+
+---
+
+# One more important point
+Because Bitdefender flagged your built DLL, this may keep recurring until excluded.
+
+So the antivirus exclusion is not optional if you want stable local builds.
+
+---
+
+# Short version
+Your code is probably fine.  
+Your current problem is:
+
+- antivirus quarantined the build output
+- `obj` permissions/file ownership got messed up
+
+## Do this:
+1. exclude project folder in Bitdefender
+2. restart
+3. delete `obj` from admin cmd
+4. if needed, work from a fresh copied folder
+
+If you want, I can give you the exact Command Prompt commands step-by-step for your exact paths.
+
+## @testsubject117
+
+ok, I was able to delete obj after restart and adding the repo folder as a bitdefender exception. I opened VB, rebuilt and ran the app. and it's working fine.
+
+## Copilot
+
+Great â€” that means the code was fine and the blocker really was the antivirus/permissions mess.
+
+## Direct answer
+Yes, youâ€™re back in a good state.
+
+For item **(5)**, if:
+- it builds
+- it opens
+- it shows the loading phase
+- it pages with Enter
+- it feels close to DOS
+
+then youâ€™re in the same place as item `(8)`:
+**functionally corrected and ready either to accept or lightly polish.**
+
+---
+
+# What just got resolved
+You cleared:
+- quarantined build output
+- locked/missing DLL issue
+- corrupted `obj` state
+- rebuild failure unrelated to code
+
+Thatâ€™s important, because now any feedback on `(5)` is actually about the form itself, not environment noise.
+
+---
+
+# My recommendation right now
+Run item **(5) View Company Totals** and evaluate only these:
+
+## behavior
+- does it show `LOADING ENTRY # ...`
+- does Enter advance page-by-page
+- does Esc exit
+- does the last page behave acceptably
+
+## visual fidelity
+- black background
+- monospace text
+- `Hit [ENTER]` placement
+- enough rows per page
+- company/amount alignment close to DOS
+
+---
+
+# Decision point
+If it feels good enough, Iâ€™d mark `(5)` done for now.
+
+If not, the most likely remaining tweaks would be:
+- lines per page
+- spacing/alignment
+- exact prompt placement
+- whether last page should say `Hit [ENTER]` or only `End of List [ESC = Exit]`
+
+Those are polish items, not structural rewrites.
+
+---
+
+# My honest view
+Youâ€™ve been making the right call on these screens:
+- item `(8)` needed flow correction, not just theme changes
+- item `(5)` also needed flow correction, not just theme changes
+
+So now the checks menu is being brought into DOS alignment the right way.
+
+---
+
+# Next
+If you want, the best next move is:
+
+1. tell me whether `(5)` now looks/behaves close enough to DOS, or  
+2. send the next checks-menu item that still doesnâ€™t match DOS.
+
+If you send a screenshot of the new VB `(5)` screen, I can tell you immediately whether Iâ€™d call it done or tweak it.
+
+## @testsubject117
+
+beautiful, it looks exactly like dos. it loads the lists of totals with hit enter at top and bottom. I have to hit enter 45 times to scroll all the way through then it returns to the checks menu, beautiful, nice work.
+
+## Copilot
+
+Excellent â€” then yes, **item (5) is done**.
+
+## Direct answer
+You now have:
+- DOS-style loading behavior
+- DOS-style paged totals
+- Enter-to-advance
+- return to Checks menu at the end
+
+That is exactly the kind of correction these screens needed.
+
+---
+
+# My assessment
+This one sounds fully successful:
+- behavior matches DOS
+- look matches DOS
+- pagination feels right
+- end-of-list return behavior works
+
+So I would absolutely mark **(5) View Company Totals** as complete.
+
+---
+
+# Where you are now
+Youâ€™ve now successfully corrected at least:
+
+- **(5) View Company Totals**
+- **(8) View Other Checks**
+
+And importantly, you corrected them by matching:
+- **workflow**
+- **screen presentation**
+- **keyboard flow**
+
+â€”not just colors.
+
+Thatâ€™s the right standard.
+
+---
+
+# Recommendation
+## Yes, move on to the next Checks menu item that still does not match DOS.
+
+If you want, send the next one exactly the same way:
+1. what DOS does
+2. what VB does
+3. screenshots if useful
+4. current `.vb` file
+
+And weâ€™ll keep knocking them down one at a time.
+
+## @testsubject117
+
+ok, now (9) Find a Check #. sending how dos looks vs how the vb app currently looks: when I hit (9) this is what pops up: 
+
+## Copilot
+
+Yes â€” this current VB screen is clearly **not** DOS-like yet.
+
+## Direct answer
+For **(9) Find a Check #**, the current VB form looks like:
+- a Windows search dialog
+- textbox + Find + Refresh buttons
+- blank white result area
+- status text
+
+So just from this screenshot, it is almost certainly another case where:
+- **presentation is wrong**
+- and possibly **workflow is wrong too**
+
+---
+
+# What I need next
+I only have the current VB screenshot so far.  
+To compare properly, I still need the DOS side for item `(9)`.
+
+Please send:
+
+1. the DOS screenshot(s) for `(9) Find a Check #`
+2. then the current VB file for this screen
+
+Most likely something like:
+- `FormFindCheckNumber.vb`
+- `FormFindByCheckNumber.vb`
+- or similar
+
+---
+
+# Why I need the DOS screenshot
+For these menu items, the important part is not just visual style â€” itâ€™s the actual flow.
+
+For example, DOS might do one of these:
+- prompt for check number and immediately show one record
+- prompt and show multiple matches
+- page through results
+- show loading status first
+- allow ESC to quit
+- use Enter-only navigation
+
+Until I see DOS, I donâ€™t want to guess wrong.
+
+---
+
+# What I can already say
+## The current VB version is definitely too Windows-like because it has:
+- standard title-bar utility form feel
+- normal buttons
+- white background
+- empty modern result pane
+- no DOS prompt framing
+
+So this one is almost certainly another candidate for:
+- prompt-driven DOS UI
+- black background
+- monospace text
+- keyboard-first interaction
+- text report output instead of a typical dialog layout
+
+---
+
+# Best next step
+Send the DOS screenshot(s) for `(9)` and then the `.vb` file behind this screen.
+
+Then Iâ€™ll tell you whether item `(9)` needs:
+- just a DOS-style rewrite of the UI, or
+- a full flow correction like `(5)` and `(8)` needed.
+
+If you want, send the code right after the DOS screenshot.
+
+## @testsubject117
+
+ok, here are the dos screenshots. here's what I've noticed. upon clicking (9) on the menu, immediately pops up a field at the bottom of the checks window (like we did previously) that says <<<  Find the invoices that a check payed for  >>> Enter Part of All of check number [Enter = All Check] [Q = Quit]. I typed in 7777 (my fake psibeari check) and hit enter. I got a brief please wait, then it loaded the first check it encountered for THEBYRAN check # 77776 for $675.00 and below that it says hit enter to look for another check [ESC = Quit]. I hit enter and it went to the next customer and check #. if I keep hitting enter, the very last entry before it closes and drops back to the checks menu is my fake check entry for PSIBEARI with check #7777:
+
+## Copilot
+
+Yes â€” now itâ€™s clear.  
+Item **(9) Find a Check #** is another one that is currently wired wrong compared to DOS.
+
+## Direct answer
+The DOS flow is:
+
+1. stay visually within the Checks screen context
+2. show prompt at the bottom:
+   - `<<<  Find the Invoices that a Check Payed for  >>>`
+   - `Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?`
+3. search by partial or full check number
+4. show **one matching check at a time**
+5. display:
+   - customer
+   - date
+   - check #
+   - reference
+   - amount
+   - invoice list
+6. prompt:
+   - `Hit ENTER to look for another check [ESC = Quit]`
+7. each Enter advances to the next match
+8. when done, it returns to the Checks menu
+
+Your screenshots show exactly that single-result paging flow. ![image13](image13) ![image14](image14) ![image15](image15) ![image12](image12)
+
+---
+
+# What that means for the VB app
+The current VB form is wrong in the same way the earlier ones were wrong:
+
+## Current VB version
+- separate popup dialog
+- search box + Find + Refresh buttons
+- white result panel
+- Windows utility-form behavior
+
+## DOS version
+- inline prompt feel
+- one record at a time
+- keyboard-driven
+- monospaced report output
+- Enter advances through result set
+- Esc exits
+
+So this is **not** a grid/search form problem.  
+Itâ€™s a **sequential result browser**.
+
+---
+
+# Key behavior details from the DOS screenshots
+A search for `7777` matches:
+- `77776`
+- `67777`
+- and finally your exact `7777`
+
+So matching is clearly:
+## **contains / partial text match**
+not exact match.
+
+Also:
+## blank input = all checks
+because prompt says:
+`[ENTER = All Checks]`
+
+And:
+## `Q` = quit immediately
+
+---
+
+# Recommendation
+For `(9)`, do **not** refine the existing popup.
+Instead, replace it with a DOS-style search/result form that:
+
+- prompts for partial/full check number
+- loads all matching results
+- shows one result at a time
+- Enter advances
+- Esc exits
+- closes automatically when results are exhausted
+
+---
+
+# What I need next
+Please paste the current `.vb` file for this screen.
+
+Likely something like:
+- `FormFindCheckNumber.vb`
+- `FormFindByCheckNumber.vb`
+- `FormFindByInvoiceNumber.vb` nearby
+- whatever file has title `Find by Check # (CHECK.INV)`
+
+That will let me convert it cleanly the same way we did `(5)` and `(8)`.
+
+---
+
+# What the replacement should probably look like
+## Input phase
+Top/bottom prompt area:
+```text
+<<<  Find the Invoices that a Check Payed for  >>>
+
+Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?
+```
+
+## Result phase
+One record at a time:
+```text
+THEBYRAN                               Date: 02-03-2014
+Check # 77776   Reference: 0444 756613   Amount $   675.00
+==================== Invoices =====================
+580474 580813 581025 581071
+
+Hit ENTER to look for another check [ESC = Quit]
+```
+
+---
+
+# Short version
+You were right again:
+**(9) is supposed to be a DOS-style one-result-at-a-time check/invoice browser, not a Windows search popup.**
+
+Paste the `.vb` file for the current form and Iâ€™ll rewrite it to match DOS.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Itâ€™s a DOS-style black screen showing a **single search result** for **Find a Check #**.
+
+Visible details:
+
+- **Customer:** `PSIBEARI`
+- **Date:** `05-19-2026`
+- **Check # line:**  
+  `Check # Check # (Top Right)? 7777`
+- **Reference:** `12345678`
+- **Amount:** `$ 0.10`
+- Then a centered-ish header:
+  `==================== Invoices =====================`
+- No invoice numbers are listed underneath in this screenshot.
+- Bottom prompt says:
+  `Hit ENTER to look for another check [ESC = Quit]`
+
+## Important implication
+This screenshot suggests that for your fake PSIBEARI check:
+
+- the DOS app is treating **â€œCheck # (Top Right)â€** as part of the displayed label/value area
+- there may be **no invoices attached** to this particular result
+- it still behaves like the same one-result-at-a-time paging screen as the other `(9)` screenshots
+
+So this image looks like the **final matching result** in the `(9) Find a Check #` sequence for search term `7777`.
+
+## @testsubject117
+
+ok, can we make the vb project match now?
+
+## Copilot
+
+Yes â€” we can make the VB project match that DOS flow now.
+
+## Direct answer
+For **(9) Find a Check #**, we should replace the current Windows search popup with a DOS-style form that:
+
+- prompts for part/all of check number
+- supports:
+  - blank = all checks
+  - `Q` = quit
+- searches using **partial/contains match**
+- shows **one matching result at a time**
+- displays:
+  - customer
+  - date
+  - check #
+  - reference
+  - amount
+  - invoice list
+- shows:
+  - `Hit ENTER to look for another check [ESC = Quit]`
+- closes and returns when the last result is exhausted
+
+So yes â€” this is ready to implement.
+
+---
+
+# What I need from you to code it correctly
+I need the current VB file behind this feature, and ideally the data model/reader for `CHECK.INV`.
+
+Please paste:
+
+1. the current form file for item `(9)`  
+   likely something like:
+   - `FormFindByCheckNumber.vb`
+   - `FormFindCheckNumber.vb`
+
+2. the reader/model classes for `CHECK.INV`  
+   whatever reads and represents those records, such as:
+   - `CheckInvReader.vb`
+   - `CheckInvEntry.vb`
+
+---
+
+# Why I need the reader/model
+To match DOS correctly, I need to know:
+- what field contains the check number
+- how invoices are stored
+- whether one record contains many invoice numbers
+- how date/reference/amount/customer are represented
+- whether â€œCheck # (Top Right)â€ is literally stored as text somewhere
+
+Without that, Iâ€™d just be guessing at the formatting and matching logic.
+
+---
+
+# What I already know from the DOS screenshots
+The VB replacement should behave like this:
+
+## Search screen
+```text
+<<<  Find the Invoices that a Check Payed for  >>>
+
+Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?
+```
+
+## Result screen
+One record at a time, e.g.:
+```text
+PSIBEARI                               Date: 05-19-2026
+Check # Check # (Top Right)? 7777   Reference: 12345678   Amount $     0.10
+==================== Invoices =====================
+
+Hit ENTER to look for another check [ESC = Quit]
+```
+
+and for other matches, show invoice numbers below the separator.
+
+---
+
+# Likely implementation plan
+Once you send the code, Iâ€™ll likely convert it into:
+
+## a DOS-style form with:
+- black background
+- monospace text
+- prompt controls at top/bottom
+- read-only multiline output area
+
+## behavior:
+- load `CHECK.INV`
+- partial match on check number
+- maintain result list + current index
+- Enter advances through matches
+- Esc closes
+
+---
+
+# Short version
+Yes â€” absolutely.  
+Weâ€™re ready to make `(9)` match DOS.
+
+Paste:
+- the current `(9)` form file
+- the `CHECK.INV` reader/model
+
+and Iâ€™ll write the replacement.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormFindByCheckNumber
+
+    Private Const ScreenTitle As String = "Find by Check #"
+
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly btnFind As New Button()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly lblHeader As New Label()
+    Private ReadOnly lstInvoices As New ListBox()
+
+    Private _all As List(Of CheckInvBlock) = New List(Of CheckInvBlock)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = "Find by Check # (CHECK.INV)"
+        Width = 700
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 45, .Padding = New Padding(10)}
+
+        top.Controls.Add(New Label() With {.Text = "Check #:", .AutoSize = True, .Padding = New Padding(0, 10, 0, 0)})
+
+        txtCheck.Width = 150
+        top.Controls.Add(txtCheck)
+
+        btnFind.Text = "Find"
+        top.Controls.Add(btnFind)
+
+        btnRefresh.Text = "Refresh"
+        top.Controls.Add(btnRefresh)
+
+        lblHeader.Dock = DockStyle.Top
+        lblHeader.Height = 60
+        lblHeader.Padding = New Padding(10)
+        lblHeader.Text = "Loading CHECK.INV..."
+
+        lstInvoices.Dock = DockStyle.Fill
+
+        Controls.Add(lstInvoices)
+        Controls.Add(lblHeader)
+        Controls.Add(top)
+
+        AddHandler btnFind.Click, Sub() DoFind()
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                lstInvoices.Items.Clear()
+            End Sub
+
+        AddHandler txtCheck.KeyDown,
+            Sub(sender, args)
+                If args.KeyCode = Keys.Enter Then
+                    args.SuppressKeyPress = True
+                    DoFind()
+                End If
+            End Sub
+
+        LoadData()
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                lblHeader.Text =
+                    "CHECK.INV was not found at:" & Environment.NewLine &
+                    path
+
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+
+            lblHeader.Text = $"Loaded {_all.Count:N0} check records from CHECK.INV."
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            lblHeader.Text =
+                "Unable to read CHECK.INV from:" & Environment.NewLine &
+                path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub DoFind()
+        Dim checkNo = txtCheck.Text.Trim()
+        If checkNo = "" Then Return
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            ' If the user opens the form when the share is down, allow them to try again later.
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) String.Equals(If(b.CheckNumber, "").Trim(),
+                                      checkNo,
+                                      StringComparison.OrdinalIgnoreCase)
+        )
+
+        lstInvoices.Items.Clear()
+
+        If hit Is Nothing Then
+            lblHeader.Text = $"No match for check #{checkNo}."
+            Return
+        End If
+
+        lblHeader.Text =
+            $"Customer: {hit.CustomerCode}    " &
+            $"Check#: {hit.CheckNumber}    " &
+            $"Date: {hit.DateText}    " &
+            $"Amount: {hit.Amount:C}    " &
+            $"Invoices: {hit.InvoiceCount}"
+
+        If hit.Invoices IsNot Nothing Then
+            For Each inv In hit.Invoices
+                lstInvoices.Items.Add(inv)
+            Next
+        End If
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this is the right file, and yes, we can make it match DOS.
+
+## Direct answer
+The current form is doing the wrong kind of search:
+
+- exact match only
+- first match only
+- listbox of invoices
+- Windows buttons/layout
+
+But DOS requires:
+
+- partial/contains match
+- blank = all checks
+- `Q` = quit
+- one matching result at a time
+- Enter advances to next match
+- Esc exits
+- DOS-style black monochrome screen
+
+So this form should be rewritten.
+
+---
+
+# One more thing I still need
+Before I give you the final replacement, I need the `CHECK.INV` data structure so I can format the result line correctly.
+
+Please paste the definitions for:
+
+- `CheckInvBlock`
+- `CheckInvReader`
+
+I need to see:
+- invoice storage
+- reference field name
+- amount/date/check number/customer field names
+- whether there are any odd legacy labels embedded in the data
+
+Because your DOS screenshot includes:
+- customer
+- date
+- reference
+- amount
+- invoice list
+- weird check label behavior on one result
+
+I want to map those correctly instead of guessing field names.
+
+---
+
+# What is definitely wrong in the current file
+## Current exact-match logic:
+```vb
+Dim hit = _all.FirstOrDefault(
+    Function(b) String.Equals(If(b.CheckNumber, "").Trim(),
+                              checkNo,
+                              StringComparison.OrdinalIgnoreCase)
+)
+```
+
+That must change because DOS clearly uses **partial matching**:
+- `7777` matched `77776`
+- `67777`
+- and `7777`
+
+## Current result behavior
+Only returns the first hit:
+```vb
+FirstOrDefault(...)
+```
+
+That must change to:
+- collect all matches
+- show one at a time
+- Enter advances through the list
+
+## Current UI
+- `ListBox`
+- `Find` button
+- `Refresh` button
+- normal label
+
+All of that should be replaced with a DOS-style text display.
+
+---
+
+# Planned replacement behavior
+Once I have the model, Iâ€™ll convert this to:
+
+## Search mode
+Prompt for:
+```text
+<<<  Find the Invoices that a Check Payed for  >>>
+
+Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?
+```
+
+## Result mode
+Show one matching block at a time like:
+```text
+THEBYRAN                               Date: 02-03-2014
+Check # 77776   Reference: 0444 756613   Amount $   675.00
+==================== Invoices =====================
+580474 580813 581025 581071
+
+Hit ENTER to look for another check [ESC = Quit]
+```
+
+and then advance through matches.
+
+---
+
+# Short version
+Yes â€” this file is the one to replace.  
+I just need:
+
+- `CheckInvBlock`
+- `CheckInvReader`
+
+Then Iâ€™ll generate the DOS-style replacement for `(9)`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvBlock)
+        Dim results As New List(Of CheckInvBlock)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim i As Integer = 0
+
+        While i < rawLines.Length
+            Dim line As String = CleanLine(rawLines(i))
+
+            If line.Length = 0 Then
+                i += 1
+                Continue While
+            End If
+
+            ' Header lines are GW-BASIC WRITE# output and start with a quote.
+            If Not line.StartsWith("""", StringComparison.Ordinal) Then
+                i += 1
+                Continue While
+            End If
+
+            Dim header As CheckInvBlock = ParseHeader(line)
+            i += 1
+
+            ' Collect invoice numbers until we reach the invoice count or the next header.
+            Dim invoices As New List(Of String)()
+
+            ' Defensive: bad/blank counts happen
+            Dim target As Integer = header.InvoiceCount
+            If target < 0 Then target = 0
+            If target > 5000 Then target = 5000 ' safety cap
+
+            While i < rawLines.Length AndAlso invoices.Count < target
+                Dim invLine As String = CleanLine(rawLines(i))
+
+                If invLine.Length = 0 Then
+                    i += 1
+                    Continue While
+                End If
+
+                ' If we hit the next header early, stop this block.
+                If invLine.StartsWith("""", StringComparison.Ordinal) Then
+                    Exit While
+                End If
+
+                ' A single line may contain one invoice or many invoices.
+                ' Try to parse as WRITE#-style CSV first. If it yields multiple parts, use them.
+                Dim parts As List(Of String) = SplitBasicWriteLine(invLine)
+
+                If parts.Count > 1 Then
+                    For Each p In parts
+                        Dim v = NormalizeInvoiceToken(p)
+                        If v.Length > 0 Then invoices.Add(v)
+                        If invoices.Count >= target Then Exit For
+                    Next
+                Else
+                    ' Not a CSV-ish line; treat as a single invoice token
+                    Dim v = NormalizeInvoiceToken(invLine)
+                    If v.Length > 0 Then invoices.Add(v)
+                End If
+
+                i += 1
+            End While
+

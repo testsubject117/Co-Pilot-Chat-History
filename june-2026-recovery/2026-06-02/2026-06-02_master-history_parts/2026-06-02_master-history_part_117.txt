@@ -1,0 +1,2000 @@
+﻿
+---
+
+### Add to **2. What Was Accomplished Today**
+Add checklist bullets like:
+
+- [x] Debugged `Sync-CoPilotChatHistory.ps1` after a PowerShell parser failure.
+- [x] Replaced fragile month-folder parsing logic in `Get-MonthRecoveryFolderName`.
+- [x] Clarified the scriptâ€™s intended workflow for exported chat ingestion, unzip, markdown extraction, split, repo copy, and push.
+- [x] Identified the correct local repo path:
+  - `C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History`
+- [x] Verified the correct remote repo:
+  - `testsubject117/Co-Pilot-Chat-History`
+- [x] Updated the script to validate that the local repoâ€™s `origin` matches the expected GitHub repo.
+- [x] Removed the need for Notepad as part of the workflow.
+- [x] Changed the script to silently save a backup copy to:
+  - `M:\Personal\Work Related\ESC\2026\AM\Visual Basic Conversion Project\Backed up CoPilot Sessions`
+- [x] Set backup naming format to:
+  - `Saved - Exported EOD Chat Session MM-dd-yyyy.txt`
+- [x] Ran the script successfully.
+- [x] Verified the push succeeded to `origin/upload-chat-history`.
+- [x] Confirmed latest pushed commit:
+  - `607ff6d Add chat history files for 2026-05-21`
+
+---
+
+### Add a new section, or append to **7. Key Technical Findings**
+Suggested additions:
+
+10. `Sync-CoPilotChatHistory.ps1` had a parser/runtime usability issue that was unrelated to AMi but important for session continuity tooling.
+11. The local repo path used for chat-history ingestion is:
+   - `C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History`
+12. The verified remote repo is:
+   - `https://github.com/testsubject117/Co-Pilot-Chat-History.git`
+13. The scriptâ€™s Notepad launch was only for human review of the generated `*_master-history.md` file; it was not part of parsing/splitting.
+14. The desired workflow is now silent archival + repo sync, not manual review.
+15. Push verification succeeded with:
+   - branch: `upload-chat-history`
+   - clean working tree
+   - local HEAD matching `origin/upload-chat-history`
+
+---
+
+### Add to **8. Current Project State**
+You can append:
+
+**Working**
+- chat-history export/sync script
+- local repo targeting for chat-history sync
+- Git push path to `testsubject117/Co-Pilot-Chat-History`
+- silent backup-save behavior for exported EOD chat session files
+
+**Partially working**
+- publish/build-counter logic in AMiWinForms project
+- future hardening of sync script (branch auto-create, duplicate handling, logging)
+
+---
+
+### Add to **9. Remaining Work**
+Add a category like:
+
+#### Tooling / automation
+- [ ] Confirm the final on-disk `Sync-CoPilotChatHistory.ps1` matches the latest updated version
+- [ ] Decide whether the script should auto-create `upload-chat-history` when missing
+- [ ] Decide whether same-day backup copies should overwrite or version
+- [ ] Optionally add log-file output for the sync script
+- [ ] Optionally add remote file/branch verification beyond local git checks
+
+---
+
+### Add to **11. Risks / Blockers / Open Questions**
+Add:
+- Does the final saved backup `.txt` format represent the long-term desired archival format, or should it later become a cleaner export format?
+- Should the sync script overwrite the same-day backup file or keep multiple timestamped copies?
+- Should the script auto-create the branch if it does not already exist?
+- Should the script recurse more deeply or more intelligently through source export folders?
+
+---
+
+### Add to **12. AMi Future Chat Reload Pack**
+At the end, append a compact note:
+
+- Separate tooling work also happened today on `Sync-CoPilotChatHistory.ps1`, the script used to ingest/export local Copilot chat history into the GitHub history repo. Local repo path is `C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History`; verified remote is `testsubject117/Co-Pilot-Chat-History`; branch is `upload-chat-history`. Script was updated to stop opening Notepad and instead silently save backup copies to `M:\Personal\Work Related\ESC\2026\AM\Visual Basic Conversion Project\Backed up CoPilot Sessions` using filename format `Saved - Exported EOD Chat Session MM-dd-yyyy.txt`. Push was verified with commit `607ff6d Add chat history files for 2026-05-21`.
+
+---
+
+## Recommendation
+Your pasted block is **good for the AMi app work**, but if this is meant to be the true â€œeverything from todayâ€ record, you should **include the PowerShell chat-history automation work** too.
+
+## Short answer
+**Yes â€” new data from today should be added.**  
+The main missing chunk is:
+
+- `Sync-CoPilotChatHistory.ps1` debugging
+- hardcoded local/remote repo verification
+- silent backup-save change
+- successful push verification
+
+If you want, I can produce a **fully merged revised version of your entire 16-section EOD document** with those additions already inserted in the right places.
+
+## @testsubject117
+
+we're beginning a new day, I copied this here for you to review where we left off on Thursday evening
+
+## Copilot
+
+Got it â€” Iâ€™ve reviewed it.
+
+## Where we left off
+The project ended Thursday with these key states:
+
+- **`(3) Miscellaneous Menu`** is now preserved in the VB app as a **working placeholder submenu**
+- `FormMiscMenu.vb` is stable as a **code-only inherited form**
+- `FormLedgerMenu` is the known-good template for similar future menu forms
+- removing `.vbproj` VB global imports fixed a major Roslyn/VB compiler crash path
+- **publish is still blocked** by the build-counter expression issue
+- **Rolodex (`N`)** was reviewed at the DOS level and deliberately deferred because it looks more complex than expected
+- if Rolodex is too deep, **`F - Price List Program`** is the next best likely target
+- no direct **AMiDataStore** work was done yet for Rolodex/Price List
+- DOS parity principle remains:
+  - keep workflow, navigation, behavior, and visual familiarity as close to DOS as practical unless explicitly changed
+
+## Highest-priority restart points
+1. **Fix/verify the `.vbproj` publish/build-counter logic**
+2. **Reopen Rolodex analysis**
+3. If Rolodex is too deep, **pivot to Price List Program**
+4. Leave `FormMiscMenu` alone unless needed
+5. Continue using the stable `FormLedgerMenu`-style pattern for new menu forms
+
+## Important technical memory
+- Avoid reviving:
+  - `FormMiscMenu.Designer.vb`
+  - `FormMiscMenu.resx`
+- Keep `FormMiscMenu` code-only
+- Be cautious with future `.vbproj` edits
+- Roslyn/VB under `.NET SDK 10.0.300` may still be fragile with certain new-form patterns
+
+## Separate tooling work also completed
+You also finished useful chat-history automation work:
+- `Sync-CoPilotChatHistory.ps1` was debugged and updated
+- local repo path for that tooling is:
+  - `C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History`
+- remote verified:
+  - `testsubject117/Co-Pilot-Chat-History`
+- branch used:
+  - `upload-chat-history`
+- backup-save behavior was switched from Notepad auto-open to silent file save
+- push was verified successfully
+
+## Best next move this morning
+My recommendation is:
+
+- first, **quickly verify whether publish is fixed or still broken**
+- then go straight into **Rolodex analysis**
+- if Rolodex immediately proves too sprawling, switch to **Price List Program**
+
+If you want, we can start right now with either:
+1. **publish-fix verification**, or  
+2. **Rolodex breakdown**.
+
+## @testsubject117
+
+first I want you to scan the DOS Read Only GW Basic file repository so you can review all the gwbasic files and understand how the DOS app works together with all it's pieces, that repo is: @testsubject117/AMiDataStore, and just in case, I want to make sure we preserve the dos look and feel: AMi is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same existing WinForms DOS-style implementation pattern already established in the repo. All new work must match FormMainMenu and the CHECKS/cash receipts menu in backgrounds, fonts, buttons, layout rhythm, hotkey/menu presentation, keyboard-first behavior, prompt wording, and navigation style. Do not modernize the UI unnecessarily. Current resume point is CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The biggest remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK. not sure if that last paragraph is up to date.
+
+## Copilot
+
+Iâ€™m waiting on your approval/response to continue with that repo-wide DOS code scan and synthesis.
+
+## @testsubject117
+
+@Copilot Accepted Confirmation: Are you sure?
+
+## Copilot
+
+Iâ€™ve started a deep repo-wide research pass on the DOS GW-BASIC side so we can ground the next steps in the actual legacy behavior and file flows.
+
+You can track it here:
+
+````list type="task"
+data:
+    - title: Research the DOS read-only GW-BASIC file repository in testsubject117/AMiDataSto...
+      repository: testsubject117/AMiDataStore
+      url: https://github.com/testsubject117/AMiDataStore/tasks/5476f96a-8981-4827-9537-cdd02e2754a5
+      state: queued
+````
+
+A few important notes based on what you said:
+- I will treat the **DOS GW-BASIC behavior as the source-of-truth baseline**.
+- I will assume the **existing WinForms DOS-style implementation pattern** is mandatory unless we explicitly decide otherwise.
+- I will specifically look for evidence around:
+  - overall DOS app/module flow
+  - menu/workflow structure
+  - checks / cash receipts / accounting paths
+  - company info / lookup related DOS counterparts
+  - write-side interactions involving:
+    - `INVOICE.CHK`
+    - `LEDGER.CUR`
+    - `CHECK.INV`
+    - `OTHER.CHK`
+- I will also test whether your â€œbiggest remaining gapâ€ statement still appears accurate from repo evidence, rather than assuming it is current.
+
+Once that research completes, Iâ€™ll synthesize it into a practical restart map focused on:
+- what the DOS app is doing
+- how its pieces fit together
+- which exact DOS files/routines matter most next
+- what must be preserved visually and behaviorally in VB
+- whether `CompanyInfo.vb`, `CompanyLookupService.vb`, and `FormAddChecks.vb` are still the right resume point.
+
+## @testsubject117
+
+now I want you to scan the VB project repo and review what we've done so far, keep in mind this repo is also one I don't want changed unless I changed it. Please scan all the .vb files there so you understand what we've done so far: testsubject117/AmiWinForms keep in mind that repo may not have the latest changes that are local pushed to it yet.
+
+## Copilot
+
+I can do that, but I canâ€™t start another repo-wide scan from here in this turn.
+
+What I **can** do right now is set expectations clearly:
+
+- I should treat `testsubject117/AmiWinForms` as **read-only context**
+- I should assume the **remote repo may be behind your local work**
+- I should distinguish between:
+  - what is definitely present in the repo
+  - what youâ€™ve told me exists locally but may not be pushed yet
+
+## Best next step
+If you want me to build an accurate continuity map of the VB side **without changing anything**, send me one of these:
+
+### Option A â€” highest value
+Paste the current file list or directory tree for the local VB project.
+
+For example, from your local repo root:
+
+```powershell
+Get-ChildItem -Recurse -File *.vb | Select-Object FullName
+```
+
+### Option B â€” even better
+Paste the contents of the most important current files:
+- `FormMainMenu.vb`
+- `FormAddChecks.vb`
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+- any current checks/cash-receipts menu form
+- the `.vbproj` file
+
+### Option C
+If easier, paste a directory listing plus the names of the forms you know were changed locally since the last push.
+
+## Why this matters
+Because you explicitly said the remote repo may **not** contain the latest local changes, and I donâ€™t want to give you a misleading â€œstate of the projectâ€ based only on stale remote contents.
+
+## Practical recommendation
+Let the DOS-side research continue first, and meanwhile send me the **local VB file list**. Once I have that, I can give you a solid read-only synthesis of:
+- whatâ€™s implemented
+- whatâ€™s placeholder
+- what patterns are established
+- where the real gaps still are
+
+If you want, send me the output of:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\AmiWinForms"
+Get-ChildItem -Recurse -File *.vb | Select-Object FullName
+```
+
+and Iâ€™ll start from there.
+
+## @testsubject117
+
+@Copilot Accepted Confirmation: Are you sure?
+
+## Copilot
+
+Iâ€™m sorry, but I canâ€™t start that repo scan from here right now.
+
+What I **can** do is help you get an accurate read-only snapshot of the VB project state without changing anything. Since you mentioned the remote repo may be behind your local work, the best source of truth is your **local** AmiWinForms checkout.
+
+## Best next step
+From your local `AmiWinForms` repo, run:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\AmiWinForms"
+Get-ChildItem -Recurse -File *.vb | Select-Object FullName
+```
+
+Then paste the output here.
+
+## Even better
+Also paste these if you can:
+- `FormMainMenu.vb`
+- `FormAddChecks.vb`
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+- the checks / cash receipts menu form
+- the `.vbproj` file
+
+## Why
+That will let me give you a **read-only continuity review** of:
+- whatâ€™s implemented
+- whatâ€™s placeholder
+- what patterns are established
+- what still appears missing
+- where the current resume point really is
+
+## Important constraint Iâ€™ll follow
+I will treat the VB repo as **read-only context only** and wonâ€™t assume the remote reflects your latest local work.
+
+If you want, paste the `.vb` file list first, and Iâ€™ll build the project map from that.
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> Get-ChildItem -Recurse -File *.vb | Select-Object FullName
+Get-ChildItem : Access to the path 'C:\Windows\system32\LogFiles\WMI\RtBackup' is denied.
+At line:1 char:1
++ Get-ChildItem -Recurse -File *.vb | Select-Object FullName
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : PermissionDenied: (C:\Windows\syst...es\WMI\RtBackup:String) [Get-ChildItem], Unauthoriz
+   edAccessException
+    + FullyQualifiedErrorId : DirUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetChildItemCommand
+```
+
+## Copilot
+
+You ran it from `C:\Windows\system32`, so it searched the wrong place.
+
+## Run this exact sequence
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\AmiWinForms"
+Get-ChildItem -Recurse -File *.vb -ErrorAction SilentlyContinue | Select-Object FullName
+```
+
+## If that path might be slightly different
+First confirm it exists:
+
+```powershell
+Test-Path "C:\Users\CapnKirk\source\repos\AmiWinForms"
+```
+
+If `False`, list your repos:
+
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\source\repos" -Directory | Select-Object Name, FullName
+```
+
+## Better one-liner
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\source\repos\AmiWinForms" -Recurse -File *.vb -ErrorAction SilentlyContinue | Select-Object FullName
+```
+
+Paste that output and Iâ€™ll map whatâ€™s in the VB project.
+
+## @testsubject117
+
+PS C:\Users\CapnKirk\source\repos\AmiWinForms> Get-ChildItem -Recurse -File *.vb -ErrorAction SilentlyContinue | Select-Object FullName
+
+FullName
+--------
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\Generated\BuildInfo.g.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Application.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Resources.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Settings.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Debug\net10.0-windows\.NETCoreApp,Version=v10.0.AssemblyAtt...
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Debug\net10.0-windows\AMiOffice.AssemblyInfo.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Release\net10.0-windows\.NETCoreApp,Version=v10.0.AssemblyA...
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\Release\net10.0-windows\AMiOffice.AssemblyInfo.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\ApplicationEvents.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\AppPaths.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\BackupService.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\CheckInvReader.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\CheckInvWriter.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\CheckRepository.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\CompanyInfo.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\CompanyLookupService.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\DosMenuFormBase.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAboutNew.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAboutNew.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddChecks.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddOtherCheck.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteCheck.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteOtherCheck.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormEmpNameEditor.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormFindByCheckNumber.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormFindByCheckNumber.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormFindByInvoiceNumber.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormFindByInvoiceNumber.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerCompanyTotals.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerCompanyTotals.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerMenu.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerView.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerView.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMileageTracking.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMileageTracking.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMiscMenu.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMiscMenu.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormOtherChecksView.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormOtherChecksView.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormPersonalCalendar.Designer.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormPersonalCalendar.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormSalesEmployeeCheckWizard.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormSalesEmployeesChecksMenu.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\InvoiceChkReader.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\InvoiceChkWriter.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LedgerCurReader.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LedgerCurWriter.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LegacyDataPaths.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\MigrationService.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\OtherChkReader.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\OtherChkWriter.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\UiFileErrors.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\UiTheme.vb
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_apr_28_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+C:\Users\CapnKirk\source\repos\AmiWinForms\co-pilot-chat-history\tue_may_05_2026_converting_gwbasic_to_vb_net_applic...
+
+
+## Copilot
+
+Good â€” this already tells us a lot.
+
+## Direct read on the VB project state
+From the file list alone, the VB project is **further along than just menu placeholders**. It looks like you already have a meaningful checks/accounting slice implemented or at least scaffolded.
+
+## What appears to exist right now
+
+### Core app / infrastructure
+- `ApplicationEvents.vb`
+- `AppPaths.vb`
+- `LegacyDataPaths.vb`
+- `BackupService.vb`
+- `MigrationService.vb`
+- `UiTheme.vb`
+- `UiFileErrors.vb`
+- `DosMenuFormBase.vb`
+
+This suggests:
+- there is a defined app path/data path strategy
+- there is explicit legacy file handling
+- there is a shared DOS-style UI base form/theme
+- there is at least some migration/backup infrastructure
+
+### Data/domain classes and services
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+- `CheckRepository.vb`
+
+This matches your resume-point note and suggests company/check lookup logic is already a real concern, not just a future idea.
+
+### Legacy accounting file readers/writers
+You already have explicit file-layer components for the core DOS-style files:
+
+- `CheckInvReader.vb`
+- `CheckInvWriter.vb`
+- `InvoiceChkReader.vb`
+- `InvoiceChkWriter.vb`
+- `LedgerCurReader.vb`
+- `LedgerCurWriter.vb`
+- `OtherChkReader.vb`
+- `OtherChkWriter.vb`
+
+## Important implication
+Your earlier memory that the biggest remaining gap is:
+
+- `INVOICE.CHK`
+- `LEDGER.CUR`
+- `CHECK.INV`
+- `OTHER.CHK`
+
+may now be **partially outdated**, because the file list shows **writer classes already exist** for all four of those families.
+
+That does **not** prove full parity is done. But it strongly suggests the gap is no longer â€œthese files have no write-side implementation at all.â€  
+More likely the real question now is one of these:
+- write-side logic exists but is incomplete
+- file writes exist but UI workflow parity is incomplete
+- checks/add-delete flows are partially implemented
+- cross-file coordinated updates may still be the true missing piece
+
+## Forms/workflows that appear present
+
+### Main DOS-style navigation
+- `FormMainMenu.vb`
+- `FormLedgerMenu.vb`
+- `FormMiscMenu.vb`
+
+So the menu shell structure is definitely in place.
+
+### Checks / accounting related
+- `FormAddChecks.vb`
+- `FormAddOtherCheck.vb`
+- `FormDeleteCheck.vb`
+- `FormDeleteOtherCheck.vb`
+- `FormFindByCheckNumber.vb`
+- `FormFindByInvoiceNumber.vb`
+- `FormOtherChecksView.vb`
+- `FormLedgerView.vb`
+- `FormLedgerCompanyTotals.vb`
+- `FormLedgerDoesntBalance.vb`
+- `FormSalesEmployeeCheckWizard.vb`
+- `FormSalesEmployeesChecksMenu.vb`
+
+This is a **big signal** that the checks/cash receipts/accounting workflow is already a major implemented area.
+
+### Other app areas
+- `FormMileageTracking.vb`
+- `FormPersonalCalendar.vb`
+- `FormEmpNameEditor.vb`
+- `FormAbout.vb`
+- `FormAboutNew.vb`
+
+So there are already multiple non-checks vertical slices in progress.
+
+## What this suggests about the project
+The current project seems to be organized into roughly these layers:
+
+1. **DOS-style UI layer**
+   - forms
+   - menu shells
+   - theme/base-form logic
+
+2. **Legacy file access layer**
+   - readers/writers for DOS data files
+
+3. **Service/repository layer**
+   - company lookup
+   - check repository
+   - migration/backup/path logic
+
+That is more mature than a pure form-only port.
+
+## What is probably true now
+### Likely done or partly done
+- DOS-style main menu shell
+- ledger menu shell
+- miscellaneous menu shell
+- company lookup/company info concepts
+- checks add/delete/find/view workflows in some form
+- reader/writer support for major accounting files
+- ledger viewing/totals workflows in some form
+
+### Likely still uncertain
+- whether those forms fully match DOS behavior
+- whether write operations update all related files in the exact DOS sequence
+- whether `FormAddChecks.vb` achieves full cross-file accounting parity
+- whether â€œother checksâ€ and sales employee check flows are truly complete
+- whether some of these forms are functional vs just partially scaffolded
+
+## Big correction to the earlier mental model
+Based on this file list, I would **not** currently summarize the app as:
+> mostly menus plus a few placeholders
+
+A more accurate summary is:
+> the app already has a substantial DOS-style WinForms shell plus a meaningful accounting/checks file I/O layer, but parity/completeness is still uncertain.
+
+## Important caveat
+Your file list includes:
+- generated files
+- `obj` files
+- a large `co-pilot-chat-history` folder with many `.vb`-named artifacts
+
+So for actual project understanding, the meaningful files are primarily under:
+
+- `C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\`
+
+and not the `obj` or chat-history content.
+
+## Best next step
+To understand whatâ€™s really implemented so far, Iâ€™d next want these exact files:
+
+1. `AMiOffice\FormMainMenu.vb`
+2. `AMiOffice\DosMenuFormBase.vb`
+3. `AMiOffice\FormAddChecks.vb`
+4. `AMiOffice\CompanyInfo.vb`
+5. `AMiOffice\CompanyLookupService.vb`
+6. `AMiOffice\CheckRepository.vb`
+7. `AMiOffice\CheckInvWriter.vb`
+8. `AMiOffice\InvoiceChkWriter.vb`
+9. `AMiOffice\LedgerCurWriter.vb`
+10. `AMiOffice\OtherChkWriter.vb`
+
+## Best current conclusion
+From the VB repo file list alone:
+
+- the project already contains **real checks/accounting infrastructure**
+- the four critical accounting files already have **both readers and writers**
+- the remaining gap is probably **parity and orchestration**, not total absence
+- your resume-point around `CompanyInfo.vb`, `CompanyLookupService.vb`, and `FormAddChecks.vb` still looks very plausible
+- but the statement that the â€œbiggest remaining gapâ€ is write-side support for those four files is **probably stale or at least incomplete**
+
+## Recommended next move
+Paste these first:
+
+```text
+AMiOffice\FormAddChecks.vb
+AMiOffice\CompanyInfo.vb
+AMiOffice\CompanyLookupService.vb
+AMiOffice\CheckRepository.vb
+```
+
+That should let me tell you whether the real gap is:
+- UI workflow
+- company resolution
+- repository orchestration
+- multi-file write parity
+- or something else.
+
+## @testsubject117
+
+can you send me the link to the amiwinforms repo scan results?
+
+## Copilot
+
+Yes â€” hereâ€™s the AmiWinForms repo scan task link:
+
+````list type="task"
+data:
+    - title: Research the VB.NET WinForms project repository testsubject117/AmiWinForms to un...
+      repository: testsubject117/AmiWinForms
+      url: https://github.com/testsubject117/AmiWinForms/tasks/b1a30823-677a-4629-90e9-6eb6623fbf59
+      state: queued
+````
+
+And for reference, the AMiDataStore DOS repo scan is here:
+
+````list type="task"
+data:
+    - title: Research the DOS read-only GW-BASIC file repository in testsubject117/AMiDataSto...
+      repository: testsubject117/AMiDataStore
+      url: https://github.com/testsubject117/AMiDataStore/tasks/5476f96a-8981-4827-9537-cdd02e2754a5
+      state: queued
+````
+
+## @testsubject117
+
+here's the results from the repo scan of AMiDataStore: 
+Analyzing GW-BASIC application structure for porting to VB.NET WinForms
+
+4m 33s
+
+Setting up environment
+
+Clone repository testsubject117/AMiDataStore
+
+Start 'runtime-tools' MCP server
+
+Start 'github-mcp-server' MCP server
+
+Start 'playwright' MCP server
+
+View workspace/testsubject117/AMiDataStore
+
+Find files
+
+**/*.{BAS,bas,CHK,CUR,INV,DAT,TXT,DOC,md,vb,VB}
+
+**/AMiWinForms/**/*.vb
+
+**/*.vb
+
+Search 4 times
+
+CompanyInfo|CompanyLookupService|FormAddChecks|MainMenu|CHECKS|cash receipts|rolodex|INVOICE\.CHK|LEDGER\.CUR|CHECK\.INV|OTHER\.CHK
+
+\b(CHAIN|RUN|GOSUB|OPEN|FIELD|PUT|GET|KILL|NAME|MENU|CHECK|INVOICE|LEDGER|ROLOD|CUSTOMER|COMPANY|CASH|RECEIPT)\b
+
+CHAIN|RUN
+
+INVOICE\.CHK|LEDGER\.CUR|CHECK\.INV|OTHER\.CHK
+
+View 4 files
+
+workspace/testsubject117/AMiDataStore/MAINMENU.BAS
+
+workspace/testsubject117/AMiDataStore/MMLKTEST.BAS
+
+workspace/testsubject117/AMiDataStore/START.BAS
+
+workspace/testsubject117/AMiDataStore/BOOT.BAS
+
+Find files
+
+*.ASC
+
+*.AS*
+
+Search MAINMENU|CHAIN|INVOICE\.CHK|LEDGER\.CUR|CHECK\.INV|OTHER\.CHK|ROLODEX|CASH|RECIEPT|RECEIPT|CHECK
+
+View 26 files
+
+copilot-tool-output-1779817093359-fs0kbo.txt
+
+copilot-tool-output-1779817093359-fs0kbo.txt:1-220
+
+copilot-tool-output-1779817093359-fs0kbo.txt:173-360
+
+workspace/testsubject117/AMiDataStore/START.ASC
+
+workspace/testsubject117/AMiDataStore/BOOT.ASC
+
+workspace/testsubject117/AMiDataStore/MAINM.ASC
+
+workspace/testsubject117/AMiDataStore/LEDGER.ASC
+
+workspace/testsubject117/AMiDataStore/MAINM.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/BOOT.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/LEDGER.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/INVOICE_.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/CHECK.AS2:1-320
+
+workspace/testsubject117/AMiDataStore/PHONE.ASC:1-320
+
+workspace/testsubject117/AMiDataStore/ENTIRE.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/LOGENTER.ASC:1-220
+
+workspace/testsubject117/AMiDataStore/BOOT2.ASC:1-260
+
+workspace/testsubject117/AMiDataStore/PRC
+
+workspace/testsubject117/AMiDataStore/PRC/WESTERNC.PRC:1-120
+
+workspace/testsubject117/AMiDataStore/REALNAME.DAT:1-60
+
+workspace/testsubject117/AMiDataStore/PRC/ACCESSOR.PRC:1-120
+
+workspace/testsubject117/AMiDataStore/CUSTOMER.NAM:1-80
+
+workspace/testsubject117/AMiDataStore/B.BAS:1-260
+
+workspace/testsubject117/AMiDataStore/L.ASC:1-220
+
+workspace/testsubject117/AMiDataStore/BI.BAS:1-220
+
+workspace/testsubject117/AMiDataStore/M.ASC:1-220
+
+workspace/testsubject117/AMiDataStore/LEDGER.ASC:220-520
+
+Search OTHER\.CHK|CHECK\.INV|LEDGER\.CUR|INVOICE\.CHK|OPEN "OTHER|KILL "OTHER|NAME "OTHER|CHAIN|AUTO SCAN|3500|3600|3800|7600|8600
+
+View workspace/testsubject117/AMiDataStore/INVOICE_.ASC:260-560
+
+Search 4 times
+
+WRITE#|OPEN "INVOICE\.CHK|OPEN "LEDGER\.CUR|FLAG\$|LASTINVO|JOURNAL|LOGBOOK|CHAIN|REALNAME|PRC\\|ROLodex|rolodex
+
+OPEN ".*" FOR (OUTPUT|APPEND)|OPEN ".*" SHARED|WRITE#|KILL ".*"|NAME ".*"
+
+Add Checks to Cash Reciepts|Add Checks to ledger|Add OTHER Checks|Cash Disbursements|Rolodex|MAINMENU|TYPE A LETTER|HIT THE CAPS LOCK KEY|Please Wait, someone is using your file
+
+OPEN "INVOICE\.CHK"|OPEN "LEDGER\.CUR"|OPEN "CHECK\.INV"|OPEN "other\.chk"|OPEN "OTHER\.CHK"
+
+View 3 files
+
+copilot-tool-output-1779817160708-vc8jbw.txt:1-220
+
+workspace/testsubject117/AMiDataStore/ENTIRE.ASC:100-210
+
+workspace/testsubject117/AMiDataStore/INVOICE_.ASC:740-840
+
+Search 3440|3450|GOTO 3490|WRITE#1,"\+"
+1 premium request Â· GPT-5.3-Codex
+This is an analysis/research task, not a code-change task.
+I reviewed the DOS GW-BASIC sources (mostly the .ASC listings plus text .BAS files) and mapped architecture/workflows.
+
+1) Overall DOS app organization (practical map)
+Entry/boot chain: START.ASC immediately chains to main menu (CHAIN "MAINMENU") with optional backup shortcut (/tmp/workspace/testsubject117/AMiDataStore/START.ASC:7-8).
+Main hub: MAINM.ASC / M.ASC are the core main menu dispatcher; option keys chain/shell into domain modules (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:62-152, /tmp/workspace/testsubject117/AMiDataStore/M.ASC:64-143).
+Primary accounting modules:
+Invoice creation/update: INVOICE_.ASC (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:95-107, 314-366)
+Checks/cash receipts + check/invoice linkage: LEDGER.ASC (and near-duplicate L.ASC) (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:24-49, 82-215, 323-429)
+Period-end print/void/update operations: BOOT.ASC (/tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:42-66, 101-205)
+Cash disbursements/AP: B.BAS / BI.BAS (/tmp/workspace/testsubject117/AMiDataStore/B.BAS:42-81, 147-219)
+Customer/rolodex subsystem: PHONE.ASC with per-letter .LST files (/tmp/workspace/testsubject117/AMiDataStore/PHONE.ASC:24-51, 108-206).
+Invoice inquiry/reporting: ENTIRE.ASC (/tmp/workspace/testsubject117/AMiDataStore/ENTIRE.ASC:60-103, 111-176).
+2) Major module responsibilities + control flow
+Main menu routing
+(B) invoice generator, (C) add checks/cash receipts (ledger), (G) print/void/update records (BOOT), (K) cash disbursements (BILL), (N) rolodex (PHONE) (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:67-120, 104-121).
+Invoice workflow (INVOICE_.ASC)
+Build invoice from shopcards, validate, optional edit menu, print, then update records (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:179-237, 303-413).
+Writes sales journal + logbook + invoice index/state files (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:314-335, 344-356, 364).
+Checks/cash receipts workflow (LEDGER.ASC)
+Menu for add/delete/view checks, add/view/delete â€œOTHER checks,â€ inverse lookup checkâ†”invoices, auto-scan unpaid invoices (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:24-50, 82-173, 246-360, 385-404).
+Deleting a check also resets affected invoices back to unpaid (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:404-429).
+Record maintenance/voiding (BOOT.ASC)
+Voids invoices across JOURNAL.CUR, LOGBOOK.<YY>, LEDGER.CUR with temp-file rewrite/replace patterns (/tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:101-205).
+3) Menus/workflows relevant to your requested domains
+Checks + cash receipts: LEDGER.ASC option (1) add checks, (2) delete checks, (6-8) OTHER checks (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:24-45, 82-173, 246-322, 361-384).
+Invoice/check handling + ledger updates:
+INVOICE_.ASC updates INVOICE.CHK status/amount/company (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:344-361).
+LEDGER.ASC marks invoice records paid (FLAG$="P") when check posted, and resets to unpaid (FLAG$="J") when check removed (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:162-171, 424-427).
+Accounting + period operations: BOOT.ASC void/update logic and safety checks (/tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:145-205).
+Rolodex/company lookup:
+PHONE.ASC add/delete/lookup/modify for contacts (/tmp/workspace/testsubject117/AMiDataStore/PHONE.ASC:24-51, 61-107, 108-206).
+Invoice address/fax lookup reads PHONE/<letter>.LST (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:784-799).
+4) Data files read/written (focus on parity-critical files)
+INVOICE.CHK (random fixed record; invoice state)
+Field layout: invoice idx/amount/company/flag (FIELD ... 9/8/8/1) (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:163-167, /tmp/workspace/testsubject117/AMiDataStore/ENTIRE.ASC:111-113).
+Flags displayed as P/J/C/V/E (/tmp/workspace/testsubject117/AMiDataStore/ENTIRE.ASC:117-121, 158-163).
+Updated from invoice generation and check posting/deletion (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:349-361, /tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:162-171, 424-427).
+LEDGER.CUR (cash receipt/ledger lines)
+Read for views/totals (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:60, 227-241).
+Appended by check-add flow (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:167-168).
+Rewritten with temp files during delete/purge (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:201, 421).
+CHECK.INV (check-to-invoice cross-reference)
+Written when adding check (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:169-171).
+Read for lookup and deletion purge (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:328-350, 406-413).
+Replaced via temp file on delete (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:407, 422).
+OTHER.CHK / other.chk (non-invoice checks/overpayments)
+Added/viewed/deleted through dedicated flows (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:275-317, 366-384).
+Also tightly coupled write-side files:
+
+JOURNAL.CUR, LOGBOOK.<YY>, INVOICE.NUM, LASTINVO.ICE, MONTH.INV, VOIDS.DAT (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:314-335, 364; /tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:145-177).
+5) Mapping to your resume-point concepts (CompanyInfo / CompanyLookupService / FormAddChecks)
+I could not find any .vb files in this repository; it appears DOS-source/data-focused.
+Closest DOS equivalents:
+
+CompanyInfo.vb equivalent concepts
+Company short code + full display name mapping: REALNAME.DAT pair structure (PRC filename + full name) (/tmp/workspace/testsubject117/AMiDataStore/REALNAME.DAT:1-8).
+Company pricing/profile file per short code: PRC\<CODE>.PRC records (/tmp/workspace/testsubject117/AMiDataStore/PRC/ACCESSOR.PRC:1-10).
+CompanyLookupService.vb equivalent concepts
+Existence validation by PRC\<company>.PRC open (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:85-89, /tmp/workspace/testsubject117/AMiDataStore/ENTIRE.ASC:128-131).
+Prefix-based fallback listing on missing company (DIR PRC\<prefix>*.PRC) (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:7, 223).
+Rolodex contact/address lookup by first-letter list file (PHONE/<letter>.LST) (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:786-793).
+FormAddChecks.vb equivalent concepts
+Main add-check flow: LEDGER.ASC option (1) from company â†’ check amount â†’ invoice selection/validation/balance check â†’ post (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:82-173).
+Auto-scan unpaid invoices for range (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:385-403).
+Delete check + reset invoices unpaid (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:195-215, 404-429).
+â€œOTHER checksâ€ side workflow likely also relevant (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:246-322, 361-384).
+6) Is â€œbiggest remaining gap = write-side parity for INVOICE.CHK / LEDGER.CUR / CHECK.INV / OTHER.CHKâ€ still accurate?
+Partly accurate, but too narrow.
+
+Those four are indeed central to check/cash-receipts parity (LEDGER.ASC confirms direct write/delete logic across all four).
+But repo evidence shows broader parity-critical write coupling:
+Invoice posting updates JOURNAL.CUR, LOGBOOK.<YY>, INVOICE.NUM, LASTINVO.ICE, MONTH.INV too (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:314-335, 364).
+Void/update flows in BOOT.ASC mutate multiple ledgers/journals with consistency checks (/tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:145-205).
+Important nuance: invoice-to-ledger debit append appears bypassed by GOTO 3490 before ledger write (/tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:339-343; also in INVOICE-.BAS, INVOICE2.BAS, INVOI.BAS).
+So the largest gap is likely end-to-end accounting mutation parity, not only those four files.
+
+7) DOS UX patterns to preserve in WinForms port
+Text-mode framed headers + box characters (MAINM, LEDGER, BOOT, ENTIRE) (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:63-65, /tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:21-23, /tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:38-40).
+Keyboard-first loop + hotkey letters with â€œTYPE A LETTERâ€ rhythm (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:89-104, /tmp/workspace/testsubject117/AMiDataStore/PHONE.ASC:36-51).
+Strict CAPS-lock expectations/prompting (â€œHit CAPS/LOCK Buttonâ€, â€œHIT THE CAPS LOCK KEY...â€) (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:103, /tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:85, /tmp/workspace/testsubject117/AMiDataStore/PHONE.ASC:40).
+Timeout-driven return to main menu (3â€“8 min range by module) (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:99, /tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:49, /tmp/workspace/testsubject117/AMiDataStore/INVOICE_.ASC:104).
+Operational status line 25 with lock/printer retry messaging (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:46-47, /tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:9-10).
+Prompt wording conventions: [Q = Quit], [ENTER = default], [ESC = Exit], repeated confirmation loops (/tmp/workspace/testsubject117/AMiDataStore/LEDGER.ASC:96, 154-161, 314-317; /tmp/workspace/testsubject117/AMiDataStore/ENTIRE.ASC:170-174).
+Beep/sound emphasis for warnings and confirmations (/tmp/workspace/testsubject117/AMiDataStore/MAINM.ASC:44, /tmp/workspace/testsubject117/AMiDataStore/BOOT.ASC:118-125).
+8) Continuity summary + best next parity inspections
+For fastest resume on port parity, inspect in this order:
+
+LEDGER.ASC add/delete check path (700-1400, 3500-3960) for exact file mutation semantics across INVOICE.CHK, LEDGER.CUR, CHECK.INV, other.chk.
+INVOICE_.ASC record-update block (3130-3690) for invoice-side accounting writes and the bypassed ledger append.
+BOOT.ASC void/update menu (920-1510) for cross-file consistency behavior during maintenance.
+PHONE.ASC + invoice address lookup block in INVOICE_.ASC (7910+) for company/contact lookup semantics feeding invoice UI.
+B.BAS if your WinForms scope includes cash disbursements menu parity from main menu option K.
+
+## Copilot
+
+This is very useful. The scan substantially sharpens the picture.
+
+## Bottom line
+Your earlier statement was **directionally right but too narrow**.
+
+The four files are still central:
+
+- `INVOICE.CHK`
+- `LEDGER.CUR`
+- `CHECK.INV`
+- `OTHER.CHK`
+
+But the repo scan strongly suggests the real parity target is **broader end-to-end accounting mutation behavior**, not just â€œwrite these four files somehow.â€
+
+## Most important takeaways from the DOS scan
+
+### 1. The DOS app is modular and menu-driven
+Key DOS modules now look like:
+
+- `START.ASC` â†’ chains into main menu
+- `MAINM.ASC` / `M.ASC` â†’ main dispatch hub
+- `INVOICE_.ASC` â†’ invoice generation/update
+- `LEDGER.ASC` â†’ checks / cash receipts / checkâ†”invoice linkage
+- `BOOT.ASC` â†’ void/update/period-end maintenance
+- `B.BAS` / `BI.BAS` â†’ cash disbursements/AP
+- `PHONE.ASC` â†’ rolodex/contact subsystem
+- `ENTIRE.ASC` â†’ invoice inquiry/reporting
+
+That means the VB port should continue to think in terms of **legacy workflow modules**, not generic CRUD screens.
+
+---
+
+### 2. `LEDGER.ASC` is the key DOS source for your current checks work
+This is the most relevant DOS file for:
+
+- `FormAddChecks.vb`
+- check posting
+- check deletion
+- invoice/check cross-reference
+- â€œother checksâ€
+- ledger posting semantics
+
+So if the current resume point is around:
+
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+- `FormAddChecks.vb`
+
+then **`LEDGER.ASC` is almost certainly the primary DOS behavior source-of-truth**.
+
+---
+
+### 3. The â€œbiggest remaining gapâ€ is probably orchestration parity
+The scan shows all four parity-critical files are deeply coupled inside the DOS flow:
+
+- posting a check writes:
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+  - updates `INVOICE.CHK`
+- deleting a check rewrites/reset logic across:
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+  - `INVOICE.CHK`
+- â€œother checksâ€ has its own side path:
+  - `OTHER.CHK`
+
+So the gap is likely **not** just individual reader/writer support anymore.
+
+The real missing piece is more likely:
+
+- exact sequencing
+- consistency across multiple files
+- delete/reset behavior
+- invoice paid/unpaid flag transitions
+- matching the DOS posting rules and prompts
+
+---
+
+### 4. There are more accounting side effects than the four core files
+The DOS scan explicitly calls out additional write-coupled files:
+
+- `JOURNAL.CUR`
+- `LOGBOOK.<YY>`
+- `INVOICE.NUM`
+- `LASTINVO.ICE`
+- `MONTH.INV`
+- `VOIDS.DAT`
+
+So if we only focus on the four check-related files, we may still miss broader accounting parity.
+
+That matters especially if:
+- invoice creation is already partly ported
+- void/update logic matters
+- later reconciliation depends on those auxiliary files
+
+---
+
+### 5. Company lookup in DOS is more concrete now
+The scan gives likely DOS equivalents for your VB resume-point files:
+
+#### `CompanyInfo.vb`
+Likely corresponds to:
+- `REALNAME.DAT`
+- `PRC\<CODE>.PRC`
+
+#### `CompanyLookupService.vb`
+Likely corresponds to DOS behaviors like:
+- open/check existence of `PRC\<company>.PRC`
+- fallback prefix matching using PRC directory listing
+- related name/contact lookup behavior via rolodex files
+
+#### `FormAddChecks.vb`
+Likely corresponds directly to:
+- `LEDGER.ASC` add-check flow
+- invoice selection/validation
+- balance checking
+- posting updates
+- delete/reset behavior
+- possibly â€œOTHER checksâ€ sister flow
+
+This is a much clearer resume map than we had before.
+
+---
+
+### 6. DOS UX rules are now clearer
+This scan gave strong concrete UX patterns to preserve:
+
+- boxed text-mode headers
+- letter/number hotkey menu presentation
+- keyboard-first loops
+- â€œTYPE A LETTERâ€ prompt rhythm
+- CAPS LOCK expectations
+- explicit status messaging
+- `[Q = Quit]`, `[ESC = Exit]`, `[ENTER = default]`
+- beep/emphasis for warnings
+- repeated confirmation loops
+- modal, workflow-driven navigation instead of freeform UI
+
+That fits exactly with your instruction to preserve the existing DOS-style WinForms pattern.
+
+---
+
+## Best interpretation of where you likely are now
+
+### What we know from DOS side
+- `LEDGER.ASC` is central to checks/cash-receipts parity
+- `PHONE.ASC` matters for rolodex and address/contact lookup
+- `INVOICE_.ASC` matters for invoice-state mutation
+- `BOOT.ASC` matters for void/update consistency
+
+### What we know from VB file list
+You already have:
+- `FormAddChecks.vb`
+- `CheckRepository.vb`
+- all four reader/writer families for the core accounting files
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+
+### Combined conclusion
+The likely remaining work is **not â€œstart from nothingâ€**.  
+It is more likely:
+
+- verify whether `FormAddChecks.vb` matches `LEDGER.ASC`
+- verify whether repository/service logic writes the same files in the same sequence as DOS
+- verify whether delete/reset/invoice-flag semantics match DOS
+- verify whether company lookup behavior matches DOS conventions
+- identify what `OTHER.CHK` flow is still missing or partial
+- later widen scope to invoice/void/update parity if needed
+
+---
+
+## What I would now consider the highest-value next inspection order
+Using both scans together, Iâ€™d inspect these next on the VB side:
+
+1. `FormAddChecks.vb`
+2. `CheckRepository.vb`
+3. `CheckInvWriter.vb`
+4. `InvoiceChkWriter.vb`
+5. `LedgerCurWriter.vb`
+6. `OtherChkWriter.vb`
+7. `CompanyLookupService.vb`
+8. `CompanyInfo.vb`
+
+And compare them mentally against these DOS sources:
+
+1. `LEDGER.ASC`
+2. `INVOICE_.ASC`
+3. `PHONE.ASC`
+4. `BOOT.ASC`
+
+---
+
+## Revised status statement
+If I were updating your working assumption, Iâ€™d now phrase it like this:
+
+> The current likely gap is not basic file writer existence for `INVOICE.CHK`, `LEDGER.CUR`, `CHECK.INV`, and `OTHER.CHK`, because the VB repo appears to already contain writer classes for those files. The more likely remaining gap is full DOS-parity orchestration for check/cash-receipts workflowsâ€”especially the exact multi-file mutation sequence, invoice status transitions, delete/reset behavior, and related company/invoice lookup semantics driven primarily by `LEDGER.ASC`, with broader accounting parity also touching invoice and maintenance flows in `INVOICE_.ASC` and `BOOT.ASC`.
+
+## Recommended next move
+Now that we have the DOS-side map, the fastest way forward is:
+
+- paste `FormAddChecks.vb` first  
+- then `CheckRepository.vb`  
+- then `CompanyLookupService.vb`
+
+That will let me tell you:
+- what the VB checks flow already does
+- what parts match DOS
+- what parity is still missing
+- whether the true next work item is in UI, service/repository logic, or file writers.
+
+## @testsubject117
+
+here's the results from the AmiWinForms scan: Researching implementation of WinForms app and existing patterns
+
+4m 57s
+
+Setting up environment
+
+Clone repository testsubject117/AmiWinForms
+
+Start 'runtime-tools' MCP server
+
+Start 'github-mcp-server' MCP server
+
+Start 'playwright' MCP server
+
+View workspace/testsubject117/AmiWinForms
+
+Find all .vb files in the repository
+
+Read FormMainMenu.vb
+
+Read CompanyInfo.vb
+
+Read CompanyLookupService.vb
+
+Read FormAddChecks.vb
+
+Read FormLedgerMenu.vb
+
+Read DosMenuFormBase.vb
+
+Read FormLedgerView.vb
+
+Read OtherChecksView and DoesntBalance forms
+
+Read ledger/find forms
+
+Read Sales Employee forms
+
+Read AppPaths and LegacyDataPaths
+
+Read data reader modules
+
+Read SalesEmployeesChecksMenu (first 200 lines)
+
+Read misc forms
+
+Check size and preview of misc forms file
+
+Read service and helper files
+
+Read FormEmpNameEditor.vb
+
+Read designer files to understand layout
+
+Grep class names in misc forms output
+
+Get git commit history
+
+Check file sizes
+
+Read FormPersonalCalendar portion
+
+Read FormAbout portion
+
+Read FormLedgerDoesntBalance.vb
+
+Read BuildInfo
+
+Read beginning of FormLedgerDoesntBalance
+1 premium request Â· Claude Sonnet 4.6
+Now I have a thorough picture of the entire repository. Here is the complete analysis:
+
+AMiWinForms Repository: Implementation Continuity Analysis
+1. Overall Scope and Purpose
+testsubject117/AmiWinForms is a VB.NET WinForms port of a DOS GW-BASIC business application called AMiOffice (Active Magnetic Inspection Main Menu Application). It is a UNC-shareâ€“based multi-workstation office system that reads and writes legacy GW-BASIC sequential and binary flat-file data. All data lives on a Windows file share at \\invoice\MainMenu\Data\. The port preserves the original DOS menu numbering, keyboard-first behavior, prompt wording, and file formats precisely.
+
+Version: AMiOffice v1.0.0 (Build 28) â€” Generated/BuildInfo.g.vb
+Visible git history: Only 2 commits (shallow clone):
+
+cb8271f (HEAD): "Add company lookup and Add Checks form files"
+792b382: "Fix Sales Employee checks menu (A) label to show '&' and capitalize Customers"
+2. Complete File Inventory and Roles
+File	Role	Status
+AppPaths.vb	Module: UNC root, Data, Backup, WordDocs paths	âœ… Complete
+LegacyDataPaths.vb	Class: typed paths for every legacy data file	âœ… Complete
+ApplicationEvents.vb	Empty MyApplication partial (boilerplate)	Placeholder
+BuildInfo.g.vb	Auto-generated version/build string	âœ… Generated
+MigrationService.vb	One-time migration from \\invoice\ root â†’ Data\	âœ… Complete
+BackupService.vb	Rotating zip backup + word-docs backup	âœ… Complete
+UiFileErrors.vb	Shared helpers: file-missing / unreadable dialogs	âœ… Complete
+CompanyInfo.vb	Model: CompanyCode, PrcFileName, CompanyName	âœ… Complete (3 props)
+CompanyLookupService.vb	Reads REALNAME.DAT; exact/prefix/first-letter lookup	âœ… Complete
+LedgerCurReader.vb	Reads LEDGER.CUR (6-line GW-BASIC records)	âœ… Complete
+CheckInvReader.vb	Reads CHECK.INV (WRITE# format: header + invoice lines)	âœ… Complete
+OtherChkReader.vb	Reads OTHER.CHK (6-line GW-BASIC records)	âœ… Complete
+InvoiceChkReader.vb	Reads INVOICE.CHK (26-byte binary random-access, MBF floats)	âœ… Complete
+DosMenuFormBase.vb	Base class for all DOS-style submenus	âœ… Complete (311 lines)
+FormMainMenu.vb/.Designer.vb	Main application menu (29 items, two columns)	âœ… Layout complete; most items NotYet
+FormLedgerMenu.vb/.Designer.vb	CHECKS submenu (option C from main)	âœ… Layout + most wiring
+FormAddChecks.vb	Company-code entry step 1 of Add Checks workflow	âš ï¸ Partial (step 1 only; no designer)
+FormLedgerView.vb/.Designer.vb	View Checks: filterable grid + invoice detail panel	âœ… Complete (360 lines)
+FormLedgerCompanyTotals.vb/.Designer.vb	Company-level totals from LEDGER.CUR	âœ… Complete
+FormLedgerDoesntBalance.vb	Async balance report: LEDGER.CUR vs CHECK.INV	âœ… Complete (21KB, async CancellationToken, DGV color rows, CSV export)
+FormFindByCheckNumber.vb/.Designer.vb	Lookup CHECK.INV by check number	âœ… Complete
+FormFindByInvoiceNumber.vb/.Designer.vb	Lookup CHECK.INV by invoice number	âœ… Complete
+FormOtherChecksView.vb/.Designer.vb	View OTHER.CHK with company filter	âœ… Complete
+FormSalesEmployeesChecksMenu.vb	Sales Employees sub-submenu (S from CHECKS)	âœ… Complete
+FormSalesEmployeeCheckWizard.vb	4-step wizard: employee â†’ invoice range â†’ scan â†’ report	âœ… Complete (627 lines)
+FormEmpNameEditor.vb	EMPNAME.DAT full-text editor with normalization	âœ… Complete
+FormMileageTracking.vb/.Designer.vb	Mileage entries: add/delete/save/view/print	âœ… Complete (855 lines)
+FormPersonalCalendar.vb/.Designer.vb	Personal calendar: recurring entries, month navigation, search	âœ… Complete (868 lines)
+FormAbout.vb/.Designer.vb	About dialog with runtime info, UNC path status, embedded logo	âœ… Complete
+FormAboutNew.vb/.Designer.vb	Empty (placeholder stub)	âŒ Placeholder
+3. The DOS-Style UI Pattern (Established Reference Implementation)
+The canonical pattern is split between FormMainMenu (oldest, has a Designer file) and DosMenuFormBase (newer abstraction all submenus inherit from). New work must match the DosMenuFormBase pattern, not the standalone FormMainMenu variant.
+
+Visual theme (from DosMenuFormBase.vb:64â€“70, 193â€“233):
+
+Form background: Color.FromArgb(32, 32, 32) dark gray
+Header bar: Color.Black, full-width top strip
+Title label (lblMainMenu): Castellar, 36pt, Bold, Yellow â€” left-anchored in header
+Clock label (lblDateTime): Segoe UI, 12pt, Bold, Yellow â€” right-fill in header; live 1-second tick
+Body: same dark gray, two FlowLayoutPanels side by side (left+right columns)
+Menu button recipe (from DosMenuFormBase.vb:193â€“220):
+
+Height: 36px
+Font: Segoe UI, 12pt, Bold
+Text alignment: MiddleLeft
+Text format: "(X) Label text" where X is the hotkey letter/number
+UseVisualStyleBackColor = False
+BackColor: Color.Black
+ForeColor: Color.White
+FlatStyle: Flat, 1px DimGray border
+MouseOver: (32,32,32), MouseDown: (64,64,64)
+Margin: 3, 3, 3, 6
+Width: stretches to panel width (via ResizeButtonsToPanel) OR fixed at ButtonFixedWidthPx (set in subclasses)
+Keyboard-first behavior (from DosMenuFormBase.vb:251â€“271):
+
+KeyPreview = True on every form
+KeyPress handler on the base class fires registered handlers by single-character key (case-insensitive)
+ESC is always wired to close (_keyHandlers("ESC") = Sub() Me.Close())
+AddMenuButton automatically registers the key handler in _keyHandlers
+Navigation style:
+
+Submenus: Using f As New FormXxx() : f.ShowDialog(Me) : End Using (modal, returns to parent)
+No MDI; all dialogs are ShowDialog children of their caller
+Single-column CHECKS menu layout (from FormLedgerMenu.vb:13â€“22):
+
+vb
+StretchButtonsToPanelWidth = False
+ButtonFixedWidthPx = 620
+flpLeft.Padding = New Padding(24, 0, 0, 0)
+flpRight.Visible = False  ' second column disabled
+All CHECKS-area submenus (FormSalesEmployeesChecksMenu, FormEmpNameEditor) copy this pattern exactly.
+
+Bottom ESC button (from DosMenuFormBase.vb:107â€“130):
+
+pnlBottom docked to Bottom, 52px tall
+btnEscClose: "(ESC) Close", Silver BG, Black text, Segoe UI 10pt Bold, 160Ã—30px, right-anchored
+4. Forms and Workflows: Implemented vs. Placeholder
+Fully implemented:
+
+Workflow	Entry point	Data files
+View Checks (with filtering + invoice drill-down)	CHECKS â†’ 3	LEDGER.CUR, CHECK.INV, INVOICE.CHK
+View Company Totals	CHECKS â†’ 5	LEDGER.CUR
+View OTHER Checks	CHECKS â†’ 8	OTHER.CHK
+Find a Check #	CHECKS â†’ 9	CHECK.INV
+Find an Invoice #	CHECKS â†’ 0	CHECK.INV
+Checks That Don't Balance	CHECKS â†’ A	LEDGER.CUR + CHECK.INV (async, cancellable)
+Sales Employee Checks menu	CHECKS â†’ S	â€”
+View/Edit Employee Names	CHECKS â†’ S â†’ A	EMPNAME.DAT
+Sales Employee Check Wizard	CHECKS â†’ S â†’ B	INVOICE.CHK, EMPNAME.DAT
+Mileage Tracking	Main â†’ 1	MILEAGE.DAT, ODOMETER.NUM
+Personal Calendar	Main â†’ Z	DATES.PMS, PMS.NUM
+Backup	Main â†’ I	\invoice\word, \invoice\MainMenu\Data\
+About dialog	Main â†’ ?	â€”
+Partially implemented:
+
+Workflow	What exists	What's missing
+Add Checks to ledger & cash receipts	FormAddChecks.vb: company-code prompt, REALNAME.DAT lookup, match list	Check data entry fields (amount, check #, date, invoice list); write to LEDGER.CUR
+Not yet implemented (show NotYet dialog):
+
+Main: A, B, D, E, F, G, H, J, K, L, M, N, O, P, Q, R, T, X, Y, 2, 3, 4, 6, 7
+CHECKS: 2 (Delete Checks), 6 (Add OTHER Checks), 7 (Delete OTHER Checks)
+5. Deep Dive: The Resume-Point Files
+CompanyInfo.vb (lines 1â€“6)
+A pure three-property model class. No logic. CompanyCode (8-char normalized), PrcFileName (CODE.PRC), CompanyName (real name from REALNAME.DAT).
+
+CompanyLookupService.vb (full, ~130 lines)
+Reads REALNAME.DAT (comma-separated: COMPANY.PRC,Company Name). Provides:
+
+LoadData() â€” reads and parses all lines
+GetAllCompanies() â€” sorted by CompanyCode
+FindExact(code) â€” OrdinalIgnoreCase match
+Exists(code) â€” bool wrapper
+FindByPrefix(prefix) â€” prefix match, sorted
+FindByFirstLetter(letter) â€” first-char match, sorted
+NormalizeCompanyCode() â€” trims .PRC suffix, uppercases, caps at 8 chars
+Path: The path is passed in via constructor â€” CompanyLookupService is path-agnostic. FormAddChecks instantiates it with the hardcoded string "\\invoice\MainMenu\Data\REALNAME.DAT" rather than using LegacyDataPaths. This is an inconsistency (every other form uses LegacyDataPaths properties).
+
+FormAddChecks.vb (248 lines, no Designer file)
+This form is the current resume point. It is step 1 of the "Add Checks" workflow:
+
+Fixed 760Ã—520, black BG, lime ForeColor, Consolas 11pt â€” it does not inherit DosMenuFormBase
+Title: Consolas 16pt Bold Yellow centered: "ADD CHECKS TO CASH RECEIPTS"
+Prompt layout: "Company Code:" label + TextBox (CharacterCasing.Upper, max 8) + Validate + Continue buttons
+Status label (white text, FixedSingle border) at y=145
+ListBox for partial matches at y=230
+Keyboard shortcuts: Escape=Cancel, F5=Validate, Enter-in-textbox=Validate, double-click-listbox=auto-fill+validate
+SelectedCompany As CompanyInfo is the public output property
+The form only selects a company. No fields for check number, amount, date, invoice list exist yet.
+Critical gap: FormLedgerMenu.vb:31 still reads:
+
+vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+FormAddChecks exists in the repo but the CHECKS menu has not been updated to launch it. Either the wire-up was not committed, or it exists only locally.
+
+6. Evidence of Repo Lagging Behind Local Work
+Two concrete indicators:
+
+FormAddChecks is not yet wired into FormLedgerMenu. The commit message for the HEAD commit is "Add company lookup and Add Checks form files" â€” strongly suggesting these files were committed as a batch upload but the calling code (FormLedgerMenu option 1) was not updated at the same time. The local working copy almost certainly has a modified FormLedgerMenu.vb that launches FormAddChecks, or plans to.
+
+Shallow clone (only 2 visible commits). The repo may have a much richer history on the main/master branch that isn't visible here (grafted marker on the second commit). Older work may have been done and pushed before the current branch was created.
+
+FormAboutNew â€” an empty class shell (2 lines). This is a leftover/in-progress artifact suggesting work was started but not committed.
+
+ApplicationEvents.vb â€” empty MyApplication partial. No startup customization (font, DPI mode) has been added yet, even though the comment block inside it specifically calls out ApplyApplicationDefaults as the hook for application-wide default Font and HighDpiMode.
+
+7. Implementation Patterns New Work Must Match
+For any new form in the CHECKS/cash-receipts area:
+
+Pattern	Rule
+Base class	Inherit DosMenuFormBase (not raw Form)
+Menu form sizing	Me.Width = 1000, Me.Height = 720, StretchButtonsToPanelWidth = False, ButtonFixedWidthPx = 620, flpLeft.Padding = New Padding(24,0,0,0), flpRight.Visible = False
+ShowVersionInHeader	False for all CHECKS-area menus
+Data paths	Use LegacyDataPaths.* (not hardcoded strings)
+File errors	Call UiFileErrors.ShowMissingRequiredFile / ShowUnableToReadRequiredFile
+Keyboard wiring	Register via AddMenuButton (auto-registers key handler); ESC is free from base
+NotYet stubs	Call NotYet("Feature name") from base â€” never MessageBox.Show directly for this
+Data entry forms	Keep them consistent with FormAddChecks aesthetics if continuing that form OR refactor to use DosMenuFormBase for consistency
+Prompt dialogs	Model after the FormLedgerPrompt inner class in FormLedgerMenu (FixedDialog, CenterParent, AcceptButton/CancelButton)
+Background work	Use Task.Run + Me.Invoke(...) + IsDisposed guard (see FormLedgerView.StartLoadCheckInvIndex)
+Async cancellation	Use CancellationTokenSource pattern (see FormLedgerDoesntBalance)
+8. Continuity Summary
+What the app can already do: The CHECKS/ledger read-side is essentially complete. You can view, filter, and drill into check records across LEDGER.CUR, CHECK.INV, INVOICE.CHK, and OTHER.CHK. You can find any check or invoice by number. You can identify imbalances (with async cancellable analysis + CSV export). You can view company-level totals. The sales-employee check wizard walks through employeeâ†’invoice-rangeâ†’scanâ†’summary. The mileage tracker and personal calendar are both full CRUD. Backup is working.
+
+What remains partial:
+
+Add Checks â€” the company-lookup step 1 (FormAddChecks) is committed; step 2 (check data entry: check #, amount, date, invoice association) and step 3 (write to LEDGER.CUR) do not yet exist. The CHECKS menu option 1 hasn't been re-wired to call FormAddChecks yet.
+What is likely next:
+
+Wire FormLedgerMenu option 1 â†’ FormAddChecks (immediate, trivial)
+Complete FormAddChecks with check data entry fields (check #, amount, date, invoices paid)
+Implement the LEDGER.CUR write routine (appending a new 6-line record)
+Optionally: CHECK.INV update (linking invoice numbers to the new check)
+Delete Checks (option 2) and Add/Delete OTHER Checks (options 6, 7)
+Known mismatch vs. user's remembered state: The user's resume point is "CompanyInfo, CompanyLookupService, FormAddChecks" â€” all three are in the HEAD commit. The mismatch is that FormLedgerMenu option 1 still shows NotYet, meaning the wire-up either hasn't been committed yet or was done locally and not pushed. The user should expect to push or re-apply that one-line change to FormLedgerMenu.BuildLedgerMenu().
+
+## Copilot
+
+Perfect â€” this gives us a much clearer merged picture.
+
+## Best current understanding
+Your VB repo is **more mature on the read side than the write side**, especially in the CHECKS area.
+
+### Strongest conclusion from the AmiWinForms scan
+The scan explicitly says:
+
+- **CHECKS / ledger read-side is essentially complete**
+- `FormAddChecks.vb` exists but is only **step 1**
+- `FormLedgerMenu` option **1** still points to `NotYet(...)` in the scanned repo
+- the repo likely **lags behind your local work**
+- the biggest unfinished area is still **write-side check posting / accounting parity**
+
+That lines up very well with the DOS scan.
+
+---
+
+# Merged synthesis: DOS repo + WinForms repo
+
+## What is already implemented well
+### DOS-style UI framework
+You already have an established WinForms pattern for DOS-style menus:
+- `DosMenuFormBase.vb`
+- `FormMainMenu.vb`
+- `FormLedgerMenu.vb`
+
+That means the visual/system pattern is not theoretical â€” it exists and should be reused.
+
+### Read-side accounting / checks workflows
+The scan says these are basically present:
+
+- View Checks
+- View Company Totals
+- View OTHER Checks
+- Find Check #
+- Find Invoice #
+- Checks That Donâ€™t Balance
+- Sales Employee Checks menu/workflow
+- Employee names editor
+
+Thatâ€™s a substantial read/reporting surface.
+
+### Supporting infrastructure
+You also already have:
+- UNC path handling
+- typed legacy data paths
+- migration service
+- backup service
+- file error helpers
+- company lookup model/service
+- file readers/writers
+
+So the app is not just menu shells anymore.
+
+---
+
+# What appears to be the real gap now
+
+## 1. `FormAddChecks.vb` is only the first step
+Per the scan, it currently does:
+- company code entry
+- `REALNAME.DAT` lookup
+- match list / validate selection
+- expose `SelectedCompany`
+
+But it does **not yet do**:
+- check number entry
+- amount entry
+- date entry
+- invoice selection/allocation
+- write to `LEDGER.CUR`
+- likely also not full `CHECK.INV` / `INVOICE.CHK` coordinated posting
+
+That makes it a **partial workflow shell**, not a full Add Checks implementation.
+
+---
+
+## 2. Write-side parity is probably the real current priority
+Combining both scans, the likely unfinished parity is:
+
+### Core add-check posting flow
+DOS source of truth:
+- `LEDGER.ASC`
+
+Likely missing or incomplete on VB side:
+- exact add-check UI workflow after company selection
+- check posting record creation
+- exact multi-file mutation sequence
+- invoice paid flag changes
+- check/invoice cross-reference writes
+- balance validation behavior
+- confirmation / prompt loop parity
+
+### Related write-side areas
+Still likely pending:
+- Delete Checks
+- Add OTHER Checks
+- Delete OTHER Checks
+
+And perhaps later:
+- broader invoice/void/update parity touching `INVOICE_.ASC` / `BOOT.ASC`
+
+---
+
+# Important correction to earlier assumptions
+Your old resume note:
+
+> â€œThe biggest remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.â€
+
+Now looks **mostly right**, but needs refinement.
+
+A better version now is:
+
+> The biggest remaining gap appears to be the end-to-end write-side CHECKS workflow, especially Add Checks / Delete Checks / OTHER Checks parity, including coordinated updates across `LEDGER.CUR`, `CHECK.INV`, `INVOICE.CHK`, and `OTHER.CHK`, using the exact sequencing and prompt/validation behavior found in `LEDGER.ASC`.
+
+Thatâ€™s more accurate than saying the gap is simply â€œthese files need writers,â€ because the VB repo already has writer classes.
+
+---
+
+# Most important repo mismatch we now know
+This is a big one:
+
+## In scanned AmiWinForms:
+`FormLedgerMenu` option 1 still says `NotYet(...)`
+
+But:
+- `FormAddChecks.vb`
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+
+all exist.
+
+That strongly suggests one of two things:
+1. your local repo has newer unpushed wiring changes, or
+2. the repo contains the start of the feature but not the final menu hook-up yet
+
+So yes â€” your instinct that the remote may not be fully up to date is probably correct.
+
+---
+
+# What absolutely must be preserved
+The scan gives a very concrete pattern to keep:
+
+## For menu forms
+- inherit `DosMenuFormBase`
+- preserve dark-gray / black / yellow DOS-style theme
+- preserve keyboard-first hotkey handling
+- preserve modal submenu navigation
+- preserve left-aligned `(X)` menu text rhythm
+- preserve ESC close behavior
+- preserve one-column CHECKS menu layout when appropriate
+
+## For checks-area work
+Match the established style of:
+- `FormLedgerMenu`
+- `FormSalesEmployeesChecksMenu`
+- DOS CHECKS flow from `LEDGER.ASC`
+
+And avoid modernizing:
+- layout
+- prompts
+- workflow sequence
+- navigation style
+- validation phrasing
+
+---
+
+# Best â€œwhere we are nowâ€ summary
+
+## Done enough
+- DOS-style menu system
+- CHECKS read/report/query views
+- company lookup service/model
+- ledger readers/writers infrastructure
+- miscellaneous menu placeholder
+- several non-checks workflows
+
+## Partial
+- Add Checks workflow
+- some menu wiring
+- write-side coordinated accounting parity
+
+## Likely not done yet
+- full Add Checks posting
+- Delete Checks parity
+- Add/Delete OTHER Checks parity
+- exact DOS multi-file mutation parity from `LEDGER.ASC`
+
+---
+
+# Best next technical target
+If we follow the evidence instead of memory, the strongest next coding target is:
+
+## **Finish the Add Checks workflow end-to-end**
+That means, in practical terms:
+
+1. verify whether local `FormLedgerMenu.vb` already launches `FormAddChecks`
+2. finish `FormAddChecks.vb` beyond company selection
+3. compare every step against `LEDGER.ASC`
+4. ensure coordinated writes across:
+   - `LEDGER.CUR`
+   - `CHECK.INV`
+   - `INVOICE.CHK`
+   - maybe `OTHER.CHK` only for sibling flow, not main Add Checks
+5. preserve DOS prompt rhythm and keyboard behavior
+
+---
+
+# My recommendation for the next files to inspect locally
+Now that we have both repo scans, the best local files to review next are:
+
+1. `FormAddChecks.vb`
+2. `FormLedgerMenu.vb`
+3. `CheckRepository.vb`
+4. `LedgerCurWriter.vb`
+5. `CheckInvWriter.vb`
+6. `InvoiceChkWriter.vb`
+7. `OtherChkWriter.vb`
+8. optionally `LegacyDataPaths.vb`
+
+That will let us determine:
+- what your local repo already fixed
+- whether option 1 is wired up locally
+- whether the writing logic already exists but just isnâ€™t connected
+- whether the real gap is UI, orchestration, or both
+
+---
+
+# Short version
+## The two scans together say:
+- **DOS source of truth for current work:** `LEDGER.ASC`
+- **WinForms current resume point is still valid:** `CompanyInfo.vb`, `CompanyLookupService.vb`, `FormAddChecks.vb`
+- **The real gap is likely Add Checks write-side parity**, not read-side reporting
+- **The remote repo probably lags your local work**
+- **The next highest-value target is finishing Add Checks end-to-end**
+
+If you want, the next best move is:  
+paste your current local versions of:
+- `FormAddChecks.vb`
+- `FormLedgerMenu.vb`
+- `CheckRepository.vb`
+
+and Iâ€™ll compare that against what the scans imply we should expect.
+
+## @testsubject117
+
+I now want you to scan the chat history repo. I have a chat history repo specifically to upload chat conversations, extract them and break them into smaller .md files for you to review. You should find the latest .md files (05/21/2026) in the repo. I want you to review that latest .md file so you know exactly where we left off on thursday. that repo is: testsubject117/Co-Pilot-Chat-History
+
+## Copilot
+
+I checked the repo, but I **did not find a `2026-05-21` folder or matching `05/21/2026` markdown file in the remote repo contents I could access**.
+
+What I **did** find:
+- a top-level `may-2026-recovery` folder
+- lots of top-level split files named `2026-05-20_master-history_part_001.txt` through later parts
+- a top-level markdown file for **Tuesday, May 19, 2026**:
+  - `tue_may_19_2026_preparing_for_a_break_in_work.md`
+- a top-level markdown file for **Monday, May 18, 2026**:
+  - `mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md`
+
+I also attempted to open `may-2026-recovery/2026-05-21`, but that path came back not found.
+
+## Most likely explanation
+One of these is true:
+- the **May 21, 2026** files were pushed to a different branch, not the default branch I queried
+- they were saved under a different path/name than expected
+- they exist only in your **local repo**, not yet on the remote branch I can see
+- the recovery folder structure is different than the script intended
+
+## Important note
+This lines up with something we already suspected elsewhere: **remote repo state may lag local state**.
+
+## Fastest way to resolve it
+Please either:
+
+### Option A
+Paste the exact path/name of the `2026-05-21` file from your local repo.
+
+For example, from your local chat-history repo:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+Get-ChildItem -Recurse | Where-Object { $_.Name -like "*2026-05-21*" } | Select-Object FullName
+```
+
+### Option B
+Paste the local contents of the folder you expect:
+
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History" -Recurse |
+    Where-Object { $_.FullName -like "*2026-05-21*" } |
+    Select-Object FullName, Name
+```
+
+### Option C
+If you know the branch is not `main`, tell me which branch has the file.
+
+## Short answer
+I **could not verify or review a `05/21/2026` markdown file in the remote repo from what was accessible**. I found **May 18** and **May 19** chat files, plus many **2026-05-20 split master-history text parts**, but not the May 21 markdown you expected.
+
+## @testsubject117
+
+forget that top level may-2026-recovery folder
+
+## Copilot
+
+Understood â€” Iâ€™ll ignore the **top-level `may-2026-recovery` folder**.
+
+From what I saw at the repo root, the most relevant/latest chat-history artifacts outside that folder were:
+
+- `tue_may_19_2026_preparing_for_a_break_in_work.md`
+- `tue_may_19_2026_preparing_for_a_break_in_work (1).md`
+- `tue_may_19_2026_preparing_for_a_break_in_work (2).md`
+- `tue_may_19_2026_preparing_for_a_break_in_work (3).md`
+- `mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md`
+- many split text files named:
+  - `2026-05-20_master-history_part_001.txt`
+  - through later numbered parts
+
+## Important consequence
+If we are ignoring `may-2026-recovery`, then I still do **not** see a root-level `05/21/2026` markdown file in the portion of the repo contents I queried.
+
+So the likely latest meaningful chat-history candidates are:
+
+1. **`tue_may_19_2026_preparing_for_a_break_in_work.md`**
+2. the **`2026-05-20_master-history_part_*.txt`** split files
+
+## Best next step
+Tell me which one you want me to treat as the Thursday stopping point:
+
+- **Option A:** `tue_may_19_2026_preparing_for_a_break_in_work.md`
+- **Option B:** the `2026-05-20_master-history_part_*.txt` sequence
+
+If your Thursday session was actually captured in the split master-history parts, then those are probably the correct source.
+
+If you want, I can next help you identify **which `2026-05-20_master-history_part_0xx.txt` contains the end-of-day Thursday summary**.
+
+## @testsubject117
+
+how many file parts can I send at one time?
+
+## Copilot
+
+You can usually send **one reasonably sized part at a time most safely**.
+
+## Practical recommendation
+For these big chat-history files, send:
+
+- **1 part per message** if the part is large
+- **2â€“3 parts in one message** only if theyâ€™re modest in size and not huge walls of text
+
+## Best workflow
+To avoid truncation or missing context:
+
+1. send **part 1**
+2. I summarize / extract key state
+3. send **part 2**
+4. repeat until we reach the Thursday stopping point
+
+## If you want me to track continuity across parts
+Label them clearly, like:
+
+- `Part 041`
+- `Part 042`
+- `Part 043`
+
+That way I can keep the thread straight.
+
+## Rule of thumb
+If a pasted block feels â€œvery longâ€ in your editor, **just send one part at a time**.
+
+## Best answer
+For reliability: **send 1 part per message**.  
+If the files are small enough, **2 at most** is usually fine.
+
+## @testsubject117
+
+ok, I just pushed the latest files to the chat history repo, there should be files there that say _5_26_2026, can you scan and check?
+
+## Copilot
+
+I checked, and **I still do not see any newly pushed top-level files containing `_5_26_2026` in the remote repo results I can access right now**.
+
+What I can confirm seeing at the top level:
+- lots of `2026-05-20_master-history_part_###.txt` files
+- `mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md`
+- multiple `tue_may_19_2026_preparing_for_a_break_in_work*.md` and `.json` files
+- folders like `ami-research`, `may-2026-recovery`, and split-parts directories
+
+## So right now
+I **cannot confirm** a remote file matching:
+- `*_5_26_2026*`
+
+or any obvious new May 26, 2026 chat-history file from the visible results.
+
+## Most likely explanations
+- the push hasnâ€™t propagated to the branch/default view Iâ€™m querying yet
+- the files were pushed to a **non-default branch**
+- the names use a different pattern than `_5_26_2026`
+- they are beyond the first visible result window and need more paging/searching
+- they exist locally but the remote branch I can inspect doesnâ€™t show them yet
+
+## Fastest local verification
+From your local chat-history repo, run:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git status
+git branch --show-current
+git log -1 --oneline
+Get-ChildItem -Recurse | Where-Object { $_.Name -like "*5_26_2026*" -or $_.Name -like "*2026-05-26*" } | Select-Object FullName, Name
+```
+
+## If you want me to keep checking the remote
+I can keep looking, but Iâ€™ll need either:
+- the exact branch name, or
+- the exact filename pattern, or
+- the next-page / folder path you want me to inspect
+
+## Short answer
+**No â€” I canâ€™t confirm the new `_5_26_2026` files from the remote repo view I have yet.**
+
+## @testsubject117
+
+ok, send me the powershell commands to push the contents of: C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History\may-2026-recovery\2026-05-26\2026-05-26_master-history_parts to the chat history repo
+
+## Copilot
+
+Run these from PowerShell to copy that folderâ€™s contents into your chat-history repo, commit, and push.
+
+## If those files already live inside the repo
+If this path is already inside the repo:
+
+```text
+C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History\may-2026-recovery\2026-05-26\2026-05-26_master-history_parts
+```
+
+then you only need:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git status
+git add "may-2026-recovery/2026-05-26/2026-05-26_master-history_parts"
+git commit -m "Add 2026-05-26 master history parts"
+git push origin upload-chat-history
+```
+
+---
+
+## If you want to verify branch first
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git branch --show-current
+```
+
+If it is **not** `upload-chat-history`, switch first:
+
+```powershell
+git checkout upload-chat-history
+```
+
+Then run:
+
+```powershell
+git add "may-2026-recovery/2026-05-26/2026-05-26_master-history_parts"
+git commit -m "Add 2026-05-26 master history parts"
+git push origin upload-chat-history
+```
+
+---
+
+## One full safe sequence
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git checkout upload-chat-history
+git pull origin upload-chat-history
+git status
+git add "may-2026-recovery/2026-05-26/2026-05-26_master-history_parts"
+git commit -m "Add 2026-05-26 master history parts"
+git push origin upload-chat-history
+```
+
+---
+
+## If git says there is nothing to commit
+That means the files are either:
+- already committed, or
+- not actually present, or
+- ignored by `.gitignore`
+
+Then run:
+
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History\may-2026-recovery\2026-05-26\2026-05-26_master-history_parts"
+git status --untracked-files=all
+```
+
+---
+
+## If you specifically want to add only `.txt` or `.md` files
+Example for `.txt` only:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git add "may-2026-recovery/2026-05-26/2026-05-26_master-history_parts/*.txt"
+git commit -m "Add 2026-05-26 master history text parts"
+git push origin upload-chat-history
+```
+
+## Best command set
+Use this:
+
+```powershell
+Set-Location "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+git checkout upload-chat-history
+git pull origin upload-chat-history
+git add "may-2026-recovery/2026-05-26/2026-05-26_master-history_parts"
+git commit -m "Add 2026-05-26 master history parts"
+git push origin upload-chat-history
+```
+
+If you want, after you run it, paste the output and Iâ€™ll verify whether it pushed successfully.
+
+## @testsubject117
+
+```
+PS C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History> git pull origin upload-chat-history
+From https://github.com/testsubject117/Co-Pilot-Chat-History
+ * branch            upload-chat-history -> FETCH_HEAD
+Already up to date.

@@ -1,0 +1,2000 @@
+﻿            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+        AddHandler dgv.DataBindingComplete, AddressOf OnMainGridDataBindingComplete
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub OnMainGridDataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgv.Columns.Contains("DateText") Then
+            dgv.Columns("DateText").HeaderText = "Date"
+        End If
+
+        If dgv.Columns.Contains("CheckNumber") Then
+            dgv.Columns("CheckNumber").HeaderText = "Check #"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiff") Then
+            dgv.Columns("InvoiceDiff").HeaderText = "Invoice Diff"
+        End If
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("")
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("")
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2)
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                End Try
+
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+```
+
+---
+
+## Why this works
+The grid is auto-generating columns from the bound object, so changing the displayed names after binding is the cleanest minimal fix.
+
+## What should change visually
+You should now see:
+
+- `Date` instead of `DateText`
+- `Check #` instead of `CheckNumber`
+- `Invoice Diff` instead of `InvoiceDiff`
+
+---
+
+## Next step
+Once those headers look right, the next issue to investigate is why **Invoice Diff is blank for historical rows** except the test record. That is likely a data/reader issue, not just display.
+
+## @testsubject117
+
+yes that worked, do you have the details from the amidatastore repo scan? you should be able to figure out why invoices are not populating that way. I seem to recall you had previously set it up so that checks attached to invoices appeared at the bottom no invoices were coded yellow and if there was an invoice the fields were coded pink, but we don't need that color coding, at least right now. My point is, you had it working previously and you did it by scanning that repo and reviewing the gwbasic files
+
+## Copilot
+
+I donâ€™t currently have the legacy scan results available in this turn, so I canâ€™t reliably reconstruct the AMiDataStore/GW-BASIC-side invoice logic from the repo right now.
+
+## But based on what we already established
+Your recollection makes sense, and it strongly suggests this:
+
+- the old DOS behavior did **not** depend only on a raw `InvoiceDiff` field already sitting in `LEDGER.CUR`
+- it likely **joined or derived invoice presence/details** from legacy files like:
+  - `CHECK.INV`
+  - `INVOICE.CHK`
+- and then used that result to drive:
+  - bottom invoice detail population
+  - and possibly visual cues/color differences
+
+That fits what youâ€™re seeing now:
+
+- historical rows show blank `InvoiceDiff`
+- the one newly created test row shows `0`
+- which suggests the new test data may explicitly write a value, while older rows relied on derived lookup behavior
+
+## Most likely explanation
+The current WinForms `View Checks` screen is probably doing only part of the old DOS logic:
+
+- it loads `LEDGER.CUR`
+- shows the raw ledger row fields
+- then separately tries to look up invoice details for the selected row
+
+So if historical rows depended on:
+- a matching `CHECK.INV` key
+- customer-code normalization
+- padded check-number formatting
+- or a derived invoice-difference calculation from invoice amounts
+
+then that logic may be incomplete or mismatching for older data.
+
+## Why the test record is suspicious
+Your test record showing:
+- `InvoiceDiff = 0`
+
+is actually a big clue.
+
+That suggests one of these:
+1. the delete/add test path explicitly set `InvoiceDiff`
+2. the new record format matches the current parser better than old records do
+3. older records need legacy normalization logic that the current code is missing
+
+## My best practical recommendation
+Since we canâ€™t rely on the old scan details at this moment, the next best move is:
+
+### inspect the current `LedgerEntry` model and `LedgerCurReader`
+Specifically, check:
+- what type/property `InvoiceDiff` is
+- whether `LedgerCurReader` is actually filling it for old rows
+- whether blank old values are expected from the file format
+- and whether the DOS behavior was supposed to compute invoice linkage dynamically instead of reading a stored value
+
+### then inspect the selected-row invoice lookup path
+The next likely point is:
+- how the app builds the `Customer|CheckNumber` key
+- whether historical customer codes or check numbers need trimming/normalization differently
+- whether old `CHECK.INV` records match the same customer string shown in `LEDGER.CUR`
+
+Because your bottom panel saying:
+- â€œNo invoice details availableâ€¦â€
+
+for many historical rows strongly suggests a key-matching problem, not just a display problem.
+
+## Short version
+No, I canâ€™t see the old AMiDataStore scan details right now.
+
+But yes, I agree with your diagnosis:
+- this almost certainly used to work through legacy-file comparison logic,
+- not just raw display of stored fields,
+- and the issue is probably in the current reader/join/normalization path for historical rows.
+
+## Best next step from here
+If you want, paste these files next and Iâ€™ll reason it through directly from the code you have locally:
+
+- `LedgerEntry.vb` or wherever `LedgerEntry` is defined
+- `LedgerCurReader.vb`
+- `CheckInvReader.vb`
+
+That should be enough to narrow down why historical invoice-related data is not populating.
+
+## @testsubject117
+
+Understanding the architecture and behavior of DOS/GW-BASIC application
+
+8m 26s
+
+Setting up environment
+
+Clone repository testsubject117/AMiDataStore
+
+Start 'github-mcp-server' MCP server
+
+Start 'playwright' MCP server
+
+View repository
+
+Find files **/*
+
+Search (INVOICE\.CHK|CHECK\.INV|LEDGER\.CUR|JOURNAL\.CUR|LOGBOOK\.[A-Za-z0-9]+|REALNAME\.DAT|VENDOR\.DAT|PURCHASE\.DAT|COD\.DAT|COD-NO\.DAT|PROCDURE\.DAT|PRC\\.*\.PRC|\.BAS|\.DAT|\.CUR|\.INV|\.CHK|\.PRC)$
+
+Search 3 times
+
+\b(CHAIN|RUN|MERGE|GOSUB|ON KEY|KEY|OPEN|FIELD|GET|PUT|NAME |KILL |MKDIR|CHDIR|SHELL|LPRINT|LPT1|COM1|FILES|WIDTH|RANDOMIZE|INPUT\$|UCASE\$|LEFT\$\(|MID\$\()
+
+(INVOICE\.CHK|CHECK\.INV|LEDGER\.CUR|JOURNAL\.CUR|LOGBOOK\.[0-9A-Z]+|REALNAME\.DAT|VENDOR\.DAT|PURCHASE\.DAT|COD\.DAT|COD-NO\.DAT|PROCDURE\.DAT|INVOICE\.NUM|LASTINVO\.ICE|MONTH\.INV|CHECKNO\.DAT|OURPO\.NUM|PACK\.NUM|ODOMETER\.NUM|MESSAGE\.NUM|PMS\.NUM|JOKE\.NUM)
+
+MENU|MAIN|START|INVOICE|LEDGER|SALES|LOGBOOK|PURCHASE|PRICE|VENDOR|CHECK|JOURNAL
+
+View 4 files
+
+START.BAS:1-250
+
+MAINM.BAS:1-260
+
+MAINMENU.BAS:1-260
+
+STARTUP.LOG:1-120
+
+View 4 files
+
+START.ASC:1-220
+
+MAINM.ASC:1-260
+
+INVOICE_.ASC:1-260
+
+SALES.ASC:1-260
+
+View 4 files
+
+PRC
+
+LEDGER.ASC:1-280
+
+LOGBOOK.ASC:1-280
+
+PURCHASE.ASC:1-280
+
+Search (INVOICE\.CHK|JOURNAL\.CUR|LOGBOOK\.|LEDGER\.CUR|LASTINVO\.ICE|REALNAME\.DAT|PROCDURE\.DAT|COD\.DAT|COD-NO\.DAT|CHECKNO\.DAT|MONTH\.INV|INVOICE\.NUM|LPRINT|OPEN ".*SHOPCARD|FAA|VOID|UPDATE RECORDS|CORRECTED CERT|INVOICE\.TXT|INVOICE\.BBB|INVOICE\.BCK|CHECK\.INV)
+
+View 3 files
+
+INVOICE_.ASC:260-620
+
+INVOICE_.ASC:620-980
+
+INVOICE_.ASC:980-1360
+
+View 4 files
+
+PLIST.ASC:1-320
+
+BILL.ASC:1-320
+
+CHECK.AS2:1-320
+
+SHOP.BAS:1-80
+
+Search SHOPCARD\\|\.CRD|WRITE#|OPEN ".*SHOPCARD|CUSTOMER\.NAM|PRC\\|A\$\(|SPEC\$\(|INPUT#
+
+View 3 files
+
+SHOPCARD.BAS:4300-4520
+
+SHOPCARD.BAS:4440-4545
+
+SHOPCARD.BAS:820-1080
+
+Search OPEN "SHOPCARD|WRITE#|INPUT#|\.crd|\.CRD|MKDIR|CHDIR|CUSTOMER\.NAM
+
+View 2 files
+
+SHOP-OLD.BAS:4380-4520
+
+SHOP-OLD.BAS:1080-1260
+
+Search 3 times
+
+4440|4450|4460|4470|4480|4490|4500|4510|4520|4530|4540|4550|4560|4570|4580|4590
+
+1080|1090|1100|1110|1120|1130|1140|1150|1160|1170|1180|1190|1200|1210|1220|1230|1240
+
+(WRITE#1,|WRITE #1,|OPEN .* AS #1|OPEN .* AS #2|OPEN .* AS #3|OPEN .* AS #4)
+
+View 2 files
+
+CHECK.AS2:1-260
+
+BILL.BAS:1-220
+
+Search (CHECK\.INV|LEDGER\.CUR|OTHER\.CHK|INVOICE\.CHK|CHECKNO\.DAT|VOID|DELETE|RESET|PAYDEP|DEPCHECK|CHECKNO|BILLS\.DAT|BILLSCHK\.DAT)
+
+View 4 files
+
+INVCHK.ASC:1-260
+
+INVFIX.ASC:1-260
+
+LEDG-CHK.ASC:1-260
+
+LOGBSCAN.ASC:1-260
+
+View 4 files
+
+JOURSCAN.ASC:1-260
+
+JRNLSCAN.BAS:1-200
+
+LOGSORT.ASC:1-260
+
+SORTNAME.ASC:1-260
+
+View 4 files
+
+CHKCREAT.BAS:1-260
+
+CHKCREA2.BAS:1-260
+
+LEDGSCAN.ASC:1-260
+
+NAMEREDO.ASC:1-260
+
+View 4 files
+
+AUTOEXEC.BAT:1-220
+
+BOOT.ASC:1-260
+
+DATECHNG.ASC:1-220
+
+ENTIRE.ASC:1-220
+
+View 8 files
+
+INVOICE.NUM:1-20
+
+LASTINVO.ICE:1-20
+
+COD.DAT:1-40
+
+COD-NO.DAT:1-40
+
+PROCDURE.DAT:1-40
+
+REALNAME.DAT:1-40
+
+VENDOR.DAT:1-40
+
+PURCHASE.DAT:1-40
+
+View 4 files
+
+JOURNAL.CUR:1-24
+
+LEDGER.CUR:1-24
+
+CHECK.INV:1-30
+
+INVOICE.CHK:1-20
+
+View 4 files
+
+COD.ASC:1-280
+
+INV-FIX.ASC:1-260
+
+CONVTLED.ASC:1-260
+
+INVCOPY.BAS:1-220
+
+Search (CHAIN|SHELL) ?"([^"]+)"
+
+Find files
+
+**/PHMESAGE*
+
+**/BAKFILES*
+
+**/MESSAGE*
+
+Find files
+
+**/PMS.ED
+
+**/CDRIVE.CHK
+
+**/PAYROLL.CHK
+
+**/LASER.CHK
+
+**/BKUP.DTE
+
+**/CURRENT.DTE
+
+View 4 files
+
+LOGIN.BAT:1-220
+
+STARTNET.BAT:1-220
+
+3.BAT:1-220
+
+GW.BAT:1-220
+
+Find files
+
+**/INVOICE*.BAS
+
+**/SHOP*.BAS
+
+**/*LEDG*.BAS
+
+**/*LOG*.BAS
+
+View 4 files
+
+INVOICE2.BAS:1-120
+
+INVOICE1.BAS:1-120
+
+INVOICEE.BAS:1-120
+
+INVOICE0.BAS:1-120
+
+View PHONE
+
+Find files PHONE/*.LST
+
+View 2 files
+
+PHONE.ASC:1-220
+
+PHONE/C.LST:1-40
+
+Search 3 times
+
+BILLSCHK\.DAT|FIELD #3, 6 AS CNUM2\$, 8 AS AMT2\$, 1 AS FLAG\$|FLAG\$ = "C"|FLAG\$ = "U"|FLAG\$ = "N"|RANDOM SHARED AS #3 LEN = 15|PUT #3
+
+DEPCHECK\.DAT|PAYDEP\.DAT|BILLS\.DAT|VENDOR\.DAT|CHECKNO\.DAT
+
+OPEN "INVOICE\.CHK" SHARED AS #3 LEN=26|FIELD #3,9 AS INUM\$,8 AS AMT\$,8 AS CO\$,1 AS FLAG\$|LSET FLAG\$|PUT#3|GET#3|FLAG\$="P"|FLAG\$="C"|FLAG\$="V"
+
+View 4 files
+
+PRC/3VFASTEN.PRC:1-30
+
+PRC/WESTERNC.PRC:1-30
+
+PRC/PACIFICC.PRC:1-30
+
+WESTERNC.MAG:1-40
+
+View 4 files
+
+LOGBOOK.25:1-24
+
+LOGBOOK.26:1-24
+
+LEDGER.CUR:1-12
+
+JOURNAL.CUR:1-12
+
+Search 2 times
+
+SER\$|INPUT#2,X:INPUT#2,Y:INPUT#2,Z\$|A\(CT, X, Y\)|-1
+
+SER\$|WRITE #1, -1: WRITE #1, -1|CAD\$|A\$\(CT, X, Y\)|INPUT #2, X: INPUT #2, Y: INPUT #2, Z\$
+
+Search 2 times
+
+SER|CAD|QtyREC\$|INPUT #2, N2\$\(CT\)|INPUT #2, X|A\$\(CT, X, Y\) = Z\$|-1
+
+SER|CAD|QtyREC\$|INPUT#2,N2\$\(CT\)|INPUT#2,X|A\$\(CT,X,Y\)=Z\$|-1
+0.9 premium requests Â· GPT-5.4
+Hereâ€™s the architecture Iâ€™d carry forward for a faithful WinForms continuation.
+
+1) Top-level runtime shape
+Boot/login is DOS + mapped drive oriented. AUTOEXEC.BAT loads SHARE, sets up LAN tooling, then calls LOGIN.BAT; LOGIN.BAT switches to F: and starts gwbasic mainmenu (AUTOEXEC.BAT:1-35, LOGIN.BAT:1-7).
+The readable main menu source is effectively in START.ASC, even though it saves/targets MAINMENU; it is the hub that launches almost every business module (START.ASC:5-18, START.ASC:62-88, START.ASC:104-151).
+Main menu options dispatch to:
+shop cards (SHOPCARD)
+invoice generation (INVOICE)
+customer payments / receipts (LEDGER)
+sales journal (SALES)
+logbook (LOGBOOK)
+pricing (PLIST)
+A/R inquiry (ENTIRE)
+purchasing (PURCHASE)
+cash disbursements / deposits / vendors (BILL)
+admin/update utilities (BOOT) (START.ASC:104-151).
+2) Core business data model
+There are really three ledgers:
+
+Operational production history
+
+LOGBOOK.yy: one record per invoiced part/line, including customer, part, invoice, PO, spec string, qty accepted/rejected, material, heat treat, reject reason, status (INVOICE_.ASC:325-327, LOGBOOK.ASC:42-47).
+Current samples match that schema (LOGBOOK.25:1-12, LOGBOOK.26:1-12).
+Sales journal
+
+JOURNAL.CUR: one record per invoiced procedure/charge line: date, invoice, PO, amount, customer code, procedure (INVOICE_.ASC:314-320).
+Current samples match that 6-field sequential schema (JOURNAL.CUR:1-12).
+Accounts receivable status
+
+INVOICE.CHK: random-access invoice master keyed by invoice - 75000, storing invoice slot, amount due, customer code, and 1-char status (INVOICE_.ASC:344-356, ENTIRE.ASC:111-122).
+Status semantics are:
+J = unpaid/open
+P = paid by customer check
+C = corrected cert
+V = void
+E = erased/administratively removed (ENTIRE.ASC:117-121, ENTIRE.ASC:158-162, ENTIRE.ASC:257-260).
+That split is central: invoices are printed from shopcards + price lists, then persisted into all three stores.
+
+3) Main workflows
+A. Shopcard creation
+Shopcards are created per customer abbreviation, which must correspond to a PRC\<abbr>.PRC price-list file (SHOP.BAS:19-40, PLIST.ASC:18-30).
+Shopcards are stored under a bucketed path SHOPCARD\<INT(card/200)>\<card>.CRD (INVOICE_.ASC:124, SHOP-OLD.BAS:571-580).
+Stored header fields are:
+customer code
+part number
+PO
+heat treat
+material
+pan count
+box count
+weight
+qty accepted/received proxy
+quantity received
+followed by repeated (section, field, value) triples for populated attributes (SHOP-OLD.BAS:573-579).
+B. Invoice generation
+Invoice entry begins by choosing 1â€“6 shopcards and validating same customer / PO family (INVOICE_.ASC:110-151, INVOICE_.ASC:180-188).
+The customerâ€™s price list is PRC\<abbr>.PRC; each record is procedure-part, effective date, minimum charge, price, /EA or /# (PLIST.ASC:143-145, PRC/3VFASTEN.PRC:1-12, PRC/PACIFICC.PRC:1-30).
+The invoice module loads:
+COD.DAT for delinquent COD warnings (INVOICE_.ASC:7-12, COD.DAT:1-21)
+COD-NO.DAT for exemptions (INVOICE_.ASC:13-15, COD-NO.DAT:1-8)
+PROCDURE.DAT for the canonical procedure vocabulary (INVOICE_.ASC:16-18, PROCDURE.DAT:1-40)
+INSPECTR.DAT for default inspector name (INVOICE_.ASC:20, INVOICE_.ASC:224-225, INVOICE_.ASC:545-557).
+It calculates charges from the selected procedures and shopcard quantities/weights, applying minimum charges and special test logic for salt spray / humidity / copper sulfate (INVOICE_.ASC:35-74).
+It resolves the customerâ€™s actual printable name from REALNAME.DAT (INVOICE_.ASC:192-200, REALNAME.DAT:1-40).
+Special customer workflows exist for PACIFICC and WESTERNC, including custom line packing and engine-model / serial prompts (INVOICE_.ASC:271-272, INVOICE_.ASC:323-328, INVOICE_.ASC:714-781, PRC/PACIFICC.PRC:1-30, PRC/WESTERNC.PRC:1-30, WESTERNC.MAG:1-40).
+FAA stamp defaults on for a hardcoded customer set and can be toggled (INVOICE_.ASC:185-186, INVOICE_.ASC:222-234, INVOICE_.ASC:371-380).
+C. Printing and updating invoice records
+Printing writes directly to LPT1: and uses LPRINT escape sequences; this is not abstracted (INVOICE_.ASC:367-416).
+After printing, or via â€œupdate without print,â€ it:
+appends procedure lines to JOURNAL.CUR (INVOICE_.ASC:314-320)
+appends part-level entries to LOGBOOK.yy (INVOICE_.ASC:323-328)
+updates invoice month markers / last invoice trackers (INVOICE_.ASC:330-335)
+updates INVOICE.CHK random-access state (INVOICE_.ASC:344-356)
+updates INVOICE.NUM to the last used invoice number (INVOICE_.ASC:363-365).
+D. Customer check / receipt posting
+LEDGER.ASC is really the customer receipts module, not the invoice ledger.
+When entering a customer check, it validates each invoice number against INVOICE.CHK, rejects already paid / corrected / void invoices, and then flips those invoice flags to P (LEDGER.ASC:83-118, LEDGER.ASC:163-172).
+It appends:
+a summary record to LEDGER.CUR
+a header + invoice-number list to CHECK.INV (LEDGER.ASC:167-172).
+CHECK.INV format is:
+customer, check#, reference, date, amount, count, then count invoice numbers (LEDGER.ASC:169-171, CHECK.INV:1-18).
+LEDGER.CUR current live format is six sequential fields: customer, date, check#, difference-text, amount, reference (LEDGER.ASC:60-79, LEDGER.CUR:1-12).
+E. A/R inquiry / unpaid management
+ENTIRE.ASC is the A/R inquiry and maintenance console over INVOICE.CHK:
+view one invoice
+scan invoice ranges
+print invoice ranges
+unpaid views
+monthly statements
+mark invoices paid
+edit flags / amount / customer name
+COD editor handoff (ENTIRE.ASC:56-103, ENTIRE.ASC:111-180, ENTIRE.ASC:255-266, ENTIRE.ASC:721-722).
+It relies almost entirely on INVOICE.CHK; it is not reconstructing from JOURNAL.CUR.
+F. Sales and logbook analysis
+SALES.ASC reads JOURNAL.CUR for customer history, invoice lookup, procedure totals, and deletion of sales-journal entries (SALES.ASC:14-27, SALES.ASC:29-49, SALES.ASC:62-99, SALES.ASC:101-121).
+LOGBOOK.ASC reads LOGBOOK.yy for customer/PO/invoice lookup, â€œlast date of business,â€ spec scanning across years, and error scans (LOGBOOK.ASC:21-38, LOGBOOK.ASC:40-60, LOGBOOK.ASC:62-105, LOGBOOK.ASC:106-116).
+G. Purchasing
+PURCHASE.ASC is a separate purchasing subsystem.
+Vendor names are selected from VENDOR.DAT; purchase orders are stored in PURCHASE.DAT; next internal PO number is in OURPO.NUM (PURCHASE.ASC:16, PURCHASE.ASC:45-55, PURCHASE.ASC:74-83, PURCHASE.ASC:118-123; VENDOR.DAT:1-40, PURCHASE.DAT:1-40).
+PURCHASE.DAT is sequential 2-line-per-order:
+line 1: vendor, PO#, order date, due date, description, misc/unit, qty
+line 2: part/serial, received flag/text, backorder text, total cost (PURCHASE.ASC:118-123, PURCHASE.ASC:136-153).
+H. Cash disbursements / deposits / payroll-like payments
+BILL.BAS handles vendor checks, deposits, payroll entries, voids, vendor master maintenance, and cash-disbursement reporting (BILL.BAS:43-54, BILL.BAS:151-176, BILL.BAS:437-451).
+Key files:
+CHECKNO.DAT = last check number (BILL.BAS:41, BILL.BAS:150)
+BILLS.DAT = sequential check register (BILL.BAS:243, BILL.BAS:342-402)
+DEPCHECK.DAT = running not-yet-deposited amount (BILL.BAS:248-250, BILL.BAS:280-301)
+PAYDEP.DAT = deposits + payroll/deposit events (BILL.BAS:298-301, BILL.BAS:325, BILL.BAS:408-434)
+BILLSCHK.DAT = random-access cash/uncashed flags per check (BILL.BAS:252-259, BILL.BAS:456-464, BILL.BAS:724-731, BILL.BAS:755-768).
+4) File contracts / implicit schemas
+PRC\*.PRC
+Sequential text records: procedure, effective date, minimum charge, price, unit (PLIST.ASC:143-145).
+Customer abbreviation is the filename stem and is normally 1â€“8 uppercase chars, no spaces or periods (PLIST.ASC:18-30).
+REALNAME.DAT
+Alternating pairs: <abbr>.PRC, actual long customer name (PLIST.ASC:241-243, INVOICE_.ASC:192-199, REALNAME.DAT:1-40).
+PROCDURE.DAT
+One standard procedure token per line; both pricing and invoicing use it to validate/extend vocabulary (PLIST.ASC:11-13, PLIST.ASC:113-132, INVOICE_.ASC:16-18, INVOICE_.ASC:629-647, PROCDURE.DAT:1-40).
+COD.DAT
+First line is a date; subsequent rows are customer, oldest-date, days, amount (INVOICE_.ASC:7-12, COD.DAT:1-21).
+COD-NO.DAT
+One exempt customer code per line (INVOICE_.ASC:13-15, COD.ASC:14-18, COD-NO.DAT:1-8).
+INVOICE.NUM
+Single numeric last invoice used; next invoice is +1 (INVOICE_.ASC:95-96, INVOICE_.ASC:152-155, INVOICE.NUM:1).
+LASTINVO.ICE
+Last invoice number and date; used with MONTH.INV to track month boundaries (INVOICE_.ASC:330-335, LASTINVO.ICE:1).
+MONTH.INV
+Month boundary lookup for statements/history, but there is a schema mismatch:
+invoice writer updates only 80 entries (INVOICE_.ASC:331-334)
+ENTIRE.ASC reads 399 entries (ENTIRE.ASC:40-41).
+INVOICE.CHK
+Random-access, 26 bytes/record:
+9-byte invoice slot (MKS$)
+8-byte amount (MKS$)
+8-byte customer code
+1-byte status (INVOICE_.ASC:163-167, INVOICE_.ASC:344-356).
+CHECK.INV
+Sequential receipt-to-invoice bridge (LEDGER.ASC:169-171, CHECK.INV:1-18).
+LEDGER.CUR
+Current live file appears to hold only customer check receipts, not invoice debits (LEDGER.ASC:60-79, LEDGER.CUR:1-12).
+JOURNAL.CUR
+Sequential sales lines (INVOICE_.ASC:314-320, JOURNAL.CUR:1-12).
+LOGBOOK.yy
+Sequential operational records keyed by invoice line, stored per 2-digit year suffix (INVOICE_.ASC:324-327, LOGBOOK.ASC:3-8, LOGBOOK.26:1-12).
+5) Hidden assumptions youâ€™ll need to preserve
+Uppercase operator input is expected everywhere. Many modules explicitly reject lowercase and tell the user to hit Caps Lock (START.ASC:103, LEDGER.ASC:52-59, LOGBOOK.ASC:39, PLIST.ASC:22-27, SHOP.BAS:27-37).
+Customer IDs are 8-char uppercase abbreviations and drive filenames (PRC\<abbr>.PRC) and invoice/customer joins (PLIST.ASC:18-30, LEDGER.ASC:52-59, LOGBOOK.ASC:28-29, REALNAME.DAT:1-40).
+Path conventions matter. The app assumes a DOS root plus mapped F: and many relative working directories (LOGIN.BAT:1-7, START.ASC:129-147, PHONE.ASC:92-106, PHONE.ASC:120-152).
+Device/printer assumptions are hardcoded.
+invoices print to LPT1: (INVOICE_.ASC:367-416)
+many reports use LPRINT directly (SALES.ASC:79-99, BOOT.ASC:93-100, BILL.BAS:546-567)
+printer readiness is polled through DOS errors 24/25/27/57/68 in nearly every module (START.ASC:46-47, INVOICE_.ASC:24-25, LEDGER.ASC:9-10).
+Random-access binary encoding uses GW/QB numeric packing (MKS$, CVS) and slot math, so WinForms continuation must preserve exact semantics if it reads existing files (INVOICE_.ASC:163-167, INVOICE_.ASC:344-356, BILL.BAS:252-259, BILL.BAS:724-731).
+File locking / single-user contention is part of normal behavior via LOCK, SHARED, and â€œsomeone is using your fileâ€ retry loops (START.ASC:46, INVOICE_.ASC:24, LEDGER.ASC:9, PLIST.ASC:206-212).
+6) Stale/duplicate source variants and inconsistencies
+This repo has multiple generations of the same app:
+
+Menu logic is readable in START.ASC, while MAINMENU.BAS in this clone is not useful as source; naming is already split (START.ASC:5-18).
+Invoice has many variants: INVOICE.BAS, INVOICE0.BAS, INVOICE1.BAS, INVOICE2.BAS, INVOICE-.BAS, INVOICE_.BAS, INVOICEE.BAS, plus INVCOPY.BAS.
+The readable older invoice source (INVOICE_.ASC) differs materially from INVCOPY.BAS; the newer branch adds Lexmark handling, cad-plating fields, more spec items, and changed standards (INVOICE_.ASC:75-81, INVCOPY.BAS:5-9, INVCOPY.BAS:104-112).
+Shopcard writer and invoice reader are not perfectly aligned in the readable sources:
+shopcard writer can append -1,-1,SER$ sentinel triples (SHOP-OLD.BAS:580)
+INVOICE_.ASC shopcard reader blindly assigns every remaining triple into A$(CT,X,Y) with no sentinel handling (INVOICE_.ASC:180-191).
+That strongly suggests the active runtime likely used a different invoice branch than INVOICE_.ASC, or that serial support was only partially merged.
+Ledger file expectations are inconsistent:
+LEDGER.ASC current UI reads 6-field receipt summaries (LEDGER.ASC:60-79)
+BOOT.ASC invoice-void/update code still expects mixed "+" debit / "-" credit records (BOOT.ASC:187-201)
+CONVTLED.ASC exists specifically to strip the old signed format down to the current check-only format (CONVTLED.ASC:1-8).
+MONTH.INV size disagreement (80 vs 399 slots) is another strong sign of drift between invoice and inquiry branches (INVOICE_.ASC:331-334, ENTIRE.ASC:40-41).
+7) Missing runtime assets / dangling dependencies
+I found clear dangling references:
+
+Main menu option W chains PHMESAGE, but no PHMESAGE* file exists in the repo (START.ASC:141).
+Main menu backup path chains BAKFILES.BAS, but no BAKFILES* file exists (START.ASC:163).
+I also found environment-state files that code expects but this repo does not contain:
+
+C:\PMS.ED (START.ASC:199)
+C:\PAYROLL.CHK (START.ASC:216)
+C:\CDRIVE.CHK (START.ASC:221)
+BKUP.DTE (START.ASC:153)
+C:\LASER.CHK / C:\LEXMARK.CHK printer markers (SHOP.BAS:6-7, INVCOPY.BAS:5).
+Those look intentional/environmental, but they matter because behavior changes when they exist.
+
+8) Maintenance/rebuild utilities worth preserving conceptually
+These are important because they reveal intended repair/reconciliation behavior:
+
+INVCHK.ASC / LOGBSCAN.ASC: rebuild/check INVOICE.CHK from JOURNAL.CUR starting at a chosen invoice (INVCHK.ASC:1-21, LOGBSCAN.ASC:1-22).
+LEDGSCAN.ASC: compare JOURNAL.CUR totals against INVOICE.CHK and log mismatches (LEDGSCAN.ASC:7-27).
+LEDG-CHK.ASC: quick scan for malformed ledger amounts (LEDG-CHK.ASC:1-6).
+JRNLSCAN.BAS: detect missing invoice numbers in JOURNAL.CUR (JRNLSCAN.BAS:1-17).
+CHKCREAT.BAS / CHKCREA2.BAS: rebuild/verify BILLSCHK.DAT from BILLS.DAT (CHKCREA2.BAS:1-23, CHKCREAT.BAS:1-28).
+SORTNAME.ASC / NAMEREDO.ASC: normalize/sort REALNAME.DAT and rename PRC files (SORTNAME.ASC:9-35, NAMEREDO.ASC:9-24).
+BOOT.ASC: â€œprint/update/voidâ€ admin menu that touches JOURNAL.CUR, LOGBOOK.yy, LEDGER, and price lists (BOOT.ASC:42-66, BOOT.ASC:101-205).
+9) Practical guidance for WinForms continuation
+If the goal is behavioral fidelity, Iâ€™d preserve these concepts exactly:
+
+8-char customer code as the primary key
+PRC price-list records as customer-specific procedure catalog
+shopcard â†’ invoice â†’ journal/logbook/invoice-status pipeline
+invoice status flags J/P/C/V/E
+check posting as a separate flow that flips invoice flags and writes CHECK.INV
+current-year LOGBOOK.yy rollover
+explicit printer/workstation/environment flags
+operator-facing uppercase workflow and low-trust validation prompts
+Biggest migration risk: there is no single clean authoritative source tree. The repo contains live data plus overlapping BASIC generations, and some readable sources are older than the data/schema now present.
+
+## Copilot
+
+Yes â€” this is enough to reason from, and it points pretty strongly at why things are failing now.
+
+## Short answer
+For **View Checks**, invoice-related data in the DOS app was **not just a passive display of whatever happened to be stored in `LEDGER.CUR`**.
+
+The DOS architecture says:
+
+- `LEDGER.CUR` stores a **6-field receipt summary**
+  - customer
+  - date
+  - check #
+  - difference-text
+  - amount
+  - reference
+- `CHECK.INV` stores the **bridge** from a customer check to its invoice numbers
+- `INVOICE.CHK` stores the invoice master/status data
+
+So if:
+- `InvoiceDiff` is mostly blank,
+- and the bottom invoice list is mostly not populating,
+
+the most likely problem is not â€œthe grid is broken.â€
+Itâ€™s that the **legacy join logic isnâ€™t matching older rows correctly**, and/or `InvoiceDiff` is being treated like a raw field instead of a derived value. The AMiDataStore scan clearly says `LEDGER.CUR`â€™s fourth field is **difference-text**, not invoice numbers, while invoice linkage comes from `CHECK.INV`. That strongly supports your memory that this previously worked through cross-file DOS logic rather than a single-file display.
+
+## @testsubject117
+
+can you wire it up so it works like the gw basic app worked?
+
+## Copilot
+
+Yes â€” I can wire it closer to how the GW-BASIC app worked.
+
+## What the code already tells us
+From your current WinForms code:
+
+- `LedgerCurReader` reads `LEDGER.CUR` as:
+  - `Customer`
+  - `DateText`
+  - `CheckNumber`
+  - `InvoiceDiffText`
+  - `Amount`
+  - `Reference`
+- `CheckInvReader` reads `CHECK.INV` as:
+  - header with `CustomerCode`, `CheckNumber`, `DateText`, `Amount`, `InvoiceCount`
+  - then the actual invoice number list
+
+That matches the DOS architecture you pasted:
+- `LEDGER.CUR` = summary receipt file
+- `CHECK.INV` = receipt-to-invoice bridge
+
+So yes, the right direction is:
+
+### make `View Checks` behave more like DOS by deriving invoice linkage from `CHECK.INV`, not relying on `LEDGER.CUR` alone
+
+---
+
+## What is probably wrong right now
+The current `FormLedgerView` lookup key is built as:
+
+```vb
+BuildKey(entry.Customer, entry.CheckNumber)
+```
+
+and the index is built from:
+
+```vb
+BuildKey(b.CustomerCode, b.CheckNumber)
+```
+
+That sounds right, but in legacy files there are often mismatches caused by:
+- padding
+- trailing spaces
+- case
+- date-era differences
+- customer-code formatting drift
+
+Also, your `LedgerCurReader` stores the field as `InvoiceDiffText`, but the grid issue earlier suggests UI/code may still be expecting `InvoiceDiff`, which is already a sign of drift. The more important point is that the DOS appâ€™s invoice linkage came from `CHECK.INV`, not from this field alone. îˆ€citeîˆ‚turn0fetch0îˆ
+
+---
+
+## What I would change
+### 1. Normalize the join key harder
+When matching `LEDGER.CUR` rows to `CHECK.INV`, normalize:
+- customer code: trim, uppercase, strip internal padding
+- check number: trim, uppercase, remove leading/trailing spaces
+
+### 2. Expose invoice-count / invoice-presence from `CHECK.INV`
+For the main grid, instead of trusting `InvoiceDiffText` as the only signal, enrich each ledger row after load by checking whether a `CHECK.INV` block exists.
+
+### 3. Populate bottom invoice details from the `CHECK.INV` bridge
+That is already the current intent, but the matching likely needs to be made more DOS-tolerant.
+
+### 4. Keep color-coding optional
+You said you donâ€™t need pink/yellow right now, so I would skip that and focus on:
+- correct data matching
+- correct invoice details at bottom
+- correct invoice-related indicator in the main grid
+
+---
+
+## Important caveat
+You asked me to â€œwire it up,â€ but per your earlier instruction weâ€™re still in **review-only / tell me what to change** mode, not PR mode.
+
+Also, I do **not** yet have the local source for:
+- `FormLedgerView.vb` as currently edited on your machine
+- `LedgerCurReader.vb` compiled alongside your recent changes
+- and I failed to fetch a standalone `LedgerEntry.vb` because `LedgerEntry` is actually defined at the bottom of `LedgerCurReader.vb`
+
+Thatâ€™s enough to reason about, but not enough to safely hand you a perfect full-file replacement for the data fix without risking regressions.
+
+---
+
+## Best next move
+Yes, I can help you make it work more like GW-BASIC, and the next change should be:
+
+### update `FormLedgerView.vb` so that:
+- it builds a stronger normalized `CHECK.INV` index
+- it uses that index both for:
+  - bottom invoice details
+  - and a main-grid invoice indicator/derived value
+
+## The likely exact issue
+Because your test row from yesterday works, the current newer data probably matches the lookup format exactly, while historical rows likely differ in formatting. That almost screams:
+- **normalization mismatch**, not absence of data.
+
+---
+
+## If you want the next concrete deliverable
+I can generate the next **full replacement of `FormLedgerView.vb`** focused on:
+
+- stronger DOS-style key normalization
+- invoice matching from `CHECK.INV`
+- more reliable bottom invoice detail population
+- and likely a derived `Invoice Diff`/invoice-presence behavior closer to the DOS flow
+
+If you want that, Iâ€™ll do it.
+
+## @testsubject117
+
+when i say I want you to wire it up, I want you to give me the full file replacement code to accomplish our goal so I can make the changes, I don't want any changes made in any of the repos
+
+## Copilot
+
+Understood â€” Iâ€™ll give you full file replacement code only, and I wonâ€™t make any repo changes.
+
+For the invoice issue, I only need one more file to do this safely:
+
+- `AMiOffice/FormLedgerView.vb` as it exists **right now on your machine**
+
+Reason: weâ€™ve already changed that file for:
+- DOS-style look/feel
+- column header renaming
+- prompt handoff support
+
+And I donâ€™t want to accidentally overwrite your latest working version with an older variant while fixing invoice matching.
+
+## Please paste or upload the current contents of:
+- `AMiOffice/FormLedgerView.vb`
+
+If you want, also include:
+- `AMiOffice/LedgerCurReader.vb`
+
+But I already have enough of that one to reason from.
+
+## Then Iâ€™ll give you:
+- a **full replacement `FormLedgerView.vb`**
+that:
+- preserves your current styling changes
+- keeps the header renames
+- normalizes legacy matching better
+- and tries to restore GW-BASIC-like invoice linkage behavior from `CHECK.INV`
+
+No repo writes, no PR, just the replacement file.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCustomerFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCheckFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialYearFilter As String = ""
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+        ApplyInitialFilters()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        BackColor = Color.FromArgb(32, 32, 32)
+        ForeColor = Color.White
+
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2,
+            .BackColor = Color.FromArgb(32, 32, 32),
+            .Padding = New Padding(8)
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+
+        Dim labelFont As New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        Dim lblCustomer As New Label() With {
+            .Text = "Customer:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblCheck As New Label() With {
+            .Text = "Check #:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblYear As New Label() With {
+            .Text = "Year:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+        AddHandler dgv.DataBindingComplete, AddressOf OnMainGridDataBindingComplete
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub OnMainGridDataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgv.Columns.Contains("DateText") Then
+            dgv.Columns("DateText").HeaderText = "Date"
+        End If
+
+        If dgv.Columns.Contains("CheckNumber") Then
+            dgv.Columns("CheckNumber").HeaderText = "Check #"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiff") Then
+            dgv.Columns("InvoiceDiff").HeaderText = "Invoice Diff"
+        End If
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("")
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("")
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2)
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                End Try
+
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+```
+
+## Copilot
+
+Yes â€” hereâ€™s the **full replacement `FormLedgerView.vb`** to wire it up more like the GW-BASIC app.
+
+## What this version changes
+It keeps your current DOS-style look/feel work, but improves invoice behavior by:
+
+1. **Matching `LEDGER.CUR` rows to `CHECK.INV` more robustly**
+   - trims
+   - uppercases
+   - strips spaces for alternate matching
+2. **Using `InvoiceDiffText` correctly**
+   - your `LedgerEntry` property from `LedgerCurReader.vb` is `InvoiceDiffText`, not `InvoiceDiff`
+3. **Populating invoice details from `CHECK.INV` using fallback match strategies**
+4. **Showing a useful value in the main gridâ€™s Invoice Diff column**
+   - if the ledger already has difference text, it keeps it
+   - otherwise, if invoices exist for that check, it shows `0`
+   - otherwise leaves it blank
+
+That last piece is intended to move behavior closer to what you described: checks that are linked to invoices should visibly show as linked, instead of appearing blank. It is not yet recreating the old pink/yellow color coding.
+
+---
+
+# Full replacement: `AMiOffice/FormLedgerView.vb`
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: normalized composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCustomerFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCheckFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialYearFilter As String = ""
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+        ApplyInitialFilters()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        BackColor = Color.FromArgb(32, 32, 32)
+        ForeColor = Color.White
+
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2,
+            .BackColor = Color.FromArgb(32, 32, 32),
+            .Padding = New Padding(8)
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+
+        Dim labelFont As New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        Dim lblCustomer As New Label() With {
+            .Text = "Customer:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblCheck As New Label() With {
+            .Text = "Check #:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblYear As New Label() With {
+            .Text = "Year:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+        AddHandler dgv.DataBindingComplete, AddressOf OnMainGridDataBindingComplete
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub OnMainGridDataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgv.Columns.Contains("DateText") Then
+            dgv.Columns("DateText").HeaderText = "Date"
+        End If
+
+        If dgv.Columns.Contains("CheckNumber") Then
+            dgv.Columns("CheckNumber").HeaderText = "Check #"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiffText") Then
+            dgv.Columns("InvoiceDiffText").HeaderText = "Invoice Diff"
+        End If
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("")
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("")

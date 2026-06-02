@@ -1,0 +1,2000 @@
+﻿    Private _globalSearchMode As Boolean = False
+    Private _searchResults As New List(Of RolodexPersonRecord)
+    Private _currentResultIndex As Integer = -1
+    Private _resultDisplayStartIndex As Integer = -1
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = New RolodexPersonRecord With {
+                .PersonName = existingRecord.PersonName,
+                .Street = existingRecord.Street,
+                .City = existingRecord.City,
+                .StateCode = existingRecord.StateCode,
+                .ZipCode = existingRecord.ZipCode,
+                .AreaCode = existingRecord.AreaCode,
+                .PhoneNumber = existingRecord.PhoneNumber,
+                .Misc = existingRecord.Misc,
+                .IsCustomer = existingRecord.IsCustomer
+            }
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        If _isComplete Then Return ""
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        If _isComplete Then Return False
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Return _isComplete
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 3
+                Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 4
+                Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 5
+                Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 6
+                Return $"Zip Code [ENTER = {WorkingRecord.ZipCode}] ?"
+            Case 7
+                Return $"Area Code [ENTER = {WorkingRecord.AreaCode}] ?"
+            Case 8
+                Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber}] ?"
+            Case 9
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 10
+                Return "Is this correct (Y/N) ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetDeletePrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return "Delete this Person (Y/N) [Q = Quit] ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetLookupPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return "Is this the Person you are looking for (Y/N) ?"
+            Case 3
+                Return "[D] to Dial Number" & Environment.NewLine & Environment.NewLine &
+                       "[Shift] and [PrtSc] to Print"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                WorkingRecord.City = input.Trim()
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.AddRecord(WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT ADDED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+
+                    If _searchResults.Count > 0 Then
+                        _searchText = _searchResults(0).PersonName
+                    End If
+
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PersonName = input.Trim()
+                End If
+            Case 3
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.City = input.Trim()
+                End If
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.ZipCode = input.Trim()
+                End If
+            Case 7
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.AreaCode = input.Trim()
+                End If
+            Case 8
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+            Case 9
+                Dim value = input.Trim()
+                If value.Equals("A", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Misc = WorkingRecord.Misc & " "
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+            Case 10
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.UpdateFirstByNamePrefix(_searchText, WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT CHANGED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitDeleteInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+
+                    If _searchResults.Count > 0 Then
+                        _searchText = _searchResults(0).PersonName
+                    End If
+
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Delete this Person (Y/N) [Q = Quit] ? " & input.Trim())
+
+                Select Case answer
+                    Case "Y"
+                        _repo.DeleteFirstByNamePrefix(_searchText)
+                        Transcript.Add("(DELETED)")
+                        _isComplete = True
+                        Return True
+
+                    Case "N"
+                        _currentResultIndex += 1
+                        Return LoadCurrentSearchResult()
+
+                    Case "Q"
+                        _isComplete = True
+                        Return True
+
+                    Case Else
+                        Transcript.Add("Please answer Y, N, or Q.")
+                        Return True
+                End Select
+        End Select
+
+        Return False
+    End Function
+
+    Private Function SubmitLookupInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+
+                    If _searchResults.Count > 0 Then
+                        _searchText = _searchResults(0).PersonName
+                    End If
+
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Is this the Person you are looking for (Y/N) ? " & input.Trim())
+
+                If answer = "Y" Then
+                    _stepIndex = 3
+                    Return True
+                ElseIf answer = "N" Then
+                    _currentResultIndex += 1
+                    Return LoadCurrentSearchResult()
+                Else
+                    Transcript.Add("Please answer Y or N.")
+                    Return True
+                End If
+
+            Case 3
+                Transcript.Add("")
+                Transcript.Add("[D] to Dial Number")
+                Transcript.Add("")
+                Transcript.Add("[Shift] and [PrtSc] to Print")
+                _isComplete = True
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Function LoadCurrentSearchResult() As Boolean
+        ClearDisplayedSearchResult()
+
+        If _searchResults Is Nothing OrElse _currentResultIndex < 0 OrElse _currentResultIndex >= _searchResults.Count Then
+            Transcript.Add("")
+            Transcript.Add("NO MATCH FOUND.")
+            Transcript.Add("")
+            Transcript.Add("Press ENTER to return.")
+            _isComplete = True
+            Return True
+        End If
+
+        WorkingRecord = CloneRecord(_searchResults(_currentResultIndex))
+        _searchText = WorkingRecord.PersonName
+
+        _resultDisplayStartIndex = Transcript.Count
+
+        Transcript.Add("")
+        For Each line In WorkingRecord.GetDisplayLines()
+            Transcript.Add(line)
+        Next
+
+        _stepIndex = 2
+        Return True
+    End Function
+
+    Private Sub ClearDisplayedSearchResult()
+        If _resultDisplayStartIndex >= 0 AndAlso _resultDisplayStartIndex < Transcript.Count Then
+            Transcript.RemoveRange(_resultDisplayStartIndex, Transcript.Count - _resultDisplayStartIndex)
+        End If
+        _resultDisplayStartIndex = -1
+    End Sub
+
+    Private Function CloneRecord(record As RolodexPersonRecord) As RolodexPersonRecord
+        If record Is Nothing Then Return Nothing
+
+        Return New RolodexPersonRecord With {
+            .PersonName = record.PersonName,
+            .Street = record.Street,
+            .City = record.City,
+            .StateCode = record.StateCode,
+            .ZipCode = record.ZipCode,
+            .AreaCode = record.AreaCode,
+            .PhoneNumber = record.PhoneNumber,
+            .Misc = record.Misc,
+            .IsCustomer = record.IsCustomer
+        }
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts(parts.Length - 1)
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## What this fixes
+Now when you do:
+- `(C)` â†’ `MICH`
+- `N`
+- `N`
+
+the previous found record is removed from the display and replaced with the next one, which is much closer to DOS behavior.
+
+## Next test
+Please retest:
+1. `(C)` â†’ `MICH`
+2. `N`
+3. `N`
+
+Expected:
+- only one candidate visible at a time
+- old candidate disappears
+- next candidate replaces it
+
+If you want, after that we can make the same behavior more DOS-like for:
+- Global Search result stepping
+- Modify candidate stepping too.
+
+## @testsubject117
+
+that fixed it perfectly
+
+## Copilot
+
+Excellent â€” that means the lookup stepping behavior now matches DOS properly.
+
+## Whatâ€™s now working
+- Add Person
+- Lookup Person
+- Delete Person
+- Modify Person
+- prefix stepping through multiple matches
+- Global Search closer to DOS behavior
+- replacement of previous result instead of stacking entries on screen
+
+Thatâ€™s a big chunk of the Rolodex system now behaving like the original.
+
+## Best next move
+The next most logical Rolodex items are:
+
+1. **Global Search next-occurrence behavior**
+   - if DOS supports stepping through multiple global matches too
+
+2. **Area Code lookup**
+   - menu option `(G)`
+
+3. **Zip Code lookup**
+   - menu option `(H)`
+
+4. **Print Phone Book**
+   - `(E)`
+
+5. **Print Labels**
+   - `(F)`
+
+## My recommendation
+Do this next:
+
+**Area Code lookup**, then  
+**Zip Code lookup**
+
+Those are likely smaller and cleaner than printing features.
+
+If you want, Iâ€™m ready to do **Area Code lookup** next.
+
+## @testsubject117
+
+Global Search next-occurrence behavior
+
+if DOS supports stepping through multiple global matches too
+
+## Copilot
+
+Yes â€” DOS almost certainly **does support next-occurrence behavior for Global Search**, but through the external viewer/search tool, not in the Rolodex code itself.
+
+## What I found
+The DOS Rolodex code does this for `G`:
+
+1. prints:
+   - â€œWhen viewing [F3] will search for another occurance.â€
+2. asks for search text
+3. copies `*.LST` into `ALLNAMES.TMP`
+4. shells out to an external command:
+   - `F:\L ALLNAMES.TMP /F<search>` îˆ€citeîˆ‚turn0commentary0îˆ
+
+That means:
+- Rolodex itself is **not** implementing next-result logic
+- the external viewer/search utility (`L`) is
+- and the user uses **F3** there to jump to the next occurrence îˆ€citeîˆ‚turn0commentary0îˆ
+
+So the right VB behavior is:
+
+## Correct VB equivalent
+For Global Search:
+- first result is shown
+- if user answers `N`
+- move to the next global result
+- replace the display, just like we now do for prefix matches
+
+That is the closest in-app equivalent to DOS `F3`.
+
+---
+
+## Important caveat
+The code search results I got are limited/incomplete, but the `P.P` / `PHONE.ASC` logic is enough to establish the design: Global Search hands off to a separate tool that supports â€œnext occurrence.â€ îˆ€citeîˆ‚turn0commentary0îˆ
+
+---
+
+# Replace the entire `RolodexPromptEngine.vb`
+This version adds **next-occurrence stepping for Global Search too**.
+
+```vb name=RolodexPromptEngine.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.Linq
+
+Public Class RolodexPromptEngine
+    Private ReadOnly _mode As RolodexPromptMode
+    Private ReadOnly _repo As New RolodexRepository()
+
+    Private _stepIndex As Integer = 0
+    Private _isComplete As Boolean = False
+    Private _searchText As String = ""
+    Private _globalSearchMode As Boolean = False
+    Private _searchResults As New List(Of RolodexPersonRecord)
+    Private _currentResultIndex As Integer = -1
+    Private _resultDisplayStartIndex As Integer = -1
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = CloneRecord(existingRecord)
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        If _isComplete Then Return ""
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        If _isComplete Then Return False
+
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Return _isComplete
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 3
+                Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 4
+                Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 5
+                Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 6
+                Return $"Zip Code [ENTER = {WorkingRecord.ZipCode}] ?"
+            Case 7
+                Return $"Area Code [ENTER = {WorkingRecord.AreaCode}] ?"
+            Case 8
+                Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber}] ?"
+            Case 9
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 10
+                Return "Is this correct (Y/N) ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetDeletePrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return "Delete this Person (Y/N) [Q = Quit] ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetLookupPrompt() As String
+        If _globalSearchMode AndAlso _stepIndex = 1 Then
+            Return "When viewing [F3] will search for another occurance." & Environment.NewLine &
+                   "Enter something to search for in any category like Phone# or Name." & Environment.NewLine &
+                   "Search ?"
+        End If
+
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 2
+                Return "Is this the Person you are looking for (Y/N) ?"
+            Case 3
+                Return "[D] to Dial Number" & Environment.NewLine & Environment.NewLine &
+                       "[Shift] and [PrtSc] to Print"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                WorkingRecord.City = input.Trim()
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.AddRecord(WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT ADDED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PersonName = input.Trim()
+                End If
+            Case 3
+                If input.Trim().Equals("N", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.City = input.Trim()
+                End If
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.ZipCode = input.Trim()
+                End If
+            Case 7
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.AreaCode = input.Trim()
+                End If
+            Case 8
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+            Case 9
+                Dim value = input.Trim()
+                If value.Equals("A", StringComparison.OrdinalIgnoreCase) Then
+                    WorkingRecord.Misc = WorkingRecord.Misc & " "
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+            Case 10
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+
+                If input.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) Then
+                    _repo.UpdateFirstByNamePrefix(_searchText, WorkingRecord)
+                Else
+                    Transcript.Add("")
+                    Transcript.Add("(NOT CHANGED)")
+                End If
+
+                _isComplete = True
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitDeleteInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Delete this Person (Y/N) [Q = Quit] ? " & input.Trim())
+
+                Select Case answer
+                    Case "Y"
+                        _repo.DeleteFirstByNamePrefix(_searchText)
+                        Transcript.Add("(DELETED)")
+                        _isComplete = True
+                        Return True
+
+                    Case "N"
+                        _currentResultIndex += 1
+                        Return LoadCurrentSearchResult()
+
+                    Case "Q"
+                        _isComplete = True
+                        Return True
+
+                    Case Else
+                        Transcript.Add("Please answer Y, N, or Q.")
+                        Return True
+                End Select
+        End Select
+
+        Return False
+    End Function
+
+    Private Function SubmitLookupInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+
+                If input.Trim().Equals("G", StringComparison.OrdinalIgnoreCase) Then
+                    _globalSearchMode = True
+                    _stepIndex = 1
+                    Return True
+                End If
+
+                _searchText = input.Trim()
+                _searchResults = _repo.FindAllByNamePrefix(_searchText)
+                _currentResultIndex = 0
+
+                Return LoadCurrentSearchResult()
+
+            Case 1
+                If _globalSearchMode Then
+                    Transcript.Add("Search ? " & input.Trim())
+                    _searchResults = _repo.GlobalSearch(input.Trim())
+                    _currentResultIndex = 0
+                    _globalSearchMode = False
+                    Return LoadCurrentSearchResult()
+                End If
+
+            Case 2
+                Dim answer = input.Trim().ToUpperInvariant()
+
+                Transcript.Add("")
+                Transcript.Add("Is this the Person you are looking for (Y/N) ? " & input.Trim())
+
+                If answer = "Y" Then
+                    _stepIndex = 3
+                    Return True
+                ElseIf answer = "N" Then
+                    _currentResultIndex += 1
+                    Return LoadCurrentSearchResult()
+                Else
+                    Transcript.Add("Please answer Y or N.")
+                    Return True
+                End If
+
+            Case 3
+                Transcript.Add("")
+                Transcript.Add("[D] to Dial Number")
+                Transcript.Add("")
+                Transcript.Add("[Shift] and [PrtSc] to Print")
+                _isComplete = True
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Function LoadCurrentSearchResult() As Boolean
+        ClearDisplayedSearchResult()
+
+        If _searchResults Is Nothing OrElse _currentResultIndex < 0 OrElse _currentResultIndex >= _searchResults.Count Then
+            Transcript.Add("")
+            Transcript.Add("NO MATCH FOUND.")
+            Transcript.Add("")
+            Transcript.Add("Press ENTER to return.")
+            _isComplete = True
+            Return True
+        End If
+
+        WorkingRecord = CloneRecord(_searchResults(_currentResultIndex))
+        _searchText = WorkingRecord.PersonName
+
+        _resultDisplayStartIndex = Transcript.Count
+
+        Transcript.Add("")
+        For Each line In WorkingRecord.GetDisplayLines()
+            Transcript.Add(line)
+        Next
+
+        _stepIndex = 2
+        Return True
+    End Function
+
+    Private Sub ClearDisplayedSearchResult()
+        If _resultDisplayStartIndex >= 0 AndAlso _resultDisplayStartIndex < Transcript.Count Then
+            Transcript.RemoveRange(_resultDisplayStartIndex, Transcript.Count - _resultDisplayStartIndex)
+        End If
+        _resultDisplayStartIndex = -1
+    End Sub
+
+    Private Function CloneRecord(record As RolodexPersonRecord) As RolodexPersonRecord
+        If record Is Nothing Then Return Nothing
+
+        Return New RolodexPersonRecord With {
+            .PersonName = record.PersonName,
+            .Street = record.Street,
+            .City = record.City,
+            .StateCode = record.StateCode,
+            .ZipCode = record.ZipCode,
+            .AreaCode = record.AreaCode,
+            .PhoneNumber = record.PhoneNumber,
+            .Misc = record.Misc,
+            .IsCustomer = record.IsCustomer
+        }
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts(parts.Length - 1)
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+## What this changes
+Now for **Global Search** in Lookup/Delete:
+- first match is shown
+- if user presses `N`
+- it goes to the **next global result**
+- and replaces the current display
+
+That is the closest VB equivalent to DOSâ€™s external viewer + `F3`.
+
+## One important note
+Search results from code search were limited/incomplete, but enough to support this inference. If DOS behaves differently in some edge case, your live testing should win. îˆ€citeîˆ‚turn0commentary0îˆ
+
+## Please test
+Try:
+1. `(C)` â†’ `G` â†’ something with multiple hits
+2. press `N`
+3. verify it advances to next global result
+4. verify previous result disappears
+
+If you want after that, I can tune **Modify + Global Search next-occurrence behavior** too, based on how DOS behaves there.
+
+## @testsubject117
+
+yes it works
+
+## Copilot
+
+Great â€” **Global Search next-occurrence behavior works** now too.
+
+## Whatâ€™s now confirmed working
+Your Rolodex now has DOS-like behavior for:
+
+- Add Person
+- Lookup Person
+- Delete Person
+- Modify Person
+- normal prefix search stepping to next match
+- Global Search (`G`)
+- Global Search next-occurrence stepping
+- replacement of prior result on screen instead of stacking
+
+Thatâ€™s a very strong match for the legacy workflow.
+
+## Practical summary
+The main Rolodex interaction model is now behaving much more like the DOS app.
+
+## Best next candidates
+If you want to stay in Rolodex, the remaining menu items are:
+
+- **(G) Look up Area Codes**
+- **(H) Look up Zip Codes**
+- **(E) Print Phone Book**
+- **(F) Print Labels**
+- **(I) Test Entire Rolodex for Errors**
+
+## My recommendation
+Do these next in this order:
+
+1. **Look up Area Codes**
+2. **Look up Zip Codes**
+3. **Test Entire Rolodex for Errors**
+4. printing features last
+
+If you want, Iâ€™m ready to do **Look up Area Codes** next.
+
+## @testsubject117
+
+lets do: (H) Look up Zip Codes, I want to see how we're going to get that working. Btw, I tested it in the app and the zipkey software appears to be there however it was not accepting any imput when I would try to search for a zip code by entering the state or city, it wouldn't allow any keyboard input.
+
+## Copilot
+
+Most likely the **ZIPKEY program itself is fine**, and the problem is **keyboard focus/input capture in your VB host**.
+
+## Why I think that
+You said:
+- the ZIPKEY software appears to launch
+- but it **wonâ€™t accept keyboard input**
+
+That usually means one of these in a WinForms-hosted legacy flow:
+1. the child process/window does not actually have focus
+2. your main form is still intercepting keystrokes
+3. the ZIPKEY app is console/DOS-based and needs to run in its own attached console window
+4. you launched it hidden or redirected I/O, so it can display but not interact normally
+5. Windows focus/input rules are blocking keystrokes from reaching the elevated/other process window in some cases ([help.smoredboard.com](https://help.smoredboard.com/docs/keybinds-not-working?utm_source=openai))
+
+## Recommended approach
+Before rewriting ZIP lookup in VB, I would **first verify how ZIPKEY is being launched**.
+
+### What I need to see
+Please paste whichever code currently handles menu option **(H) Look up Zip Codes**, especially:
+- the click handler/menu handler
+- any `Process.Start(...)`
+- any shell/command launching code
+- any form code that opens ZIPKEY
+
+## What I suspect needs to change
+If you are launching ZIPKEY with `ProcessStartInfo`, it probably needs something like:
+
+```vb
+Dim psi As New ProcessStartInfo()
+psi.FileName = zipKeyPath
+psi.WorkingDirectory = Path.GetDirectoryName(zipKeyPath)
+psi.UseShellExecute = True
+psi.WindowStyle = ProcessWindowStyle.Normal
+Process.Start(psi)
+```
+
+And importantly:
+- **do not** redirect standard input/output
+- **do not** host it inside the Rolodex prompt form
+- **do not** keep your custom key-capturing form active over it
+
+If your current app uses a prompt form with `KeyPreview = True`, that can also interfere if focus never really leaves your app window.
+
+## Likely product direction
+For `(H) Look up Zip Codes`, there are really two possible paths:
+
+### Path A â€” launch the original ZIPKEY cleanly
+Best if:
+- ZIPKEY still works
+- data files are intact
+- you want fastest DOS-faithful behavior
+
+### Path B â€” reimplement ZIP lookup in VB
+Best if:
+- ZIPKEY is flaky/incompatible
+- keyboard input remains unreliable
+- you want long-term maintainability
+
+## My recommendation
+**Start with Path A**:
+- fix the launch/focus problem first
+- confirm ZIPKEY can take input
+- then decide whether to keep it or reimplement it
+
+## Next step
+Paste the current code for **(H) Look up Zip Codes** and Iâ€™ll tell you exactly what to change.
+
+## @testsubject117
+
+yes path a
+
+## Copilot
+
+Good â€” **Path A** is the right first move.
+
+## Direct recommendation
+For `(H) Look up Zip Codes`, we should:
+- launch the original ZIPKEY executable as a **normal external process**
+- make sure it gets its **own window and focus**
+- make sure your WinForms prompt form is **not intercepting keys**
+
+## Most likely fix
+If ZIPKEY is already launching but wonâ€™t take keyboard input, the launch code probably needs to be changed so that:
+
+- `UseShellExecute = True`
+- no redirected input/output
+- normal working directory
+- normal window style
+- your current prompt form should not stay active on top of it
+
+---
+
+## What I need from you
+Please paste the current code that runs menu option **(H) Look up Zip Codes)**.
+
+Specifically, I want to see:
+- the menu click handler
+- the method that launches ZIPKEY
+- any `Process.Start`, `Shell`, or custom prompt form logic around it
+
+## Why I need that first
+You asked how weâ€™re going to get it working via Path A, and the answer depends entirely on how youâ€™re launching it now.
+
+There are a few common broken patterns:
+- launching hidden
+- launching with redirected streams
+- launching from a key-capturing modal form
+- not setting the working directory
+- using the wrong executable path
+- launching a DOS-era app in a way that prevents focus
+
+## Once you paste that code
+Iâ€™ll give you one of these:
+1. a **small patch**
+2. or the **full replacement method/file**
+
+so ZIPKEY launches correctly and accepts input.
+
+## @testsubject117
+
+are you asking for the code from the .bas files or .vb files
+
+## Copilot
+
+**The `.vb` files** â€” your current WinForms port code.
+
+I want to see the code that currently handles:
+- menu option **(H) Look up Zip Codes**
+- and whatever launches ZIPKEY now
+
+Most useful would be:
+- the form/menu click handler in VB
+- the method that calls `Process.Start`, `Shell`, etc.
+- any prompt-engine or navigation code involved
+
+Not the old `.bas` yet â€” unless the VB code is unclear and we need to compare behavior.
+
+## @testsubject117
+
+so that code is on whatever page gets launched when I click (N) what page is that
+
+## Copilot
+
+Most likely: **the Rolodex menu form/page** â€” the screen that opens after you choose `(N)` from the main menu.
+
+## What to look for
+You want the **VB file for the form or control that displays the Rolodex submenu**, where options like these exist:
+
+- `(A) Add Person`
+- `(C) Look up Person`
+- `(H) Look up Zip Codes`
+
+So the code is probably in one of these kinds of files:
+
+- `RolodexForm.vb`
+- `RolodexMenuForm.vb`
+- `PhoneForm.vb`
+- `PhoneMenuForm.vb`
+- `MainMenuForm.vb` if `(N)` is handled inline there
+- or a shared menu dispatcher file
+
+## How to find it quickly
+Search your VB project for one of these exact strings:
+
+- `Look up Zip Codes`
+- `Zip Codes`
+- `(H)`
+- `ZIPKEY`
+- `Rolodex`
+- `Phone Book`
+
+## What I need pasted
+Whichever `.vb` file contains:
+1. the code that runs when you click `(N)`
+2. the code that runs when you click `(H)`
+
+If youâ€™re not sure which one it is, paste:
+- the file that handles the `(N)` menu selection
+- and I can tell you where to go next
+
+## Short answer
+I need the **current VB form/page code behind the Rolodex menu**, not the `.bas` file.
+
+## @testsubject117
+
+```
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                OpenAreaCodes()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+is it this one?: 
+
+## Copilot
+
+Yes â€” **this is the right file**.
+
+## Direct answer
+The reason ZIPKEY wonâ€™t accept input is most likely **because you are not launching the original ZIPKEY executable at all**.
+
+Youâ€™re doing this:
+
+```vb
+Private Sub OpenZipKey()
+    Using frm As New FrmZipKeyPopup()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+So `(H)` is opening a **VB modal popup form**, not the original external ZIPKEY program.
+
+That means the next file I need is:
+
+- **`FrmZipKeyPopup.vb`**
+
+because that is almost certainly where the input problem lives.
+
+---
+
+## Why this matters
+You chose **Path A**, which means:
+- we want to launch the original ZIPKEY software as an external process
+
+But right now, this Rolodex menu is only opening:
+- `FrmZipKeyPopup`
+
+So one of two things is happening:
+
+1. `FrmZipKeyPopup` is trying to host or simulate ZIPKEY
+2. `FrmZipKeyPopup` is launching ZIPKEY incorrectly
+
+Either way, that is the file we need next.
+
+## Please paste next
+Paste the code for:
+
+- `FrmZipKeyPopup.vb`
+
+If thereâ€™s also:
+- designer-independent code
+- helper methods
+- `Process.Start`
+- `Shell`
+- event handlers for load/activate/shown
+
+include all of that too.
+
+## Short version
+Yes, this is the correct menu file.  
+**Next I need `FrmZipKeyPopup.vb`.**
+
+## @testsubject117
+
+hold on, does this mean I'll need to put the zipkey executable in the \\invoice\mainmenu\data folder?
+
+## Copilot
+
+**Not necessarily.**
+
+## Direct answer
+You do **not** have to put the ZIPKEY executable in `\\invoice\mainmenu\data` unless the original DOS app expected it there or your current VB code is hardcoded to look there.
+
+There are really **two separate things**:
+
+1. **ZIPKEY executable location**
+   - where `ZIPKEY.EXE` lives
+
+2. **ZIPKEY data files location**
+   - whatever files ZIPKEY needs to read while running
+
+Those do **not** always have to be the same folder.
+
+---
+
+## Most likely scenario
+If you want Path A to work cleanly, youâ€™ll probably need:
+
+- the executable in a known local/app folder, **or** in the original legacy folder
+- and the **working directory** set to wherever ZIPKEY expects its support/data files to be
+
+For old DOS/Windows utilities, the **working directory** often matters as much as the exe path.
+
+---
+
+## What determines the answer
+The real answer depends on:
+- where `ZIPKEY.EXE` currently is
+- whether it requires companion files in the same folder
+- how `FrmZipKeyPopup.vb` is launching it now
+
+---
+
+## Practical recommendation
+For now, **donâ€™t move anything yet**.
+
+First let me inspect:
+- `FrmZipKeyPopup.vb`
+
+Then I can tell you exactly:
+- where the exe should live
+- what folder should be used as the working directory
+- whether it needs files copied to `\\invoice\mainmenu\data`
+- or whether we can leave everything where it already is
+
+---
+
+## Short answer
+So: **no, not automatically**.  
+You probably just need the correct **exe path + working directory**, not necessarily to relocate the executable.
+
+Paste `FrmZipKeyPopup.vb` next and Iâ€™ll tell you the exact setup.
+
+## @testsubject117
+
+```
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmZipKeyPopup
+    Inherits Form
+
+    Private pnlPopup As Panel
+    Private lblZipContent As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "ZipKey"
+
+        pnlPopup = New Panel() With {
+            .Size = New Size(360, 460),
+            .Location = New Point(270, 70),
+            .BackColor = Color.DarkRed,
+            .BorderStyle = BorderStyle.FixedSingle
+        }
+
+        lblZipContent = New Label() With {
+            .Dock = DockStyle.Fill,
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Regular),
+            .Padding = New Padding(8),
+            .TextAlign = ContentAlignment.TopLeft
+        }
+
+        pnlPopup.Controls.Add(lblZipContent)
+        Me.Controls.Add(pnlPopup)
+
+        AddHandler Me.Load, AddressOf FrmZipKeyPopup_Load
+        AddHandler Me.KeyDown, AddressOf FrmZipKeyPopup_KeyDown
+    End Sub
+
+    Private Sub FrmZipKeyPopup_Load(sender As Object, e As EventArgs)
+        lblZipContent.Text =
+            "ZIPKEY, V1.07e current to 06/89" & Environment.NewLine &
+            "Copyright 1989 Eric Isaacson" & Environment.NewLine & Environment.NewLine &
+            "EVALUATION COPY -- register" & Environment.NewLine &
+            "by sending $30 to:" & Environment.NewLine & Environment.NewLine &
+            "Eric Isaacson Software" & Environment.NewLine &
+            "416 E. University Ave." & Environment.NewLine &
+            "Bloomington, IN 47401-4739" & Environment.NewLine &
+            "Visa/MC/AmEx   (812)339-1811" & Environment.NewLine & Environment.NewLine &
+            "Type a zip code, a two-letter" & Environment.NewLine &
+            "state code, or ? for a city-" & Environment.NewLine &
+            "only search:" & Environment.NewLine & Environment.NewLine &
+            "Type the Esc key to exit."
+    End Sub
+
+    Private Sub FrmZipKeyPopup_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+End Class
+```
+
+## Copilot
+
+Yes â€” this confirms it.
+
+## Direct answer
+Your current `(H)` implementation is **not launching ZIPKEY at all**.
+
+`FrmZipKeyPopup.vb` is just a **static mock screen** that displays ZIPKEY text inside a label. A label cannot accept keyboard input, so thatâ€™s why â€œZIPKEYâ€ appears but wonâ€™t let you type.
+
+So for **Path A**, we should replace this fake popup behavior with code that launches the **real ZIPKEY executable**.
+
+---
+
+## Answer to your earlier question
+No, this does **not automatically mean** the executable must go in `\\invoice\mainmenu\data`.
+
+But the real ZIPKEY app does need:
+- a real executable path
+- likely a correct working directory
+- possibly companion data files in the same directory as the exe
+
+We can choose a proper location once we know where the real ZIPKEY files currently live.
+
+---
+
+# What to change
+## 1. Stop opening `FrmZipKeyPopup`
+Replace the `(H)` handler so it launches the external program instead.
+
+## 2. Keep the old popup file out of the flow
+You can leave `FrmZipKeyPopup.vb` in the project for now, but it should no longer be used.
+
+---
+
+# Replace `OpenZipKey()` in `FrmRolodexMenu`
+Use this version:
+
+```vb name=FrmRolodexMenu_OpenZipKey.vb
+Private Sub OpenZipKey()
+    Try
+        Dim zipKeyExe As String = "C:\AMI\ZIPKEY\ZIPKEY.EXE"
+        Dim zipKeyWorkingDir As String = "C:\AMI\ZIPKEY"
+
+        If Not IO.File.Exists(zipKeyExe) Then
+            MessageBox.Show(
+                "ZIPKEY executable was not found:" & Environment.NewLine & zipKeyExe,
+                "ZIPKEY",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error)
+            Return
+        End If
+
+        Dim psi As New ProcessStartInfo()
+        psi.FileName = zipKeyExe
+        psi.WorkingDirectory = zipKeyWorkingDir
+        psi.UseShellExecute = True
+        psi.WindowStyle = ProcessWindowStyle.Normal
+
+        Me.Hide()
+
+        Dim p As Process = Process.Start(psi)
+
+        If p IsNot Nothing Then
+            p.WaitForExit()
+        End If
+
+    Catch ex As Exception
+        MessageBox.Show(
+            "Unable to launch ZIPKEY." & Environment.NewLine & Environment.NewLine & ex.Message,
+            "ZIPKEY",
+            MessageBoxButtons.OK,
+            MessageBoxIcon.Error)
+    Finally
+        Me.Show()
+        Me.Activate()
+    End Try
+End Sub
+```
+
+---
+
+## Important
+This code needs these imports at the top of `FrmRolodexMenu.vb`:
+
+```vb name=FrmRolodexMenu_imports.vb
+Imports System.Diagnostics
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+So your imports section should become:
+
+```vb name=FrmRolodexMenu_top.vb
+Imports System.Diagnostics
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+---
+
+# Full recommendation before you run it
+You need to set these to the **real location** of ZIPKEY:
+
+```vb
+Dim zipKeyExe As String = "C:\AMI\ZIPKEY\ZIPKEY.EXE"
+Dim zipKeyWorkingDir As String = "C:\AMI\ZIPKEY"
+```
+
+If your ZIPKEY files are somewhere else, change both values accordingly.
+
+---
+
+## Best folder layout
+A good setup would be something like:
+
+```text
+C:\AMI\ZIPKEY\ZIPKEY.EXE
+C:\AMI\ZIPKEY\{all ZIPKEY support/data files}
+```
+
+That is usually safer than trying to run old utilities from a network share.
+
+---
+
+## Why this should fix input
+Because now:
+- ZIPKEY runs as its **own real process**
+- in its **own window**
+- with its **own keyboard focus**
+- instead of a VB label pretending to be ZIPKEY
+
+---
+
+## What I recommend next
+### Step 1
+Find where the real ZIPKEY executable currently lives.
+
+### Step 2
+Update these two paths:
+- `zipKeyExe`
+- `zipKeyWorkingDir`
+
+### Step 3
+Test `(H)` again.
+
+---
+
+## One more likely reality check
+If ZIPKEY is truly a DOS-era executable, modern Windows may still have trouble running it directly depending on:
+- 16-bit vs 32-bit
+- console subsystem
+- Windows version
+
+If that happens, the next solution would be:
+- launch via DOSBox / vDos / emulator
+- or fall back to a VB reimplementation
+
+But first we should try the proper external launch, because right now you are not launching it at all.
+
+## Best next response from you
+Tell me:
+- where `ZIPKEY.EXE` currently lives
+
+and Iâ€™ll give you the exact final `OpenZipKey()` code with the right path filled in.
+
+## @testsubject117
+
+zipkey.exe lives in the phone folder for DOS, so we should put it in \\invoice\mainmenu\data\phone for VB.
+
+## Copilot
+
+Yes â€” that makes sense.
+
+## Direct recommendation
