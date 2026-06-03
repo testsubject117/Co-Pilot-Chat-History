@@ -1,0 +1,2000 @@
+﻿
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <CurrentBuildNumber>%(BuildCounterLines.Identity)</CurrentBuildNumber>
+      <CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(BuildCounterFile)" Overwrite="true" Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile Condition="!Exists('$(BuildCounterFile)')" File="$(BuildCounterFile)" Overwrite="true" Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile File="$(BuildInfoFile)" Overwrite="true" Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## What changed
+This line:
+
+```xml
+<BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+```
+
+was replaced with:
+
+```xml
+<CurrentBuildNumber>%(BuildCounterLines.Identity)</CurrentBuildNumber>
+<CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+<BuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</BuildNumber>
+```
+
+## Why
+`Publish` is more sensitive about property-expression evaluation.  
+`MSBuild::Add(...)` is usually safer there than `System.Int32::Parse(...) + 1`.
+
+## If you want the smallest possible edit
+You can replace only this part:
+
+```xml
+<PropertyGroup>
+  <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+</PropertyGroup>
+```
+
+with:
+
+```xml
+<PropertyGroup>
+  <CurrentBuildNumber>%(BuildCounterLines.Identity)</CurrentBuildNumber>
+  <CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+  <BuildNumber>$([MSBuild]::Add($(CurrentBuildNumber), 1))</BuildNumber>
+</PropertyGroup>
+```
+
+If publish still errors after that, paste the new exact message and Iâ€™ll narrow it further.
+
+## @testsubject117
+
+```
+Please create a complete AMi project end-of-day wrap-up for todayâ€™s work.
+
+Use everything discussed in this chat session. Be concrete, highly specific, and detailed. Do not be vague.
+
+This project involves ongoing modernization / continuation work across AMiWinForms and AMiDataStore, with frequent comparison to legacy DOS behavior. The summary must preserve continuity across sessions and help me resume work quickly tomorrow.
+
+Core requirements:
+- Include exact forms, menus, files, classes, methods, business workflows, bugs, UI decisions, and repo findings discussed today.
+- Include both implementation work and analysis/research work.
+- Include code review findings from AMiWinForms and AMiDataStore where relevant.
+- Include comparisons between DOS behavior and VB behavior.
+- Preserve the principle that the VB version should keep the DOS workflow, behavior, navigation, and look-and-feel as closely as practical unless we explicitly decided otherwise.
+- Be explicit about what is done, what is partially done, what still needs to be built, and what is uncertain.
+- Make this output useful as:
+  1. an end-of-day handoff,
+  2. a next-morning restart guide,
+  3. a future chat reload pack,
+  4. a roadmap snapshot.
+
+Output in exactly these sections:
+
+# 1. Executive Summary
+Write a detailed narrative summary of todayâ€™s work, including coding, debugging, planning, repo review, and design decisions.
+
+# 2. What Was Accomplished Today
+Create a markdown checklist of completed work.
+Use:
+- [x] item
+
+Be specific and include files/forms/components where possible.
+
+# 3. AMiWinForms Work Summary
+Summarize all work, findings, or decisions related to AMiWinForms.
+Include:
+- forms reviewed or changed
+- UI/workflow findings
+- event handling / business logic notes
+- areas that are complete vs incomplete
+
+# 4. AMiDataStore Work Summary
+Summarize all work, findings, or decisions related to AMiDataStore.
+Include:
+- data access behavior reviewed
+- dependencies identified
+- repository interactions
+- why those findings matter
+
+# 5. DOS vs VB Parity Summary
+Create a detailed parity summary covering:
+- what DOS currently does in the relevant workflow
+- what VB already reproduces
+- what VB still needs to match
+- what visual/behavioral patterns must remain familiar
+- any known gaps, mismatches, or deviations
+- anything we explicitly decided can differ
+
+# 6. Forms / Workflow Status
+Summarize the status of the active forms, screens, menus, workflows, or features discussed today.
+For each relevant item, indicate:
+- current state
+- what works
+- what is missing
+- what to do next
+
+# 7. Key Technical Findings
+List important discoveries made today, including:
+- code behavior
+- architecture understanding
+- dependencies
+- hidden assumptions
+- debugging findings
+- file/function-level insights
+
+# 8. Current Project State
+Summarize where the project stands right now overall:
+- working
+- partially working
+- not started
+- broken
+- uncertain
+
+# 9. Remaining Work
+Create a grouped markdown checklist of remaining work.
+Group by category where practical, such as:
+- UI/forms
+- data/store
+- DOS parity
+- validation/business rules
+- testing
+- cleanup/refactor
+
+# 10. Highest Priority Next Steps
+List the most important tasks to work on next, in strict priority order.
+
+# 11. Risks / Blockers / Open Questions
+List unresolved issues, blockers, risks, assumptions, and anything that needs validation.
+
+# 12. AMi Future Chat Reload Pack
+Create a compact but dense context pack for a brand new chat.
+This must include:
+- project identity
+- current objective
+- AMiWinForms status
+- AMiDataStore status
+- DOS parity expectations
+- critical forms/files/components discussed
+- current implementation gaps
+- immediate next coding targets
+
+# 13. Operator Tactical Notes
+Create a short, practical, checklist-style handoff for me personally.
+Keep this compact and optimized for quick scanning.
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+Create a roadmap section with:
+- previous baseline
+- what changed today
+- current state
+- next milestone
+- long-term target
+
+# 15. First Thing Tomorrow Morning
+Create a short checklist of the exact first actions to take next session.
+
+# 16. Fast Reload Shorthand Block
+Create a compact shorthand block that I can paste into a future chat session to reload the essential state quickly. Keep it dense, specific, and practical.
+
+Make the entire result highly structured, reusable, and continuity-focused.
+```
+I'm pasting in the end of the day master prompt, please review and follow the instructions there, if there  is any new data from today that needs to be included, please add it where you feel necessary: 
+
+## Copilot
+
+# 1. Executive Summary
+
+Todayâ€™s work focused primarily on **main menu triage, placeholder/menu continuity, VB WinForms stability, and deciding what not to tackle yet** in the ongoing AMi modernization effort. The session stayed centered on preserving **legacy DOS familiarity** while unblocking forward progress in **AMiWinForms**, with some indirect project/build-system implications that matter for continuity.
+
+A major objective today was to keep the **Main Menu option `(3) Miscellaneous Menu` visible and navigable** in the VB application even though its real functionality is not yet implemented. The decision was made **not** to remove or hide `(3)` from the main menu. Instead, the VB app should preserve DOS-style navigation and menu completeness by allowing the user to click `(3)` and open a real submenu screen, but that submenu should clearly communicate that it is **for future use / not yet implemented**.
+
+Initial work attempted to add a `FormMiscMenu` placeholder form. That immediately exposed a series of **Visual Basic / Roslyn compiler crashes** under **.NET SDK 10.0.300**, including internal CLR / compiler fatal errors during parse, metadata emission, and standalone signature / attribute processing. These failures were not typical syntax errors; they were compiler-internal crashes. Troubleshooting found that one contributing issue was the project fileâ€™s explicit VB global imports block:
+- `System`
+- `System.Windows.Forms`
+- `System.Drawing`
+
+Removing that `<Import Include="..."/>` block from the SDK-style `.vbproj` allowed the project to build cleanly again. This was a meaningful technical finding because the compiler stack traces pointed directly into **VB command-line global import parsing** (`ParseOneImportsDirective`, `ParseImportsStatement`, `ParseGlobalImports`), and removal of the global imports block resolved that class of failure.
+
+A second stability finding was that **new standalone form definitions** seemed more likely to trigger Roslyn instability unless they followed a pattern already known to work in the codebase. `FormMiscMenu` only became stable once it was rewritten to closely mirror the structure of an existing working inherited menu form, specifically **`FormLedgerMenu`**. The final stable `FormMiscMenu.vb` was implemented as a **code-only form** inheriting `DosMenuFormBase`, with the local designer file and `.resx` excluded from compilation in the project file:
+- `FormMiscMenu.Designer.vb` removed from compile
+- `FormMiscMenu.resx` removed from embedded resources
+
+The final placeholder implementation preserves the menu option on the main menu, opens a real submenu, and uses a title eventually refined to:
+- `MISC. MENU (FUTURE USE)`
+
+This title was a deliberate UI wording decision after iterating through:
+- `MISCELLANEOUS MENU - PLACEHOLDER`
+- `MISC. MENU (FOR FUTURE USE)`
+- final chosen simplification: `MISC. MENU (FUTURE USE)`
+
+The internal submenu buttons were implemented as placeholders:
+- Aâ€“F placeholder items
+- each intentionally calls `NotYet(...)`
+
+This preserves expected DOS-era menu-navigation structure while clearly signaling incomplete functionality.
+
+There was also a behavior clarification around main menu click handling. The `FormMainMenu.vb` code was reviewed, including:
+- `BuildMenu()`
+- `AddMenuButton(...)`
+- `HandleMenuKey(...)`
+- `Case "3"` launching `FormMiscMenu`
+- button click delegation via `HandleMenuKey(CStr(btn.Tag))`
+
+That review confirmed that `(3)` in the main menu is correctly wired to open the new submenu through the same navigation pipeline used by other keys, and that the â€œNot Yet Implementedâ€ response seen after clicking `(3)` was actually expected behavior of the **submenuâ€™s internal placeholder buttons**, not evidence that the main menu launch wiring was wrong.
+
+On planning/prioritization, the team revisited the remaining items from the earlier prioritized group of menu options. Current status of the original â€œ1â€“5â€ bucket became:
+- `3 Miscellaneous Menu` -> addressed for now as a working placeholder
+- `H Quick Message Flashing` -> investigated earlier but intentionally skipped for now
+- `N Rolodex` -> reviewed at the DOS layout level and found to be **more convoluted than expected**, so it was explicitly **earmarked for tomorrow**
+- `F Price List Program` -> now the strongest likely next candidate
+- `A Shop Card Generator` -> still likely more complex / workflow-heavy than `F`
+
+A strategic decision was made **not to force Rolodex today** after reviewing its DOS layout and seeing that it likely has more complicated navigation/data interactions than initially hoped. That is important continuity context for tomorrow: Rolodex is not abandoned, but it has been consciously deferred because it appears more involved and needs a fresher session.
+
+Finally, a publish-time MSBuild problem was identified in the `.vbproj` build-number increment logic. Publishing failed on:
+- `The expression "[System.Int32]::Parse('32') + 1" cannot be evaluated.`
+
+That came from the custom build counter target in the project file. A safer alternative using MSBuild property functions was proposed:
+- replacing `System.Int32::Parse(...) + 1`
+- with `MSBuild::Add($(CurrentBuildNumber), 1)`
+
+This issue belongs to project/build infrastructure rather than functional UI, but it is important because it currently blocks publish even if the app builds in Visual Studio.
+
+Overall, today moved the project forward by:
+1. preserving the DOS main menu structure more faithfully,
+2. adding a stable placeholder submenu for `(3)`,
+3. discovering and fixing a key `.vbproj` VB compiler crash trigger,
+4. identifying a reliable pattern for future inherited menu forms,
+5. narrowing next work priorities,
+6. and capturing that Rolodex needs a dedicated follow-up session.
+
+---
+
+# 2. What Was Accomplished Today
+
+- [x] Kept **Main Menu option `(3) Miscellaneous Menu` visible and active** instead of hiding or removing it.
+- [x] Decided that `(3)` should open a **real submenu screen** rather than immediately showing a generic â€œNot Yet Implementedâ€ message.
+- [x] Created and stabilized **`FormMiscMenu.vb`** as a placeholder submenu inheriting `DosMenuFormBase`.
+- [x] Implemented `FormMiscMenu` as a **code-only form** without relying on local designer/resx files.
+- [x] Updated `FormMainMenu.vb` so `Case "3"` opens `FormMiscMenu` through `ShowDialog(Me)`.
+- [x] Reviewed `FormMainMenu.vb` and confirmed button-click routing uses `HandleMenuKey(CStr(btn.Tag))`, preserving keyboard/click consistency.
+- [x] Implemented placeholder submenu items **Aâ€“F** inside `FormMiscMenu`.
+- [x] Ensured each placeholder item intentionally calls `NotYet(...)`.
+- [x] Finalized the submenu title wording to **`MISC. MENU (FUTURE USE)`**.
+- [x] Used **`FormLedgerMenu`** as the proven structural template for a stable inherited menu form.
+- [x] Identified that earlier `FormMiscMenu` attempts were triggering **Roslyn/VB compiler crashes** under **.NET SDK 10.0.300**.
+- [x] Diagnosed one root cause of compiler failure as the `.vbproj` **VB global imports block**.
+- [x] Removed the `.vbproj` block containing:
+  - [x] `<Import Include="System" />`
+  - [x] `<Import Include="System.Windows.Forms" />`
+  - [x] `<Import Include="System.Drawing" />`
+- [x] Confirmed that removing those project-level imports allowed the project to **build cleanly** again.
+- [x] Updated project file handling to exclude:
+  - [x] `FormMiscMenu.Designer.vb`
+  - [x] `FormMiscMenu.resx`
+- [x] Confirmed that the project could build cleanly after those adjustments.
+- [x] Clarified that the â€œNot Yet Implementedâ€ shown after clicking `(3)` was actually from the **submenu placeholder items**, not from broken main menu wiring.
+- [x] Assessed remaining top candidates from the earlier menu-priority list.
+- [x] Reviewed the DOS Rolodex layout and concluded it appears **convoluted / non-trivial**.
+- [x] Explicitly deferred **`N Rolodex`** to tomorrow.
+- [x] Narrowed likely next implementation candidate to **`F Price List Program`**.
+- [x] Identified a **publish-time MSBuild expression failure** in the build-number increment logic:
+  - [x] `"[System.Int32]::Parse('32') + 1" cannot be evaluated`
+- [x] Proposed safer MSBuild build-number increment logic using `MSBuild::Add(...)`.
+
+---
+
+# 3. AMiWinForms Work Summary
+
+## Forms reviewed or changed
+
+### `FormMainMenu.vb`
+Reviewed in detail. Key relevant elements confirmed:
+- `BuildMenu()`
+- `AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)`
+- button click handler:
+  - `AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))`
+- `HandleMenuKey(ch As String)`
+- `Case "3"`:
+  - opens `FormMiscMenu` with `Using f As New FormMiscMenu() : f.ShowDialog(Me) : End Using`
+
+The main menu currently preserves DOS-like labeled button navigation using explicit single-character keys and modal form transitions. This remains aligned with the DOS look-and-feel goal.
+
+### `FormMiscMenu.vb`
+This was the main implementation file created/stabilized today.
+
+Final stable pattern:
+- `Partial Public Class FormMiscMenu`
+- `Inherits DosMenuFormBase`
+- uses the same overall structure as `FormLedgerMenu`
+
+Final behavior:
+- title set via:
+  - `SetMenuTitle("MISC. MENU (FUTURE USE)")`
+- hides `flpRight`
+- uses one-column menu layout in `flpLeft`
+- creates placeholder items Aâ€“F
+- each placeholder item calls `NotYet("Placeholder Item X")`
+
+This is intentionally a continuity-preserving placeholder, not a feature-complete submenu.
+
+### `FormLedgerMenu.vb`
+Not modified, but used as a known-good structural reference. Important because its pattern informed the stable implementation of `FormMiscMenu`. Relevant characteristics reused:
+- inherited from `DosMenuFormBase`
+- one-column left-panel menu layout
+- inline `AddMenuButton(..., Sub() ... End Sub)` handlers
+- post-build button tightening via helper method
+- code-only control composition beyond base-form scaffolding
+
+### Other referenced forms in `FormMainMenu.vb`
+These were not changed today but were part of review/context:
+- `FormPersonalCalendar`
+- `FormMileageTracking`
+- `FormAbout`
+- `FormLedgerMenu`
+
+They matter because they help define which menu entries are already real vs still placeholders.
+
+## UI/workflow findings
+
+- The main menu should remain as complete and familiar to DOS users as practical.
+- Even non-implemented menu entries should preferably remain visible if DOS presented them that way.
+- `(3) Miscellaneous Menu` should not disappear; it should open a submenu shell.
+- For now, a placeholder submenu is preferable to removing the path or collapsing the menu structure.
+- The submenu title text was refined for readability and compactness:
+  - final: `MISC. MENU (FUTURE USE)`
+
+## Event handling / business logic notes
+
+- `FormMainMenu` button clicks and keyboard presses both route through `HandleMenuKey`.
+- This is good because it keeps mouse and keyboard behavior unified and DOS-like.
+- The confusion about `(3)` returning â€œNot Yet Implementedâ€ was resolved by reviewing the code path:
+  - `(3)` does open `FormMiscMenu`
+  - the message box appears only when clicking one of the placeholder submenu items
+
+## Areas complete vs incomplete
+
+### Complete for now
+- Main menu entry `(3)` preserved
+- `(3)` launches a real submenu
+- placeholder submenu visually exists and functions
+- compiler/build stabilized enough for current progress
+
+### Incomplete
+- actual Miscellaneous Menu business functions
+- any real submenu destinations beyond placeholders
+- likely other remaining main menu entries still unimplemented
+
+---
+
+# 4. AMiDataStore Work Summary
+
+Todayâ€™s session did **not include direct implementation work inside AMiDataStore**, nor did it include repository-level code inspection specifically targeting datastore classes or methods. However, there are still indirect findings that matter:
+
+## Data access behavior reviewed
+- No new AMiDataStore methods, repositories, services, or schema mappings were inspected today.
+- No datastore CRUD path was added for Misc Menu because the Misc submenu is currently a UI shell only.
+
+## Dependencies identified
+- The discussion about **Rolodex** strongly implies eventual dependence on persistent contact/customer data behavior, but that data contract was **not yet investigated today**.
+- The decision to postpone Rolodex means datastore exploration for Rolodex-related entities remains pending.
+
+## Repository interactions
+- None directly in AMiDataStore today.
+- No code review of AMiDataStore classes was performed in this session.
+
+## Why those findings matter
+- Todayâ€™s work was intentionally front-end/navigation-focused to preserve visible DOS menu continuity.
+- Tomorrowâ€™s Rolodex work will almost certainly require AMiDataStore inspection because Rolodex appears more complex than a simple menu placeholder.
+- The absence of AMiDataStore changes today is itself important: current progress is UI shell continuity, not underlying datastore expansion.
+
+---
+
+# 5. DOS vs VB Parity Summary
+
+## What DOS currently does in the relevant workflow
+From todayâ€™s discussion and the general modernization context:
+- DOS exposes a **Main Menu** with many single-key entries.
+- `(3) Miscellaneous Menu` exists as a visible menu choice.
+- DOS workflow values consistency, discoverability, and stable navigation structure.
+- Users are likely accustomed to seeing complete menu maps, even when some branches are less frequently used.
+
+The Rolodex DOS layout was reviewed informally enough to determine that it looks **convoluted**, suggesting a more complex legacy interaction pattern than a simple CRUD screen.
+
+## What VB already reproduces
+- Main menu key/button pattern is preserved.
+- Menu entries are displayed with DOS-like key markers: `(A)`, `(B)`, `(1)`, `(3)`, etc.
+- `HandleMenuKey` preserves single-key navigation semantics.
+- Clicking and keyboard activation route into the same handler.
+- `(3)` now opens a distinct submenu screen instead of vanishing or being removed.
+- The submenu uses a layout and navigation pattern consistent with existing DOS-style VB menu forms.
+
+## What VB still needs to match
+- Actual Miscellaneous Menu functionality has not been ported.
+- Any real DOS submenu options under Miscellaneous are not yet reproduced.
+- Rolodex DOS complexity remains to be analyzed and ported carefully.
+- Future work on `F Price List Program` and `A Shop Card Generator` must preserve DOS flow and user expectations.
+
+## What visual/behavioral patterns must remain familiar
+- Keep DOS menu completeness wherever practical.
+- Preserve key-letter / key-number activation semantics.
+- Preserve modal workflow transitions for submenu screens.
+- Maintain a familiar â€œmenu treeâ€ rather than hiding unfinished branches.
+- Continue using compact, explicit menu labels instead of modernized abstraction-heavy navigation.
+- Keep overall screen arrangement and behavior aligned with the DOS mental model unless explicitly changed.
+
+## Known gaps, mismatches, or deviations
+- Miscellaneous Menu exists in VB only as a future-use placeholder, not a real DOS-equivalent implementation.
+- The exact DOS Misc submenu contents have not yet been ported.
+- Some menu options elsewhere still return `NotYet(...)`.
+- Title wording in VB was intentionally adjusted for clarity:
+  - `MISC. MENU (FUTURE USE)`
+  This is a practical deviation in wording, but still consistent with a legacy-style placeholder purpose.
+
+## Anything explicitly decided can differ
+- We explicitly accepted a **placeholder submenu** for `(3)` rather than fully removing it or fully implementing it immediately.
+- We explicitly decided not to pursue more complex title-formatting changes (e.g. separate subtitle rendering beneath title) because it was not worth modifying `DosMenuFormBase` for now.
+- We explicitly deferred Rolodex rather than forcing parity work late in the day.
+
+---
+
+# 6. Forms / Workflow Status
+
+## Main Menu (`FormMainMenu`)
+- **Current state:** active, working
+- **What works:** menu buttons render, keyboard/click routing works, `(3)` is wired to open `FormMiscMenu`
+- **What is missing:** many menu options still not implemented
+- **What to do next:** continue porting highest-priority menu branches
+
+## Miscellaneous Menu (`FormMiscMenu`)
+- **Current state:** working placeholder submenu
+- **What works:** opens from `(3)`, displays title `MISC. MENU (FUTURE USE)`, shows placeholder submenu items, placeholder items call `NotYet(...)`
+- **What is missing:** real business functions, real submenu mapping, confirmation of DOS original submenu structure
+- **What to do next:** leave as-is unless/until Misc branch becomes a real priority
+
+## Ledger Menu (`FormLedgerMenu`)
+- **Current state:** existing working form used as implementation reference
+- **What works:** proven stable inherited menu pattern, one-column left-panel layout, modal child form launches, inline button actions
+- **What is missing:** not part of todayâ€™s implementation gap
+- **What to do next:** use as a template for similar future menu forms when compiler stability is a concern
+
+## Rolodex (`N`)
+- **Current state:** not started today; complexity reassessed
+- **What works:** only the decision-making / planning step
+- **What is missing:** form analysis, data flow review, DOS parity mapping, implementation
+- **What to do next:** begin fresh tomorrow with DOS-layout comparison and likely datastore investigation
+
+## Price List Program (`F`)
+- **Current state:** candidate for next implementation
+- **What works:** not implemented today
+- **What is missing:** full analysis, form/data behavior, DOS parity mapping
+- **What to do next:** likely next feature to inspect if Rolodex remains deferred
+
+## Shop Card Generator (`A`)
+- **Current state:** still pending
+- **What works:** no new work today
+- **What is missing:** workflow analysis and implementation
+- **What to do next:** likely after `F`, unless priorities shift
+
+## Publish / Build workflow
+- **Current state:** build works; publish has a custom-target expression issue
+- **What works:** clean build after removing `.vbproj` VB import block
+- **What is missing:** publish-safe build counter logic
+- **What to do next:** replace parse expression with safer MSBuild arithmetic and retest publish
+
+---
+
+# 7. Key Technical Findings
+
+1. **The `.vbproj` VB global imports block was a real stability problem.**  
+   Removing:
+   - `<Import Include="System" />`
+   - `<Import Include="System.Windows.Forms" />`
+   - `<Import Include="System.Drawing" />`
+   resolved one set of Roslyn/VB compiler crashes.
+
+2. **Roslyn/VB under .NET SDK 10.0.300 is fragile enough that certain new form patterns can trigger internal compiler errors.**  
+   Errors appeared in:
+   - parse/global imports paths
+   - metadata emission
+   - standalone signature handling
+   - custom-attribute emission
+
+3. **A known-good existing form pattern matters.**  
+   Rewriting `FormMiscMenu` to closely resemble `FormLedgerMenu` stabilized it.
+
+4. **For code-only inherited forms, excluding local designer artifacts is acceptable and useful.**  
+   The project now removes:
+   - `FormMiscMenu.Designer.vb`
+   - `FormMiscMenu.resx`
+
+5. **`FormMainMenu` click handling is unified and not the source of the `(3)` confusion.**  
+   Buttons call `HandleMenuKey(CStr(btn.Tag))`, so click and keyboard paths are consistent.
+
+6. **The apparent â€œstill getting Not Yet Implemented on (3)â€ issue was a workflow misunderstanding, not a wiring failure.**  
+   `(3)` successfully opens `FormMiscMenu`; placeholder submenu buttons intentionally show the message.
+
+7. **Rolodex is more complicated than hoped.**  
+   After looking at the DOS layout, it was deemed convoluted enough to defer to tomorrow.
+
+8. **Publish is currently blocked by custom MSBuild expression logic.**  
+   The failing expression:
+   - `[System.Int32]::Parse('32') + 1`
+   should likely be replaced by MSBuild-native arithmetic.
+
+9. **We intentionally did not modify `DosMenuFormBase` title rendering.**  
+   A request to place smaller subtitle text on a new line under the main title was declined for now in favor of a simple title-string change.
+
+---
+
+# 8. Current Project State
+
+## Working
+- Main menu
+- `(3) Miscellaneous Menu` entry
+- `FormMiscMenu` placeholder submenu
+- build after `.vbproj` import cleanup
+- current menu routing behavior
+- placeholder submenu title and buttons
+
+## Partially working
+- overall main-menu modernization
+- several already-portioned forms/menu branches
+- publish/build infrastructure (build works; publish still needs fix)
+- DOS parity for visible menu continuity
+
+## Not started
+- real Misc submenu functionality
+- todayâ€™s Rolodex implementation
+- todayâ€™s Price List Program implementation
+- todayâ€™s Shop Card Generator implementation
+- AMiDataStore work related to Rolodex/Price List from this session
+
+## Broken
+- publish pipeline due to custom build-number expression issue
+
+## Uncertain
+- how much Roslyn/VB fragility remains for future new forms
+- exact scope/complexity of Rolodex port
+- exact best next implementation order between Rolodex, Price List, and Shop Card once tomorrow starts
+
+---
+
+# 9. Remaining Work
+
+## UI / forms
+- [ ] Implement real submenu actions under `FormMiscMenu` if/when Misc branch becomes active work
+- [ ] Analyze and port **Rolodex (`N`)**
+- [ ] Analyze and port **Price List Program (`F`)**
+- [ ] Analyze and port **Shop Card Generator (`A`)**
+- [ ] Continue replacing `NotYet(...)` menu entries with real forms/workflows
+
+## Data / store
+- [ ] Inspect AMiDataStore dependencies needed for Rolodex
+- [ ] Identify datastore dependencies for Price List Program
+- [ ] Determine whether Shop Card Generator depends on AMiDataStore, file import, or legacy flat-file logic
+- [ ] Validate whether existing repositories/services already cover required data for these menu branches
+
+## DOS parity
+- [ ] Map actual DOS Miscellaneous Menu contents if future implementation is required
+- [ ] Review DOS Rolodex workflow in more detail
+- [ ] Preserve DOS navigation, field ordering, prompts, and workflow expectations in future ports
+- [ ] Verify visual/menu terminology against DOS where possible
+
+## Validation / business rules
+- [ ] Identify validation rules and workflow constraints for Rolodex
+- [ ] Identify pricing/business rules for Price List Program
+- [ ] Identify shop card generation logic, outputs, and dependencies
+
+## Testing
+- [ ] Re-test main menu routing after any additional menu-form additions
+- [ ] Verify `FormMiscMenu` remains stable after future project file changes
+- [ ] Test publish after fixing build-number target
+- [ ] Smoke-test current build after any new form is added, due to compiler fragility
+
+## Cleanup / refactor
+- [ ] Clean up project build-counter/publish logic
+- [ ] Consider documenting the safe pattern for adding inherited menu forms
+- [ ] Consider centralizing notes on known Roslyn/.NET 10 VB issues affecting this repo
+
+---
+
+# 10. Highest Priority Next Steps
+
+1. **Fix publish/build-counter logic in the `.vbproj`** so publish is unblocked.
+2. **Start tomorrow with Rolodex analysis** since it was intentionally deferred after discovering DOS complexity.
+3. **If Rolodex proves too deep for immediate progress, shift to `F Price List Program` as the next likely tractable implementation target.**
+4. Preserve todayâ€™s stable `FormMiscMenu` state without overworking it.
+5. Continue using the `FormLedgerMenu` pattern for any future similar menu forms to reduce Roslyn/VB risk.
+
+---
+
+# 11. Risks / Blockers / Open Questions
+
+- **Publish blocker:** custom MSBuild expression for build number currently fails during publish.
+- **Compiler fragility risk:** VB / Roslyn under .NET SDK 10.0.300 may still crash on certain new form/code shapes.
+- **Rolodex scope risk:** DOS Rolodex layout appears convoluted; underlying data/workflow complexity remains unknown.
+- **AMiDataStore dependency uncertainty:** Rolodex and Price List likely need datastore work that was not reviewed today.
+- **Parity risk:** placeholder submenu keeps the menu tree intact, but actual DOS-equivalent behavior is still absent.
+- **Project-file fragility:** earlier `.vbproj` imports configuration caused compiler instability; future edits should be cautious.
+- **Form pattern risk:** brand-new designer/inheritance combinations may trigger compiler issues unless they follow a known-good pattern.
+
+---
+
+# 12. AMi Future Chat Reload Pack
+
+AMi is an ongoing modernization/continuation project preserving DOS workflow and look/feel in VB WinForms, with AMiWinForms as the UI/client layer and AMiDataStore as the backing data layer. Current work is menu-by-menu continuation from the DOS app. Principle remains: keep DOS workflow, navigation, behavior, and visual familiarity as closely as practical unless explicitly changed.
+
+Todayâ€™s main AMiWinForms work was on **Main Menu option `(3) Miscellaneous Menu`**. We decided not to hide/remove it; instead it must remain visible and open a real submenu shell. Implemented stable `FormMiscMenu.vb` as a **code-only inherited menu form** based on the proven `FormLedgerMenu` pattern. Final title is **`MISC. MENU (FUTURE USE)`**. Internal Aâ€“F buttons are placeholders that call `NotYet(...)`. `FormMainMenu.vb` already routes `(3)` correctly through `HandleMenuKey` to `FormMiscMenu`.
+
+Important technical finding: adding `FormMiscMenu` initially triggered multiple **Roslyn/VB internal compiler crashes** under **.NET SDK 10.0.300**. One fix was removing the SDK-style `.vbproj` VB global-imports block:
+- `System`
+- `System.Windows.Forms`
+- `System.Drawing`
+
+Project also excludes:
+- `FormMiscMenu.Designer.vb`
+- `FormMiscMenu.resx`
+
+That helped keep `FormMiscMenu` code-only and stable.
+
+`FormMainMenu.vb` was reviewed and confirmed correct:
+- `BuildMenu()`
+- `AddMenuButton(...)`
+- `HandleMenuKey(...)`
+- `Case "3"` launches `FormMiscMenu`
+
+Confusion about `(3)` still showing â€œNot Yet Implementedâ€ was resolved: the main menu launch works; the message comes from clicking placeholder submenu items inside `FormMiscMenu`.
+
+Priority/status snapshot:
+- `3 Miscellaneous Menu` -> done for now as placeholder
+- `H Quick Message Flashing` -> skipped for now
+- `N Rolodex` -> reviewed against DOS layout, appears convoluted, deferred to tomorrow
+- `F Price List Program` -> likely next tractable target if Rolodex is still too deep
+- `A Shop Card Generator` -> still pending, likely more workflow-heavy
+
+No direct AMiDataStore implementation happened today, but Rolodex/Price List likely require datastore review next.
+
+Open infrastructure issue: publish currently fails due to `.vbproj` build-counter logic with:
+- `The expression "[System.Int32]::Parse('32') + 1" cannot be evaluated.`
+Need to replace that arithmetic with safer MSBuild-native property-function logic and retest publish.
+
+Critical files/components discussed:
+- `FormMainMenu.vb`
+- `FormMiscMenu.vb`
+- `FormLedgerMenu.vb`
+- project `.vbproj`
+- `DosMenuFormBase`
+- build-counter / `GenerateBuildInfo` targets
+
+Immediate next coding targets:
+1. fix publish/build-counter logic
+2. begin Rolodex analysis tomorrow
+3. if Rolodex is too deep, pivot to Price List Program
+4. continue preserving DOS parity and stable menu structure
+
+---
+
+# 13. Operator Tactical Notes
+
+- [ ] Fix publish failure in `.vbproj` build counter target first
+- [ ] Do **not** disturb working `FormMiscMenu` unless necessary
+- [ ] Keep `FormMiscMenu` code-only; avoid reviving local designer/resx
+- [ ] Use `FormLedgerMenu` as template for future similar forms
+- [ ] Start tomorrow with Rolodex review, but be ready to pivot to Price List
+- [ ] Remember: `(3)` is done enough for now
+- [ ] Keep DOS structure intact even when using placeholders
+
+---
+
+# 14. Roadmap: Where We Were / Where We Are / Where Weâ€™re Going
+
+## Previous baseline
+- Main menu modernization was in progress.
+- Several menu entries still used `NotYet(...)`.
+- `(3) Miscellaneous Menu` had not yet been stabilized as a real submenu shell.
+- Remaining likely targets included Rolodex, Price List, and Shop Card Generator.
+
+## What changed today
+- `(3)` now remains visible and opens a real placeholder submenu.
+- `FormMiscMenu.vb` was created/stabilized.
+- `.vbproj` global imports causing VB compiler crashes were identified and removed.
+- A safe pattern for future inherited menu forms was reinforced using `FormLedgerMenu`.
+- Rolodex was reassessed and deferred after discovering DOS complexity.
+- Publish issue with build-counter expression was identified.
+
+## Current state
+- App builds.
+- Main menu continuity improved.
+- Misc submenu placeholder exists and works.
+- Publish is blocked.
+- Rolodex remains pending and likely non-trivial.
+- Price List is becoming the likely next feature if Rolodex is still too deep tomorrow.
+
+## Next milestone
+- Unblock publish.
+- Begin the next substantive legacy feature port: ideally Rolodex analysis, otherwise Price List Program.
+
+## Long-term target
+- Continue replacing `NotYet(...)` branches with DOS-faithful WinForms workflows backed by AMiDataStore where needed.
+- Preserve DOS navigation, prompts, screen structure, and familiarity across the port.
+
+---
+
+# 15. First Thing Tomorrow Morning
+
+- [ ] Fix or verify the `.vbproj` publish/build-counter expression
+- [ ] Reopen the DOS Rolodex layout and map the workflow carefully
+- [ ] Identify which files/forms/data components Rolodex will need
+- [ ] Decide quickly: continue with Rolodex or pivot to Price List Program
+- [ ] Preserve todayâ€™s stable Misc Menu implementation as-is
+
+---
+
+# 16. Fast Reload Shorthand Block
+
+AMi modernization/continuation project; preserve DOS workflow/look/feel in VB WinForms unless explicitly changed. Today: implemented `(3) Miscellaneous Menu` as working placeholder submenu in AMiWinForms. `FormMainMenu.vb` already routes `(3)` correctly via `HandleMenuKey`; created stable `FormMiscMenu.vb` based on `FormLedgerMenu` pattern; final title `MISC. MENU (FUTURE USE)`; submenu items Aâ€“F intentionally call `NotYet(...)`. Important fix: removed `.vbproj` VB global imports block (`System`, `System.Windows.Forms`, `System.Drawing`) because it was triggering Roslyn/VB compiler crashes under .NET SDK 10.0.300. Project excludes `FormMiscMenu.Designer.vb` and `FormMiscMenu.resx`; keep `FormMiscMenu` code-only. Rolodex (`N`) reviewed at DOS level and looks convoluted, so deferred to tomorrow. Likely next target if Rolodex is too deep: `F Price List Program`; `A Shop Card Generator` still pending. No direct AMiDataStore code work today, but Rolodex/Price List likely require datastore review next. Open blocker: publish fails in `.vbproj` build counter target with `[System.Int32]::Parse('32') + 1`; replace with safer MSBuild arithmetic and retest.
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -Silent
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:465 char:17
++         '^jan-' { $monthFolder -replace '^jan', 'january' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:466 char:17
++         '^feb-' { $monthFolder -replace '^feb', 'february' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:467 char:17
++         '^mar-' { $monthFolder -replace '^mar', 'march' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:468 char:17
++         '^apr-' { $monthFolder -replace '^apr', 'april' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:469 char:17
++         '^may-' { $monthFolder -replace '^may', 'may' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:470 char:17
++         '^jun-' { $monthFolder -replace '^jun', 'june' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:471 char:17
++         '^jul-' { $monthFolder -replace '^jul', 'july' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:472 char:17
++         '^aug-' { $monthFolder -replace '^aug', 'august' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:473 char:17
++         '^sep-' { $monthFolder -replace '^sep', 'september' }
++                 ~
+Unexpected token '{' in expression or statement.
+At H:\AM\Scripts\Sync-CoPilotChatHistory.ps1:474 char:17
++         '^oct-' { $monthFolder -replace '^oct', 'october' }
++                 ~
+Unexpected token '{' in expression or statement.
+Not all parse errors were reported.  Correct the reported errors and try again.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+
+```
+it looks like the script to scan and find .md files in downloads, extract/split them, save them to the repo and sync the repo is not working. pasting file and run results here: 
+
+## Copilot
+
+Yes â€” the script is failing because that `switch` block is written with **regex-style cases but without `-Regex` on the `switch` statement**. In PowerShell, pattern cases like `'^jan-' { ... }` are valid only when the `switch` is using regex matching; otherwise the parser treats that layout as invalid in this context. Microsoftâ€™s `about_Switch` docs show that regex cases require `switch -Regex (...) { ... }`. ([learn.microsoft.com](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_switch?view=powershell-7.5&utm_source=openai))
+
+## What to change
+
+At or just above **line 465**, you likely have something like this:
+
+```powershell
+switch ($monthFolder) {
+    '^jan-' { $monthFolder -replace '^jan', 'january' }
+    '^feb-' { $monthFolder -replace '^feb', 'february' }
+    '^mar-' { $monthFolder -replace '^mar', 'march' }
+    '^apr-' { $monthFolder -replace '^apr', 'april' }
+    '^may-' { $monthFolder -replace '^may', 'may' }
+    '^jun-' { $monthFolder -replace '^jun', 'june' }
+    '^jul-' { $monthFolder -replace '^jul', 'july' }
+    '^aug-' { $monthFolder -replace '^aug', 'august' }
+    '^sep-' { $monthFolder -replace '^sep', 'september' }
+    '^oct-' { $monthFolder -replace '^oct', 'october' }
+    '^nov-' { $monthFolder -replace '^nov', 'november' }
+    '^dec-' { $monthFolder -replace '^dec', 'december' }
+}
+```
+
+Change it to:
+
+```powershell
+switch -Regex ($monthFolder) {
+    '^jan-' { $monthFolder -replace '^jan', 'january'; break }
+    '^feb-' { $monthFolder -replace '^feb', 'february'; break }
+    '^mar-' { $monthFolder -replace '^mar', 'march'; break }
+    '^apr-' { $monthFolder -replace '^apr', 'april'; break }
+    '^may-' { $monthFolder -replace '^may', 'may'; break }
+    '^jun-' { $monthFolder -replace '^jun', 'june'; break }
+    '^jul-' { $monthFolder -replace '^jul', 'july'; break }
+    '^aug-' { $monthFolder -replace '^aug', 'august'; break }
+    '^sep-' { $monthFolder -replace '^sep', 'september'; break }
+    '^oct-' { $monthFolder -replace '^oct', 'october'; break }
+    '^nov-' { $monthFolder -replace '^nov', 'november'; break }
+    '^dec-' { $monthFolder -replace '^dec', 'december'; break }
+    default { $monthFolder }
+}
+```
+
+## Even safer version
+If youâ€™re assigning to a variable, use:
+
+```powershell
+$normalizedMonthFolder = switch -Regex ($monthFolder) {
+    '^jan-' { $monthFolder -replace '^jan', 'january'; break }
+    '^feb-' { $monthFolder -replace '^feb', 'february'; break }
+    '^mar-' { $monthFolder -replace '^mar', 'march'; break }
+    '^apr-' { $monthFolder -replace '^apr', 'april'; break }
+    '^may-' { $monthFolder -replace '^may', 'may'; break }
+    '^jun-' { $monthFolder -replace '^jun', 'june'; break }
+    '^jul-' { $monthFolder -replace '^jul', 'july'; break }
+    '^aug-' { $monthFolder -replace '^aug', 'august'; break }
+    '^sep-' { $monthFolder -replace '^sep', 'september'; break }
+    '^oct-' { $monthFolder -replace '^oct', 'october'; break }
+    '^nov-' { $monthFolder -replace '^nov', 'november'; break }
+    '^dec-' { $monthFolder -replace '^dec', 'december'; break }
+    default { $monthFolder }
+}
+```
+
+## If you want the simplest possible fix
+Skip `switch` entirely and use a map:
+
+```powershell
+$monthMap = @{
+    'jan' = 'january'
+    'feb' = 'february'
+    'mar' = 'march'
+    'apr' = 'april'
+    'may' = 'may'
+    'jun' = 'june'
+    'jul' = 'july'
+    'aug' = 'august'
+    'sep' = 'september'
+    'oct' = 'october'
+    'nov' = 'november'
+    'dec' = 'december'
+}
+
+if ($monthFolder -match '^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-') {
+    $abbr = $Matches[1].ToLower()
+    $normalizedMonthFolder = $monthFolder -replace "^(?i)$abbr", $monthMap[$abbr]
+} else {
+    $normalizedMonthFolder = $monthFolder
+}
+```
+
+## My recommendation
+Use the **map version** if you want robustness.  
+Use `switch -Regex` if you want the smallest edit.
+
+## Next step
+Paste **lines ~450â€“480** from `Sync-CoPilotChatHistory.ps1` and Iâ€™ll give you the exact corrected block with the right surrounding variable names.
+
+## @testsubject117
+
+```
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateScript({ Test-Path $_ })]
+    [string]$RepoPath,
+
+    [Parameter(Mandatory = $false)]
+    [datetime]$TargetDate = (Get-Date),
+
+    [Parameter(Mandatory = $false)]
+    [string]$DailyBasePath = "H:\AM\DailyConversations",
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$ScanPaths = @(
+        "$env:USERPROFILE\Downloads",
+        "H:\AM\Backed up CoPilot Sessions"
+    ),
+
+    [Parameter(Mandatory = $false)]
+    [string]$BranchName = "upload-chat-history",
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(100, 10000)]
+    [int]$ChunkLineCount = 2000,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipGit,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Silent
+)
+
+$ErrorActionPreference = "Stop"
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host "[INFO] $Message"
+}
+
+function Get-VersionNumber {
+    param([string]$FileName)
+
+    if ($FileName -match '\((\d+)\)(?=\.[^.]+$)') {
+        return [int]$matches[1]
+    }
+
+    return 0
+}
+
+function Get-NormalizedBaseName {
+    param([string]$FileName)
+
+    $nameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $normalized = $nameWithoutExtension -replace '\s*\(\d+\)$', ''
+    return $normalized.ToLower().Replace("-", "_").Replace(" ", "_")
+}
+
+function Get-DatePatterns {
+    param([datetime]$Date)
+
+    return @(
+        $Date.ToString("ddd_MMM_d_yyyy"),
+        $Date.ToString("ddd_MMMM_d_yyyy"),
+        $Date.ToString("yyyy-MM-dd"),
+        $Date.ToString("MM-dd-yyyy"),
+        $Date.ToString("M-d-yyyy")
+    ) | ForEach-Object {
+        $_.ToLower().Replace("-", "_").Replace(" ", "_")
+    }
+}
+
+function Get-ExportFilesForDate {
+    param(
+        [string[]]$Paths,
+        [datetime]$Date
+    )
+
+    $datePatterns = Get-DatePatterns -Date $Date
+    $results = @()
+
+    foreach ($path in $Paths) {
+        if (-not (Test-Path $path)) {
+            continue
+        }
+
+        $files = Get-ChildItem -Path $path -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer } |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".zip" } |
+            Where-Object {
+                $baseName = $_.BaseName.ToLower().Replace("-", "_").Replace(" ", "_")
+                ($datePatterns | Where-Object { $baseName -like "*$_*" }).Count -gt 0
+            }
+
+        $results += $files
+    }
+
+    return $results
+}
+
+function Get-LatestExportGroup {
+    param([object[]]$Files)
+
+    if (-not $Files -or $Files.Count -eq 0) {
+        return $null
+    }
+
+    $ranked = $Files |
+        Sort-Object `
+            @{ Expression = { Get-VersionNumber $_.Name }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    $best = $ranked | Select-Object -First 1
+    $bestNormalized = Get-NormalizedBaseName $best.Name
+    $bestVersion = Get-VersionNumber $best.Name
+
+    return $Files | Where-Object {
+        (Get-NormalizedBaseName $_.Name) -eq $bestNormalized -and
+        (Get-VersionNumber $_.Name) -eq $bestVersion
+    }
+}
+
+function Expand-ZipFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ZipFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $extractFolderName = [System.IO.Path]::GetFileNameWithoutExtension($ZipFile.Name)
+    $extractPath = Join-Path $DestinationRoot $extractFolderName
+
+    if (Test-Path $extractPath) {
+        Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+    Expand-Archive -Path $ZipFile.FullName -DestinationPath $extractPath -Force
+
+    return $extractPath
+}
+
+function Get-MainMarkdownCandidate {
+    param(
+        [object[]]$MarkdownFiles,
+        [string]$ExpectedBaseName
+    )
+
+    if (-not $MarkdownFiles -or $MarkdownFiles.Count -eq 0) {
+        return $null
+    }
+
+    $expected = $ExpectedBaseName.ToLower()
+
+    $ranked = $MarkdownFiles |
+        Sort-Object `
+            @{ Expression = {
+                $name = $_.BaseName.ToLower()
+                if ($name -eq $expected) { 100 }
+                elseif ($name -like "$expected*") { 90 }
+                elseif ($name -match 'checklist|readme|guide|instruction|instructions') { 10 }
+                else { 50 }
+            }; Descending = $true },
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    return $ranked | Select-Object -First 1
+}
+
+function Get-BestImportSourceFromGroup {
+    param(
+        [object[]]$GroupFiles,
+        [string]$TodayFolder
+    )
+
+    if (-not $GroupFiles -or $GroupFiles.Count -eq 0) {
+        return $null
+    }
+
+    $zipFile = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".zip" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($zipFile) {
+        $extractRoot = Join-Path $TodayFolder "extracted"
+        New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+        $extractPath = Expand-ZipFile -ZipFile $zipFile -DestinationRoot $extractRoot
+        $expectedBaseName = Get-NormalizedBaseName $zipFile.Name
+
+        $mdFiles = Get-ChildItem -Path $extractPath -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".md" }
+
+        $mdInside = Get-MainMarkdownCandidate -MarkdownFiles $mdFiles -ExpectedBaseName $expectedBaseName
+        if ($mdInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedMarkdown"
+                ImportFile    = $mdInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+
+        $jsonInside = Get-ChildItem -Path $extractPath -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".json" } |
+            Sort-Object `
+                @{ Expression = { $_.Length }; Descending = $true },
+                @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+            Select-Object -First 1
+
+        if ($jsonInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedJson"
+                ImportFile    = $jsonInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+    }
+
+    $standaloneMdFiles = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    $expectedStandaloneBase = Get-NormalizedBaseName (($GroupFiles | Select-Object -First 1).Name)
+    $standaloneMd = Get-MainMarkdownCandidate -MarkdownFiles $standaloneMdFiles -ExpectedBaseName $expectedStandaloneBase
+
+    if ($standaloneMd) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneMarkdown"
+            ImportFile    = $standaloneMd
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    $standaloneJson = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".json" } |
+        Sort-Object `
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+        Select-Object -First 1
+
+    if ($standaloneJson) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneJson"
+            ImportFile    = $standaloneJson
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    return $null
+}
+
+function Get-LatestPreviousHistoryFile {
+    param(
+        [string]$BasePath,
+        [string]$Today
+    )
+
+    $previousFolder = Get-ChildItem -Path $BasePath -ErrorAction SilentlyContinue |
+        Where-Object { $_.PSIsContainer -and $_.Name -lt $Today } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+
+    if (-not $previousFolder) {
+        return $null
+    }
+
+    return Get-ChildItem -Path $previousFolder.FullName -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.PSIsContainer -and $_.Name -like "*_master-history.md" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+function Build-MasterHistoryFile {
+    param(
+        [datetime]$Date,
+        [string]$DailyBasePath,
+        [object]$ImportSource
+    )
+
+    $today = $Date.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $today
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    $historyFile = Join-Path $todayFolder "${today}_master-history.md"
+    $previousHistory = Get-LatestPreviousHistoryFile -BasePath $DailyBasePath -Today $today
+    $latestImportSource = if ($ImportSource) { $ImportSource.ImportFile.FullName } else { "None" }
+
+    $content = @()
+    $content += "# Daily Copilot Running History"
+    $content += ""
+    $content += "- Date: $today"
+    $content += "- Last Updated: $((Get-Date).ToString('HH:mm:ss'))"
+    $content += "- Latest Import Source: $latestImportSource"
+    $content += ""
+
+    if ($ImportSource) {
+        $content += "- Import Source Type: $($ImportSource.SourceType)"
+        if ($ImportSource.ContainerFile) {
+            $content += "- Source Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $content += "- Extracted To: $($ImportSource.ExtractPath)"
+        }
+        $content += ""
+    }
+
+    $content += "---"
+    $content += ""
+    $content += "## Previous Running History"
+    $content += ""
+
+    if ($previousHistory) {
+        $content += Get-Content -Path $previousHistory.FullName
+    }
+    else {
+        $content += "_No previous running history file was found._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## Today's Latest Export"
+    $content += ""
+
+    if ($ImportSource) {
+        $detectedVersionSource = if ($ImportSource.ContainerFile) { $ImportSource.ContainerFile.Name } else { $ImportSource.ImportFile.Name }
+
+        $content += "- Source File: $($ImportSource.ImportFile.FullName)"
+        $content += "- Last Write Time: $($ImportSource.ImportFile.LastWriteTime)"
+        $content += "- File Type: $($ImportSource.ImportFile.Extension)"
+        $content += "- Detected Version: $(Get-VersionNumber $detectedVersionSource)"
+        $content += ""
+        $content += "===== BEGIN IMPORTED EXPORT ====="
+        $content += ""
+
+        try {
+            $raw = Get-Content -Path $ImportSource.ImportFile.FullName -Raw
+            $content += $raw
+        }
+        catch {
+            $content += "[ERROR] Failed to read import file: $($ImportSource.ImportFile.FullName)"
+            $content += $_.Exception.Message
+        }
+
+        $content += ""
+        $content += "===== END IMPORTED EXPORT ====="
+    }
+    else {
+        $content += "_No export file for target date was found in the scan paths._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## New Notes"
+    $content += ""
+    $content += "_Add today's notes below._"
+    $content += ""
+
+    Set-Content -Path $historyFile -Value $content -Encoding UTF8
+    return $historyFile
+}
+
+function Build-ExecutiveSummaryFile {
+    param(
+        [datetime]$Date,
+        [string]$TargetFolder,
+        [string]$MasterHistoryPath,
+        [object]$ImportSource
+    )
+
+    $dateString = $Date.ToString("yyyy-MM-dd")
+    $summaryPath = Join-Path $TargetFolder "${dateString}_executive-summary.md"
+
+    $summary = @()
+    $summary += "# Executive Summary - $dateString"
+    $summary += ""
+    $summary += "## Source Overview"
+    $summary += ""
+    $summary += "- Master History: $MasterHistoryPath"
+
+    if ($ImportSource) {
+        $summary += "- Import Source Type: $($ImportSource.SourceType)"
+        $summary += "- Import File: $($ImportSource.ImportFile.FullName)"
+        if ($ImportSource.ContainerFile) {
+            $summary += "- Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $summary += "- Extracted Folder: $($ImportSource.ExtractPath)"
+        }
+    }
+    else {
+        $summary += "- No import source detected for the target date."
+    }
+
+    $summary += ""
+    $summary += "## Notes"
+    $summary += ""
+    $summary += "- This file is an operator-facing summary placeholder."
+    $summary += "- Replace or expand this with a handoff summary after review."
+    $summary += "- Recommended follow-up: ask Copilot to summarize the imported history into a project handoff."
+    $summary += ""
+
+    Set-Content -Path $summaryPath -Value $summary -Encoding UTF8
+    return $summaryPath
+}
+
+function Split-TextFileIntoParts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputRoot,
+
+        [int]$LinesPerPart = 2000
+    )
+
+    if (-not (Test-Path $SourceFile)) {
+        return $null
+    }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($SourceFile)
+    $partsFolder = Join-Path $OutputRoot ($baseName + "_parts")
+
+    New-Item -ItemType Directory -Path $partsFolder -Force | Out-Null
+
+    Get-ChildItem -Path $partsFolder -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.PSIsContainer -and $_.Name -like "${baseName}_part_*.txt" } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    $chunk = New-Object System.Collections.Generic.List[string]
+    $partNumber = 1
+
+    Get-Content -Path $SourceFile | ForEach-Object {
+        $chunk.Add($_)
+
+        if ($chunk.Count -ge $LinesPerPart) {
+            $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+            $chunk | Set-Content -Path $partPath -Encoding UTF8
+            $chunk = New-Object System.Collections.Generic.List[string]
+            $partNumber++
+        }
+    }
+
+    if ($chunk.Count -gt 0) {
+        $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+        $chunk | Set-Content -Path $partPath -Encoding UTF8
+    }
+
+    return $partsFolder
+}
+
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    return switch -Regex ($monthFolder) {
+        '^jan-' { $monthFolder -replace '^jan', 'january' }
+        '^feb-' { $monthFolder -replace '^feb', 'february' }
+        '^mar-' { $monthFolder -replace '^mar', 'march' }
+        '^apr-' { $monthFolder -replace '^apr', 'april' }
+        '^may-' { $monthFolder -replace '^may', 'may' }
+        '^jun-' { $monthFolder -replace '^jun', 'june' }
+        '^jul-' { $monthFolder -replace '^jul', 'july' }
+        '^aug-' { $monthFolder -replace '^aug', 'august' }
+        '^sep-' { $monthFolder -replace '^sep', 'september' }
+        '^oct-' { $monthFolder -replace '^oct', 'october' }
+        '^nov-' { $monthFolder -replace '^nov', 'november' }
+        '^dec-' { $monthFolder -replace '^dec', 'december' }
+        default { $monthFolder }
+    }
+}
+
+function Assert-GitRepo {
+    param([string]$Path)
+
+    if (-not (Test-Path (Join-Path $Path ".git"))) {
+        throw "RepoPath is not a Git repository: $Path"
+    }
+}
+
+# Main flow
+$targetDateString = $TargetDate.ToString("yyyy-MM-dd")
+$todayFolder = Join-Path $DailyBasePath $targetDateString
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+Assert-GitRepo -Path $RepoPath
+
+Write-Info "Scanning export files for $targetDateString"
+$exports = Get-ExportFilesForDate -Paths $ScanPaths -Date $TargetDate
+$latestGroup = Get-LatestExportGroup -Files $exports
+$importSource = Get-BestImportSourceFromGroup -GroupFiles $latestGroup -TodayFolder $todayFolder
+
+if ($importSource) {
+    Write-Info "Selected import source: $($importSource.ImportFile.FullName)"
+    Write-Info "Import type: $($importSource.SourceType)"
+}
+else {
+    Write-Info "No import source found for $targetDateString"
+}
+
+$masterHistory = Build-MasterHistoryFile -Date $TargetDate -DailyBasePath $DailyBasePath -ImportSource $importSource
+Write-Info "Built master history: $masterHistory"
+
+$monthRecoveryFolder = Get-MonthRecoveryFolderName -Date $TargetDate
+$repoSubfolder = Join-Path ("${monthRecoveryFolder}-recovery") $targetDateString
+$repoTargetFolder = Join-Path $RepoPath $repoSubfolder
+New-Item -ItemType Directory -Path $repoTargetFolder -Force | Out-Null
+
+Copy-Item -Path $masterHistory -Destination $repoTargetFolder -Force
+Write-Info "Copied master history to repo folder"
+
+if ($importSource -and $importSource.ExtractPath -and (Test-Path $importSource.ExtractPath)) {
+    $filesToCopy = Get-ChildItem -Path $importSource.ExtractPath -Recurse -ErrorAction SilentlyContinue |
+        Where-Object {
+            -not $_.PSIsContainer -and $_.Extension.ToLower() -in ".md", ".json", ".txt"
+        }
+
+    foreach ($file in $filesToCopy) {
+        Copy-Item -Path $file.FullName -Destination $repoTargetFolder -Force
+    }
+
+    Write-Info "Copied extracted reviewable files to repo folder"
+}
+
+$summaryPath = Build-ExecutiveSummaryFile -Date $TargetDate -TargetFolder $repoTargetFolder -MasterHistoryPath $masterHistory -ImportSource $importSource
+Write-Info "Built executive summary: $summaryPath"
+
+$markdownFiles = Get-ChildItem -Path $repoTargetFolder -ErrorAction SilentlyContinue |
+    Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".md" }
+
+foreach ($mdFile in $markdownFiles) {
+    $partsFolder = Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $repoTargetFolder -LinesPerPart $ChunkLineCount
+    if ($partsFolder) {
+        Write-Info "Split markdown file into parts: $partsFolder"
+    }
+}
+
+if (-not $Silent) {
+    Start-Process notepad.exe $masterHistory
+}
+
+if (-not $SkipGit) {
+    Push-Location $RepoPath
+    try {
+        git checkout $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $BranchName" }
+
+        git pull origin $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Failed to pull branch $BranchName" }
+
+        git add $repoSubfolder
+
+        $status = git status --porcelain
+        if (-not $status) {
+            Write-Info "No changes to commit."
+            exit 0
+        }
+
+        $commitMessage = "Add chat history files for $targetDateString"
+        git commit -m $commitMessage
+        if ($LASTEXITCODE -ne 0) { throw "Git commit failed." }
+
+        git push origin $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Git push failed." }
+
+        Write-Info "Synced chat history to repo: $repoSubfolder"
+    }
+    finally {
+        Pop-Location
+    }
+}
+else {
+    Write-Info "SkipGit specified; files prepared but not committed/pushed."
+}
+```
+
+## Copilot
+
+The `switch -Regex` syntax in your pasted file is actually fine. The parse error is likely because you're running this in **Windows PowerShell 5.1**, and `return switch -Regex (...) { ... }` is one of those constructs that can parse badly depending on host/version/context.
+
+## Direct fix
+Rewrite `Get-MonthRecoveryFolderName` without `switch`.
+
+Replace your entire function with this:
+
+```powershell
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    $monthMap = @{
+        'jan' = 'january'
+        'feb' = 'february'
+        'mar' = 'march'
+        'apr' = 'april'
+        'may' = 'may'
+        'jun' = 'june'
+        'jul' = 'july'
+        'aug' = 'august'
+        'sep' = 'september'
+        'oct' = 'october'
+        'nov' = 'november'
+        'dec' = 'december'
+    }
+
+    if ($monthFolder -match '^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-') {
+        $abbr = $matches[1].ToLower()
+        return ($monthFolder -replace "^(?i)$abbr", $monthMap[$abbr])
+    }
+
+    return $monthFolder
+}
+```
+
+## Why this is better
+It avoids parser weirdness entirely and is easier to maintain.
+
+---
+
+## One more thing: your command line is missing a required parameter
+Your script defines:
+
+```powershell
+[Parameter(Mandatory = $true)]
+[string]$RepoPath
+```
+
+But your run command was:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -Silent
+```
+
+That does **not** supply `-RepoPath`.
+
+So after fixing the parse error, your next problem will be that PowerShell will prompt for or fail on `RepoPath`.
+
+You need to run it like:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\path\to\your\repo" -Silent
+```
+
+---
+
+## Also likely bug in your Git flow
+This line:
+
+```powershell
+git add $repoSubfolder
+```
+
+may fail or behave inconsistently if `$repoSubfolder` contains backslashes or is treated oddly by git from the repo root.
+
+Safer:
+
+```powershell
+git add -- $repoSubfolder
+```
+
+So change:
+
+```powershell
+git add $repoSubfolder
+```
+
+to:
+
+```powershell
+git add -- $repoSubfolder
+```
+
+---
+
+## Recommended exact changes
+
+### 1. Replace this function:
+```powershell
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    return switch -Regex ($monthFolder) {
+        '^jan-' { $monthFolder -replace '^jan', 'january' }
+        '^feb-' { $monthFolder -replace '^feb', 'february' }
+        '^mar-' { $monthFolder -replace '^mar', 'march' }
+        '^apr-' { $monthFolder -replace '^apr', 'april' }
+        '^may-' { $monthFolder -replace '^may', 'may' }
+        '^jun-' { $monthFolder -replace '^jun', 'june' }
+        '^jul-' { $monthFolder -replace '^jul', 'july' }
+        '^aug-' { $monthFolder -replace '^aug', 'august' }
+        '^sep-' { $monthFolder -replace '^sep', 'september' }
+        '^oct-' { $monthFolder -replace '^oct', 'october' }
+        '^nov-' { $monthFolder -replace '^nov', 'november' }
+        '^dec-' { $monthFolder -replace '^dec', 'december' }
+        default { $monthFolder }
+    }
+}
+```
+
+### with:
+```powershell
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    $monthMap = @{
+        'jan' = 'january'
+        'feb' = 'february'
+        'mar' = 'march'
+        'apr' = 'april'
+        'may' = 'may'
+        'jun' = 'june'
+        'jul' = 'july'
+        'aug' = 'august'
+        'sep' = 'september'
+        'oct' = 'october'
+        'nov' = 'november'
+        'dec' = 'december'
+    }
+
+    if ($monthFolder -match '^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-') {
+        $abbr = $matches[1].ToLower()
+        return ($monthFolder -replace "^(?i)$abbr", $monthMap[$abbr])
+    }
+
+    return $monthFolder
+}
+```
+
+### 2. Change:
+```powershell
+git add $repoSubfolder
+```
+
+### to:
+```powershell
+git add -- $repoSubfolder
+```
+
+### 3. Run with RepoPath
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepo" -Silent
+```
+
+---
+
+## Short answer
+The month-name function is the immediate parser problem.  
+Replace it with the hashmap version above, then rerun **with `-RepoPath` provided**.
+
+If you want, I can give you the **entire corrected script back in one paste-ready block**.
+
+## @testsubject117
+
+please generate the entire file code so I can replace it
+
+## Copilot
+
+Yes â€” here is the full corrected script with:
+- the **month-folder parser fix**
+- safer `git add -- $repoSubfolder`
+- otherwise preserving your current behavior
+
+```powershell
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateScript({ Test-Path $_ })]
+    [string]$RepoPath,
+
+    [Parameter(Mandatory = $false)]
+    [datetime]$TargetDate = (Get-Date),
+
+    [Parameter(Mandatory = $false)]
+    [string]$DailyBasePath = "H:\AM\DailyConversations",
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$ScanPaths = @(
+        "$env:USERPROFILE\Downloads",
+        "H:\AM\Backed up CoPilot Sessions"
+    ),
+
+    [Parameter(Mandatory = $false)]
+    [string]$BranchName = "upload-chat-history",
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(100, 10000)]
+    [int]$ChunkLineCount = 2000,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipGit,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Silent
+)
+
+$ErrorActionPreference = "Stop"
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host "[INFO] $Message"
+}
+
+function Get-VersionNumber {
+    param([string]$FileName)
+
+    if ($FileName -match '\((\d+)\)(?=\.[^.]+$)') {
+        return [int]$matches[1]
+    }
+
+    return 0
+}
+
+function Get-NormalizedBaseName {
+    param([string]$FileName)
+
+    $nameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $normalized = $nameWithoutExtension -replace '\s*\(\d+\)$', ''
+    return $normalized.ToLower().Replace("-", "_").Replace(" ", "_")
+}
+
+function Get-DatePatterns {
+    param([datetime]$Date)
+
+    return @(
+        $Date.ToString("ddd_MMM_d_yyyy"),
+        $Date.ToString("ddd_MMMM_d_yyyy"),
+        $Date.ToString("yyyy-MM-dd"),
+        $Date.ToString("MM-dd-yyyy"),
+        $Date.ToString("M-d-yyyy")
+    ) | ForEach-Object {
+        $_.ToLower().Replace("-", "_").Replace(" ", "_")
+    }
+}
+
+function Get-ExportFilesForDate {
+    param(
+        [string[]]$Paths,
+        [datetime]$Date
+    )
+
+    $datePatterns = Get-DatePatterns -Date $Date
+    $results = @()
+
+    foreach ($path in $Paths) {
+        if (-not (Test-Path $path)) {
+            continue
+        }
+
+        $files = Get-ChildItem -Path $path -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer } |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".zip" } |
+            Where-Object {
+                $baseName = $_.BaseName.ToLower().Replace("-", "_").Replace(" ", "_")
+                ($datePatterns | Where-Object { $baseName -like "*$_*" }).Count -gt 0
+            }
+
+        $results += $files
+    }
+
+    return $results
+}
+
+function Get-LatestExportGroup {
+    param([object[]]$Files)
+
+    if (-not $Files -or $Files.Count -eq 0) {
+        return $null
+    }
+
+    $ranked = $Files |
+        Sort-Object `
+            @{ Expression = { Get-VersionNumber $_.Name }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    $best = $ranked | Select-Object -First 1
+    $bestNormalized = Get-NormalizedBaseName $best.Name
+    $bestVersion = Get-VersionNumber $best.Name
+
+    return $Files | Where-Object {
+        (Get-NormalizedBaseName $_.Name) -eq $bestNormalized -and
+        (Get-VersionNumber $_.Name) -eq $bestVersion
+    }
+}
+
+function Expand-ZipFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ZipFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $extractFolderName = [System.IO.Path]::GetFileNameWithoutExtension($ZipFile.Name)
+    $extractPath = Join-Path $DestinationRoot $extractFolderName
+
+    if (Test-Path $extractPath) {
+        Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+    Expand-Archive -Path $ZipFile.FullName -DestinationPath $extractPath -Force
+
+    return $extractPath
+}
+
+function Get-MainMarkdownCandidate {
+    param(
+        [object[]]$MarkdownFiles,
+        [string]$ExpectedBaseName
+    )
+
+    if (-not $MarkdownFiles -or $MarkdownFiles.Count -eq 0) {
+        return $null
+    }
+
+    $expected = $ExpectedBaseName.ToLower()
+
+    $ranked = $MarkdownFiles |
+        Sort-Object `
+            @{ Expression = {
+                $name = $_.BaseName.ToLower()
+                if ($name -eq $expected) { 100 }
+                elseif ($name -like "$expected*") { 90 }
+                elseif ($name -match 'checklist|readme|guide|instruction|instructions') { 10 }
+                else { 50 }
+            }; Descending = $true },
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    return $ranked | Select-Object -First 1
+}
+
+function Get-BestImportSourceFromGroup {
+    param(
+        [object[]]$GroupFiles,
+        [string]$TodayFolder
+    )
+
+    if (-not $GroupFiles -or $GroupFiles.Count -eq 0) {
+        return $null
+    }
+
+    $zipFile = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".zip" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($zipFile) {
+        $extractRoot = Join-Path $TodayFolder "extracted"
+        New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+        $extractPath = Expand-ZipFile -ZipFile $zipFile -DestinationRoot $extractRoot
+        $expectedBaseName = Get-NormalizedBaseName $zipFile.Name
+
+        $mdFiles = Get-ChildItem -Path $extractPath -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".md" }
+
+        $mdInside = Get-MainMarkdownCandidate -MarkdownFiles $mdFiles -ExpectedBaseName $expectedBaseName
+        if ($mdInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedMarkdown"
+                ImportFile    = $mdInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+
+        $jsonInside = Get-ChildItem -Path $extractPath -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".json" } |
+            Sort-Object `
+                @{ Expression = { $_.Length }; Descending = $true },
+                @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+            Select-Object -First 1
+
+        if ($jsonInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedJson"
+                ImportFile    = $jsonInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+    }
+
+    $standaloneMdFiles = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    $expectedStandaloneBase = Get-NormalizedBaseName (($GroupFiles | Select-Object -First 1).Name)
+    $standaloneMd = Get-MainMarkdownCandidate -MarkdownFiles $standaloneMdFiles -ExpectedBaseName $expectedStandaloneBase
+
+    if ($standaloneMd) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneMarkdown"
+            ImportFile    = $standaloneMd
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    $standaloneJson = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".json" } |
+        Sort-Object `
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+        Select-Object -First 1
+
+    if ($standaloneJson) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneJson"
+            ImportFile    = $standaloneJson
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    return $null
+}
+
+function Get-LatestPreviousHistoryFile {
+    param(
+        [string]$BasePath,
+        [string]$Today
+    )
+
+    $previousFolder = Get-ChildItem -Path $BasePath -ErrorAction SilentlyContinue |
+        Where-Object { $_.PSIsContainer -and $_.Name -lt $Today } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+
+    if (-not $previousFolder) {
+        return $null
+    }
+
+    return Get-ChildItem -Path $previousFolder.FullName -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.PSIsContainer -and $_.Name -like "*_master-history.md" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+function Build-MasterHistoryFile {
+    param(
+        [datetime]$Date,
+        [string]$DailyBasePath,
+        [object]$ImportSource

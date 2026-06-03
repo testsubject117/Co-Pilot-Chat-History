@@ -1,0 +1,2000 @@
+﻿
+## @testsubject117
+
+yep, there you go, perfect! ok, can we go on to the last button we need to fix on this menu?
+
+## Copilot
+
+Yes â€” absolutely, letâ€™s do the last one.
+
+## Direct answer
+Youâ€™ve now got **(0) Find an Invoice #** working and looking right, so yes:  
+send the **last Checks-menu item that still doesnâ€™t match DOS**, and weâ€™ll finish it.
+
+---
+
+# Where you are now
+Youâ€™ve cleaned up a big chunk of this menu:
+
+- **(5) View Company Totals**
+- **(8) View OTHER Checks**
+- **(9) Find a Check #**
+- **(0) Find an Invoice #**
+
+Thatâ€™s real progress.
+
+---
+
+# What to send for the last one
+Same format as before is perfect:
+
+1. what DOS does
+2. what VB does now
+3. DOS screenshots
+4. current VB screenshot if useful
+5. the `.vb` file for that screen
+
+Send it over and Iâ€™ll help you match it.
+
+## @testsubject117
+
+This last one is (A) Find checks that don't balance. and I think the logic here was already worked out to make sure it's performing the same function as dos, it just doesn't look like the rest of the app. this is the list that you had coded so no invoice was yellow and if there was an invoice it's pink.
+
+## Copilot
+
+Yes â€” this is the last one, and the problem looks purely **presentation/interaction**, not logic.
+
+## Direct answer
+If the balancing logic already matches DOS, then for **(A) Find checks that donâ€™t balance**, the thing to fix is the UI:
+
+### Current VB
+- spreadsheet/grid view
+- colored rows
+- column headers
+- scrollable table
+- very Windows/data-entry feel
+
+### What it should become
+Based on the pattern of the rest of this menu, it should almost certainly be converted into a **DOS-style text report screen**:
+- black background
+- monospace text
+- paged output
+- Enter to continue
+- return to Checks menu at end
+
+So yes â€” this should be rewritten as a report viewer, not a `DataGridView`.
+
+---
+
+# What I can infer already
+Your current grid is showing two DOS-meaningful categories:
+
+## yellow rows
+- no invoices found
+- note says `No CHECK.INV mapping`
+
+## pink rows
+- invoices exist
+- but totals donâ€™t balance against the check amount
+
+That logic sounds fine.  
+The issue is that DOS almost certainly would not present this as a sortable spreadsheet.
+
+---
+
+# Most likely DOS behavior
+I suspect `(A)` behaves similarly to the other report/list items:
+
+- run the mismatch scan
+- maybe brief â€œplease waitâ€
+- display a paged text report
+- one screenful at a time
+- Enter advances
+- return to Checks menu when finished
+
+But I do **not** want to guess the exact report layout without seeing DOS.
+
+---
+
+# What I need next
+Please send:
+
+1. DOS screenshot(s) for `(A) Find checks that donâ€™t balance`
+2. the current `.vb` file for this screen
+
+That will tell us:
+- whether DOS groups â€œno invoice mappingâ€ separately from â€œout of balanceâ€
+- whether it prints customer/date/check#/amount/delta/note
+- whether it pages one line at a time or one full screen at a time
+- whether it pauses at top/bottom like the totals screen
+- what exact wording it uses
+
+---
+
+# My current recommendation
+Do **not** keep the grid.
+
+Even before seeing DOS, Iâ€™d say the end state should likely be:
+- DOS-like report output
+- text-only rows
+- Enter paging
+- no colored spreadsheet
+
+If you send the DOS screenshots and the current form code, I can convert this final item the same way we did the others.
+
+---
+
+# Short version
+Yes â€” `(A)` looks like the logic is already right, but the **UI is still wrong**.  
+Send the DOS screenshots and the current `.vb` file, and weâ€™ll make this last screen match the rest.
+
+## @testsubject117
+
+ALSO, I've noticed the dos vm doesn't do anything when I hit (A) Find Checks that don't balance. I am not sure if this actually ever did anything. I will have to ask the users tomorrow. For now, let's keep what we have and just color it and style it more to look like dos. if the flow is different or needs to be completely changed, we can visit that another day.
+
+## Copilot
+
+Yes â€” thatâ€™s the right call.
+
+## Direct answer
+Since:
+- DOS currently appears to do nothing for `(A)`,
+- the balancing logic in VB is already useful,
+- and you may get clarification from users tomorrow,
+
+the best move **for now** is:
+
+### keep the existing logic and grid
+but
+### restyle it to visually fit the DOS-inspired app better
+
+That is a good temporary finish.
+
+---
+
+# Best approach for now
+Instead of rewriting the feature flow, just make the current screen feel consistent with the rest of the Checks menu:
+
+## Keep
+- the current mismatch detection
+- the current columns
+- the current yellow/pink distinction
+
+## Change
+- form background/header styling
+- grid colors
+- fonts
+- selection colors
+- button styling
+- overall dark DOS-like feel
+
+---
+
+# Recommended visual direction
+Based on your current app style, Iâ€™d aim for:
+
+## Form
+- dark charcoal background
+- black header strip
+- yellow title text
+- yellow date/time if that screen has a header
+
+## Grid
+- dark background overall
+- darker header row
+- light text
+- keep mismatch highlighting, but tune it
+
+## Row colors
+You currently have:
+- pale yellow = no invoice mapping
+- pale pink = invoice mismatch
+
+That concept is good, but for better consistency you could use more muted DOS-ish tones:
+
+### No invoice mapping
+- dark olive / muted yellow background
+- black or very dark text
+
+### Out of balance
+- muted rose / dusty red background
+- black or very dark text
+
+That keeps meaning while avoiding spreadsheet pastel feel.
+
+## Buttons
+- any Close / Refresh / Export buttons should match the Checks menu style:
+  - silver/light gray
+  - dark bold text
+  - wider flat rectangular look
+
+---
+
+# What I need from you to give exact replacement code
+Please paste the `.vb` file for this screen.
+
+Likely something like:
+- `FormFindChecksThatDontBalance.vb`
+- `FormCheckBalanceExceptions.vb`
+- or similar
+
+Once I see the current form code, I can give you a **styling-focused replacement** without changing the underlying logic.
+
+---
+
+# Good plan
+Your staged approach is smart:
+
+## today
+- preserve useful working VB behavior
+- make it visually consistent
+
+## tomorrow, after user feedback
+- decide whether DOS parity means:
+  - leave it as a useful enhancement
+  - hide it
+  - or completely redesign the flow
+
+That avoids rework before you know what users actually want.
+
+---
+
+# Short version
+Yes â€” letâ€™s **keep the current logic** and just make `(A)` look like the rest of the app for now.
+
+Paste the `.vb` file for that screen and Iâ€™ll give you a style-only rewrite.
+
+## @testsubject117
+
+ok, can you send me the code to get that last button (A) changed to look more like dos
+
+## Copilot
+
+Yes â€” I can, but I need the actual form code first.
+
+## Direct answer
+To restyle **(A) Find checks that don't balance** without breaking the logic, I need the current `.vb` file for that screen.
+
+Because right now I donâ€™t know:
+- the form class name
+- control names
+- whether it uses a `DataGridView`
+- whether there are buttons/panels already on it
+- where the row-color logic currently lives
+
+If I guessed, Iâ€™d risk giving you code that doesnâ€™t line up with your actual form.
+
+---
+
+# What to send
+Please paste the file for the current screen, likely something like:
+- `FormFindChecksThatDontBalance.vb`
+- `FormChecksDontBalance.vb`
+- `FormCheckBalanceExceptions.vb`
+
+Once I have that, I can give you a **style-only replacement** that:
+- keeps the existing logic
+- keeps the yellow/pink meaning
+- makes the screen fit the DOS-inspired app better
+
+---
+
+# What I expect to change
+Most likely Iâ€™ll update:
+- form background/header
+- title styling
+- `DataGridView` colors
+- fonts
+- row highlighting colors
+- selection colors
+- close button style
+
+But I want to do that against your real code, not a guess.
+
+Paste the file and Iâ€™ll turn it around.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Text
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Public Class FormLedgerDoesntBalance
+    Inherits System.Windows.Forms.Form
+
+    Private Const ScreenTitle As String = "Checks - Doesn't Balance"
+    Private Const Tolerance As Decimal = 1D ' DOS treated < 1 as OK
+
+    ' Row highlighting thresholds
+    Private Const LargeDeltaWarn As Decimal = 25D
+    Private Const LargeDeltaSevere As Decimal = 100D
+
+    Private cts As CancellationTokenSource
+
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly btnCancel As New Button()
+    Private ReadOnly btnCopyRow As New Button()
+    Private ReadOnly btnExportCsv As New Button()
+    Private ReadOnly cboFilter As New ComboBox()
+    Private ReadOnly lblStatus As New Label()
+
+    ' Keep the full results so we can filter/sort without re-running the report.
+    Private allRows As List(Of BalanceRow) = New List(Of BalanceRow)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1200
+        Height = 850
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+
+        ' Fire-and-forget startup load (keeps UI responsive)
+        FireAndForget(RunReportAsync())
+    End Sub
+
+    Private Sub BuildUi()
+        Dim top As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .Padding = New Padding(8),
+            .FlowDirection = FlowDirection.LeftToRight,
+            .WrapContents = False
+        }
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
+
+        btnCancel.Text = "Cancel"
+        btnCancel.AutoSize = True
+        btnCancel.Enabled = False
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        btnCopyRow.Text = "Copy Row"
+        btnCopyRow.AutoSize = True
+        btnCopyRow.Enabled = False
+        AddHandler btnCopyRow.Click, AddressOf btnCopyRow_Click
+
+        btnExportCsv.Text = "Export CSV"
+        btnExportCsv.AutoSize = True
+        btnExportCsv.Enabled = False
+        AddHandler btnExportCsv.Click, AddressOf btnExportCsv_Click
+
+        cboFilter.DropDownStyle = ComboBoxStyle.DropDownList
+        cboFilter.Width = 220
+        cboFilter.Items.Clear()
+        cboFilter.Items.Add(FilterMode.AllUnbalanced)
+        cboFilter.Items.Add(FilterMode.NoMapping)
+        cboFilter.Items.Add(FilterMode.DeltaOnly)
+        cboFilter.SelectedIndex = 0
+        AddHandler cboFilter.SelectedIndexChanged, AddressOf cboFilter_SelectedIndexChanged
+
+        lblStatus.AutoSize = True
+        lblStatus.Padding = New Padding(12, 10, 0, 0)
+        lblStatus.Text = ""
+
+        top.Controls.Add(btnRefresh)
+        top.Controls.Add(btnCancel)
+        top.Controls.Add(btnCopyRow)
+        top.Controls.Add(btnExportCsv)
+        top.Controls.Add(New Label() With {.AutoSize = True, .Padding = New Padding(8, 10, 0, 0), .Text = "Filter:"})
+        top.Controls.Add(cboFilter)
+        top.Controls.Add(lblStatus)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.AutoGenerateColumns = False
+        dgv.MultiSelect = False
+
+        AddHandler dgv.SelectionChanged, AddressOf dgv_SelectionChanged
+        AddHandler dgv.RowPrePaint, AddressOf dgv_RowPrePaint
+
+        dgv.Columns.Clear()
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Customer", .DataPropertyName = NameOf(BalanceRow.Customer), .Width = 140})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Date", .DataPropertyName = NameOf(BalanceRow.DateText), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check #", .DataPropertyName = NameOf(BalanceRow.CheckNumber), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check Amount", .DataPropertyName = NameOf(BalanceRow.CheckAmount), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Count", .DataPropertyName = NameOf(BalanceRow.InvoiceCount), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Sum", .DataPropertyName = NameOf(BalanceRow.InvoiceSum), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Delta", .DataPropertyName = NameOf(BalanceRow.Delta), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Note", .DataPropertyName = NameOf(BalanceRow.Note), .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill})
+
+        Controls.Add(dgv)
+        Controls.Add(top)
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        If cts IsNot Nothing Then cts.Cancel()
+    End Sub
+
+    Private Async Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        Await RunReportAsync()
+    End Sub
+
+    Private Sub btnCopyRow_Click(sender As Object, e As EventArgs)
+        Dim r As BalanceRow = TryCast(dgv.CurrentRow?.DataBoundItem, BalanceRow)
+        If r Is Nothing Then Return
+
+        ' Tab-separated so it pastes cleanly into Excel.
+        Dim text As String =
+            r.Customer & vbTab &
+            r.DateText & vbTab &
+            r.CheckNumber & vbTab &
+            r.CheckAmount & vbTab &
+            r.InvoiceCount & vbTab &
+            r.InvoiceSum & vbTab &
+            r.Delta & vbTab &
+            r.Note
+
+        Clipboard.SetText(text)
+        lblStatus.Text = "Copied selected row to clipboard."
+    End Sub
+
+    Private Sub btnExportCsv_Click(sender As Object, e As EventArgs)
+        Dim rows As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+        If rows Is Nothing OrElse rows.Count = 0 Then
+            MessageBox.Show(Me, "There are no rows to export.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Title = "Export CSV"
+            sfd.Filter = "CSV (*.csv)|*.csv|All files (*.*)|*.*"
+            sfd.FileName = $"LedgerDoesntBalance_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            If sfd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+            Try
+                Dim sb As New StringBuilder()
+                sb.AppendLine("Customer,Date,CheckNumber,CheckAmount,InvoiceCount,InvoiceSum,Delta,Note")
+
+                For Each r In rows
+                    sb.AppendLine(
+                        Csv(r.Customer) & "," &
+                        Csv(r.DateText) & "," &
+                        Csv(r.CheckNumber) & "," &
+                        Csv(r.CheckAmount) & "," &
+                        Csv(r.InvoiceCount) & "," &
+                        Csv(r.InvoiceSum) & "," &
+                        Csv(r.Delta) & "," &
+                        Csv(r.Note)
+                    )
+                Next
+
+                IO.File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8)
+                lblStatus.Text = $"Exported {rows.Count:N0} row(s) to CSV."
+            Catch ex As Exception
+                MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Using
+    End Sub
+
+    Private Sub cboFilter_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilterAndBind()
+    End Sub
+
+    Private Sub dgv_SelectionChanged(sender As Object, e As EventArgs)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs)
+        Dim row As DataGridViewRow = dgv.Rows(e.RowIndex)
+        Dim data As BalanceRow = TryCast(row.DataBoundItem, BalanceRow)
+        If data Is Nothing Then Return
+
+        ' Reset to default first.
+        row.DefaultCellStyle.BackColor = dgv.DefaultCellStyle.BackColor
+        row.DefaultCellStyle.ForeColor = dgv.DefaultCellStyle.ForeColor
+        row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+
+        If data.IsNoMapping Then
+            row.DefaultCellStyle.BackColor = Color.LightGoldenrodYellow
+            row.DefaultCellStyle.Font = New Font(dgv.Font, FontStyle.Bold)
+            Return
+        End If
+
+        Dim absDelta As Decimal = Math.Abs(data.DeltaValue)
+        If absDelta >= LargeDeltaSevere Then
+            row.DefaultCellStyle.BackColor = Color.MistyRose
+        ElseIf absDelta >= LargeDeltaWarn Then
+            row.DefaultCellStyle.BackColor = Color.LemonChiffon
+        End If
+    End Sub
+
+    Private Async Function RunReportAsync() As Task
+        ' Cancel any prior run (if one is in flight)
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        cts = New CancellationTokenSource()
+        Dim token As CancellationToken = cts.Token
+
+        btnRefresh.Enabled = False
+        btnCancel.Enabled = True
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+        cboFilter.Enabled = False
+        lblStatus.Text = "Starting..."
+        dgv.DataSource = Nothing
+        allRows = New List(Of BalanceRow)()
+
+        Dim ledgerPath As String = LegacyDataPaths.LedgerCur
+        Dim checkInvPath As String = LegacyDataPaths.CheckInv
+        Dim invoiceChkPath As String = LegacyDataPaths.InvoiceChk
+
+        If Not IO.File.Exists(ledgerPath) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, ledgerPath)
+            lblStatus.Text = "Missing LEDGER.CUR"
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            cboFilter.Enabled = True
+            Return
+        End If
+
+        ' Progress: safely update UI from background thread.
+        Dim progress As IProgress(Of ProgressInfo) =
+            New Progress(Of ProgressInfo)(
+                Sub(p As ProgressInfo)
+                    If token.IsCancellationRequested Then Return
+                    If p.Total > 0 Then
+                        lblStatus.Text = $"{p.Message}  ({p.Current:N0}/{p.Total:N0})"
+                    Else
+                        lblStatus.Text = p.Message
+                    End If
+                End Sub
+            )
+
+        Try
+            Dim rows As List(Of BalanceRow) =
+                Await Task.Run(Function() ComputeRows(ledgerPath, checkInvPath, invoiceChkPath, token, progress), token)
+
+            If token.IsCancellationRequested Then
+                lblStatus.Text = "Cancelled"
+                Return
+            End If
+
+            allRows = rows
+            ApplyFilterAndBind()
+        Catch ex As OperationCanceledException
+            lblStatus.Text = "Cancelled"
+        Catch ex As Exception
+            lblStatus.Text = "Error running report"
+            MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            cboFilter.Enabled = True
+
+            Dim current As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+            btnExportCsv.Enabled = (current IsNot Nothing AndAlso current.Count > 0)
+        End Try
+    End Function
+
+    Private Sub ApplyFilterAndBind()
+        Dim mode As String = TryCast(cboFilter.SelectedItem, String)
+        If String.IsNullOrWhiteSpace(mode) Then mode = FilterMode.AllUnbalanced
+
+        Dim filtered As IEnumerable(Of BalanceRow) = allRows
+
+        Select Case mode
+            Case FilterMode.NoMapping
+                filtered = filtered.Where(Function(r) r.IsNoMapping)
+            Case FilterMode.DeltaOnly
+                filtered = filtered.Where(Function(r) Not r.IsNoMapping)
+            Case Else
+                ' AllUnbalanced (no extra filter)
+        End Select
+
+        ' Sort: biggest absolute delta first; keep "No mapping" at top.
+        Dim sorted As List(Of BalanceRow) =
+            filtered.OrderByDescending(Function(r) If(r.IsNoMapping, Decimal.MaxValue, Math.Abs(r.DeltaValue))).ToList()
+
+        dgv.DataSource = sorted
+
+        Dim noMap As Integer = allRows.Where(Function(r) r.IsNoMapping).Count()
+        Dim deltaRows As Integer = allRows.Where(Function(r) Not r.IsNoMapping).Count()
+        Dim showing As Integer = sorted.Count
+
+        lblStatus.Text = $"Showing: {showing:N0} | Total: {allRows.Count:N0} | No mapping: {noMap:N0} | Delta rows: {deltaRows:N0}"
+        btnExportCsv.Enabled = (showing > 0)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Shared Function ComputeRows(
+        ledgerPath As String,
+        checkInvPath As String,
+        invoiceChkPath As String,
+        token As CancellationToken,
+        progress As IProgress(Of ProgressInfo)
+    ) As List(Of BalanceRow)
+
+        token.ThrowIfCancellationRequested()
+        progress?.Report(New ProgressInfo("Loading ledger...", 0, 0))
+
+        ' Load ledger
+        Dim ledger As List(Of LedgerEntry) = LedgerCurReader.ReadAll(ledgerPath)
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Loading CHECK.INV...", 0, 0))
+
+        ' Load CHECK.INV blocks (if missing, treat as no mapping for all)
+        Dim invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+        If IO.File.Exists(checkInvPath) Then
+            Try
+                Dim blocks = CheckInvReader.ReadAll(checkInvPath)
+                Dim i As Integer = 0
+                For Each b In blocks
+                    token.ThrowIfCancellationRequested()
+                    i += 1
+                    If (i Mod 250) = 0 Then
+                        progress?.Report(New ProgressInfo("Indexing CHECK.INV...", i, blocks.Count))
+                    End If
+
+                    Dim key = BuildKey(b.CustomerCode, b.CheckNumber)
+                    Dim lst As List(Of Long) = Nothing
+                    If Not invIndex.TryGetValue(key, lst) Then
+                        lst = New List(Of Long)()
+                        invIndex(key) = lst
+                    End If
+
+                    If b.Invoices IsNot Nothing Then
+                        For Each s In b.Invoices
+                            Dim n As Long
+                            If Long.TryParse(If(s, "").Trim(), n) Then
+                                lst.Add(n)
+                            End If
+                        Next
+                    End If
+                Next
+            Catch
+                ' Best-effort; keep what we have.
+            End Try
+        End If
+
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Computing rows...", 0, ledger.Count))
+
+        ' Cache invoice amounts to avoid re-reading INVOICE.CHK for duplicates
+        Dim amtCache As New Dictionary(Of Long, Decimal)()
+
+        Dim rows As New List(Of BalanceRow)()
+
+        Dim idx As Integer = 0
+        For Each e In ledger
+            token.ThrowIfCancellationRequested()
+
+            idx += 1
+            If (idx Mod 250) = 0 Then
+                progress?.Report(New ProgressInfo("Computing rows...", idx, ledger.Count))
+            End If
+
+            Dim key = BuildKey(e.Customer, e.CheckNumber)
+
+            Dim invNos As List(Of Long) = Nothing
+            Dim hasMapping As Boolean = invIndex.TryGetValue(key, invNos)
+
+            If Not hasMapping OrElse invNos Is Nothing OrElse invNos.Count = 0 Then
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = 0,
+                    .InvoiceSumValue = 0D,
+                    .DeltaValue = 0D,
+                    .Note = "No CHECK.INV mapping",
+                    .IsNoMapping = True
+                })
+                Continue For
+            End If
+
+            Dim sum As Decimal = 0D
+            Dim foundAny As Boolean = False
+
+            For Each invNo In invNos
+                token.ThrowIfCancellationRequested()
+
+                Dim a As Decimal = 0D
+                If amtCache.TryGetValue(invNo, a) Then
+                    sum += a
+                    foundAny = True
+                Else
+                    Dim rec = InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)
+                    If rec.IsFound Then
+                        a = rec.Amount
+                        amtCache(invNo) = a
+                        sum += a
+                        foundAny = True
+                    Else
+                        ' Cache missing as 0 so we don't keep re-reading it
+                        amtCache(invNo) = 0D
+                    End If
+                End If
+            Next
+
+            Dim delta As Decimal = sum - e.Amount
+            Dim unbalanced As Boolean = (Not foundAny) OrElse (Math.Abs(delta) >= Tolerance)
+
+            If unbalanced Then
+                Dim note As String = If(Not foundAny, "Invoices not found in INVOICE.CHK", "")
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = invNos.Count,
+                    .InvoiceSumValue = sum,
+                    .DeltaValue = delta,
+                    .Note = note,
+                    .IsNoMapping = False
+                })
+            End If
+        Next
+
+        progress?.Report(New ProgressInfo("Done.", ledger.Count, ledger.Count))
+        Return rows
+    End Function
+
+    Private Shared Sub FireAndForget(t As Task)
+        ' Intentionally ignore the task. Observe exceptions to avoid UnobservedTaskException.
+        If t Is Nothing Then Return
+
+        t.ContinueWith(
+            Sub(completed As Task)
+                Dim ignored = completed.Exception
+            End Sub,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default
+        )
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrim(s As String) As String
+        Return If(s, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrimEnd(s As String) As String
+        Return If(s, "").TrimEnd()
+    End Function
+
+    Private Shared Function Csv(s As String) As String
+        Dim v As String = If(s, "")
+        Dim mustQuote As Boolean =
+            (v.Contains(","c) OrElse v.Contains(ControlChars.Quote) OrElse v.Contains(ControlChars.Cr) OrElse v.Contains(ControlChars.Lf))
+
+        If mustQuote Then
+            v = v.Replace("""", """""")
+            v = """" & v & """"
+        End If
+
+        Return v
+    End Function
+
+    Private NotInheritable Class FilterMode
+        Public Const AllUnbalanced As String = "All unbalanced"
+        Public Const NoMapping As String = "No CHECK.INV mapping"
+        Public Const DeltaOnly As String = "Delta rows (has mapping)"
+    End Class
+
+    Private NotInheritable Class ProgressInfo
+        Public ReadOnly Property Message As String
+        Public ReadOnly Property Current As Integer
+        Public ReadOnly Property Total As Integer
+
+        Public Sub New(message As String, current As Integer, total As Integer)
+            Me.Message = message
+            Me.Current = current
+            Me.Total = total
+        End Sub
+    End Class
+
+    Private Class BalanceRow
+        Public Property Customer As String
+        Public Property DateText As String
+        Public Property CheckNumber As String
+
+        Public Property CheckAmountValue As Decimal
+        Public Property InvoiceCountValue As Integer
+        Public Property InvoiceSumValue As Decimal
+        Public Property DeltaValue As Decimal
+
+        Public Property Note As String
+        Public Property IsNoMapping As Boolean
+
+        Public ReadOnly Property CheckAmount As String
+            Get
+                Return CheckAmountValue.ToString("C")
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceCount As String
+            Get
+                Return InvoiceCountValue.ToString()
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceSum As String
+            Get
+                Return If(IsNoMapping, "", InvoiceSumValue.ToString("C"))
+            End Get
+        End Property
+
+        Public ReadOnly Property Delta As String
+            Get
+                Return If(IsNoMapping, "", DeltaValue.ToString("C"))
+            End Get
+        End Property
+    End Class
+End Class
+```
+
+## Copilot
+
+Yes â€” hereâ€™s a **style-focused replacement** for `FormLedgerDoesntBalance` that keeps your current logic, filtering, export, copy, and async report behavior, but makes the screen look much more like the rest of your DOS-inspired Checks app.
+
+## What this changes
+- dark charcoal form background
+- black top header panel
+- large yellow title
+- yellow date/time on the right
+- darker command bar
+- menu-matching silver buttons with bold black text
+- darker `DataGridView`
+- keeps your yellow/pink row meaning, but tones them to fit better
+- bottom-right **`(ESC) Close`** button like the Checks menu
+- Esc closes the form
+
+## Full replacement
+```vb name=FormLedgerDoesntBalance.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Text
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Public Class FormLedgerDoesntBalance
+    Inherits System.Windows.Forms.Form
+
+    Private Const ScreenTitle As String = "Checks - Doesn't Balance"
+    Private Const Tolerance As Decimal = 1D ' DOS treated < 1 as OK
+
+    ' Row highlighting thresholds
+    Private Const LargeDeltaWarn As Decimal = 25D
+    Private Const LargeDeltaSevere As Decimal = 100D
+
+    Private cts As CancellationTokenSource
+
+    Private ReadOnly pnlHeader As New Panel()
+    Private ReadOnly lblHeaderTitle As New Label()
+    Private ReadOnly lblHeaderClock As New Label()
+    Private ReadOnly tmrClock As New Timer()
+
+    Private ReadOnly pnlCommands As New FlowLayoutPanel()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly btnCancel As New Button()
+    Private ReadOnly btnCopyRow As New Button()
+    Private ReadOnly btnExportCsv As New Button()
+    Private ReadOnly btnClose As New Button()
+    Private ReadOnly cboFilter As New ComboBox()
+    Private ReadOnly lblFilter As New Label()
+    Private ReadOnly lblStatus As New Label()
+
+    ' Keep the full results so we can filter/sort without re-running the report.
+    Private allRows As List(Of BalanceRow) = New List(Of BalanceRow)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1200
+        Height = 850
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.FromArgb(34, 34, 34)
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+
+        BuildUi()
+        UpdateClock()
+
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, Sub() UpdateClock()
+        tmrClock.Start()
+
+        ' Fire-and-forget startup load (keeps UI responsive)
+        FireAndForget(RunReportAsync())
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        If tmrClock IsNot Nothing Then
+            tmrClock.Stop()
+        End If
+
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        MyBase.OnFormClosed(e)
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub BuildUi()
+        SuspendLayout()
+
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Height = 100
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Padding = New Padding(18, 10, 18, 10)
+
+        lblHeaderTitle.AutoSize = False
+        lblHeaderTitle.Left = 18
+        lblHeaderTitle.Top = 8
+        lblHeaderTitle.Width = 420
+        lblHeaderTitle.Height = 70
+        lblHeaderTitle.BackColor = Color.Black
+        lblHeaderTitle.ForeColor = Color.Yellow
+        lblHeaderTitle.Font = New Font("Times New Roman", 34.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblHeaderTitle.Text = "CHECKS"
+        lblHeaderTitle.TextAlign = ContentAlignment.MiddleLeft
+
+        lblHeaderClock.AutoSize = False
+        lblHeaderClock.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        lblHeaderClock.Width = 420
+        lblHeaderClock.Height = 40
+        lblHeaderClock.Left = ClientSize.Width - lblHeaderClock.Width - 18
+        lblHeaderClock.Top = 22
+        lblHeaderClock.BackColor = Color.Black
+        lblHeaderClock.ForeColor = Color.Yellow
+        lblHeaderClock.Font = New Font("Segoe UI", 13.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblHeaderClock.TextAlign = ContentAlignment.MiddleRight
+
+        AddHandler pnlHeader.Resize,
+            Sub()
+                lblHeaderClock.Left = pnlHeader.ClientSize.Width - lblHeaderClock.Width - 18
+            End Sub
+
+        pnlHeader.Controls.Add(lblHeaderTitle)
+        pnlHeader.Controls.Add(lblHeaderClock)
+
+        pnlCommands.Dock = DockStyle.Top
+        pnlCommands.Height = 58
+        pnlCommands.Padding = New Padding(12, 12, 12, 8)
+        pnlCommands.FlowDirection = FlowDirection.LeftToRight
+        pnlCommands.WrapContents = False
+        pnlCommands.BackColor = Color.FromArgb(34, 34, 34)
+
+        StyleMenuButton(btnRefresh, "Refresh", 110)
+        StyleMenuButton(btnCancel, "Cancel", 110)
+        StyleMenuButton(btnCopyRow, "Copy Row", 120)
+        StyleMenuButton(btnExportCsv, "Export CSV", 130)
+        StyleMenuButton(btnClose, "(ESC) Close", 130)
+
+        btnCancel.Enabled = False
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+
+        AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+        AddHandler btnCopyRow.Click, AddressOf btnCopyRow_Click
+        AddHandler btnExportCsv.Click, AddressOf btnExportCsv_Click
+        AddHandler btnClose.Click, Sub() Close()
+
+        lblFilter.AutoSize = True
+        lblFilter.Padding = New Padding(10, 9, 0, 0)
+        lblFilter.ForeColor = Color.Gainsboro
+        lblFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblFilter.Text = "Filter:"
+
+        cboFilter.DropDownStyle = ComboBoxStyle.DropDownList
+        cboFilter.Width = 220
+        cboFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cboFilter.BackColor = Color.White
+        cboFilter.ForeColor = Color.Black
+        cboFilter.Items.Clear()
+        cboFilter.Items.Add(FilterMode.AllUnbalanced)
+        cboFilter.Items.Add(FilterMode.NoMapping)
+        cboFilter.Items.Add(FilterMode.DeltaOnly)
+        cboFilter.SelectedIndex = 0
+        AddHandler cboFilter.SelectedIndexChanged, AddressOf cboFilter_SelectedIndexChanged
+
+        lblStatus.AutoSize = True
+        lblStatus.Padding = New Padding(14, 9, 0, 0)
+        lblStatus.ForeColor = Color.Gainsboro
+        lblStatus.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblStatus.Text = ""
+
+        pnlCommands.Controls.Add(btnRefresh)
+        pnlCommands.Controls.Add(btnCancel)
+        pnlCommands.Controls.Add(btnCopyRow)
+        pnlCommands.Controls.Add(btnExportCsv)
+        pnlCommands.Controls.Add(btnClose)
+        pnlCommands.Controls.Add(lblFilter)
+        pnlCommands.Controls.Add(cboFilter)
+        pnlCommands.Controls.Add(lblStatus)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.AutoGenerateColumns = False
+        dgv.MultiSelect = False
+        dgv.BackgroundColor = Color.Black
+        dgv.BorderStyle = BorderStyle.None
+        dgv.GridColor = Color.DimGray
+        dgv.RowHeadersVisible = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+        dgv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+        dgv.ColumnHeadersHeight = 34
+        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        dgv.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(45, 85, 140)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(18, 18, 18)
+
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        AddHandler dgv.SelectionChanged, AddressOf dgv_SelectionChanged
+        AddHandler dgv.RowPrePaint, AddressOf dgv_RowPrePaint
+
+        dgv.Columns.Clear()
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Customer", .DataPropertyName = NameOf(BalanceRow.Customer), .Width = 140})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Date", .DataPropertyName = NameOf(BalanceRow.DateText), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check #", .DataPropertyName = NameOf(BalanceRow.CheckNumber), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check Amount", .DataPropertyName = NameOf(BalanceRow.CheckAmount), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Count", .DataPropertyName = NameOf(BalanceRow.InvoiceCount), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Sum", .DataPropertyName = NameOf(BalanceRow.InvoiceSum), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Delta", .DataPropertyName = NameOf(BalanceRow.Delta), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Note", .DataPropertyName = NameOf(BalanceRow.Note), .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill})
+
+        Controls.Add(dgv)
+        Controls.Add(pnlCommands)
+        Controls.Add(pnlHeader)
+
+        ResumeLayout()
+    End Sub
+
+    Private Sub StyleMenuButton(btn As Button, caption As String, width As Integer)
+        btn.Text = caption
+        btn.Width = width
+        btn.Height = 30
+        btn.Margin = New Padding(0, 0, 8, 0)
+        btn.FlatStyle = FlatStyle.Standard
+        btn.BackColor = Color.Silver
+        btn.ForeColor = Color.Black
+        btn.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.UseVisualStyleBackColor = True
+    End Sub
+
+    Private Sub UpdateClock()
+        lblHeaderClock.Text = DateTime.Now.ToString("dddd  MM-dd-yyyy      hh:mm:ss tt")
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        If cts IsNot Nothing Then cts.Cancel()
+    End Sub
+
+    Private Async Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        Await RunReportAsync()
+    End Sub
+
+    Private Sub btnCopyRow_Click(sender As Object, e As EventArgs)
+        Dim r As BalanceRow = TryCast(dgv.CurrentRow?.DataBoundItem, BalanceRow)
+        If r Is Nothing Then Return
+
+        Dim text As String =
+            r.Customer & vbTab &
+            r.DateText & vbTab &
+            r.CheckNumber & vbTab &
+            r.CheckAmount & vbTab &
+            r.InvoiceCount & vbTab &
+            r.InvoiceSum & vbTab &
+            r.Delta & vbTab &
+            r.Note
+
+        Clipboard.SetText(text)
+        lblStatus.Text = "Copied selected row to clipboard."
+    End Sub
+
+    Private Sub btnExportCsv_Click(sender As Object, e As EventArgs)
+        Dim rows As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+        If rows Is Nothing OrElse rows.Count = 0 Then
+            MessageBox.Show(Me, "There are no rows to export.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Title = "Export CSV"
+            sfd.Filter = "CSV (*.csv)|*.csv|All files (*.*)|*.*"
+            sfd.FileName = $"LedgerDoesntBalance_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            If sfd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+            Try
+                Dim sb As New StringBuilder()
+                sb.AppendLine("Customer,Date,CheckNumber,CheckAmount,InvoiceCount,InvoiceSum,Delta,Note")
+
+                For Each r In rows
+                    sb.AppendLine(
+                        Csv(r.Customer) & "," &
+                        Csv(r.DateText) & "," &
+                        Csv(r.CheckNumber) & "," &
+                        Csv(r.CheckAmount) & "," &
+                        Csv(r.InvoiceCount) & "," &
+                        Csv(r.InvoiceSum) & "," &
+                        Csv(r.Delta) & "," &
+                        Csv(r.Note)
+                    )
+                Next
+
+                IO.File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8)
+                lblStatus.Text = $"Exported {rows.Count:N0} row(s) to CSV."
+            Catch ex As Exception
+                MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Using
+    End Sub
+
+    Private Sub cboFilter_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilterAndBind()
+    End Sub
+
+    Private Sub dgv_SelectionChanged(sender As Object, e As EventArgs)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs)
+        Dim row As DataGridViewRow = dgv.Rows(e.RowIndex)
+        Dim data As BalanceRow = TryCast(row.DataBoundItem, BalanceRow)
+        If data Is Nothing Then Return
+
+        row.DefaultCellStyle.BackColor = dgv.DefaultCellStyle.BackColor
+        row.DefaultCellStyle.ForeColor = dgv.DefaultCellStyle.ForeColor
+        row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+        row.DefaultCellStyle.SelectionForeColor = Color.Black
+
+        If data.IsNoMapping Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(210, 190, 70)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(235, 215, 95)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+            row.DefaultCellStyle.Font = New Font(dgv.DefaultCellStyle.Font, FontStyle.Bold)
+            Return
+        End If
+
+        Dim absDelta As Decimal = Math.Abs(data.DeltaValue)
+        If absDelta >= LargeDeltaSevere Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(214, 170, 170)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(230, 185, 185)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        ElseIf absDelta >= LargeDeltaWarn Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(190, 150, 150)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(210, 170, 170)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        End If
+    End Sub
+
+    Private Async Function RunReportAsync() As Task
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        cts = New CancellationTokenSource()
+        Dim token As CancellationToken = cts.Token
+
+        btnRefresh.Enabled = False
+        btnCancel.Enabled = True
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+        btnClose.Enabled = False
+        cboFilter.Enabled = False
+        lblStatus.Text = "Starting..."
+        dgv.DataSource = Nothing
+        allRows = New List(Of BalanceRow)()
+
+        Dim ledgerPath As String = LegacyDataPaths.LedgerCur
+        Dim checkInvPath As String = LegacyDataPaths.CheckInv
+        Dim invoiceChkPath As String = LegacyDataPaths.InvoiceChk
+
+        If Not IO.File.Exists(ledgerPath) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, ledgerPath)
+            lblStatus.Text = "Missing LEDGER.CUR"
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+            Return
+        End If
+
+        Dim progress As IProgress(Of ProgressInfo) =
+            New Progress(Of ProgressInfo)(
+                Sub(p As ProgressInfo)
+                    If token.IsCancellationRequested Then Return
+                    If p.Total > 0 Then
+                        lblStatus.Text = $"{p.Message}  ({p.Current:N0}/{p.Total:N0})"
+                    Else
+                        lblStatus.Text = p.Message
+                    End If
+                End Sub
+            )
+
+        Try
+            Dim rows As List(Of BalanceRow) =
+                Await Task.Run(Function() ComputeRows(ledgerPath, checkInvPath, invoiceChkPath, token, progress), token)
+
+            If token.IsCancellationRequested Then
+                lblStatus.Text = "Cancelled"
+                Return
+            End If
+
+            allRows = rows
+            ApplyFilterAndBind()
+        Catch ex As OperationCanceledException
+            lblStatus.Text = "Cancelled"
+        Catch ex As Exception
+            lblStatus.Text = "Error running report"
+            MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+
+            Dim current As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+            btnExportCsv.Enabled = (current IsNot Nothing AndAlso current.Count > 0)
+        End Try
+    End Function
+
+    Private Sub ApplyFilterAndBind()
+        Dim mode As String = TryCast(cboFilter.SelectedItem, String)
+        If String.IsNullOrWhiteSpace(mode) Then mode = FilterMode.AllUnbalanced
+
+        Dim filtered As IEnumerable(Of BalanceRow) = allRows
+
+        Select Case mode
+            Case FilterMode.NoMapping
+                filtered = filtered.Where(Function(r) r.IsNoMapping)
+            Case FilterMode.DeltaOnly
+                filtered = filtered.Where(Function(r) Not r.IsNoMapping)
+            Case Else
+        End Select
+
+        Dim sorted As List(Of BalanceRow) =
+            filtered.OrderByDescending(Function(r) If(r.IsNoMapping, Decimal.MaxValue, Math.Abs(r.DeltaValue))).ToList()
+
+        dgv.DataSource = sorted
+
+        Dim noMap As Integer = allRows.Where(Function(r) r.IsNoMapping).Count()
+        Dim deltaRows As Integer = allRows.Where(Function(r) Not r.IsNoMapping).Count()
+        Dim showing As Integer = sorted.Count
+
+        lblStatus.Text = $"Showing: {showing:N0} | Total: {allRows.Count:N0} | No mapping: {noMap:N0} | Delta rows: {deltaRows:N0}"
+        btnExportCsv.Enabled = (showing > 0)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Shared Function ComputeRows(
+        ledgerPath As String,
+        checkInvPath As String,
+        invoiceChkPath As String,
+        token As CancellationToken,
+        progress As IProgress(Of ProgressInfo)
+    ) As List(Of BalanceRow)
+
+        token.ThrowIfCancellationRequested()
+        progress?.Report(New ProgressInfo("Loading ledger...", 0, 0))
+
+        Dim ledger As List(Of LedgerEntry) = LedgerCurReader.ReadAll(ledgerPath)
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Loading CHECK.INV...", 0, 0))
+
+        Dim invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+        If IO.File.Exists(checkInvPath) Then
+            Try
+                Dim blocks = CheckInvReader.ReadAll(checkInvPath)
+                Dim i As Integer = 0
+                For Each b In blocks
+                    token.ThrowIfCancellationRequested()
+                    i += 1
+                    If (i Mod 250) = 0 Then
+                        progress?.Report(New ProgressInfo("Indexing CHECK.INV...", i, blocks.Count))
+                    End If
+
+                    Dim key = BuildKey(b.CustomerCode, b.CheckNumber)
+                    Dim lst As List(Of Long) = Nothing
+                    If Not invIndex.TryGetValue(key, lst) Then
+                        lst = New List(Of Long)()
+                        invIndex(key) = lst
+                    End If
+
+                    If b.Invoices IsNot Nothing Then
+                        For Each s In b.Invoices
+                            Dim n As Long
+                            If Long.TryParse(If(s, "").Trim(), n) Then
+                                lst.Add(n)
+                            End If
+                        Next
+                    End If
+                Next
+            Catch
+            End Try
+        End If
+
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Computing rows...", 0, ledger.Count))
+
+        Dim amtCache As New Dictionary(Of Long, Decimal)()
+        Dim rows As New List(Of BalanceRow)()
+
+        Dim idx As Integer = 0
+        For Each e In ledger
+            token.ThrowIfCancellationRequested()
+
+            idx += 1
+            If (idx Mod 250) = 0 Then
+                progress?.Report(New ProgressInfo("Computing rows...", idx, ledger.Count))
+            End If
+
+            Dim key = BuildKey(e.Customer, e.CheckNumber)
+
+            Dim invNos As List(Of Long) = Nothing
+            Dim hasMapping As Boolean = invIndex.TryGetValue(key, invNos)
+
+            If Not hasMapping OrElse invNos Is Nothing OrElse invNos.Count = 0 Then
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = 0,
+                    .InvoiceSumValue = 0D,
+                    .DeltaValue = 0D,
+                    .Note = "No CHECK.INV mapping",
+                    .IsNoMapping = True
+                })
+                Continue For
+            End If
+
+            Dim sum As Decimal = 0D
+            Dim foundAny As Boolean = False
+
+            For Each invNo In invNos
+                token.ThrowIfCancellationRequested()
+
+                Dim a As Decimal = 0D
+                If amtCache.TryGetValue(invNo, a) Then
+                    sum += a
+                    foundAny = True
+                Else
+                    Dim rec = InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)
+                    If rec.IsFound Then
+                        a = rec.Amount
+                        amtCache(invNo) = a
+                        sum += a
+                        foundAny = True
+                    Else
+                        amtCache(invNo) = 0D
+                    End If
+                End If
+            Next
+
+            Dim delta As Decimal = sum - e.Amount
+            Dim unbalanced As Boolean = (Not foundAny) OrElse (Math.Abs(delta) >= Tolerance)
+
+            If unbalanced Then
+                Dim note As String = If(Not foundAny, "Invoices not found in INVOICE.CHK", "")
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = invNos.Count,
+                    .InvoiceSumValue = sum,
+                    .DeltaValue = delta,
+                    .Note = note,
+                    .IsNoMapping = False
+                })
+            End If
+        Next
+
+        progress?.Report(New ProgressInfo("Done.", ledger.Count, ledger.Count))
+        Return rows
+    End Function
+
+    Private Shared Sub FireAndForget(t As Task)
+        If t Is Nothing Then Return
+
+        t.ContinueWith(
+            Sub(completed As Task)
+                Dim ignored = completed.Exception
+            End Sub,
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default
+        )
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrim(s As String) As String
+        Return If(s, "").Trim()
+    End Function
+
+    Private Shared Function SafeTrimEnd(s As String) As String
+        Return If(s, "").TrimEnd()
+    End Function
+
+    Private Shared Function Csv(s As String) As String
+        Dim v As String = If(s, "")
+        Dim mustQuote As Boolean =
+            (v.Contains(","c) OrElse v.Contains(ControlChars.Quote) OrElse v.Contains(ControlChars.Cr) OrElse v.Contains(ControlChars.Lf))
+
+        If mustQuote Then
+            v = v.Replace("""", """""")
+            v = """" & v & """"
+        End If
+
+        Return v
+    End Function
+
+    Private NotInheritable Class FilterMode
+        Public Const AllUnbalanced As String = "All unbalanced"
+        Public Const NoMapping As String = "No CHECK.INV mapping"
+        Public Const DeltaOnly As String = "Delta rows (has mapping)"
+    End Class
+
+    Private NotInheritable Class ProgressInfo
+        Public ReadOnly Property Message As String
+        Public ReadOnly Property Current As Integer
+        Public ReadOnly Property Total As Integer
+
+        Public Sub New(message As String, current As Integer, total As Integer)
+            Me.Message = message
+            Me.Current = current
+            Me.Total = total
+        End Sub
+    End Class
+
+    Private Class BalanceRow
+        Public Property Customer As String
+        Public Property DateText As String
+        Public Property CheckNumber As String
+
+        Public Property CheckAmountValue As Decimal
+        Public Property InvoiceCountValue As Integer
+        Public Property InvoiceSumValue As Decimal
+        Public Property DeltaValue As Decimal
+
+        Public Property Note As String
+        Public Property IsNoMapping As Boolean
+
+        Public ReadOnly Property CheckAmount As String
+            Get
+                Return CheckAmountValue.ToString("C")
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceCount As String
+            Get
+                Return InvoiceCountValue.ToString()
+            End Get
+        End Property
+
+        Public ReadOnly Property InvoiceSum As String
+            Get
+                Return If(IsNoMapping, "", InvoiceSumValue.ToString("C"))
+            End Get
+        End Property
+
+        Public ReadOnly Property Delta As String
+            Get
+                Return If(IsNoMapping, "", DeltaValue.ToString("C"))
+            End Get
+        End Property
+    End Class
+End Class
+```
+
+## Notes
+- I kept your **logic unchanged**.
+- I kept the **yellow / pink meaning**, but adjusted the form styling to fit your existing Checks screen better.
+- The title says **CHECKS** in the header to visually match the menu you showed.
+- The window caption still uses **Checks - Doesn't Balance**.
+
+If you want, next I can give you a **small polish pass** to rename the visible header from just `CHECKS` to something like:
+
+- `CHECKS - DOESN'T BALANCE`
+- or `FIND CHECKS THAT DON'T BALANCE`
+
+while still keeping the same menu style.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30561	'Timer' is ambiguous, imported from the namespaces or types 'System.Windows.Forms, System.Threading'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb	26	
+
+
+## Copilot
+
+Change the timer declaration to use the WinForms timer explicitly.
+
+## Fix
+Replace:
+
+```vb
+Private ReadOnly tmrClock As New Timer()
+```
+
+with:
+
+```vb
+Private ReadOnly tmrClock As New System.Windows.Forms.Timer()
+```
+
+---
+
+# Why
+You import both:
+
+```vb
+Imports System.Windows.Forms
+Imports System.Threading
+```
+
+Both namespaces contain a `Timer`, so VB doesnâ€™t know which one you mean.
+
+For a UI clock, you want:
+
+```vb
+System.Windows.Forms.Timer
+```
+
+not the threading timer.
+
+---
+
+# Optional cleanup
+If you want to make it extra clear everywhere, you can also change the field type explicitly:
+
+```vb
+Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()
+```
+
+That removes all ambiguity.
+
+---
+
+# Short version
+Use this line:
+
+```vb
+Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()
+```
+
+and that error should go away.
+
+## @testsubject117
+
+ok, looks better, but computing rows text is truncated, is there a way to make computing rows... on the top, with the rolling numbers below it?
+
+## Copilot
+
+Yes. Put the progress message and the counts in **two separate labels** stacked vertically.
+
+## What to change
+
+### 1) Add a second status label field
+Add this near `lblStatus`:
+
+```vb
+Private ReadOnly lblStatusCount As New Label()
+```
+
+---
+
+### 2) In `BuildUi()`, style both labels
+Replace your current `lblStatus` setup:
+
+```vb
+lblStatus.AutoSize = True
+lblStatus.Padding = New Padding(14, 9, 0, 0)
+lblStatus.ForeColor = Color.Gainsboro
+lblStatus.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+lblStatus.Text = ""
+```
+
+with:
+
+```vb
+lblStatus.AutoSize = True
+lblStatus.Margin = New Padding(14, 2, 0, 0)
+lblStatus.ForeColor = Color.Gainsboro
+lblStatus.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+lblStatus.Text = ""
+
+lblStatusCount.AutoSize = True
+lblStatusCount.Margin = New Padding(14, 0, 0, 0)
+lblStatusCount.ForeColor = Color.Gainsboro
+lblStatusCount.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular, GraphicsUnit.Point)
+lblStatusCount.Text = ""
+```
+
+---
+
+### 3) Put them in a vertical panel
+Before adding `lblStatus` to `pnlCommands`, create:
+
+```vb
+Dim pnlStatus As New FlowLayoutPanel()
+pnlStatus.AutoSize = True
+pnlStatus.FlowDirection = FlowDirection.TopDown
+pnlStatus.WrapContents = False
+pnlStatus.Margin = New Padding(10, 0, 0, 0)
+pnlStatus.BackColor = Color.Transparent
+pnlStatus.Controls.Add(lblStatus)
+pnlStatus.Controls.Add(lblStatusCount)
+```
+
+Then replace:
+
+```vb
+pnlCommands.Controls.Add(lblStatus)
+```
+
+with:
+
+```vb
+pnlCommands.Controls.Add(pnlStatus)
+```
+
+---
+
+### 4) Update the progress reporter
+Replace this block in `RunReportAsync()`:
+
+```vb
+Dim progress As IProgress(Of ProgressInfo) =
+    New Progress(Of ProgressInfo)(
+        Sub(p As ProgressInfo)
+            If token.IsCancellationRequested Then Return
+            If p.Total > 0 Then
+                lblStatus.Text = $"{p.Message}  ({p.Current:N0}/{p.Total:N0})"
+            Else
+                lblStatus.Text = p.Message
+            End If
+        End Sub
+    )
+```
+
+with:
+
+```vb
+Dim progress As IProgress(Of ProgressInfo) =
+    New Progress(Of ProgressInfo)(
+        Sub(p As ProgressInfo)
+            If token.IsCancellationRequested Then Return
+
+            lblStatus.Text = p.Message
+
+            If p.Total > 0 Then
+                lblStatusCount.Text = $"{p.Current:N0}/{p.Total:N0}"
+            Else
+                lblStatusCount.Text = ""
+            End If
+        End Sub
+    )
+```
+
+---
+
+### 5) Update the non-progress status assignments
+Wherever you currently set:
+
+```vb
+lblStatus.Text = "Starting..."
+```
+
+also set:
+
+```vb
+lblStatusCount.Text = ""
+```
+
+Do the same for:
+- `"Cancelled"`
+- `"Error running report"`
+- `"Missing LEDGER.CUR"`
+- copied/exported messages
+- final summary line
+
+For the final summary in `ApplyFilterAndBind()`, Iâ€™d suggest:
+
+```vb
+lblStatus.Text = "Report complete"
+lblStatusCount.Text = $"Showing: {showing:N0} | Total: {allRows.Count:N0} | No mapping: {noMap:N0} | Delta rows: {deltaRows:N0}"
+```
+
+---
+
+# Best final result
+This gives you:
+
+**top line**
+```text
+Computing rows...
+```
+
+**line below**
+```text
+2,500/18,742
+```
+
+which is much easier to read than one long truncated line.
+
+If you want, I can send you the **full updated `FormLedgerDoesntBalance.vb`** with these status-label changes already merged in.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Itâ€™s a dark-themed report screen for **â€œChecks - Doesnâ€™t Balanceâ€** styled to match the rest of the app.
+
+## Overall look
+- Very dark / black main background
+- Maroon/burgundy window title bar
+- Large black header area at the top
+- Yellow DOS-inspired branding
+
+## Header
+- Large yellow **CHECKS** title on the upper left
+- Yellow date/time on the upper right:
+  - `Wednesday 05-20-2026`
+  - `04:45:55 PM`
+
+## Command bar
+Under the header is a horizontal toolbar with light gray buttons:
+
+- `Refresh`
+- `Cancel`
+- `Copy Row`
+- `Export CSV`
+- `(ESC) Close`
+
+To the right of the buttons:
+- a **Filter:** label
+- a dropdown currently set to **All unbalanced**
+- a status/progress message on the far right
+
+## Grid/report area
+Below the toolbar is a dark `DataGridView`-style report table with column headers:
+
+- `Customer`
+- `Date`
+- `Check #`
+- `Check Amount`
+- `Invoice Count`
+- `Invoice Sum`
+- `Delta`
+- `Note`
+
+The table is currently empty because the report is still running or loading.
+
+## Current issue visible in the screenshot
+The progress text on the top-right is cut off / truncated. It shows something like:
+
+- `Computing rows... (28,500/51,35...`
+
+So the status area is too narrow for the full message and counts.
+
+## Bottom
+- Large empty black content area where rows will appear after computation finishes.
+
+So visually, the screen is much closer to the DOS-inspired app now, but the status/progress text needs a better layout.
+
+## @testsubject117
+
+did you send me code to move the computing rows text?
+
+## Copilot
+
+Yes â€” I told you **how** to change it, but I did **not** send a fully merged replacement file yet.
+
+## Direct answer
+I gave you the edits to:
+- add a second label
+- stack the labels vertically
+- put `Computing rows...` on top
+- put `28,500/51,350` underneath
+
+But I didnâ€™t send the complete pasted-in `.vb` file with those changes already applied.
+
+---
+
+# What I suggested
+The idea was:
+
+## top line
+`lblStatus`
+- shows:
+  - `Starting...`
+  - `Loading ledger...`
+  - `Computing rows...`
+  - `Report complete`
+
+## line below
+`lblStatusCount`
+- shows:
+  - `28,500/51,350`
+  - or blank when not needed
+
+That fixes the truncation by splitting one long status into two shorter lines.
+
+---
+
+# If you want the shortest possible answer
+No â€” I didnâ€™t yet send the **full replacement code** for that change.
+
+## I can do that next.
+If you want, Iâ€™ll send you the full updated `FormLedgerDoesntBalance.vb` with:
+- the two-line progress area
+- all the status wiring already merged in
+
+and you can paste it directly.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” here is the **full updated replacement** for `FormLedgerDoesntBalance.vb` with the progress split into two lines:
+
+- top line: `Computing rows...`
+- line below: `28,500/51,350`
+
+That avoids the truncation youâ€™re seeing.
+
+```vb name=FormLedgerDoesntBalance.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Text
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Public Class FormLedgerDoesntBalance
+    Inherits System.Windows.Forms.Form
+
+    Private Const ScreenTitle As String = "Checks - Doesn't Balance"
+    Private Const Tolerance As Decimal = 1D ' DOS treated < 1 as OK
+
+    ' Row highlighting thresholds
+    Private Const LargeDeltaWarn As Decimal = 25D
+    Private Const LargeDeltaSevere As Decimal = 100D
+
+    Private cts As CancellationTokenSource
+
+    Private ReadOnly pnlHeader As New Panel()
+    Private ReadOnly lblHeaderTitle As New Label()
+    Private ReadOnly lblHeaderClock As New Label()
+    Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()
+
+    Private ReadOnly pnlCommands As New FlowLayoutPanel()
+    Private ReadOnly pnlStatus As New FlowLayoutPanel()
+
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly btnCancel As New Button()
+    Private ReadOnly btnCopyRow As New Button()
+    Private ReadOnly btnExportCsv As New Button()
+    Private ReadOnly btnClose As New Button()
+    Private ReadOnly cboFilter As New ComboBox()
+    Private ReadOnly lblFilter As New Label()
+    Private ReadOnly lblStatus As New Label()
+    Private ReadOnly lblStatusCount As New Label()
+
+    ' Keep the full results so we can filter/sort without re-running the report.
+    Private allRows As List(Of BalanceRow) = New List(Of BalanceRow)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1200
+        Height = 850
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.FromArgb(34, 34, 34)
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+
+        BuildUi()
+        UpdateClock()
+
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, Sub() UpdateClock()
+        tmrClock.Start()
+
+        FireAndForget(RunReportAsync())
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        If tmrClock IsNot Nothing Then
+            tmrClock.Stop()
+        End If
+
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        MyBase.OnFormClosed(e)
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub BuildUi()
+        SuspendLayout()

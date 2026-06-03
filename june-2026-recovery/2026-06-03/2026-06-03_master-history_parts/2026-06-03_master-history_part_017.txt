@@ -1,0 +1,2000 @@
+﻿- same spacing rhythm between controls
+- same alignment style for labels/prompts/inputs
+- same hotkey caption style
+- same focus cues and keyboard-first behavior
+
+## Layout rules
+- prefer the same centered/menu-panel style already used in the app
+- avoid modern â€œdata entry formâ€ styling unless an existing DOS-style child form already uses it
+- keep prompts compact and structured like DOS flow screens
+- preserve vertical flow and clear step-by-step sequencing
+- donâ€™t introduce visually busy grouping unless current forms already do that the same way
+
+## Control rules
+- use the same button text style as existing menus
+- preserve letter-based menu wording where applicable
+- avoid mixing radically different control sizes/styles
+- keep tab order intentional and keyboard-driven
+- Enter/Escape behavior should feel like the rest of the app
+- if existing forms use owner-return navigation, keep that same pattern
+
+## Behavior rules
+- keyboard first
+- mouse usable, but not mouse dependent
+- prompt order should mirror DOS logic
+- messages/prompts should sound like the existing app, not modernized UX copy
+- validation should be concise and operational, not verbose or wizardy unless the existing app already does that
+
+## Coding-pattern rules
+Before changing `FormAddChecks`, compare it against:
+- `FormMainMenu.vb`
+- `FormLedgerMenu.vb`
+- `DosMenuFormBase.vb`
+- `FormSalesEmployeesChecksMenu.vb`
+
+And keep consistent with:
+- how controls are created
+- how forms are shown/hidden/closed
+- how hotkeys are handled
+- how colors/fonts are assigned
+- how DOS-style prompts are phrased
+
+## Functional guardrail
+`FormAddChecks` should become the **DOS-faithful Add Checks path**, not a modern replacement workflow.
+
+That means it should ultimately support:
+- company lookup using DOS-era rules
+- invoice/check posting semantics matching DOS
+- future writer integration for:
+  - `INVOICE.CHK`
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+
+---
+
+# 2) Pasteable project handoff / memory file
+
+Below is a compact reusable file you can save as something like:
+
+````text name=AMI_COPILOT_HANDOFF.txt
+AMi Project Handoff / Copilot Context
+Date: 2026-05-18
+
+Repositories
+- DOS source repo: testsubject117/AMiDataStore
+- VB.NET WinForms port repo: testsubject117/AmiWinForms
+
+Project goal
+- Port the legacy DOS GW-BASIC AMi application to VB.NET WinForms.
+- Preserve DOS behavior and workflow semantics as closely as possible.
+- Preserve the existing WinForms DOS-style implementation pattern already established in the repo.
+- No unnecessary modernization of UI flow, wording, styling, or control layout.
+
+Critical UI requirement
+ALL new work must preserve BOTH:
+1. the original DOS feel
+2. the exact same WinForms DOS-style implementation pattern already established in the repo
+
+This means new or modified forms must match the style and implementation approach of:
+- FormMainMenu.vb
+- the CHECKS / cash receipts menu (FormLedgerMenu.vb)
+- related DOS-style forms/base classes already in the repo
+
+Specifically preserve:
+- backgrounds
+- fonts
+- button styles
+- layout rhythm
+- menu/hotkey style
+- keyboard-first behavior
+- owner/child navigation behavior
+- existing message/prompt tone
+
+Do NOT introduce:
+- modern business-form styling
+- designer-default inconsistent controls
+- modernized workflow text
+- UI patterns that visually clash with FormMainMenu / Checks menu
+
+What was established today
+1. AMiDataStore local repo path confirmed:
+   C:\Users\capnkirk\source\repos\AMiDataStore
+
+2. AmiWinForms local repo path confirmed:
+   C:\Users\capnkirk\source\repos\AMiWinForms
+
+3. Git status was checked for both repos.
+
+AMiDataStore state
+- branch: main
+- local and origin/main are in sync
+- working tree clean
+- no uncommitted changes
+- no local-only commits
+- no remote-only commits on main
+
+AmiWinForms state before sync
+- branch: master
+- local and origin/master committed history were in sync
+- but these 3 files existed only locally as untracked files:
+  - AMiOffice/CompanyInfo.vb
+  - AMiOffice/CompanyLookupService.vb
+  - AMiOffice/FormAddChecks.vb
+
+AmiWinForms action completed today
+- Those 3 files were added, committed, and pushed.
+- Latest visible commit on GitHub now:
+  cb8271f - "Add company lookup and Add Checks form files"
+
+Current AmiWinForms state
+- branch: master
+- working tree clean
+- local and origin/master are fully synced
+- latest committed GitHub-visible work includes:
+  - CompanyInfo.vb
+  - CompanyLookupService.vb
+  - FormAddChecks.vb
+
+Deep review findings: DOS repo (AMiDataStore)
+The DOS app is a hub-and-spoke GW-BASIC system launched from DOS scripts and routed primarily by MAINM.ASC.
+Main menu routes include:
+- A SHOPCARD
+- B Invoice generator
+- C LEDGER / checks / cash receipts
+- D SALES
+- E LOGBOOK
+- F PLIST / PRC management
+- G BOOT / maintenance
+- K BILL / cash disbursements / check writing
+- M QUOTE
+- N PHONE
+- P ENTIRE / invoice inquiry-editor
+
+The DOS app is held together mainly by shared files, not in-memory APIs.
+
+Critical DOS files and semantics
+- INVOICE.CHK = master invoice status/index file
+  statuses include:
+  - J unpaid
+  - P paid
+  - C corrected cert
+  - V void
+  - E erased
+- LEDGER.CUR = mixed debit/credit ledger stream
+- CHECK.INV = check-to-invoice linkage
+- OTHER.CHK = other/non-invoice checks
+- EMPNAME.DAT = sales employee/customer mapping
+- REALNAME.DAT + PRC\*.PRC = company/procedure pricing and lookup
+- JOURNAL.CUR = sales journal stream
+- LOGBOOK.yy = year-based detailed logbook
+- INVOICE.NUM / MONTH.INV / LASTINVO.ICE = invoice counters/boundaries/history
+
+Important DOS accounting behavior
+- Invoice creation updates multiple files
+- Receiving customer payment check updates:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+- Delete/void flows also rebalance/reset linked file state
+- The original accounting system depends on coordinated synchronized flat-file updates
+
+Deep review findings: AmiWinForms repo
+WinForms port currently has strong read/report parity, including readers and forms for:
+- LEDGER.CUR
+- CHECK.INV
+- INVOICE.CHK
+- OTHER.CHK
+- ledger views/reports
+- company totals
+- find by check/invoice
+- doesn't balance report
+- EMPNAME editor
+
+Recent/latest implementation point
+Newest concrete work is:
+- CompanyInfo.vb
+- CompanyLookupService.vb
+- FormAddChecks.vb
+
+Current partial implementations
+- Sales Employee checks menu exists
+- Sales Employee wizard exists
+- EMPNAME editor exists
+- Add Checks groundwork exists
+- company lookup groundwork exists
+
+Current missing core parity
+The biggest remaining gap is write-side accounting parity:
+- Add Checks is not fully wired/implemented
+- Delete Checks is not fully implemented
+- Add OTHER Checks is not fully implemented
+- Delete OTHER Checks is not fully implemented
+- no fully realized writer pipeline yet for:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+  - OTHER.CHK
+
+Interpretation / current resume point
+The correct resume point appears to be the new Add Checks groundwork:
+- CompanyInfo.vb
+- CompanyLookupService.vb
+- FormAddChecks.vb
+
+This aligns with:
+- the latest pushed code
+- DOS architecture
+- Friday checklists / interrupted work direction
+
+Recommended direction
+Treat FormAddChecks as the canonical DOS-faithful Add Checks path.
+Do NOT replace it with a modernized workflow.
+Sales Employee wizard should remain secondary unless old notes prove it should become the main accounting flow.
+
+Next recommended development steps
+1. Keep FormAddChecks visually and behaviorally aligned with existing DOS-style WinForms forms.
+2. Compare FormAddChecks directly against:
+   - FormMainMenu.vb
+   - FormLedgerMenu.vb
+   - DosMenuFormBase.vb
+   - FormSalesEmployeesChecksMenu.vb
+3. Wire the Add Checks menu item to FormAddChecks.
+4. Confirm prompt order and wording match DOS expectations as closely as possible.
+5. Finalize DOS-faithful company lookup behavior using:
+   - REALNAME.DAT
+   - PRC file naming semantics
+6. Design and implement the write-side transaction pipeline for:
+   - INVOICE.CHK status updates
+   - LEDGER.CUR append/update behavior
+   - CHECK.INV linkage writes
+7. After Add Checks works end-to-end, handle:
+   - Delete Checks
+   - Add OTHER Checks
+   - Delete OTHER Checks
+8. Keep Sales Employee wizard separate unless future evidence says otherwise.
+
+Copilot quick-paste instruction block
+Use this in future Copilot chats:
+
+This AMi project is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same WinForms DOS-style implementation pattern already established in the repo. All new UI/work must visually and behaviorally match FormMainMenu and the CHECKS / cash receipts menu, including backgrounds, fonts, buttons, layout style, hotkey/menu presentation, keyboard-first behavior, prompt tone, and navigation patterns. Do not modernize the UI or workflow unnecessarily. Current resume point is the Add Checks groundwork in CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The main remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.
+
+End of handoff.
+````
+
+---
+
+## Optional shorter quick-paste version
+If you want something even shorter for fast Copilot context, use this:
+
+```text
+AMi is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same existing WinForms DOS-style implementation pattern already established in the repo. All new work must match FormMainMenu and the CHECKS/cash receipts menu in backgrounds, fonts, buttons, layout rhythm, hotkey/menu presentation, keyboard-first behavior, prompt wording, and navigation style. Do not modernize the UI unnecessarily. Current resume point is CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The biggest remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.
+```
+
+---
+
+## Recommendation
+Save both:
+- the long handoff file
+- the short quick-paste block
+
+The long one is for continuity.
+The short one is for steering future Copilot sessions quickly.
+
+If you want, I can also make a **third version**: a more structured **developer TODO checklist file** for your local repo notes.
+
+## @testsubject117
+
+please do
+
+## Copilot
+
+Absolutely â€” hereâ€™s a **third version** as a structured developer TODO checklist you can save locally.
+
+Suggested filename:
+
+````text name=AMI_NEXT_STEPS_CHECKLIST.txt
+AMi Next Steps Checklist
+Date: 2026-05-18
+
+Project context
+- DOS repo: testsubject117/AMiDataStore
+- VB repo: testsubject117/AmiWinForms
+- Current resume point:
+  - AMiOffice/CompanyInfo.vb
+  - AMiOffice/CompanyLookupService.vb
+  - AMiOffice/FormAddChecks.vb
+
+Primary project rule
+Preserve BOTH:
+1. original DOS behavior/workflow semantics
+2. the exact same WinForms DOS-style implementation pattern already established in the repo
+
+UI/style must match:
+- FormMainMenu.vb
+- FormLedgerMenu.vb
+- related DOS-style forms/base classes already in the project
+
+Do NOT introduce:
+- modern business-form styling
+- mismatched fonts/colors/buttons/layouts
+- modernized prompt wording unless necessary
+- workflows that depart from DOS behavior without a clear reason
+
+--------------------------------------------------
+PHASE 1 - LOCK DOWN UI / STYLE PARITY
+--------------------------------------------------
+
+[ ] Compare FormAddChecks against FormMainMenu.vb
+[ ] Compare FormAddChecks against FormLedgerMenu.vb
+[ ] Compare FormAddChecks against DosMenuFormBase.vb
+[ ] Compare FormAddChecks against FormSalesEmployeesChecksMenu.vb
+
+[ ] Verify background colors match established DOS-style forms
+[ ] Verify fonts match established DOS-style forms
+[ ] Verify button sizes/styles/captions match established DOS-style forms
+[ ] Verify spacing/alignment/layout rhythm matches existing forms
+[ ] Verify keyboard-first behavior matches existing forms
+[ ] Verify Enter/Escape/owner-return behavior matches existing forms
+[ ] Verify prompt wording/tone matches existing app style
+
+Goal of Phase 1
+- FormAddChecks should visibly and behaviorally feel like it belongs beside FormMainMenu and the Checks menu without looking newly introduced.
+
+--------------------------------------------------
+PHASE 2 - CONFIRM DOS-FAITHFUL ADD CHECKS FLOW
+--------------------------------------------------
+
+[ ] Reconfirm that Add Checks is the canonical accounting entry path from DOS
+[ ] Keep Sales Employee wizard secondary unless evidence proves otherwise
+[ ] Identify DOS prompt/order for Add Checks flow
+[ ] Align FormAddChecks field order with DOS flow as closely as practical
+[ ] Align validation prompts/messages with DOS intent and tone
+[ ] Avoid modernizing the workflow into a generic wizard/business form
+
+Goal of Phase 2
+- FormAddChecks should become the DOS-faithful Add Checks path, not a modern replacement.
+
+--------------------------------------------------
+PHASE 3 - COMPLETE COMPANY LOOKUP BEHAVIOR
+--------------------------------------------------
+
+[ ] Review CompanyInfo.vb structure against DOS needs
+[ ] Review CompanyLookupService.vb behavior against REALNAME.DAT semantics
+[ ] Confirm company code normalization matches DOS expectations
+[ ] Confirm PRC filename derivation is DOS-faithful
+[ ] Confirm whether lookup should validate:
+    [ ] REALNAME.DAT only
+    [ ] PRC filename existence
+    [ ] both
+[ ] Preserve DOS-like abbreviation rules
+[ ] Preserve DOS-like lookup/prompt behavior
+
+Goal of Phase 3
+- Company lookup should behave like DOS-era company selection/validation, not a modern search UX.
+
+--------------------------------------------------
+PHASE 4 - WIRE ADD CHECKS INTO THE CHECKS MENU
+--------------------------------------------------
+
+[ ] Replace Add Checks stub in FormLedgerMenu with FormAddChecks launch
+[ ] Preserve existing owner/child form navigation pattern
+[ ] Preserve current menu hotkey behavior
+[ ] Preserve DOS-style return/cancel flow
+
+Goal of Phase 4
+- Menu option 1/Add Checks should open the new DOS-style Add Checks form cleanly and consistently.
+
+--------------------------------------------------
+PHASE 5 - DEFINE WRITE-SIDE ACCOUNTING SEMANTICS BEFORE CODING
+--------------------------------------------------
+
+[ ] Document exact Add Checks transaction behavior from DOS
+[ ] Define how selected invoices change in INVOICE.CHK
+[ ] Define when invoice flags become P or remain J
+[ ] Define how ledger credit rows are written to LEDGER.CUR
+[ ] Define how check-to-invoice links are appended to CHECK.INV
+[ ] Define handling for partial/inexact allocations if DOS supported them
+[ ] Define failure behavior / rollback expectations
+[ ] Define whether OTHER.CHK is involved in this flow or stays separate
+
+Goal of Phase 5
+- Write behavior must be explicitly DOS-faithful before implementation starts.
+
+--------------------------------------------------
+PHASE 6 - IMPLEMENT WRITER PIPELINE
+--------------------------------------------------
+
+[ ] Add/plan writer support for INVOICE.CHK
+[ ] Add/plan writer support for LEDGER.CUR
+[ ] Add/plan writer support for CHECK.INV
+[ ] Keep file update ordering consistent and safe
+[ ] Preserve DOS status semantics:
+    - J unpaid
+    - P paid
+    - C corrected cert
+    - V void
+    - E erased
+[ ] Keep file formats compatible with existing DOS-era data
+[ ] Verify read-side forms still interpret new writes correctly
+
+Goal of Phase 6
+- Achieve first true write-side accounting parity milestone.
+
+--------------------------------------------------
+PHASE 7 - FOLLOW-ON ACCOUNTING PARITY
+--------------------------------------------------
+
+[ ] Implement Delete Checks
+[ ] Implement Add OTHER Checks
+[ ] Implement Delete OTHER Checks
+[ ] Recheck â€œDoesnâ€™t Balanceâ€ report against new write behavior
+[ ] Recheck find-by-check / find-by-invoice flows against new writes
+[ ] Recheck company totals / ledger views after write support
+
+Goal of Phase 7
+- Extend parity beyond first Add Checks success into broader checks accounting maintenance.
+
+--------------------------------------------------
+PHASE 8 - SALES EMPLOYEE PATH DECISION
+--------------------------------------------------
+
+[ ] Reassess FormSalesEmployeeCheckWizard after Add Checks is working
+[ ] Decide whether wizard remains:
+    [ ] reporting/support only
+    [ ] partially integrated helper
+    [ ] broader transaction flow
+[ ] Keep EMPNAME.DAT behavior DOS-faithful
+[ ] Avoid promoting Sales Employee wizard to canonical path unless DOS evidence supports it
+
+Goal of Phase 8
+- Keep Sales Employee features aligned with DOS role and avoid architecture drift.
+
+--------------------------------------------------
+CURRENT KNOWN STATUS
+--------------------------------------------------
+
+AMiDataStore
+- local and GitHub main are in sync
+- DOS architecture reviewed
+- key accounting file relationships identified
+
+AmiWinForms
+- local and GitHub master are in sync
+- latest pushed commit:
+  cb8271f - Add company lookup and Add Checks form files
+
+Current interpretation
+- Read/report parity is already fairly strong
+- Add Checks groundwork is now the main resume point
+- Biggest missing gap is write-side accounting parity
+- UI/style parity with existing DOS-style WinForms shell is a hard requirement
+
+--------------------------------------------------
+COPY/PASTE COPILOT REMINDER
+--------------------------------------------------
+
+This AMi project is a DOS GW-BASIC to VB.NET WinForms port. Preserve DOS behavior and workflow semantics as closely as possible. Also preserve the exact same existing WinForms DOS-style implementation pattern already established in the repo. All new work must match FormMainMenu and the CHECKS/cash receipts menu in backgrounds, fonts, buttons, layout rhythm, hotkey/menu presentation, keyboard-first behavior, prompt wording, and navigation style. Do not modernize the UI unnecessarily. Current resume point is CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb. The biggest remaining gap is write-side accounting parity for INVOICE.CHK, LEDGER.CUR, CHECK.INV, and OTHER.CHK.
+
+End of checklist.
+````
+
+## What you now have
+You now have 3 reusable artifacts:
+
+1. **Long handoff / history file**
+2. **Short quick-paste Copilot context block**
+3. **Structured next-steps checklist**
+
+## Recommendation
+Save all three somewhere easy, like:
+- `E:\Co-Pilot-Chat-History\`
+- or inside a local notes folder for the AMi project
+
+If you want, next I can also make a **fourth artifact**:
+- a **very compact â€œsession starter promptâ€** optimized specifically for pasting into a brand-new Copilot chat before asking it to inspect or modify `FormAddChecks`.
+
+## @testsubject117
+
+yes, a quick paste in, that could bring the next session up to date would be great, is there a way to make it so that it's dated and the paste in would reflect the date and time? but also, I want to be able to save an entire days chat session, and later, append to that days chat file by opening it, adding the new days entire chat text and saving it in a new file and folder, in a location such as H:\AM\DailyConversations\%TodaysDate%\ where when this script or file was ran, it would open the previous days chat file, copy it's contents, paste that into a new file at H:\AM\DailyConversations\%TodaysDate%\ by changing that folder name from %TodaysDate%\ to that days date, then creating the new file inside that folder, naming it with the description and date of the file?
+
+## Copilot
+
+Yes. Below are two things:
+
+1. a **compact session-starter paste block**
+2. a **PowerShell script** that creates a dated conversation folder/file and can seed it from a previous chat file
+
+## Quick paste-in for next Copilot session
+
+Use this at the top of a new chat:
+
+```text
+AMi project context as of 2026-05-18:
+This is a DOS GW-BASIC to VB.NET WinForms port.
+Repos:
+- DOS source: testsubject117/AMiDataStore
+- WinForms port: testsubject117/AmiWinForms
+
+Current resume point:
+- AMiOffice/CompanyInfo.vb
+- AMiOffice/CompanyLookupService.vb
+- AMiOffice/FormAddChecks.vb
+
+Current known state:
+- AMiDataStore main is synced locally/remotely and its DOS architecture was reviewed.
+- AmiWinForms master is synced locally/remotely.
+- Latest relevant commit on AmiWinForms: cb8271f "Add company lookup and Add Checks form files"
+
+Important findings:
+- DOS app is a file-coupled GW-BASIC menu hub.
+- Core accounting parity depends on synchronized updates across INVOICE.CHK, LEDGER.CUR, CHECK.INV, and related files.
+- WinForms port already has strong read/report parity.
+- Biggest remaining gap is write-side accounting parity.
+- Add Checks appears to be the correct canonical next path, more than finishing Sales Employee wizard first.
+
+Hard requirement:
+Preserve BOTH:
+1. the original DOS behavior/workflow semantics
+2. the exact same existing WinForms DOS-style implementation pattern already established in the repo
+
+All UI/work must match FormMainMenu and the CHECKS/cash receipts menu in:
+- backgrounds
+- fonts
+- buttons
+- layout rhythm
+- hotkey/menu presentation
+- keyboard-first behavior
+- prompt wording
+- navigation style
+
+Do not modernize the UI unnecessarily.
+
+Please use this context for all recommendations and code changes in this session.
+```
+
+## About date/time in the paste block
+A plain text paste block cannot automatically update its own date/time by itself.
+
+If you want the date/time to be automatic, the easiest solution is:
+- generate the text from a small script
+- or use placeholders like `%DATE%` / `%TIME%` and expand them in a script
+
+So I made you a PowerShell script for that broader workflow.
+
+---
+
+# PowerShell script: create todayâ€™s conversation file from a previous one
+
+This script:
+- creates `H:\AM\DailyConversations\YYYY-MM-DD\`
+- creates a new dated file inside it
+- optionally copies the contents of a prior conversation file into the new one
+- stamps the new file with date/time and description
+
+## Example output path
+If run on 2026-05-18 with description `AmiWinForms-AddChecks`:
+
+```text
+H:\AM\DailyConversations\2026-05-18\2026-05-18_143522_AmiWinForms-AddChecks.txt
+```
+
+## Script
+
+```powershell
+param(
+    [string]$BasePath = "H:\AM\DailyConversations",
+    [string]$Description = "Session",
+    [string]$PreviousFile = ""
+)
+
+$now = Get-Date
+$today = $now.ToString("yyyy-MM-dd")
+$timestamp = $now.ToString("yyyy-MM-dd_HHmmss")
+
+function Sanitize-Name([string]$name) {
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    $result = $name
+    foreach ($ch in $invalid) {
+        $result = $result.Replace($ch, "-")
+    }
+    return $result.Trim()
+}
+
+$safeDescription = Sanitize-Name $Description
+$todayFolder = Join-Path $BasePath $today
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+$newFileName = "${timestamp}_${safeDescription}.txt"
+$newFilePath = Join-Path $todayFolder $newFileName
+
+$header = @"
+Conversation Session
+Date: $($now.ToString("yyyy-MM-dd"))
+Time: $($now.ToString("HH:mm:ss"))
+Description: $Description
+Base Path: $BasePath
+
+"@
+
+Set-Content -Path $newFilePath -Value $header -Encoding UTF8
+
+if (-not [string]::IsNullOrWhiteSpace($PreviousFile) -and (Test-Path $PreviousFile)) {
+    Add-Content -Path $newFilePath -Value "===== PREVIOUS SESSION CONTENT START =====" -Encoding UTF8
+    Get-Content -Path $PreviousFile | Add-Content -Path $newFilePath -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "`r`n===== PREVIOUS SESSION CONTENT END =====`r`n" -Encoding UTF8
+} elseif (-not [string]::IsNullOrWhiteSpace($PreviousFile)) {
+    Add-Content -Path $newFilePath -Value "WARNING: Previous file not found: $PreviousFile`r`n" -Encoding UTF8
+}
+
+$starterBlock = @"
+===== COPILOT SESSION STARTER =====
+AMi project context as of $($now.ToString("yyyy-MM-dd HH:mm:ss")):
+This is a DOS GW-BASIC to VB.NET WinForms port.
+Repos:
+- DOS source: testsubject117/AMiDataStore
+- WinForms port: testsubject117/AmiWinForms
+
+Current resume point:
+- AMiOffice/CompanyInfo.vb
+- AMiOffice/CompanyLookupService.vb
+- AMiOffice/FormAddChecks.vb
+
+Current known state:
+- AMiDataStore main is synced locally/remotely and its DOS architecture was reviewed.
+- AmiWinForms master is synced locally/remotely.
+- Latest relevant commit on AmiWinForms: cb8271f "Add company lookup and Add Checks form files"
+
+Important findings:
+- DOS app is a file-coupled GW-BASIC menu hub.
+- Core accounting parity depends on synchronized updates across INVOICE.CHK, LEDGER.CUR, CHECK.INV, and related files.
+- WinForms port already has strong read/report parity.
+- Biggest remaining gap is write-side accounting parity.
+- Add Checks appears to be the correct canonical next path, more than finishing Sales Employee wizard first.
+
+Hard requirement:
+Preserve BOTH:
+1. the original DOS behavior/workflow semantics
+2. the exact same existing WinForms DOS-style implementation pattern already established in the repo
+
+All UI/work must match FormMainMenu and the CHECKS/cash receipts menu in:
+- backgrounds
+- fonts
+- buttons
+- layout rhythm
+- hotkey/menu presentation
+- keyboard-first behavior
+- prompt wording
+- navigation style
+
+Do not modernize the UI unnecessarily.
+===== END COPILOT SESSION STARTER =====
+
+"@
+
+Add-Content -Path $newFilePath -Value $starterBlock -Encoding UTF8
+
+Write-Host "Created: $newFilePath"
+```
+
+---
+
+# How to use it
+
+## Save it as
+For example:
+
+```text
+H:\AM\Scripts\New-DailyConversation.ps1
+```
+
+## Run it without a previous file
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\New-DailyConversation.ps1" -Description "AmiWinForms-AddChecks"
+```
+
+## Run it with a previous file
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\New-DailyConversation.ps1" `
+  -Description "AmiWinForms-AddChecks" `
+  -PreviousFile "H:\AM\DailyConversations\2026-05-17\2026-05-17_213000_AmiWinForms-Resume.txt"
+```
+
+That will:
+- create todayâ€™s folder
+- create a new file
+- copy yesterdayâ€™s file into it
+- append the Copilot starter block
+
+---
+
+# If you want â€œopen previous day automaticallyâ€
+Yes, that can be done too.
+
+You seem to want this behavior:
+
+1. detect todayâ€™s date
+2. create `H:\AM\DailyConversations\<today>\`
+3. find the most recent conversation file from the previous day
+4. copy it into todayâ€™s new file
+5. then you can paste todayâ€™s new chat beneath it
+
+Thatâ€™s doable. Hereâ€™s a version that auto-selects the most recent file from the most recent earlier dated folder.
+
+## Auto-previous version
+
+```powershell
+param(
+    [string]$BasePath = "H:\AM\DailyConversations",
+    [string]$Description = "Session"
+)
+
+$now = Get-Date
+$today = $now.ToString("yyyy-MM-dd")
+$timestamp = $now.ToString("yyyy-MM-dd_HHmmss")
+
+function Sanitize-Name([string]$name) {
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    $result = $name
+    foreach ($ch in $invalid) {
+        $result = $result.Replace($ch, "-")
+    }
+    return $result.Trim()
+}
+
+$safeDescription = Sanitize-Name $Description
+$todayFolder = Join-Path $BasePath $today
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+$previousFolder = Get-ChildItem -Path $BasePath -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -lt $today } |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+
+$previousFile = $null
+if ($previousFolder) {
+    $previousFile = Get-ChildItem -Path $previousFolder.FullName -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+$newFileName = "${timestamp}_${safeDescription}.txt"
+$newFilePath = Join-Path $todayFolder $newFileName
+
+$header = @"
+Conversation Session
+Date: $($now.ToString("yyyy-MM-dd"))
+Time: $($now.ToString("HH:mm:ss"))
+Description: $Description
+Base Path: $BasePath
+
+"@
+
+Set-Content -Path $newFilePath -Value $header -Encoding UTF8
+
+if ($previousFile) {
+    Add-Content -Path $newFilePath -Value "===== PREVIOUS SESSION FILE =====" -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "Source: $($previousFile.FullName)`r`n" -Encoding UTF8
+    Get-Content -Path $previousFile.FullName | Add-Content -Path $newFilePath -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "`r`n===== END PREVIOUS SESSION FILE =====`r`n" -Encoding UTF8
+}
+
+Write-Host "Created: $newFilePath"
+if ($previousFile) {
+    Write-Host "Seeded from: $($previousFile.FullName)"
+} else {
+    Write-Host "No previous file found."
+}
+```
+
+---
+
+# Important clarification
+You said:
+
+> open the previous days chat file, copy its contents, paste that into a new file at H:\AM\DailyConversations\%TodaysDate%\...
+
+Thatâ€™s exactly what these scripts do conceptually, but they do it programmatically instead of literally opening Notepad and copying/pasting.
+
+Thatâ€™s much safer and easier.
+
+---
+
+# Recommendation
+Use one script only:
+- if you want control, use the first script with `-PreviousFile`
+- if you want convenience, use the auto-previous version
+
+## Best practical setup
+Iâ€™d recommend:
+- save the auto-previous version
+- then create a desktop shortcut that runs it with a description prompt later if needed
+
+If you want, I can next make you a **final polished version** that:
+1. prompts you for a description in a popup
+2. automatically creates the dated folder/file
+3. auto-loads the latest previous chat
+4. opens the new file in Notepad automatically
+
+That would probably fit your workflow best.
+
+## @testsubject117
+
+yes, lets try that
+
+## Copilot
+
+Yes â€” hereâ€™s a polished version that should fit your workflow well.
+
+It will:
+
+1. prompt you for a session description
+2. create `H:\AM\DailyConversations\YYYY-MM-DD\`
+3. find the most recent prior conversation file automatically
+4. copy that prior file into the new file
+5. append a dated Copilot starter block
+6. open the new file in Notepad
+
+## Save this as
+```text
+H:\AM\Scripts\Start-DailyConversation.ps1
+```
+
+## Script
+
+```powershell
+Add-Type -AssemblyName Microsoft.VisualBasic
+
+$BasePath = "H:\AM\DailyConversations"
+
+function Sanitize-Name([string]$name) {
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        return "Session"
+    }
+
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    $result = $name
+    foreach ($ch in $invalid) {
+        $result = $result.Replace($ch, "-")
+    }
+
+    $result = $result.Trim()
+    if ([string]::IsNullOrWhiteSpace($result)) {
+        $result = "Session"
+    }
+
+    return $result
+}
+
+$description = [Microsoft.VisualBasic.Interaction]::InputBox(
+    "Enter a short description for this conversation/session file.",
+    "New Daily Conversation",
+    "AmiWinForms-AddChecks"
+)
+
+$description = Sanitize-Name $description
+
+$now = Get-Date
+$today = $now.ToString("yyyy-MM-dd")
+$timestamp = $now.ToString("yyyy-MM-dd_HHmmss")
+
+$todayFolder = Join-Path $BasePath $today
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+$previousFolder = Get-ChildItem -Path $BasePath -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -lt $today } |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+
+$previousFile = $null
+if ($previousFolder) {
+    $previousFile = Get-ChildItem -Path $previousFolder.FullName -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+$newFileName = "${timestamp}_${description}.txt"
+$newFilePath = Join-Path $todayFolder $newFileName
+
+$header = @"
+Conversation Session
+Date: $($now.ToString("yyyy-MM-dd"))
+Time: $($now.ToString("HH:mm:ss"))
+Description: $description
+Path: $newFilePath
+
+"@
+
+Set-Content -Path $newFilePath -Value $header -Encoding UTF8
+
+if ($previousFile) {
+    Add-Content -Path $newFilePath -Value "===== PREVIOUS SESSION FILE =====" -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "Source: $($previousFile.FullName)`r`n" -Encoding UTF8
+    Get-Content -Path $previousFile.FullName | Add-Content -Path $newFilePath -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "`r`n===== END PREVIOUS SESSION FILE =====`r`n" -Encoding UTF8
+} else {
+    Add-Content -Path $newFilePath -Value "No previous session file was found.`r`n" -Encoding UTF8
+}
+
+$starterBlock = @"
+===== COPILOT SESSION STARTER =====
+Generated: $($now.ToString("yyyy-MM-dd HH:mm:ss"))
+
+AMi project context:
+This is a DOS GW-BASIC to VB.NET WinForms port.
+
+Repositories:
+- DOS source: testsubject117/AMiDataStore
+- WinForms port: testsubject117/AmiWinForms
+
+Current resume point:
+- AMiOffice/CompanyInfo.vb
+- AMiOffice/CompanyLookupService.vb
+- AMiOffice/FormAddChecks.vb
+
+Current known state:
+- AMiDataStore main is synced locally/remotely and its DOS architecture was reviewed.
+- AmiWinForms master is synced locally/remotely.
+- Latest relevant commit on AmiWinForms:
+  cb8271f - Add company lookup and Add Checks form files
+
+Architecture findings:
+- DOS app is a file-coupled GW-BASIC menu hub.
+- Core accounting parity depends on synchronized updates across INVOICE.CHK, LEDGER.CUR, CHECK.INV, and related files.
+- WinForms port already has strong read/report parity.
+- Biggest remaining gap is write-side accounting parity.
+- Add Checks appears to be the correct canonical next path.
+
+Hard requirements:
+Preserve BOTH:
+1. the original DOS behavior/workflow semantics
+2. the exact same existing WinForms DOS-style implementation pattern already established in the repo
+
+All UI/work must match FormMainMenu and the CHECKS/cash receipts menu in:
+- backgrounds
+- fonts
+- buttons
+- layout rhythm
+- hotkey/menu presentation
+- keyboard-first behavior
+- prompt wording
+- navigation style
+
+Do not modernize the UI unnecessarily.
+
+Recommended current direction:
+- Continue from CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb
+- Keep FormAddChecks as the DOS-faithful Add Checks path
+- Keep Sales Employee wizard secondary unless evidence proves otherwise
+- Next major milestone is write-side accounting parity for:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+  - OTHER.CHK
+
+===== END COPILOT SESSION STARTER =====
+
+
+===== NEW SESSION NOTES START BELOW THIS LINE =====
+
+"@
+
+Add-Content -Path $newFilePath -Value $starterBlock -Encoding UTF8
+
+Start-Process notepad.exe $newFilePath
+Write-Host "Created and opened: $newFilePath"
+if ($previousFile) {
+    Write-Host "Seeded from: $($previousFile.FullName)"
+}
+```
+
+---
+
+# How to run it
+
+Open PowerShell and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+```
+
+It should:
+- ask for a description
+- create todayâ€™s folder/file
+- bring forward the most recent prior conversation file
+- open the new file in Notepad
+
+---
+
+# Optional desktop shortcut
+You can make a shortcut that runs:
+
+```text
+powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+```
+
+Then you can launch it with a double-click.
+
+---
+
+# One important note
+This script copies the **most recent file from the most recent earlier date folder**.
+
+So if your folder structure is like:
+
+- `H:\AM\DailyConversations\2026-05-16\...`
+- `H:\AM\DailyConversations\2026-05-17\...`
+
+and you run it on `2026-05-18`, it will use the latest file from `2026-05-17`.
+
+---
+
+# If it fails
+Common causes:
+- `H:\AM\Scripts\` doesnâ€™t exist yet
+- `H:\AM\DailyConversations\` doesnâ€™t exist yet
+- PowerShell execution policy blocks scripts
+- `Microsoft.VisualBasic` InputBox is unavailable in that shell environment
+
+If that happens, I can give you a no-popup console-prompt version.
+
+## Best next step
+Try this exact flow:
+1. save the script
+2. create `H:\AM\Scripts\` if needed
+3. run it once
+4. tell me what happened
+
+If you want, after that I can also give you a **matching â€œappend todayâ€™s full chat into the currently open fileâ€ helper script**.
+
+## @testsubject117
+
+before I do I have some questions. if the folder for the day does not exist, does the script you're referring to create the folder for that day? and also create the file for that day? does it not change the previous days file, but only copy the content in order to paste into each new day, as a prepend with that days text incorporated after?
+
+## Copilot
+
+Yes.
+
+## Short answer
+The script does all of this:
+
+- **creates todayâ€™s folder** if it does not exist
+- **creates todayâ€™s new file** inside that folder
+- **does not modify the previous dayâ€™s file**
+- only **reads/copies** the previous fileâ€™s contents
+- writes that copied content into the **new file only**
+- then appends the new session starter text below it
+
+## Specifically
+
+### 1. If todayâ€™s folder does not exist
+Yes, this line creates it:
+
+```powershell
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+```
+
+So if today is `2026-05-18`, it creates:
+
+```text
+H:\AM\DailyConversations\2026-05-18
+```
+
+if needed.
+
+---
+
+### 2. Does it create todayâ€™s file too?
+Yes.
+
+This line creates the new file and writes the header:
+
+```powershell
+Set-Content -Path $newFilePath -Value $header -Encoding UTF8
+```
+
+So yes:
+- folder gets created
+- file gets created
+
+---
+
+### 3. Does it alter the previous dayâ€™s file?
+No.
+
+It only does this to the previous file:
+
+```powershell
+Get-Content -Path $previousFile.FullName
+```
+
+That is a **read-only** operation.
+
+It does **not** write back to the previous file.
+It does **not** rename it.
+It does **not** move it.
+It does **not** append to it.
+
+So your previous file stays unchanged.
+
+---
+
+### 4. Does it copy the previous content into the new dayâ€™s file as a prepend?
+Yes, exactly.
+
+The flow is:
+
+1. create new dayâ€™s file
+2. write a new header
+3. copy in the previous fileâ€™s contents
+4. append the new Copilot starter block
+5. leave space for the new dayâ€™s notes/chat below that
+
+So the new file becomes something like:
+
+```text
+[header for today]
+
+===== PREVIOUS SESSION FILE =====
+[all content copied from previous file]
+===== END PREVIOUS SESSION FILE =====
+
+===== COPILOT SESSION STARTER =====
+[today's generated summary block]
+===== END COPILOT SESSION STARTER =====
+
+===== NEW SESSION NOTES START BELOW THIS LINE =====
+```
+
+So yes, the previous content is effectively **prepended context** inside the **new** file.
+
+---
+
+## Important nuance
+It is not literally â€œopening old file and pasting into it.â€
+It is:
+- reading old file contents
+- writing those contents into a newly created file
+
+Thatâ€™s better, because it avoids accidental damage to the previous file.
+
+---
+
+## So the answer to your exact concern is
+**Yes: the script creates the new day folder and new file if needed, leaves the old file untouched, and only copies the old contents into the new dayâ€™s file as inherited context before you add the new dayâ€™s text.**
+
+If you want, I can also give you a **tiny â€œsafe test versionâ€** of the script that writes into a fake test folder first so you can confirm behavior without touching your real conversation archive.
+
+## @testsubject117
+
+no, just go ahead with the normal version
+
+## Copilot
+
+Sounds good â€” use the normal version as-is.
+
+## What to expect when you run it
+It should:
+
+1. prompt you for a description
+2. create todayâ€™s folder under:
+   `H:\AM\DailyConversations\YYYY-MM-DD\`
+3. create a new timestamped file in that folder
+4. copy the most recent earlier conversation file into the new file
+5. append the AMi/Copilot context block
+6. open the new file in Notepad
+
+## Reminder: save path
+Save the script as:
+
+```text
+H:\AM\Scripts\Start-DailyConversation.ps1
+```
+
+## Run command
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+```
+
+## What I need from you next
+After you run it, tell me one of these:
+
+- **it worked**
+- **it opened but did something unexpected**
+- **you got an error**, and paste the error text
+
+If it errors, Iâ€™ll help fix it quickly.
+
+## @testsubject117
+
+oh, and yes, please create a desktop icon that I can run from my desktop
+
+## Copilot
+
+Yes â€” hereâ€™s the easiest way.
+
+## Step 1: make sure the script is saved here
+```text
+H:\AM\Scripts\Start-DailyConversation.ps1
+```
+
+## Step 2: create a desktop shortcut
+Run this in PowerShell:
+
+```powershell
+$WshShell = New-Object -ComObject WScript.Shell
+$desktop = [Environment]::GetFolderPath("Desktop")
+$shortcut = $WshShell.CreateShortcut((Join-Path $desktop "Start Daily Conversation.lnk"))
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = '-ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"'
+$shortcut.WorkingDirectory = "H:\AM\Scripts"
+$shortcut.IconLocation = "powershell.exe,0"
+$shortcut.Save()
+```
+
+## What it does
+It creates a desktop shortcut named:
+
+```text
+Start Daily Conversation
+```
+
+When you double-click it, it runs:
+
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+```
+
+## Optional: use a nicer icon
+If you want, later you can right-click the shortcut:
+- **Properties**
+- **Change Icon**
+- choose any `.ico` file you like
+
+## Best next step
+1. save the `.ps1` script
+2. run the shortcut-creation block above
+3. double-click the desktop icon
+
+If you want, I can also give you a **single setup script** that:
+- creates `H:\AM\Scripts\`
+- writes the PowerShell file
+- and creates the desktop shortcut automatically.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AMiWinForms> powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+The argument 'H:\AM\Scripts\Start-DailyConversation.ps1' to the -File parameter does not exist. Provide the path to an existing '.ps1' file as an argument to the -File parameter.
+Windows PowerShell
+Copyright (C) Microsoft Corporation. All rights reserved.
+
+Try the new cross-platform PowerShell https://aka.ms/pscore6
+
+
+## Copilot
+
+That error just means the script file hasnâ€™t been saved there yet.
+
+## Direct fix
+First create the folder if needed:
+
+```powershell
+New-Item -ItemType Directory -Path "H:\AM\Scripts" -Force
+```
+
+Then save the script content into:
+
+```text
+H:\AM\Scripts\Start-DailyConversation.ps1
+```
+
+## Easiest way to save it from PowerShell
+Run this block exactly â€” it will create the script file for you:
+
+```powershell
+New-Item -ItemType Directory -Path "H:\AM\Scripts" -Force | Out-Null
+
+@'
+Add-Type -AssemblyName Microsoft.VisualBasic
+
+$BasePath = "H:\AM\DailyConversations"
+
+function Sanitize-Name([string]$name) {
+    if ([string]::IsNullOrWhiteSpace($name)) {
+        return "Session"
+    }
+
+    $invalid = [System.IO.Path]::GetInvalidFileNameChars()
+    $result = $name
+    foreach ($ch in $invalid) {
+        $result = $result.Replace($ch, "-")
+    }
+
+    $result = $result.Trim()
+    if ([string]::IsNullOrWhiteSpace($result)) {
+        $result = "Session"
+    }
+
+    return $result
+}
+
+$description = [Microsoft.VisualBasic.Interaction]::InputBox(
+    "Enter a short description for this conversation/session file.",
+    "New Daily Conversation",
+    "AmiWinForms-AddChecks"
+)
+
+$description = Sanitize-Name $description
+
+$now = Get-Date
+$today = $now.ToString("yyyy-MM-dd")
+$timestamp = $now.ToString("yyyy-MM-dd_HHmmss")
+
+$todayFolder = Join-Path $BasePath $today
+New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+$previousFolder = Get-ChildItem -Path $BasePath -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -lt $today } |
+    Sort-Object Name -Descending |
+    Select-Object -First 1
+
+$previousFile = $null
+if ($previousFolder) {
+    $previousFile = Get-ChildItem -Path $previousFolder.FullName -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+$newFileName = "${timestamp}_${description}.txt"
+$newFilePath = Join-Path $todayFolder $newFileName
+
+$header = @"
+Conversation Session
+Date: $($now.ToString("yyyy-MM-dd"))
+Time: $($now.ToString("HH:mm:ss"))
+Description: $description
+Path: $newFilePath
+
+"@
+
+Set-Content -Path $newFilePath -Value $header -Encoding UTF8
+
+if ($previousFile) {
+    Add-Content -Path $newFilePath -Value "===== PREVIOUS SESSION FILE =====" -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "Source: $($previousFile.FullName)`r`n" -Encoding UTF8
+    Get-Content -Path $previousFile.FullName | Add-Content -Path $newFilePath -Encoding UTF8
+    Add-Content -Path $newFilePath -Value "`r`n===== END PREVIOUS SESSION FILE =====`r`n" -Encoding UTF8
+} else {
+    Add-Content -Path $newFilePath -Value "No previous session file was found.`r`n" -Encoding UTF8
+}
+
+$starterBlock = @"
+===== COPILOT SESSION STARTER =====
+Generated: $($now.ToString("yyyy-MM-dd HH:mm:ss"))
+
+AMi project context:
+This is a DOS GW-BASIC to VB.NET WinForms port.
+
+Repositories:
+- DOS source: testsubject117/AMiDataStore
+- WinForms port: testsubject117/AmiWinForms
+
+Current resume point:
+- AMiOffice/CompanyInfo.vb
+- AMiOffice/CompanyLookupService.vb
+- AMiOffice/FormAddChecks.vb
+
+Current known state:
+- AMiDataStore main is synced locally/remotely and its DOS architecture was reviewed.
+- AmiWinForms master is synced locally/remotely.
+- Latest relevant commit on AmiWinForms:
+  cb8271f - Add company lookup and Add Checks form files
+
+Architecture findings:
+- DOS app is a file-coupled GW-BASIC menu hub.
+- Core accounting parity depends on synchronized updates across INVOICE.CHK, LEDGER.CUR, CHECK.INV, and related files.
+- WinForms port already has strong read/report parity.
+- Biggest remaining gap is write-side accounting parity.
+- Add Checks appears to be the correct canonical next path.
+
+Hard requirements:
+Preserve BOTH:
+1. the original DOS behavior/workflow semantics
+2. the exact same existing WinForms DOS-style implementation pattern already established in the repo
+
+All UI/work must match FormMainMenu and the CHECKS/cash receipts menu in:
+- backgrounds
+- fonts
+- buttons
+- layout rhythm
+- hotkey/menu presentation
+- keyboard-first behavior
+- prompt wording
+- navigation style
+
+Do not modernize the UI unnecessarily.
+
+Recommended current direction:
+- Continue from CompanyInfo.vb, CompanyLookupService.vb, and FormAddChecks.vb
+- Keep FormAddChecks as the DOS-faithful Add Checks path
+- Keep Sales Employee wizard secondary unless evidence proves otherwise
+- Next major milestone is write-side accounting parity for:
+  - INVOICE.CHK
+  - LEDGER.CUR
+  - CHECK.INV
+  - OTHER.CHK
+
+===== END COPILOT SESSION STARTER =====
+
+
+===== NEW SESSION NOTES START BELOW THIS LINE =====
+
+"@
+
+Add-Content -Path $newFilePath -Value $starterBlock -Encoding UTF8
+
+Start-Process notepad.exe $newFilePath
+Write-Host "Created and opened: $newFilePath"
+if ($previousFile) {
+    Write-Host "Seeded from: $($previousFile.FullName)"
+}
+'@ | Set-Content -Path "H:\AM\Scripts\Start-DailyConversation.ps1" -Encoding UTF8
+```
+
+## Then run it again
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"
+```
+
+## Then create the desktop shortcut
+After the script works, run this:
+
+```powershell
+$WshShell = New-Object -ComObject WScript.Shell
+$desktop = [Environment]::GetFolderPath("Desktop")
+$shortcut = $WshShell.CreateShortcut((Join-Path $desktop "Start Daily Conversation.lnk"))
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = '-ExecutionPolicy Bypass -File "H:\AM\Scripts\Start-DailyConversation.ps1"'
+$shortcut.WorkingDirectory = "H:\AM\Scripts"
+$shortcut.IconLocation = "powershell.exe,0"
+$shortcut.Save()
+```
+
+## Recommended order
+1. run the big save-script block
+2. run the script
+3. confirm it opens Notepad and creates the file
+4. then create the desktop icon
+
+If you want, after you test it, I can also give you a **second shortcut** called something like:
+- `Append Current Chat Notes`
+for adding more notes into the latest file for today.
+
+## @testsubject117
+
+yes, please do that.
+
+## Copilot
+
+Yes â€” that would pair nicely with the first script.
+
+## What this second script will do
+It will:
+
+1. find **todayâ€™s folder** in  
+   `H:\AM\DailyConversations\YYYY-MM-DD\`
+2. find the **most recently modified file** in that folder
+3. open that file in **Notepad**
+4. if no file exists for today yet, tell you
+
+This is useful when:
+- you already created todayâ€™s conversation file earlier
+- and later want to reopen it to append more notes/chat
+
+---
+
+# Step 1: create the append/open-latest script
+
+Run this in PowerShell:
+
+```powershell
+@'
+$BasePath = "H:\AM\DailyConversations"
+
+$today = (Get-Date).ToString("yyyy-MM-dd")
+$todayFolder = Join-Path $BasePath $today
+
+if (-not (Test-Path $todayFolder)) {
+    Write-Host "Today's folder does not exist: $todayFolder"
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+$latestFile = Get-ChildItem -Path $todayFolder -File -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+
+if (-not $latestFile) {
+    Write-Host "No conversation files found in: $todayFolder"
+    Read-Host "Press Enter to exit"
+    exit
+}
+
+Start-Process notepad.exe $latestFile.FullName
+Write-Host "Opened latest file: $($latestFile.FullName)"
+'@ | Set-Content -Path "H:\AM\Scripts\Open-LatestDailyConversation.ps1" -Encoding UTF8
+```
+
+---
+
+# Step 2: test it
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Open-LatestDailyConversation.ps1"
+```
+
+If todayâ€™s file already exists, it should open it.
+
+---
+
+# Step 3: create a desktop icon for it
+Run this:
+
+```powershell
+$WshShell = New-Object -ComObject WScript.Shell
+$desktop = [Environment]::GetFolderPath("Desktop")
+$shortcut = $WshShell.CreateShortcut((Join-Path $desktop "Open Latest Daily Conversation.lnk"))
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = '-ExecutionPolicy Bypass -File "H:\AM\Scripts\Open-LatestDailyConversation.ps1"'
+$shortcut.WorkingDirectory = "H:\AM\Scripts"
+$shortcut.IconLocation = "notepad.exe,0"
+$shortcut.Save()
+```
+
+---
+
+# So now youâ€™ll have two desktop actions
+
+## 1. `Start Daily Conversation`
+Use this when starting a new day/session:
+- creates todayâ€™s file
+- copies previous session
+- appends Copilot context
+- opens new file
+
+## 2. `Open Latest Daily Conversation`
+Use this later in the same day:
+- reopens the newest file from today
+- lets you continue appending notes/chat
+
+---
+
+# Small note
+This second script does **not** automatically paste clipboard contents or append chat text by itself.
+It just opens the right file fast.
+
+If you want, I can also make a **third helper** later that:
+- prompts for pasted text
+- appends it automatically to todayâ€™s latest conversation file
+
+But for now, this should be the cleanest/safest workflow.
+
+## Recommended next step
+Run the script-creation block above, then test:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Open-LatestDailyConversation.ps1"
+```
+
+If you want, after that I can help you create a **matching append-from-clipboard tool** too.
+
+## @testsubject117
+
+at this point, as long as we have made sure I have a quick way to resume after a chat session is lost each day, as well as ways to save and update chat session logs, I'm good. I would rather begin to move forward with where we left off            in the checks menu
+
+## Copilot
+
+Yes â€” youâ€™re set up well enough to resume work now.
+
+## Where we left off
+The right resume point is the **Checks menu / Add Checks path**, specifically around:
+
+- `AMiOffice/CompanyInfo.vb`
+- `AMiOffice/CompanyLookupService.vb`
+- `AMiOffice/FormAddChecks.vb`
+
+And with these hard requirements:
+
+- preserve original DOS behavior/workflow
+- preserve the existing WinForms DOS-style implementation pattern
+- visually/behaviorally match:
+  - `FormMainMenu.vb`
+  - `FormLedgerMenu.vb`
+  - related DOS-style forms/base classes
+
+## Best next step in the code
+The most logical next move is:
+
+### **inspect and normalize the current Add Checks entry flow**
+before adding more new logic.
+
+That means reviewing:
+1. how `FormLedgerMenu` currently stubs or routes Add Checks
+2. how `FormAddChecks` is currently structured
+3. whether its UI/style already matches the existing DOS-style forms
+4. whether company lookup flow aligns with DOS expectations
+
+## What I recommend doing next
+If you want to move forward cleanly, the next concrete repo task should be:
+
+### **review these files together**
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/FormAddChecks.vb`
+- `AMiOffice/CompanyLookupService.vb`
+- possibly `AMiOffice/DosMenuFormBase.vb`
+- and `AMiOffice/FormMainMenu.vb` for style comparison
+
+Then decide the next exact implementation step:
+- wire Add Checks menu item
+- or first restyle/refine `FormAddChecks`
+- or both
+
+## Short answer
+**Yes â€” your chat continuity/logging setup is good enough for now, and the right place to resume development is the Checks menu â†’ Add Checks path.**
+
+If you want, the very next thing I can help you do is:
+### **map out the exact next code change in `FormLedgerMenu.vb` and `FormAddChecks.vb`**
+based on the DOS-faithful direction.
+
+## @testsubject117
+
+yes, if you need to review, we did push or at least verify the latest were pushed, all of the .vb project files, so you could look at them quicker that way couldn't you?
+
+## Copilot
+
+Yes â€” reviewing the pushed GitHub files is the fastest way, and Iâ€™ve now looked at the key ones.
+
+## Direct conclusion
+The next code change should be:
+
+### **wire CHECKS menu option 1 to `FormAddChecks`**
+but **before going further**, `FormAddChecks` should be reshaped to match the existing DOS-style WinForms implementation pattern much more closely.
+
+Right now, the project is close functionally in direction, but **`FormAddChecks` does not yet visually/structurally match** `FormMainMenu` / `FormLedgerMenu`.
+
+---
+
+# What I found
+
+## 1) `FormLedgerMenu.vb`
+Right now Add Checks is still stubbed here:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+```
+
+So yes, the first obvious next step is to replace that stub with a `FormAddChecks` launch.
+
+Butâ€¦
+
+---
+
+## 2) `FormAddChecks.vb`
+This file is functional groundwork, but stylistically it is **not yet in the same UI family** as the rest of the menus.
+
+### Why it doesnâ€™t match yet
+`FormAddChecks` currently:
+- inherits directly from `Form`
+- uses `Consolas`
+- uses a black/lime terminal-style theme
+- uses direct absolute positioning
+- uses standalone Validate / Continue / Cancel buttons
+- uses a `ListBox` and status strip style that feels more custom/modern dialog than existing repo menu flow
+
+### That conflicts with the current repo style
+The actual established WinForms DOS-style shell uses:
+- `DosMenuFormBase`
+- dark gray host background with black menu areas
+- yellow Castellar title header
+- Segoe UI bold menu buttons
+- structured top header with clock
+- gray bottom `(ESC) Close` button
+- flow/menu based layout
+- consistent button styling
+
+Thatâ€™s coming from `DosMenuFormBase.vb` and used by `FormLedgerMenu.vb`.  
+So if you want the new work to truly match the existing app, `FormAddChecks` needs to be normalized toward that pattern.
+
+---
+
+## 3) `CompanyLookupService.vb`
+This is fine as a service-layer starting point.
+
+It:
+- reads `REALNAME.DAT`
+- parses `COMPANY.PRC,Company Name`
+- normalizes company code
+- derives `PrcFileName = code & ".PRC"`
+- supports exact/prefix/first-letter lookup
+
+So this is a reasonable backend piece to keep building on.
+
+---
+
+# Best next-step recommendation
+
+## Phase A: fix the UI/style mismatch first
+Before deepening behavior, `FormAddChecks` should be brought closer to repo style.
+
+### Minimum changes Iâ€™d recommend before anything else
+- make `FormAddChecks` inherit from `DosMenuFormBase`, **or**
+- if thatâ€™s too awkward for a prompt/data-entry screen, at least manually mirror its:
+  - background colors
+  - header style
+  - fonts
+  - button styling
+  - bottom close behavior
+  - parent/child dialog behavior
+
+### Most important mismatch today
+The current `FormAddChecks` looks more like a terminal utility form than the actual established WinForms shell.
+
+That may be DOS-ish in spirit, but it is **not consistent with the repoâ€™s existing implementation family**, which you explicitly said must be preserved.
+
+---
+
+## Phase B: then wire menu option 1
+After style normalization, change `FormLedgerMenu` option 1 from this:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+```
+
+to something like:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+    Using f As New FormAddChecks()
+        f.ShowDialog(Me)
+    End Using
+End Sub)
+```
+
+That would be the correct immediate wiring step.
+
+---
+
+# My judgment on â€œwhere we left offâ€
+If the question is:
+
+> are we at the point where the next change is wiring Add Checks from the Checks menu?
+
+The answer is:
+
+### **Yes, but only after we align `FormAddChecks` with the existing repoâ€™s DOS-style WinForms shell.**
+
+Because otherwise youâ€™ll wire in a form that works as a prototype, but visibly breaks the house style.
+
+---
+
+# Most important specific findings
+
+## Good
+- `FormLedgerMenu` is already correctly using `DosMenuFormBase`
+- Add Checks slot is clearly defined as menu option `1`
+- `CompanyLookupService` is a valid starting service
+- `FormAddChecks` already has the first-company-selection concept in place
+
+## Needs correction
+- `FormAddChecks` inheritance/style/layout do not match current app shell
+- hardcoded path:
+  ```vb
+  "\\invoice\MainMenu\Data\REALNAME.DAT"
+  ```
+  should probably be replaced with the projectâ€™s existing path infrastructure if available
+- button/control styling is inconsistent with `FormMainMenu` / `FormLedgerMenu`
+
+---
+
+# Best concrete next task
+I would define the next local coding task as:
+
+### **Refactor `FormAddChecks` to match the established `DosMenuFormBase` visual/behavioral pattern, then wire it to CHECKS menu option 1 in `FormLedgerMenu`.**
+
+That is the cleanest continuation point from where you left off.
+
+---
+
+# Short version
+**Yes, reviewing the pushed GitHub files was the quickest way. Based on them, the immediate next step is not just â€œwire Add Checks,â€ but â€œfirst make `FormAddChecks` match the existing DOS-style WinForms shell, then wire CHECKS option 1 to it.â€**
+
+If you want, I can now do the next most useful thing:
+### outline the exact code-level refactor plan for `FormAddChecks` before wiring it in.
+
+*System: User retried message*
+
+## Copilot
+
+Yes â€” since the latest files are on GitHub, I can review them directly, and I just did.
+
+## Direct answer
+The next move is clear:
+
+### `FormAddChecks.vb` is **not yet styled or structured like the existing DOS-style menu/forms**
+and
+### `FormLedgerMenu.vb` still has Add Checks stubbed out
+
+So the best next step is:
+
+1. **wire menu option 1 to `FormAddChecks`**
+2. **refactor/restyle `FormAddChecks` so it matches the existing DOS-style WinForms shell**
+
+---
+
+# What I found
+
+## 1) `FormLedgerMenu.vb`
+Right now Add Checks is still stubbed here:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+```
+
+So menu option 1 is still not connected.  
+That is the most obvious next code change.
+
+---
+
+## 2) `FormAddChecks.vb`
+This file works as an isolated custom form, but it does **not** match the established repo style closely enough yet.
+
+### Why it does not match
+It currently:
+- inherits directly from `Form`
+- uses custom black/lime `Consolas` styling
+- manually positions controls with `SetBounds`
+- uses a more standalone dialog-like implementation
+- uses button captions like:
+  - `Validate`
+  - `Continue`
+  - `Cancel`
+
+That is **not the same implementation method** as the current menu shell.
+
+### Existing app style is different
+The current established shell uses:
+- `DosMenuFormBase`
+- dark gray form background
+- black button rows
+- white button text
+- yellow header
+- Segoe UI menu buttons
+- keyboard-driven menu/button flow
+- consistent bottom `(ESC) Close` bar
+- owner/child modal dialog pattern
+
+Thatâ€™s visible in:
+- `FormLedgerMenu.vb`
+- `DosMenuFormBase.vb`
+- `FormMainMenu.vb`
+
+So your instinct was right:
+### `FormAddChecks` needs to be brought into that same house style.
+
+---
+
+## 3) `CompanyLookupService.vb`
+This file looks fine as service groundwork.
+
+It:
+- loads `REALNAME.DAT`
+- normalizes company codes
+- strips `.PRC`
+- derives `PrcFileName`
+- supports exact/prefix/first-letter lookup
+
+So this is probably not the next styling target.
+The main issues are in:
+- menu wiring
+- Add Checks form UI/structure
+
+---
+
+# Best next implementation step
+
+## Recommended order
+
+### Step 1 â€” wire Add Checks into the menu
+Replace the current stub in `FormLedgerMenu.vb` with something like:
+- open `FormAddChecks`
+- `ShowDialog(Me)`
+
+That alone gets the Checks menu flowing into the new work.
+
+### Step 2 â€” rework `FormAddChecks` to match the app shell
+This likely means:
+- stop treating it as a one-off custom black/lime form
+- reshape it so it visually/behaviorally matches the existing DOS-style WinForms app
+
+---
+
+# Important design decision
+
+## Should `FormAddChecks` inherit `DosMenuFormBase`?
+**Probably not as a full menu form**, unless you want Add Checks to appear as a true menu page.
+
+Why I say â€œprobably notâ€:
+- `DosMenuFormBase` is very menu-oriented
+- `FormAddChecks` is more of a prompt/data-entry screen
+- forcing it into pure menu-button structure might be awkward
+
+### Better approach
+Make `FormAddChecks` match the **visual family** and **navigation behavior** of the existing forms, even if it still inherits `Form`.
+
+That means:
+- use the same background/header/button conventions
+- use the same font choices where appropriate
+- keep the same close behavior
+- keep keyboard-first flow
+- avoid introducing a totally separate black/lime terminal aesthetic
+
+So:
+### match the established WinForms DOS shell,
+not necessarily the exact inheritance tree, unless that turns out to be practical.
+
+---
+
+# Specific gaps to fix in `FormAddChecks`
+
+## Visual/style mismatches
+Current:
+- black background
+- lime text
+- Consolas-heavy terminal look
+- standalone title label
+- standard Validate/Continue/Cancel button cluster
+
+Repo house style:
+- dark gray main background
+- black button surfaces
+- white button text
+- yellow header
+- Segoe UI button styling
+- bottom ESC close button pattern
+- shell-like layout
+
+## Behavioral mismatches
+Current:
+- `F5 = Validate`
+- Enter only validates if textbox focused
+- double-click listbox to pick match
+
+Possible better DOS-style alignment:
+- simpler Enter/Escape flow
+- more explicit keyboard cues
+- prompts/status layout that feels like the rest of the port
+- less â€œutility dialogâ€, more â€œAMi screenâ€
+
+---
+
+# What I would do next, concretely
+
+## In `FormLedgerMenu.vb`
+Change option 1 from stubbed to:
+
+- open `FormAddChecks`
+- modal from the Checks menu
+- preserve owner/return flow
+
+## In `FormAddChecks.vb`
+Refactor in this order:
+
+### First pass: style-only normalization
+- align colors with current shell
+- align fonts with existing forms
+- align button styling/captions
+- align form sizing/start behavior
+- align cancel/escape behavior
+- align layout rhythm
+
+### Second pass: flow normalization

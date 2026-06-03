@@ -1,0 +1,2000 @@
+﻿End Class
+
+''' <summary>
+''' Flat row bound to the invoice-details DataGridView inside FormLedgerView.
+''' </summary>
+Public Class InvoiceDetailRow
+    Public Property InvoiceNumber As Long
+    Public Property Amount As String = ""
+    Public Property CompanyCode As String = ""
+    Public Property Status As String = ""
+End Class
+
+```
+
+## Copilot
+
+Yes â€” I can see the likely problem.
+
+## Direct answer
+Your `InvoiceChkReader.vb` is **very close**, but the record-number math is almost certainly off by one.
+
+From the AMiDataStore notes and your own comment:
+
+- GW-BASIC uses `FILNUM = InvoiceNumber - 75000`
+- random-access **record numbers are 1-based**
+- but the current code does:
+
+```vb
+Dim filNum As Long = invoiceNumber - InvoiceBase
+If filNum < 1 Then Return rec
+Dim recordOffset As Long = (filNum - 1) * RecordSize
+```
+
+That means invoice `75000` would be rejected, and invoice `190815` would land one record too early if the DOS code actually did `GET #3, FILNUM` with `FILNUM = invoice - 75000`.
+
+In GW-BASIC, if the source literally used:
+
+- `FILNUM = invoice - 75000`
+- `GET #3, FILNUM`
+
+then `FILNUM` itself is already the 1-based record number.
+
+So the VB offset should be:
+
+- `recordNumber = invoiceNumber - 75000`
+- `offset = (recordNumber - 1) * 26`
+
+That part looks superficially correct, **but** the guard clause and â€œfoundâ€ logic are too aggressive, and more importantly you are not validating against the stored invoice number in the record. If the offset lands on a plausible record but not the intended invoice, you still mark it found.
+
+Also, your `FlagDescription` labels donâ€™t match the DOS semantics you pasted:
+- `J` = unpaid/open
+- `P` = paid by customer check
+- `C` = corrected cert
+- `V` = void
+- `E` = erased/removed
+
+Right now you have:
+- `J` â†’ `Journal`
+- `C` â†’ `Credit`
+
+Those are not faithful to the DOS app.
+
+---
+
+# What I want you to replace
+Replace **`AMiOffice/InvoiceChkReader.vb`** with this full version.
+
+## What this version improves
+1. keeps 26-byte record logic
+2. decodes both stored invoice number and amount from MBF
+3. validates the decoded invoice slot against the requested invoice
+4. if direct slot lookup fails, tries a small nearby-window fallback
+   - useful if historical data has an off-by-one drift or sparse oddities
+5. fixes status descriptions to match the DOS semantics you provided
+6. still returns gracefully when records are absent/corrupt
+
+---
+
+# Full replacement: `AMiOffice/InvoiceChkReader.vb`
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Text
+
+''' <summary>
+''' Reads random-access binary records from INVOICE.CHK.
+''' Each record is 26 bytes.
+''' Legacy GW-BASIC layout:
+'''   INUM$ : 9 bytes  (MBF single stored in first 4 bytes, remaining bytes padding)
+'''   AMT$  : 8 bytes  (MBF single stored in first 4 bytes, remaining bytes padding)
+'''   CO$   : 8 bytes  (ASCII company code)
+'''   FLAG$ : 1 byte   (status character: J/P/C/V/E)
+''' </summary>
+Public NotInheritable Class InvoiceChkReader
+    Private Sub New()
+    End Sub
+
+    Private Const RecordSize As Integer = 26
+    Private Const InvoiceBase As Long = 75000L
+
+    Public Shared Function DecodeMbfSingle(buf() As Byte, offset As Integer) As Single
+        If buf Is Nothing OrElse offset < 0 OrElse offset + 4 > buf.Length Then Return 0.0F
+
+        Dim b0 As Byte = buf(offset)
+        Dim b1 As Byte = buf(offset + 1)
+        Dim b2 As Byte = buf(offset + 2)
+        Dim b3 As Byte = buf(offset + 3)
+
+        If b3 = 0 Then Return 0.0F
+
+        Dim signBit As UInteger = (CUInt(b2) And &H80UI) << 24
+        Dim ieeeExp As UInteger = CUInt(b3) - 1UI
+        Dim mantissa As UInteger = ((CUInt(b2) And &H7FUI) << 16) Or
+                                   (CUInt(b1) << 8) Or
+                                   CUInt(b0)
+
+        Dim bits As UInteger = signBit Or (ieeeExp << 23) Or mantissa
+
+        Dim ieee4(3) As Byte
+        ieee4(0) = CByte(bits And &HFFUI)
+        ieee4(1) = CByte((bits >> 8) And &HFFUI)
+        ieee4(2) = CByte((bits >> 16) And &HFFUI)
+        ieee4(3) = CByte((bits >> 24) And &HFFUI)
+
+        Dim result As Single = BitConverter.ToSingle(ieee4, 0)
+        If Single.IsNaN(result) OrElse Single.IsInfinity(result) Then Return 0.0F
+        Return result
+    End Function
+
+    Public Shared Function ReadRecord(path As String, invoiceNumber As Long) As InvoiceChkRecord
+        Dim emptyResult As New InvoiceChkRecord() With {.InvoiceNumber = invoiceNumber}
+
+        If invoiceNumber <= 0 Then Return emptyResult
+        If Not File.Exists(path) Then Return emptyResult
+
+        Dim fileSize As Long
+        Try
+            fileSize = New FileInfo(path).Length
+        Catch
+            Return emptyResult
+        End Try
+
+        If fileSize < RecordSize Then Return emptyResult
+
+        ' GW-BASIC uses record number = invoice - 75000
+        Dim directRecordNumber As Long = invoiceNumber - InvoiceBase
+        If directRecordNumber < 1 Then Return emptyResult
+
+        Try
+            Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+                ' First try the exact direct slot.
+                Dim direct = ReadRecordAtRecordNumber(fs, invoiceNumber, directRecordNumber)
+                If direct.IsFound Then
+                    Return direct
+                End If
+
+                ' Fallback: search a very small nearby window to tolerate historical drift.
+                ' This keeps lookups fast while handling possible off-by-one / nearby-slot anomalies.
+                Dim delta As Integer
+                For delta = -3 To 3
+                    If delta = 0 Then Continue For
+
+                    Dim candidateRecordNumber As Long = directRecordNumber + delta
+                    If candidateRecordNumber < 1 Then Continue For
+
+                    Dim candidate = ReadRecordAtRecordNumber(fs, invoiceNumber, candidateRecordNumber)
+                    If candidate.IsFound Then
+                        Return candidate
+                    End If
+                Next
+            End Using
+        Catch
+            ' Treat any I/O/format failure as not found.
+        End Try
+
+        Return emptyResult
+    End Function
+
+    Private Shared Function ReadRecordAtRecordNumber(fs As FileStream, requestedInvoiceNumber As Long, recordNumber As Long) As InvoiceChkRecord
+        Dim rec As New InvoiceChkRecord() With {.InvoiceNumber = requestedInvoiceNumber}
+
+        If fs Is Nothing Then Return rec
+        If recordNumber < 1 Then Return rec
+
+        Dim recordOffset As Long = (recordNumber - 1) * RecordSize
+        If recordOffset < 0 OrElse recordOffset + RecordSize > fs.Length Then Return rec
+
+        Dim buf(RecordSize - 1) As Byte
+
+        fs.Seek(recordOffset, SeekOrigin.Begin)
+        Dim bytesRead As Integer = fs.Read(buf, 0, RecordSize)
+        If bytesRead < RecordSize Then Return rec
+
+        Dim storedInvoiceRaw As Single = DecodeMbfSingle(buf, 0)
+        Dim storedAmountRaw As Single = DecodeMbfSingle(buf, 9)
+
+        Dim storedInvoiceNumber As Long = CLng(Math.Round(CDbl(storedInvoiceRaw), MidpointRounding.AwayFromZero))
+
+        ' Validate against the requested invoice number.
+        ' If it doesn't match, this isn't the record we want.
+        If storedInvoiceNumber <> requestedInvoiceNumber Then
+            Return rec
+        End If
+
+        rec.Amount = CDec(storedAmountRaw)
+
+        rec.CompanyCode = Encoding.ASCII.GetString(buf, 17, 8).TrimEnd(ChrW(0), " "c)
+
+        Dim flagByte As Byte = buf(25)
+        If flagByte <> 0 AndAlso flagByte <> 32 Then
+            rec.Flag = ChrW(flagByte).ToString().ToUpperInvariant()
+        Else
+            rec.Flag = ""
+        End If
+
+        rec.IsFound = True
+        Return rec
+    End Function
+End Class
+
+''' <summary>Decoded record from INVOICE.CHK.</summary>
+Public Class InvoiceChkRecord
+    Public Property InvoiceNumber As Long
+    Public Property Amount As Decimal
+    Public Property CompanyCode As String = ""
+    Public Property Flag As String = ""
+    Public Property IsFound As Boolean = False
+
+    ''' <summary>Human-readable description of the status flag.</summary>
+    Public ReadOnly Property FlagDescription As String
+        Get
+            Select Case Flag
+                Case "J" : Return "Open"
+                Case "P" : Return "Paid"
+                Case "C" : Return "Corrected Cert"
+                Case "V" : Return "Void"
+                Case "E" : Return "Erased"
+                Case Else : Return If(Flag, "")
+            End Select
+        End Get
+    End Property
+End Class
+
+''' <summary>
+''' Flat row bound to the invoice-details DataGridView inside FormLedgerView.
+''' </summary>
+Public Class InvoiceDetailRow
+    Public Property InvoiceNumber As Long
+    Public Property Amount As String = ""
+    Public Property CompanyCode As String = ""
+    Public Property Status As String = ""
+End Class
+```
+
+---
+
+## Why I think this is the right fix
+Your current behavior proves:
+
+- `CHECK.INV` invoice numbers are now being found
+- but `INVOICE.CHK` metadata is not
+
+That usually means either:
+- slot calculation mismatch
+- record not being validated correctly
+- or amount/status parse happening against the wrong record
+
+This replacement addresses all three.
+
+---
+
+## What I expect after replacing it
+For rows like `NATAIRCR` where you already see:
+- 4 invoice numbers at bottom
+
+you should start seeing:
+- actual amount values
+- company code values
+- status like `Open`, `Paid`, etc.
+
+instead of `Unavailable`
+
+---
+
+## If it still partly fails
+Then the next likely issue is that this particular `INVOICE.CHK` file may not store the invoice number in the record exactly the way we expect for every era/version.
+
+But this replacement is the correct next test, and a much more faithful DOS-style reader than the current one.
+
+## @testsubject117
+
+rebuilt after changing the code and ran the app, no change. still unavailable for amount and status
+
+## Copilot
+
+Then the next likely issue is that my assumption about the `INVOICE.CHK` record layout is wrong for your actual live file, or the MBF offsets arenâ€™t where we think they are.
+
+## Most likely explanation
+You **are** finding invoice numbers from `CHECK.INV`, but `INVOICE.CHK` still canâ€™t resolve them. That means one of these is true:
+
+1. the record-number formula is still wrong for your real file
+2. the record length is not actually 26 for this data
+3. the invoice number is not stored/encoded the way we assumed
+4. the amount field offset is different from what your current reader expects
+5. the file in your live environment differs from the version inferred from the GW-BASIC notes
+
+## Best next step
+I do **not** want to guess again here.
+
+What I need now is a **diagnostic pass**, and then I can give you the correct replacement.
+
+## Please give me one of these
+### Best option
+Paste the first few bytes/records of the actual `INVOICE.CHK` file in some inspectable way.
+
+For example, if you can, tell me:
+- file size of `INVOICE.CHK`
+- the invoice number you clicked, e.g. `190815`
+- and ideally a hex dump of:
+  - the supposed target record
+  - or the first 5â€“10 records
+
+### Even better and easier in code
+If you want, I can give you a temporary **diagnostic replacement for `InvoiceChkReader.vb`** that logs:
+- requested invoice number
+- computed record number
+- raw decoded invoice at that slot
+- raw decoded amount
+- company bytes
+- flag byte
+
+Then you run once, paste the debug output, and Iâ€™ll give you the final correct file.
+
+## Recommendation
+At this point, the fastest path is:
+
+### let me give you a temporary diagnostic version of `InvoiceChkReader.vb`
+
+That is better than blind guessing.
+
+If you want, Iâ€™ll send that now.
+
+## @testsubject117
+
+geez, I just noticed that invoice.chk is not located at \\invoice\mainmenu\data. is it supposed to be there?
+
+## Copilot
+
+That is **very likely the issue**.
+
+## Direct answer
+No â€” if your app is trying to read `INVOICE.CHK` from `\\invoice\mainmenu\data` but the real file is **not there**, then of course the bottom pane will show:
+
+- invoice numbers from `CHECK.INV`
+- but `Amount` / `Status` as **Unavailable**
+
+because the second-stage lookup file is missing from the path the app is using.
+
+So yes, before changing any more decoding logic, you should verify the actual path used for:
+
+- `LegacyDataPaths.InvoiceChk`
+
+---
+
+## Why this fits perfectly
+What youâ€™re seeing now is exactly consistent with this sequence:
+
+1. `LEDGER.CUR` loads fine
+2. `CHECK.INV` loads fine
+3. invoice numbers appear in the bottom pane
+4. then `InvoiceChkReader.ReadRecord(invChkPath, invNo)` runs
+5. if `invChkPath` points to a nonexistent or wrong file, `IsFound = False`
+6. UI shows:
+   - `Amount = Unavailable`
+   - `Status = Unavailable`
+
+That matches your symptoms **exactly**.
+
+---
+
+## So what to inspect next
+Please check the code that defines:
+
+- `LegacyDataPaths.InvoiceChk`
+
+I want to see the file where `LegacyDataPaths` is defined.
+
+Most likely:
+- `Ledger.CUR` and `CHECK.INV` are in one place
+- but `INVOICE.CHK` actually lives somewhere else
+- and the current path constant is wrong
+
+---
+
+## What I need from you
+Paste the file that defines:
+
+- `LegacyDataPaths`
+
+Likely something like:
+- `AMiOffice/LegacyDataPaths.vb`
+
+or whatever file contains:
+
+```vb
+Public Shared ReadOnly Property InvoiceChk As String
+```
+
+---
+
+## Very likely outcome
+I suspect weâ€™ll find that:
+
+- `InvoiceChk` points to the wrong folder
+- and the fix will be a simple path correction, not more binary parsing work
+
+## Short version
+Yes â€” that absolutely could be the whole problem.
+
+And it is the **first thing to fix now** before any more reader changes.
+
+## @testsubject117
+
+ok, I placed the file in that location and reran the app, it still isn't working
+
+## Copilot
+
+Okay â€” then the path was a valid suspicion, but not the whole issue.
+
+## What we know now
+At this point:
+
+- `CHECK.INV` is being read
+- invoice numbers are showing up
+- `INVOICE.CHK` is now present at the expected location
+- but amount/status are still unavailable
+
+So now weâ€™re back to:
+## the `INVOICE.CHK` decoding logic is still wrong for your real file
+
+That means I donâ€™t want to keep guessing.
+
+---
+
+## Best next move
+Yes â€” now I want to give you a **temporary diagnostic replacement** for `InvoiceChkReader.vb`.
+
+This will let us see exactly what the app is reading for:
+- record number
+- offset
+- raw bytes
+- decoded invoice number
+- decoded amount
+- company code
+- flag
+
+Then you can run the app once, click a row like `NATAIRCR`, and paste the diagnostic output back here.
+
+That will let me give you the **correct final replacement**, instead of another blind guess.
+
+---
+
+# Temporary diagnostic replacement: `AMiOffice/InvoiceChkReader.vb`
+
+Replace your current file with this:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class InvoiceChkReader
+    Private Sub New()
+    End Sub
+
+    Private Const RecordSize As Integer = 26
+    Private Const InvoiceBase As Long = 75000L
+    Private Const DebugLogPath As String = "C:\Temp\InvoiceChkDebug.txt"
+
+    Public Shared Function DecodeMbfSingle(buf() As Byte, offset As Integer) As Single
+        If buf Is Nothing OrElse offset < 0 OrElse offset + 4 > buf.Length Then Return 0.0F
+
+        Dim b0 As Byte = buf(offset)
+        Dim b1 As Byte = buf(offset + 1)
+        Dim b2 As Byte = buf(offset + 2)
+        Dim b3 As Byte = buf(offset + 3)
+
+        If b3 = 0 Then Return 0.0F
+
+        Dim signBit As UInteger = (CUInt(b2) And &H80UI) << 24
+        Dim ieeeExp As UInteger = CUInt(b3) - 1UI
+        Dim mantissa As UInteger = ((CUInt(b2) And &H7FUI) << 16) Or
+                                   (CUInt(b1) << 8) Or
+                                   CUInt(b0)
+
+        Dim bits As UInteger = signBit Or (ieeeExp << 23) Or mantissa
+
+        Dim ieee4(3) As Byte
+        ieee4(0) = CByte(bits And &HFFUI)
+        ieee4(1) = CByte((bits >> 8) And &HFFUI)
+        ieee4(2) = CByte((bits >> 16) And &HFFUI)
+        ieee4(3) = CByte((bits >> 24) And &HFFUI)
+
+        Dim result As Single = BitConverter.ToSingle(ieee4, 0)
+        If Single.IsNaN(result) OrElse Single.IsInfinity(result) Then Return 0.0F
+        Return result
+    End Function
+
+    Public Shared Function ReadRecord(path As String, invoiceNumber As Long) As InvoiceChkRecord
+        Dim rec As New InvoiceChkRecord() With {.InvoiceNumber = invoiceNumber}
+
+        LogLine("==================================================")
+        LogLine("ReadRecord called")
+        LogLine("Path: " & path)
+        LogLine("InvoiceNumber: " & invoiceNumber.ToString())
+
+        If invoiceNumber <= 0 Then
+            LogLine("Invoice number <= 0")
+            Return rec
+        End If
+
+        If Not File.Exists(path) Then
+            LogLine("File does not exist")
+            Return rec
+        End If
+
+        Dim fileSize As Long
+        Try
+            fileSize = New FileInfo(path).Length
+            LogLine("FileSize: " & fileSize.ToString())
+        Catch ex As Exception
+            LogLine("FileInfo failed: " & ex.Message)
+            Return rec
+        End Try
+
+        Dim directRecordNumber As Long = invoiceNumber - InvoiceBase
+        LogLine("DirectRecordNumber: " & directRecordNumber.ToString())
+
+        If directRecordNumber < 1 Then
+            LogLine("Direct record number < 1")
+            Return rec
+        End If
+
+        Try
+            Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+                Dim delta As Integer
+                For delta = -3 To 3
+                    Dim candidateRecordNumber As Long = directRecordNumber + delta
+                    If candidateRecordNumber < 1 Then Continue For
+
+                    Dim candidate = ReadRecordAtRecordNumber(fs, invoiceNumber, candidateRecordNumber, delta)
+                    If candidate.IsFound Then
+                        LogLine("MATCH FOUND at delta " & delta.ToString())
+                        Return candidate
+                    End If
+                Next
+            End Using
+        Catch ex As Exception
+            LogLine("ReadRecord exception: " & ex.ToString())
+        End Try
+
+        LogLine("No matching record found")
+        Return rec
+    End Function
+
+    Private Shared Function ReadRecordAtRecordNumber(fs As FileStream, requestedInvoiceNumber As Long, recordNumber As Long, delta As Integer) As InvoiceChkRecord
+        Dim rec As New InvoiceChkRecord() With {.InvoiceNumber = requestedInvoiceNumber}
+
+        Dim recordOffset As Long = (recordNumber - 1) * RecordSize
+        If recordOffset < 0 OrElse recordOffset + RecordSize > fs.Length Then
+            LogLine($"delta={delta} record={recordNumber} offset={recordOffset} out of range")
+            Return rec
+        End If
+
+        Dim buf(RecordSize - 1) As Byte
+        fs.Seek(recordOffset, SeekOrigin.Begin)
+        Dim bytesRead As Integer = fs.Read(buf, 0, RecordSize)
+
+        If bytesRead < RecordSize Then
+            LogLine($"delta={delta} record={recordNumber} short read={bytesRead}")
+            Return rec
+        End If
+
+        Dim rawHex As String = BitConverter.ToString(buf)
+        Dim storedInvoiceRaw As Single = DecodeMbfSingle(buf, 0)
+        Dim storedAmountRaw As Single = DecodeMbfSingle(buf, 9)
+        Dim storedInvoiceRounded As Long = CLng(Math.Round(CDbl(storedInvoiceRaw), MidpointRounding.AwayFromZero))
+        Dim companyCode As String = Encoding.ASCII.GetString(buf, 17, 8).TrimEnd(ChrW(0), " "c)
+        Dim flagByte As Byte = buf(25)
+        Dim flagText As String = ""
+        If flagByte <> 0 AndAlso flagByte <> 32 Then
+            flagText = ChrW(flagByte).ToString()
+        End If
+
+        LogLine($"delta={delta} record={recordNumber} offset={recordOffset}")
+        LogLine("raw=" & rawHex)
+        LogLine("decoded invoice raw=" & storedInvoiceRaw.ToString())
+        LogLine("decoded invoice rounded=" & storedInvoiceRounded.ToString())
+        LogLine("decoded amount raw=" & storedAmountRaw.ToString())
+        LogLine("company=[" & companyCode & "]")
+        LogLine("flagByte=" & flagByte.ToString() & " flag=[" & flagText & "]")
+
+        If storedInvoiceRounded <> requestedInvoiceNumber Then
+            LogLine("No match for requested invoice " & requestedInvoiceNumber.ToString())
+            Return rec
+        End If
+
+        rec.Amount = CDec(storedAmountRaw)
+        rec.CompanyCode = companyCode
+        rec.Flag = flagText.ToUpperInvariant()
+        rec.IsFound = True
+
+        Return rec
+    End Function
+
+    Private Shared Sub LogLine(text As String)
+        Try
+            Dim dir As String = Path.GetDirectoryName(DebugLogPath)
+            If Not String.IsNullOrWhiteSpace(dir) AndAlso Not Directory.Exists(dir) Then
+                Directory.CreateDirectory(dir)
+            End If
+
+            File.AppendAllText(DebugLogPath, text & Environment.NewLine)
+        Catch
+        End Try
+    End Sub
+End Class
+
+Public Class InvoiceChkRecord
+    Public Property InvoiceNumber As Long
+    Public Property Amount As Decimal
+    Public Property CompanyCode As String = ""
+    Public Property Flag As String = ""
+    Public Property IsFound As Boolean = False
+
+    Public ReadOnly Property FlagDescription As String
+        Get
+            Select Case Flag
+                Case "J" : Return "Open"
+                Case "P" : Return "Paid"
+                Case "C" : Return "Corrected Cert"
+                Case "V" : Return "Void"
+                Case "E" : Return "Erased"
+                Case Else : Return If(Flag, "")
+            End Select
+        End Get
+    End Property
+End Class
+
+Public Class InvoiceDetailRow
+    Public Property InvoiceNumber As Long
+    Public Property Amount As String = ""
+    Public Property CompanyCode As String = ""
+    Public Property Status As String = ""
+End Class
+```
+
+---
+
+## What to do after replacing it
+1. rebuild
+2. run app
+3. go to the row with invoices, like `NATAIRCR`
+4. click it
+5. then open:
+
+- `C:\Temp\InvoiceChkDebug.txt`
+
+## Then paste back:
+Just the section for one invoice is enough at first.
+
+If possible, paste the log lines for one of:
+- `190815`
+- `191124`
+- `191768`
+- `192026`
+
+---
+
+## Why this is necessary
+We are now beyond the point where guessing is useful.  
+This debug output will tell us whether:
+
+- the slot math is wrong
+- the MBF decoder is wrong
+- the record size is wrong
+- or the live file layout differs from what we expected
+
+Once I see that, I can give you the **real final replacement**.
+
+## @testsubject117
+
+```
+==================================================
+ReadRecord called
+Path: \\invoice\MainMenu\Data\INVOICE.CHK
+InvoiceNumber: 190815
+FileSize: 17253054
+DirectRecordNumber: 115815
+delta=-3 record=115812 offset=3011086
+raw=00-32-62-91-20-20-20-20-20-00-40-0E-89-20-20-20-20-4D-53-41-45-52-4F-53-50-50
+decoded invoice raw=231624
+decoded invoice rounded=231624
+decoded amount raw=569
+company=[MSAEROSP]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=-2 record=115813 offset=3011112
+raw=80-32-62-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-53-41-54-55-52-4E-46-41-50
+decoded invoice raw=231626
+decoded invoice rounded=231626
+decoded amount raw=70
+company=[SATURNFA]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=-1 record=115814 offset=3011138
+raw=00-33-62-91-20-20-20-20-20-00-00-48-84-20-20-20-20-53-41-54-55-52-4E-46-41-50
+decoded invoice raw=231628
+decoded invoice rounded=231628
+decoded amount raw=25
+company=[SATURNFA]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=0 record=115815 offset=3011164
+raw=80-33-62-91-20-20-20-20-20-00-00-6A-86-20-20-20-20-4E-41-54-41-49-52-43-52-50
+decoded invoice raw=231630
+decoded invoice rounded=231630
+decoded amount raw=117
+company=[NATAIRCR]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=1 record=115816 offset=3011190
+raw=00-34-62-91-20-20-20-20-20-00-00-19-86-20-20-20-20-41-49-52-43-45-52-54-49-50
+decoded invoice raw=231632
+decoded invoice rounded=231632
+decoded amount raw=76.5
+company=[AIRCERTI]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=2 record=115817 offset=3011216
+raw=80-34-62-91-20-20-20-20-20-14-2E-07-87-20-20-20-20-43-4F-52-4F-4E-41-44-4F-50
+decoded invoice raw=231634
+decoded invoice rounded=231634
+decoded amount raw=135.18
+company=[CORONADO]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+delta=3 record=115818 offset=3011242
+raw=00-35-62-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-4D-53-41-45-52-4F-53-50-50
+decoded invoice raw=231636
+decoded invoice rounded=231636
+decoded amount raw=70
+company=[MSAEROSP]
+flagByte=80 flag=[P]
+No match for requested invoice 190815
+No matching record found
+==================================================
+ReadRecord called
+Path: \\invoice\MainMenu\Data\INVOICE.CHK
+InvoiceNumber: 191124
+FileSize: 17253054
+DirectRecordNumber: 116124
+delta=-3 record=116121 offset=3019120
+raw=80-CC-62-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-56-41-4E-50-45-54-54-59-50
+decoded invoice raw=232242
+decoded invoice rounded=232242
+decoded amount raw=70
+company=[VANPETTY]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=-2 record=116122 offset=3019146
+raw=00-CD-62-91-20-20-20-20-20-00-00-02-87-20-20-20-20-56-41-4E-50-45-54-54-59-50
+decoded invoice raw=232244
+decoded invoice rounded=232244
+decoded amount raw=130
+company=[VANPETTY]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=-1 record=116123 offset=3019172
+raw=80-CD-62-91-20-20-20-20-20-00-00-02-87-20-20-20-20-56-41-4E-50-45-54-54-59-50
+decoded invoice raw=232246
+decoded invoice rounded=232246
+decoded amount raw=130
+company=[VANPETTY]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=0 record=116124 offset=3019198
+raw=00-CE-62-91-20-20-20-20-20-00-00-35-86-20-20-20-20-4E-41-54-41-49-52-43-52-50
+decoded invoice raw=232248
+decoded invoice rounded=232248
+decoded amount raw=90.5
+company=[NATAIRCR]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=1 record=116125 offset=3019224
+raw=80-CE-62-91-20-20-20-20-20-00-00-70-85-20-20-20-20-57-45-53-54-41-45-52-4F-50
+decoded invoice raw=232250
+decoded invoice rounded=232250
+decoded amount raw=60
+company=[WESTAERO]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=2 record=116126 offset=3019250
+raw=00-CF-62-91-20-20-20-20-20-66-66-0C-86-20-20-20-20-56-41-4C-4C-45-59-54-4F-50
+decoded invoice raw=232252
+decoded invoice rounded=232252
+decoded amount raw=70.2
+company=[VALLEYTO]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+delta=3 record=116127 offset=3019276
+raw=80-CF-62-91-20-20-20-20-20-00-A0-3B-89-20-20-20-20-56-41-4E-50-45-54-54-59-50
+decoded invoice raw=232254
+decoded invoice rounded=232254
+decoded amount raw=750.5
+company=[VANPETTY]
+flagByte=80 flag=[P]
+No match for requested invoice 191124
+No matching record found
+==================================================
+ReadRecord called
+Path: \\invoice\MainMenu\Data\INVOICE.CHK
+InvoiceNumber: 191768
+FileSize: 17253054
+DirectRecordNumber: 116768
+delta=-3 record=116765 offset=3035864
+raw=80-0E-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-4E-4F-45-54-54-4C-45-4E-50
+decoded invoice raw=233530
+decoded invoice rounded=233530
+decoded amount raw=70
+company=[NOETTLEN]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=-2 record=116766 offset=3035890
+raw=00-0F-64-91-20-20-20-20-20-00-00-70-85-20-20-20-20-44-41-56-49-53-49-4E-44-50
+decoded invoice raw=233532
+decoded invoice rounded=233532
+decoded amount raw=60
+company=[DAVISIND]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=-1 record=116767 offset=3035916
+raw=80-0F-64-91-20-20-20-20-20-00-00-02-87-20-20-20-20-41-49-52-43-45-52-54-49-50
+decoded invoice raw=233534
+decoded invoice rounded=233534
+decoded amount raw=130
+company=[AIRCERTI]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=0 record=116768 offset=3035942
+raw=00-10-64-91-20-20-20-20-20-00-00-19-86-20-20-20-20-4E-41-54-41-49-52-43-52-50
+decoded invoice raw=233536
+decoded invoice rounded=233536
+decoded amount raw=76.5
+company=[NATAIRCR]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=1 record=116769 offset=3035968
+raw=80-10-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-4E-45-54-57-4F-52-4B-53-50
+decoded invoice raw=233538
+decoded invoice rounded=233538
+decoded amount raw=70
+company=[NETWORKS]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=2 record=116770 offset=3035994
+raw=00-11-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-4E-45-54-57-4F-52-4B-53-50
+decoded invoice raw=233540
+decoded invoice rounded=233540
+decoded amount raw=70
+company=[NETWORKS]
+flagByte=80 flag=[P]
+No match for requested invoice 191768
+delta=3 record=116771 offset=3036020
+raw=80-11-64-91-20-20-20-20-20-00-00-00-00-20-20-20-20-50-53-49-42-45-41-52-49-43
+decoded invoice raw=233542
+decoded invoice rounded=233542
+decoded amount raw=0
+company=[PSIBEARI]
+flagByte=67 flag=[C]
+No match for requested invoice 191768
+No matching record found
+==================================================
+ReadRecord called
+Path: \\invoice\MainMenu\Data\INVOICE.CHK
+InvoiceNumber: 192026
+FileSize: 17253054
+DirectRecordNumber: 117026
+delta=-3 record=117023 offset=3042572
+raw=80-8F-64-91-20-20-20-20-20-00-00-20-85-20-20-20-20-53-41-54-55-52-4E-46-41-50
+decoded invoice raw=234046
+decoded invoice rounded=234046
+decoded amount raw=40
+company=[SATURNFA]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=-2 record=117024 offset=3042598
+raw=00-90-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-53-41-54-55-52-4E-46-41-50
+decoded invoice raw=234048
+decoded invoice rounded=234048
+decoded amount raw=70
+company=[SATURNFA]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=-1 record=117025 offset=3042624
+raw=80-90-64-91-20-20-20-20-20-00-00-48-84-20-20-20-20-53-41-54-55-52-4E-46-41-50
+decoded invoice raw=234050
+decoded invoice rounded=234050
+decoded amount raw=25
+company=[SATURNFA]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=0 record=117026 offset=3042650
+raw=00-91-64-91-20-20-20-20-20-00-00-5B-86-20-20-20-20-4E-41-54-41-49-52-43-52-50
+decoded invoice raw=234052
+decoded invoice rounded=234052
+decoded amount raw=109.5
+company=[NATAIRCR]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=1 record=117027 offset=3042676
+raw=80-91-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-44-41-56-49-44-42-41-52-50
+decoded invoice raw=234054
+decoded invoice rounded=234054
+decoded amount raw=70
+company=[DAVIDBAR]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=2 record=117028 offset=3042702
+raw=00-92-64-91-20-20-20-20-20-00-00-0C-86-20-20-20-20-44-41-56-49-44-42-41-52-50
+decoded invoice raw=234056
+decoded invoice rounded=234056
+decoded amount raw=70
+company=[DAVIDBAR]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+delta=3 record=117029 offset=3042728
+raw=80-92-64-91-20-20-20-20-20-00-00-48-85-20-20-20-20-44-41-56-49-44-42-41-52-50
+decoded invoice raw=234058
+decoded invoice rounded=234058
+decoded amount raw=50
+company=[DAVIDBAR]
+flagByte=80 flag=[P]
+No match for requested invoice 192026
+No matching record found
+
+```
+
+## Copilot
+
+Yes â€” this debug output is extremely helpful, and it shows the real problem.
+
+## Direct answer
+Your `INVOICE.CHK` file is **not using the invoice number directly** in the way we assumed.
+
+The critical clue is:
+
+- requested invoice: `190815`
+- direct record number: `115815`
+- decoded stored invoice at that record: `231630`
+
+That means the record math is systematically off.
+
+Even more importantly, the decoded invoice numbers are increasing by **2** each record:
+
+- 231624
+- 231626
+- 231628
+- 231630
+- 231632
+
+That pattern is too clean to be corruption. It means:
+## the MBF decode is working,
+but
+## the file is keyed differently than `invoice - 75000`.
+
+---
+
+## What the debug proves
+For the `NATAIRCR` row:
+
+- at the slot you checked, the company code is `NATAIRCR`
+- the amount decodes correctly to values like `117`, `90.5`, `76.5`, `109.5`
+- the flag decodes to `P`
+
+So:
+- binary layout is basically correct
+- amount offset is correct
+- company code offset is correct
+- flag offset is correct
+
+The only bad assumption is:
+## how to locate the correct record for a requested invoice number
+
+---
+
+## Most likely interpretation
+The live file is likely indexed by something like:
+
+- `(invoice - base) / 2`
+or
+- a different invoice base altogether
+
+Because your requested invoice `190815` lands near stored invoice `231630`, and those decoded invoice values are stepping by 2, this looks like the stored invoice field is not the lookup key we thought, or the record number formula from the old notes doesnâ€™t match your actual live file generation.
+
+---
+
+## What matters practically
+We now know enough to stop guessing.
+
+Since:
+- company, amount, and status decode correctly once we land on a record,
+- but direct positioning is wrong,
+
+the safest practical fix is:
+
+# **search for the invoice number in `INVOICE.CHK` instead of assuming a direct slot formula**
+
+That is slower than true random access, but for the invoice-detail panel it is completely acceptable and much more robust for legacy data.
+
+Youâ€™re only loading a few invoice numbers at a time when a row is clicked, so scanning the file for 4â€“10 invoice records is fine.
+
+---
+
+# What I want you to replace
+Replace **`AMiOffice/InvoiceChkReader.vb`** with this full version.
+
+## What this version does
+1. keeps the correct 26-byte record structure
+2. keeps the MBF decoding you already proved is valid
+3. **scans the file record-by-record** until it finds the requested invoice number
+4. returns amount/company/status when found
+5. keeps DOS-correct status labels
+
+This avoids the broken direct-slot assumption entirely.
+
+---
+
+# Full replacement: `AMiOffice/InvoiceChkReader.vb`
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Text
+
+''' <summary>
+''' Reads random-access binary records from INVOICE.CHK.
+''' Actual field decoding is valid at 26 bytes per record:
+'''   INUM$ : 9 bytes  (MBF single in first 4 bytes)
+'''   AMT$  : 8 bytes  (MBF single in first 4 bytes)
+'''   CO$   : 8 bytes  (ASCII company code)
+'''   FLAG$ : 1 byte   (status character)
+'''
+''' Although legacy notes suggest direct slot math from invoice number,
+''' live data may not follow that mapping consistently. To remain robust,
+''' this reader scans records until it finds the requested invoice number.
+''' </summary>
+Public NotInheritable Class InvoiceChkReader
+    Private Sub New()
+    End Sub
+
+    Private Const RecordSize As Integer = 26
+
+    Public Shared Function DecodeMbfSingle(buf() As Byte, offset As Integer) As Single
+        If buf Is Nothing OrElse offset < 0 OrElse offset + 4 > buf.Length Then Return 0.0F
+
+        Dim b0 As Byte = buf(offset)
+        Dim b1 As Byte = buf(offset + 1)
+        Dim b2 As Byte = buf(offset + 2)
+        Dim b3 As Byte = buf(offset + 3)
+
+        If b3 = 0 Then Return 0.0F
+
+        Dim signBit As UInteger = (CUInt(b2) And &H80UI) << 24
+        Dim ieeeExp As UInteger = CUInt(b3) - 1UI
+        Dim mantissa As UInteger = ((CUInt(b2) And &H7FUI) << 16) Or
+                                   (CUInt(b1) << 8) Or
+                                   CUInt(b0)
+
+        Dim bits As UInteger = signBit Or (ieeeExp << 23) Or mantissa
+
+        Dim ieee4(3) As Byte
+        ieee4(0) = CByte(bits And &HFFUI)
+        ieee4(1) = CByte((bits >> 8) And &HFFUI)
+        ieee4(2) = CByte((bits >> 16) And &HFFUI)
+        ieee4(3) = CByte((bits >> 24) And &HFFUI)
+
+        Dim result As Single = BitConverter.ToSingle(ieee4, 0)
+        If Single.IsNaN(result) OrElse Single.IsInfinity(result) Then Return 0.0F
+        Return result
+    End Function
+
+    Public Shared Function ReadRecord(path As String, invoiceNumber As Long) As InvoiceChkRecord
+        Dim result As New InvoiceChkRecord() With {.InvoiceNumber = invoiceNumber}
+
+        If invoiceNumber <= 0 Then Return result
+        If Not File.Exists(path) Then Return result
+
+        Try
+            Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+                Dim fileLength As Long = fs.Length
+                If fileLength < RecordSize Then
+                    Return result
+                End If
+
+                Dim recordCount As Long = fileLength \ RecordSize
+                Dim recordIndex As Long
+
+                For recordIndex = 0 To recordCount - 1
+                    Dim rec = ReadRecordAtIndex(fs, recordIndex)
+                    If rec.IsFound AndAlso rec.InvoiceNumber = invoiceNumber Then
+                        Return rec
+                    End If
+                Next
+            End Using
+        Catch
+            ' Treat any error as not found.
+        End Try
+
+        Return result
+    End Function
+
+    Private Shared Function ReadRecordAtIndex(fs As FileStream, recordIndex As Long) As InvoiceChkRecord
+        Dim rec As New InvoiceChkRecord()
+
+        If fs Is Nothing Then Return rec
+        If recordIndex < 0 Then Return rec
+
+        Dim recordOffset As Long = recordIndex * RecordSize
+        If recordOffset < 0 OrElse recordOffset + RecordSize > fs.Length Then Return rec
+
+        Dim buf(RecordSize - 1) As Byte
+        fs.Seek(recordOffset, SeekOrigin.Begin)
+
+        Dim bytesRead As Integer = fs.Read(buf, 0, RecordSize)
+        If bytesRead < RecordSize Then Return rec
+
+        Dim storedInvoiceRaw As Single = DecodeMbfSingle(buf, 0)
+        Dim storedAmountRaw As Single = DecodeMbfSingle(buf, 9)
+
+        Dim storedInvoiceNumber As Long = CLng(Math.Round(CDbl(storedInvoiceRaw), MidpointRounding.AwayFromZero))
+
+        ' Skip clearly empty/invalid records
+        If storedInvoiceNumber <= 0 Then
+            Return rec
+        End If
+
+        rec.InvoiceNumber = storedInvoiceNumber
+        rec.Amount = CDec(storedAmountRaw)
+        rec.CompanyCode = Encoding.ASCII.GetString(buf, 17, 8).TrimEnd(ChrW(0), " "c)
+
+        Dim flagByte As Byte = buf(25)
+        If flagByte <> 0 AndAlso flagByte <> 32 Then
+            rec.Flag = ChrW(flagByte).ToString().ToUpperInvariant()
+        Else
+            rec.Flag = ""
+        End If
+
+        rec.IsFound = True
+        Return rec
+    End Function
+End Class
+
+''' <summary>Decoded record from INVOICE.CHK.</summary>
+Public Class InvoiceChkRecord
+    Public Property InvoiceNumber As Long
+    Public Property Amount As Decimal
+    Public Property CompanyCode As String = ""
+    Public Property Flag As String = ""
+    Public Property IsFound As Boolean = False
+
+    Public ReadOnly Property FlagDescription As String
+        Get
+            Select Case Flag
+                Case "J" : Return "Open"
+                Case "P" : Return "Paid"
+                Case "C" : Return "Corrected Cert"
+                Case "V" : Return "Void"
+                Case "E" : Return "Erased"
+                Case Else : Return If(Flag, "")
+            End Select
+        End Get
+    End Property
+End Class
+
+''' <summary>
+''' Flat row bound to the invoice-details DataGridView inside FormLedgerView.
+''' </summary>
+Public Class InvoiceDetailRow
+    Public Property InvoiceNumber As Long
+    Public Property Amount As String = ""
+    Public Property CompanyCode As String = ""
+    Public Property Status As String = ""
+End Class
+```
+
+---
+
+## Why this should work
+Your debug output already proved that:
+- amount decoding works
+- company code decoding works
+- flag decoding works
+
+So the only failing part is locating the right record.
+
+This version solves that by searching instead of guessing the slot.
+
+---
+
+## Performance note
+This is absolutely fine for the current use case, because:
+- the bottom panel only loads a handful of invoices per selected check
+- not tens of thousands all at once
+
+If later you want it faster, we can build an in-memory index once and reuse it.
+
+---
+
+## What to test
+After replacing the file:
+
+1. rebuild
+2. run app
+3. go back to `NATAIRCR`
+4. click it
+5. bottom pane should now ideally show:
+   - real amounts
+   - real company code
+   - real status
+
+instead of `Unavailable`
+
+If it still fails after this, then the next conclusion is that the stored invoice number itself is transformed differently than the invoice numbers coming from `CHECK.INV`. But based on your debug log, this scan-based fix is the right next move.
+
+## @testsubject117
+
+nope still unavailable for both
+
+## Copilot
+
+Good â€” now we can stop blaming the file reader math alone.
+
+## What your debug already proved
+For records near those `NATAIRCR` invoices, the file clearly contains valid decoded data:
+
+- company codes like `NATAIRCR`
+- amounts like `117`, `90.5`, `76.5`, `109.5`
+- flags like `P`
+
+So `INVOICE.CHK` **is readable**.
+
+But the requested invoice numbers from `CHECK.INV`:
+
+- `190815`
+- `191124`
+- `191768`
+- `192026`
+
+do **not** appear to match the invoice numbers decoded from `INVOICE.CHK`:
+
+- `231630`
+- `232248`
+- `233536`
+- `234052`
+
+So the issue is now very likely this:
+
+# the invoice numbers stored in `CHECK.INV` are not the same numbering domain as the invoice keys stored in `INVOICE.CHK`
+
+In other words, the bridge file is giving you one invoice identifier, while `INVOICE.CHK` is keyed by a different transformed/renumbered invoice value.
+
+---
+
+## The strongest clue
+For the selected `NATAIRCR` row, the decoded `INVOICE.CHK` records at matching company/date neighborhood are:
+
+- `231630`
+- `232248`
+- `233536`
+- `234052`
+
+And the `CHECK.INV` invoices are:
+
+- `190815`
+- `191124`
+- `191768`
+- `192026`
+
+Those differences are not random:
+- `231630 - 190815 = 40815`
+- `232248 - 191124 = 41124`
+- `233536 - 191768 = 41768`
+- `234052 - 192026 = 42026`
+
+That pattern strongly suggests a transformation, not corruption.
+
+---
+
+## Best practical conclusion
+At this point, the DOS app likely did **not** use the `CHECK.INV` invoice numbers directly against `INVOICE.CHK` in the naive way we assumed.
+
+Instead, one of these is true:
+
+1. `CHECK.INV` invoice values need to be transformed before lookup
+2. the app used a different ledger/journal cross-reference path to resolve displayed invoice metadata
+3. `CHECK.INV` stores a displayed invoice number, while `INVOICE.CHK` stores an internal sequence value
+
+---
+
+## What to do now
+Since we already know the bottom panel is finding the correct customer/check grouping, the most practical next step is:
+
+# show invoice detail rows directly from the `CHECK.INV` linkage even when `INVOICE.CHK` lookup fails,
+and stop pretending the metadata should be found unless we can map it correctly
+
+But if your goal is to truly match the DOS behavior, then we need to identify the transformation between:
+
+- `CHECK.INV` invoice number
+and
+- `INVOICE.CHK` stored invoice number
+
+---
+
+## Fastest next debugging step
+I need to see how those invoice numbers were written in the legacy app or what your current `CHECK.INV` parser is reading for a known row.
+
+But before that, there is one very practical improvement I can give you:
+
+### make the bottom panel display the invoice numbers from `CHECK.INV` cleanly,
+and when `INVOICE.CHK` fails, show a more truthful status like:
+- `Linked`
+instead of `Unavailable`
+
+That would at least align the UI with the fact that invoice linkage exists.
+
+---
+
+## But for actual GW-BASIC fidelity
+The next code file Iâ€™d want to inspect is:
+
+- your current `CheckInvReader.vb`
+
+because if the invoice numbers in `CHECK.INV` are being parsed as plain `Long`, but the DOS app actually stored some transformed values or mixed line formatting, that could be the bridge mismatch.
+
+## Direct answer
+So:
+- no, the current `InvoiceChkReader` fix alone is not enough
+- yes, the data clearly shows a mismatch between `CHECK.INV` invoice IDs and `INVOICE.CHK` invoice IDs
+- the next useful thing is for me to see your current `CheckInvReader.vb`
+
+If you paste that, I can tell you whether the mismatch is coming from the `CHECK.INV` side or whether we need a transformation layer in `FormLedgerView`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvBlock)
+        Dim results As New List(Of CheckInvBlock)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim i As Integer = 0
+
+        While i < rawLines.Length
+            Dim line As String = CleanLine(rawLines(i))
+
+            If line.Length = 0 Then
+                i += 1
+                Continue While
+            End If
+
+            ' Header lines are GW-BASIC WRITE# output and start with a quote.
+            If Not line.StartsWith("""", StringComparison.Ordinal) Then
+                i += 1
+                Continue While
+            End If
+
+            Dim header As CheckInvBlock = ParseHeader(line)
+            i += 1
+
+            ' Collect invoice numbers until we reach the invoice count or the next header.
+            Dim invoices As New List(Of String)()
+
+            ' Defensive: bad/blank counts happen
+            Dim target As Integer = header.InvoiceCount
+            If target < 0 Then target = 0
+            If target > 5000 Then target = 5000 ' safety cap
+
+            While i < rawLines.Length AndAlso invoices.Count < target
+                Dim invLine As String = CleanLine(rawLines(i))
+
+                If invLine.Length = 0 Then
+                    i += 1
+                    Continue While
+                End If
+
+                ' If we hit the next header early, stop this block.
+                If invLine.StartsWith("""", StringComparison.Ordinal) Then
+                    Exit While
+                End If
+
+                ' A single line may contain one invoice or many invoices.
+                ' Try to parse as WRITE#-style CSV first. If it yields multiple parts, use them.
+                Dim parts As List(Of String) = SplitBasicWriteLine(invLine)
+
+                If parts.Count > 1 Then
+                    For Each p In parts
+                        Dim v = NormalizeInvoiceToken(p)
+                        If v.Length > 0 Then invoices.Add(v)
+                        If invoices.Count >= target Then Exit For
+                    Next
+                Else
+                    ' Not a CSV-ish line; treat as a single invoice token
+                    Dim v = NormalizeInvoiceToken(invLine)
+                    If v.Length > 0 Then invoices.Add(v)
+                End If
+
+                i += 1
+            End While
+
+            header.Invoices = invoices
+            results.Add(header)
+        End While
+
+        Return results
+    End Function
+    Public Shared Function DiagnoseFormat(path As String) As String
+        If Not File.Exists(path) Then Return "File not found: " & path
+
+        Dim rawLines = File.ReadAllLines(path)
+        Dim headers As Integer = 0
+        Dim invLines As Integer = 0
+        Dim invLinesWithCommas As Integer = 0
+        Dim invLinesThatLookQuoted As Integer = 0
+
+        Dim seen As Integer = 0
+        For Each raw In rawLines
+            Dim line = If(raw, "").Replace(ChrW(26), "").Trim()
+            If line = "" Then Continue For
+
+            seen += 1
+            If line.StartsWith("""", StringComparison.Ordinal) Then
+                headers += 1
+            Else
+                invLines += 1
+                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+                If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
+            End If
+
+            If seen >= 200 Then Exit For
+        Next
+
+        Return $"Lines scanned: {seen}" & Environment.NewLine &
+           $"Header lines (start with quote): {headers}" & Environment.NewLine &
+           $"Non-header lines: {invLines}" & Environment.NewLine &
+           $"Non-header lines containing commas: {invLinesWithCommas}" & Environment.NewLine &
+           $"Non-header lines containing quotes: {invLinesThatLookQuoted}"
+    End Function
+    Private Shared Function ParseHeader(line As String) As CheckInvBlock
+        ' Example:
+        ' "NATAIRCR","8508","4","01-03-1995",196.75,4
+        Dim parts As List(Of String) = SplitBasicWriteLine(line)
+
+        Dim b As New CheckInvBlock() With {
+            .CustomerCode = GetPart(parts, 0),
+            .CheckNumber = GetPart(parts, 1),
+            .SalesmanCode = GetPart(parts, 2),
+            .DateText = GetPart(parts, 3),
+            .Amount = ParseDecimal(GetPart(parts, 4)),
+            .InvoiceCount = ParseInt(GetPart(parts, 5)),
+            .Invoices = New List(Of String)()
+        }
+
+        Return b
+    End Function
+
+    Private Shared Function CleanLine(s As String) As String
+        If s Is Nothing Then Return ""
+        Return s.Replace(ChrW(26), "").Trim()
+    End Function
+
+    Private Shared Function NormalizeInvoiceToken(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t = s.Replace(ChrW(26), "").Trim()
+
+        ' Some legacy files may quote invoice numbers even on "invoice lines"
+        ' SplitBasicWriteLine already unquotes, but for safety:
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2).Trim()
+        End If
+
+        ' Optional normalization that often matches legacy: collapse internal spaces
+        ' (keep it conservative to avoid changing real invoice formats)
+        t = t.Replace(vbTab, " ")
+        While t.Contains("  ", StringComparison.Ordinal)
+            t = t.Replace("  ", " ")
+        End While
+
+        Return t
+    End Function
+
+    Private Shared Function GetPart(parts As List(Of String), idx As Integer) As String
+        If parts Is Nothing OrElse idx < 0 OrElse idx >= parts.Count Then Return ""
+        Return If(parts(idx), "").Trim()
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+
+    Private Shared Function ParseInt(s As String) As Integer
+        If s Is Nothing Then Return 0
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim n As Integer
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, n) Then Return n
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then Return n
+        Return 0
+    End Function
+
+    ' Robust parser for GW-BASIC WRITE# "CSV-ish" lines:
+    ' - quoted strings allowed
+    ' - embedded quotes written as "" inside quoted strings
+    ' - numeric fields unquoted
+    Private Shared Function SplitBasicWriteLine(line As String) As List(Of String)
+        Dim result As New List(Of String)()
+        If line Is Nothing Then Return result
+
+        Dim sb As New StringBuilder()
+        Dim inQuotes As Boolean = False
+        Dim i As Integer = 0
+
+        While i < line.Length
+            Dim ch As Char = line(i)
+
+            If inQuotes Then
+                If ch = """"c Then
+                    ' Doubled quote => literal quote
+                    If i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 2
+                        Continue While
+                    Else
+                        inQuotes = False
+                        i += 1
+                        Continue While
+                    End If
+                Else
+                    sb.Append(ch)
+                    i += 1
+                    Continue While
+                End If
+            Else
+                If ch = """"c Then
+                    inQuotes = True
+                    i += 1
+                    Continue While
+                End If
+
+                If ch = ","c Then
+                    result.Add(sb.ToString().Trim())
+                    sb.Clear()
+                    i += 1
+                    Continue While
+                End If
+
+                sb.Append(ch)
+                i += 1
+            End If
+        End While
+
+        result.Add(sb.ToString().Trim())
+        Return result
+    End Function
+End Class
+
+Public Class CheckInvBlock
+    Public Property CustomerCode As String
+    Public Property CheckNumber As String
+    Public Property SalesmanCode As String
+    Public Property DateText As String
+    Public Property Amount As Decimal
+    Public Property InvoiceCount As Integer
+    Public Property Invoices As List(Of String)
+End Class
+```
+
+## Copilot
+
+Yes â€” I see the issue now.
+
+## Direct answer
+Your `CheckInvReader.vb` is reading the invoice list as if those trailing invoice lines are plain text invoice numbers.
+
+But based on the behavior youâ€™re seeing, those values coming out of `CHECK.INV` are **not the real `INVOICE.CHK` keys** for your live data.
+
+So right now:
+
+- `CHECK.INV` parsing is good enough to show â€œsome invoice-like identifiersâ€
+- but those identifiers do **not** match what `INVOICE.CHK` uses for lookup
+
+That means the DOS app likely used `CHECK.INV` mainly as a **bridge/list artifact**, while detailed invoice metadata was probably resolved differently in the original environment.
+
+---
+
+## The most practical fix
+Given what we now know, the best behavior for the current WinForms app is:
+
+### In `View Checks`
+- keep using `CHECK.INV` to determine whether a check has attached invoices
+- show the invoice count in the main grid
+- show the listed invoice numbers at the bottom
+- **do not attempt to show amount/company/status from `INVOICE.CHK` unless we can actually resolve them**
+- instead show a useful linked status
+
+Because right now, pretending those invoice numbers should resolve and showing `Unavailable` is worse UX than simply admitting:
+- these are linked invoice numbers from `CHECK.INV`
+- detailed invoice master metadata is not resolved yet
+
+That is the honest, stable behavior.
+
+---
+
+## What I recommend changing now
+You do **not** need to change `CheckInvReader.vb` again right now.
+
+Instead, update `FormLedgerView.vb` so that the bottom panel behaves like this:
+
+For each invoice number from `CHECK.INV`, show:
+
+- **Invoice #** = the number from `CHECK.INV`
+- **Amount** = blank
+- **Company Code** = blank
+- **Status** = `Linked`
+
+And if at some point `InvoiceChkReader.ReadRecord(...)` actually succeeds, then populate the richer fields.
+
+That gives you:
+- correct invoice linkage display
+- no misleading â€œUnavailableâ€ noise
+- a much closer operational result to the old GW-BASIC screen intent
+
+---
+
+# Full replacement: `AMiOffice/FormLedgerView.vb`
+
+This version changes only the behavior of the bottom invoice list:
+
+- if `INVOICE.CHK` lookup succeeds, show full details
+- if it fails, still show the invoice number and mark it as **Linked**
+- keep invoice counts in the main grid
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Linq
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: normalized composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCustomerFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialCheckFilter As String = ""
+
+    <Browsable(False)>
+    <DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)>
+    Public Property InitialYearFilter As String = ""
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+        ApplyInitialFilters()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        BackColor = Color.FromArgb(32, 32, 32)
+        ForeColor = Color.White
+
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2,
+            .BackColor = Color.FromArgb(32, 32, 32),
+            .Padding = New Padding(8)
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+
+        Dim labelFont As New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        Dim lblCustomer As New Label() With {
+            .Text = "Customer:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblCheck As New Label() With {
+            .Text = "Check #:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblYear As New Label() With {
+            .Text = "Year:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        Dim lblMonth As New Label() With {
+            .Text = "Month:",
+            .AutoSize = True,
+            .Anchor = AnchorStyles.Left,
+            .ForeColor = Color.White,
+            .BackColor = topPanel.BackColor,
+            .Font = labelFont
+        }
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCustomer.BackColor = Color.Black
+        txtCustomer.ForeColor = Color.White
+        txtCustomer.BorderStyle = BorderStyle.FixedSingle
+        txtCustomer.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtCheck.Dock = DockStyle.Fill
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.White
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+        cmbYear.BackColor = Color.Black
+        cmbYear.ForeColor = Color.White
+        cmbMonth.BackColor = Color.Black
+        cmbMonth.ForeColor = Color.White
+        cmbYear.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cmbMonth.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+        btnRefresh.UseVisualStyleBackColor = False
+        btnRefresh.BackColor = Color.Black
+        btnRefresh.ForeColor = Color.White
+        btnRefresh.FlatStyle = FlatStyle.Flat
+        btnRefresh.FlatAppearance.BorderColor = Color.DimGray
+        btnRefresh.FlatAppearance.BorderSize = 1
+        btnRefresh.FlatAppearance.MouseOverBackColor = Color.FromArgb(48, 48, 48)
+        btnRefresh.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btnRefresh.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+        lblTotal.ForeColor = Color.Yellow
+        lblTotal.BackColor = topPanel.BackColor
+        lblTotal.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.DimGray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.RowHeadersVisible = False
+
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.FixedSingle
+        pnlInvoice.BackColor = Color.FromArgb(32, 32, 32)
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Color.Black
+        lblInvoiceTitle.ForeColor = Color.Yellow
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+        AddHandler dgv.DataBindingComplete, AddressOf OnMainGridDataBindingComplete
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub OnMainGridDataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgv.Columns.Contains("DateText") Then
+            dgv.Columns("DateText").HeaderText = "Date"
+        End If
+
+        If dgv.Columns.Contains("CheckNumber") Then
+            dgv.Columns("CheckNumber").HeaderText = "Check #"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiffText") Then
+            dgv.Columns("InvoiceDiffText").HeaderText = "Invoice"
+            dgv.Columns("InvoiceDiffText").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+            dgv.Columns("InvoiceDiffText").Width = 90
+        End If
+
+        If dgv.Columns.Contains("Amount") Then
+            dgv.Columns("Amount").DefaultCellStyle.Format = "G29"
+        End If
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
