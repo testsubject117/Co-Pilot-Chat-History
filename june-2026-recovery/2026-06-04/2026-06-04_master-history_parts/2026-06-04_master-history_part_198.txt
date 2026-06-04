@@ -1,0 +1,2000 @@
+﻿
+        If ordered.Count = 0 Then
+            Return pages
+        End If
+
+        If linesPerPage <= 0 Then
+            linesPerPage = 35
+        End If
+
+        For i As Integer = 0 To ordered.Count - 1 Step linesPerPage
+            Dim pageEntries = ordered.Skip(i).Take(linesPerPage).ToList()
+            Dim sb As New StringBuilder()
+
+            sb.AppendLine("Area Code Directory")
+            sb.AppendLine(New String("-"c, 46))
+            sb.AppendLine("Code   State  Location")
+            sb.AppendLine(New String("-"c, 46))
+
+            For Each item In pageEntries
+                sb.AppendLine(item.AreaCode.PadRight(6) &
+                              item.State.PadRight(7) &
+                              item.Location)
+            Next
+
+            pages.Add(sb.ToString())
+        Next
+
+        Return pages
+    End Function
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(CsvPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return CsvPath
+    End Function
+
+    Private Function LoadEntries() As List(Of AreaCodeEntry)
+        Dim results As New List(Of AreaCodeEntry)
+
+        If Not File.Exists(CsvPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(CsvPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("AreaCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New AreaCodeEntry With {
+                .AreaCode = parts(0).Trim(),
+                .State = parts(1).Trim().ToUpperInvariant(),
+                .Location = parts(2).Trim()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.AreaCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.Location) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+## Why this works
+Now `GetAllPages()` returns:
+
+```vb
+List(Of String)
+```
+
+which matches what `FrmRolodexMenu.vb` expects.
+
+Each string is one fully formatted page.
+
+---
+
+## Ignore the warning for now
+This warning is still unrelated:
+
+```text
+BC42025
+```
+
+It wonâ€™t stop the build unless warnings are being treated as errors.
+
+## Next step
+Replace the file, rebuild, and if thereâ€™s another mismatch, paste the next compile error and Iâ€™ll align the service exactly to the formâ€™s expectations.
+
+## @testsubject117
+
+don't I also need to copy an area codes data base file into \\invoice\mainmenu\data\phone?
+
+## Copilot
+
+Yes â€” **you absolutely do**.
+
+## Direct answer
+The code is looking for this file:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+So unless that file exists, the area code lookup will load **zero records**.
+
+---
+
+## What you need
+Create this file:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+with contents like:
+
+```csv
+AreaCode,State,Location
+201,NJ,Northern New Jersey
+202,DC,Washington
+203,CT,Southwestern Connecticut
+205,AL,Birmingham
+206,WA,Seattle
+207,ME,Maine
+208,ID,Idaho
+209,CA,Stockton Modesto
+210,TX,San Antonio
+212,NY,Manhattan
+213,CA,Los Angeles
+214,TX,Dallas
+215,PA,Philadelphia
+216,OH,Cleveland
+217,IL,Central Illinois
+218,MN,Northern Minnesota
+219,IN,Northwest Indiana
+224,IL,Northern Illinois
+225,LA,Baton Rouge
+228,MS,Mississippi Gulf Coast
+229,GA,Southwest Georgia
+231,MI,Northwest Michigan
+234,OH,Northeast Ohio
+239,FL,Southwest Florida
+240,MD,Western Maryland
+248,MI,Oakland County
+251,AL,Mobile
+252,NC,Eastern North Carolina
+253,WA,Tacoma
+254,TX,Waco
+256,AL,Huntsville
+260,IN,Northeast Indiana
+262,WI,Southeast Wisconsin
+267,PA,Philadelphia
+269,MI,Southwest Michigan
+270,KY,Western Kentucky
+272,PA,Northeast Pennsylvania
+274,WI,Wisconsin
+276,VA,Southwest Virginia
+281,TX,Houston
+301,MD,Western Maryland
+302,DE,Delaware
+303,CO,Denver
+304,WV,West Virginia
+305,FL,Miami
+310,CA,West Los Angeles
+312,IL,Chicago
+313,MI,Detroit
+314,MO,St Louis
+315,NY,Central New York
+316,KS,Wichita
+317,IN,Indianapolis
+318,LA,Northern Louisiana
+319,IA,Eastern Iowa
+320,MN,Central Minnesota
+321,FL,Space Coast
+323,CA,Los Angeles
+325,TX,Abilene
+330,OH,Akron Canton
+331,IL,Illinois
+334,AL,Montgomery
+336,NC,Triad
+337,LA,Southwest Louisiana
+339,MA,Massachusetts
+346,TX,Houston
+347,NY,New York City
+351,MA,Massachusetts
+352,FL,Gainesville
+360,WA,Western Washington
+361,TX,Corpus Christi
+364,KY,Kentucky
+380,OH,Ohio
+385,UT,Utah
+386,FL,Daytona Beach
+401,RI,Rhode Island
+402,NE,Nebraska
+403,AB,Southern Alberta
+404,GA,Atlanta
+405,OK,Oklahoma City
+406,MT,Montana
+407,FL,Orlando
+408,CA,San Jose
+409,TX,Beaumont
+410,MD,Baltimore
+412,PA,Pittsburgh
+413,MA,Western Massachusetts
+414,WI,Milwaukee
+415,CA,San Francisco
+416,ON,Toronto
+417,MO,Southwest Missouri
+419,OH,Northwest Ohio
+423,TN,East Tennessee
+424,CA,West Los Angeles
+425,WA,Eastside
+430,TX,Northeast Texas
+432,TX,West Texas
+434,VA,South Central Virginia
+435,UT,Utah
+440,OH,Northeast Ohio
+442,CA,California
+443,MD,Maryland
+447,IL,Illinois
+458,OR,Oregon
+463,IN,Indiana
+464,IL,Illinois
+469,TX,Dallas
+470,GA,Atlanta
+475,CT,Connecticut
+478,GA,Central Georgia
+479,AR,Northwest Arkansas
+480,AZ,East Phoenix
+484,PA,Southeast Pennsylvania
+501,AR,Little Rock
+502,KY,Louisville
+503,OR,Portland
+504,LA,New Orleans
+505,NM,New Mexico
+507,MN,Southern Minnesota
+508,MA,Central Massachusetts
+509,WA,Eastern Washington
+510,CA,East Bay
+512,TX,Austin
+513,OH,Cincinnati
+515,IA,Des Moines
+516,NY,Nassau County
+517,MI,Central Michigan
+518,NY,Capital Region
+520,AZ,Tucson
+530,CA,Northeast California
+531,NE,Nebraska
+534,WI,Wisconsin
+539,OK,Oklahoma
+540,VA,Northern Virginia
+541,OR,Oregon
+551,NJ,Northern New Jersey
+559,CA,Fresno
+561,FL,Palm Beach
+562,CA,Long Beach
+563,IA,Eastern Iowa
+567,OH,Ohio
+570,PA,Northeast Pennsylvania
+571,VA,Northern Virginia
+573,MO,Missouri
+574,IN,North Central Indiana
+575,NM,New Mexico
+580,OK,Western Oklahoma
+585,NY,Rochester
+586,MI,Macomb County
+601,MS,Mississippi
+602,AZ,Phoenix
+603,NH,New Hampshire
+604,BC,Vancouver
+605,SD,South Dakota
+606,KY,Eastern Kentucky
+607,NY,Southern Tier
+608,WI,Southwest Wisconsin
+609,NJ,South New Jersey
+610,PA,Southeast Pennsylvania
+612,MN,Minneapolis
+614,OH,Columbus
+615,TN,Nashville
+616,MI,Grand Rapids
+617,MA,Boston
+618,IL,Southern Illinois
+619,CA,San Diego
+620,KS,Kansas
+623,AZ,West Phoenix
+626,CA,Pasadena
+628,CA,San Francisco
+629,TN,Tennessee
+630,IL,West Suburban Chicago
+631,NY,Suffolk County
+636,MO,St Charles
+641,IA,Iowa
+646,NY,Manhattan
+650,CA,Peninsula
+651,MN,St Paul
+657,CA,Orange County
+660,MO,Missouri
+661,CA,Bakersfield
+662,MS,Mississippi
+667,MD,Maryland
+669,CA,San Jose
+678,GA,Atlanta
+681,WV,West Virginia
+682,TX,Fort Worth
+701,ND,North Dakota
+702,NV,Las Vegas
+703,VA,Northern Virginia
+704,NC,Charlotte
+706,GA,North Georgia
+707,CA,North Coast
+708,IL,Chicago Suburbs
+712,IA,Western Iowa
+713,TX,Houston
+714,CA,Orange County
+715,WI,Northern Wisconsin
+716,NY,Buffalo
+717,PA,South Central Pennsylvania
+718,NY,New York City
+719,CO,Colorado Springs
+720,CO,Denver
+724,PA,Western Pennsylvania
+725,NV,Las Vegas
+727,FL,Pinellas County
+730,IL,Illinois
+731,TN,West Tennessee
+732,NJ,Central New Jersey
+734,MI,Ann Arbor
+737,TX,Austin
+740,OH,Southeast Ohio
+743,NC,North Carolina
+747,CA,San Fernando Valley
+754,FL,Broward County
+757,VA,Hampton Roads
+760,CA,North San Diego
+762,GA,Georgia
+763,MN,Northwest Twin Cities
+765,IN,Indiana
+769,MS,Mississippi
+770,GA,Atlanta Suburbs
+772,FL,Treasure Coast
+773,IL,Chicago
+774,MA,Massachusetts
+775,NV,Nevada
+779,IL,Northern Illinois
+781,MA,Boston Suburbs
+785,KS,Topeka
+786,FL,Miami
+801,UT,Salt Lake City
+802,VT,Vermont
+803,SC,Columbia
+804,VA,Richmond
+805,CA,Ventura Santa Barbara
+806,TX,Texas Panhandle
+808,HI,Hawaii
+810,MI,Flint
+812,IN,Southern Indiana
+813,FL,Tampa
+814,PA,Central Pennsylvania
+815,IL,Northern Illinois
+816,MO,Kansas City
+817,TX,Fort Worth
+818,CA,San Fernando Valley
+828,NC,Western North Carolina
+830,TX,Texas Hill Country
+831,CA,Monterey Bay
+832,TX,Houston
+843,SC,Charleston
+845,NY,Hudson Valley
+847,IL,Northern Illinois
+848,NJ,Central New Jersey
+850,FL,Florida Panhandle
+854,SC,South Carolina
+856,NJ,South New Jersey
+857,MA,Boston
+858,CA,San Diego
+859,KY,Lexington
+860,CT,Hartford
+862,NJ,North New Jersey
+863,FL,Central Florida
+864,SC,Upstate South Carolina
+865,TN,Knoxville
+870,AR,Arkansas
+872,IL,Chicago
+878,PA,Western Pennsylvania
+901,TN,Memphis
+903,TX,Northeast Texas
+904,FL,Jacksonville
+906,MI,Upper Peninsula
+907,AK,Alaska
+908,NJ,Central New Jersey
+909,CA,Inland Empire
+910,NC,Fayetteville
+912,GA,Southeast Georgia
+913,KS,Kansas City
+914,NY,Westchester
+915,TX,El Paso
+916,CA,Sacramento
+917,NY,New York City
+918,OK,Tulsa
+919,NC,Raleigh
+920,WI,Northeast Wisconsin
+925,CA,East Bay
+928,AZ,Northern Arizona
+929,NY,New York City
+930,IN,Southern Indiana
+931,TN,Middle Tennessee
+934,NY,Long Island
+936,TX,East Texas
+937,OH,Dayton
+938,AL,North Alabama
+940,TX,Wichita Falls
+941,FL,Sarasota
+947,MI,Oakland County
+949,CA,Orange County
+951,CA,Riverside
+952,MN,Southwest Twin Cities
+954,FL,Broward County
+956,TX,Rio Grande Valley
+959,CT,Connecticut
+970,CO,Northern Colorado
+971,OR,Portland
+972,TX,Dallas
+973,NJ,North New Jersey
+978,MA,Northeast Massachusetts
+979,TX,Southeast Texas
+980,NC,Charlotte
+984,NC,Raleigh
+985,LA,Southeast Louisiana
+986,ID,Idaho
+989,MI,Northeast Michigan
+```
+
+---
+
+## Important note
+That sample is enough to test the feature, but it may not be:
+- perfectly current
+- perfectly complete
+- strictly US-only
+
+For example, it includes some Canadian province codes like:
+- `403`
+- `416`
+- `604`
+
+If you want this to behave like a US-only Rolodex utility, you may want to remove those.
+
+---
+
+## Recommendation
+For now:
+
+1. create `areacodes.csv`
+2. paste in the sample data
+3. save it to:
+   ```text
+   \\invoice\mainmenu\data\phone\areacodes.csv
+   ```
+4. test the app with:
+   - `818`
+   - `CA`
+   - `san`
+   - `new`
+
+---
+
+## Best next step
+If you want, I can next do one of these:
+
+1. give you a **smaller clean US-only starter file**
+2. help you find a **better master area code dataset**
+3. generate the **`FrmAreaCodePopup.vb`** file so the UI is ready too
+
+## @testsubject117
+
+oh, wait, I need to upload the screenshots of what dos does for this menu option. 
+
+## Copilot
+
+Yes â€” please upload the screenshots first.
+
+Thatâ€™s the right move, because the DOS behavior may tell us:
+
+- what the screen layout should look like
+- whether itâ€™s a searchable popup or paged directory
+- what commands/keys it expects
+- what data columns it shows
+- whether the results are grouped in a specific way
+
+## What to upload
+Ideally include:
+
+1. the **main area code lookup screen**
+2. a **search result screen**
+3. any **help/instruction text**
+4. any **paging or prompt screens**
+5. examples of:
+   - searching by area code
+   - searching by state
+   - searching by city/region
+
+## Why this matters
+Right now we can build a reasonable replacement, but the screenshots will let us match the DOS behavior more closely before you spend time wiring in the wrong UI.
+
+## Next step
+Upload the screenshots, and Iâ€™ll use them to map out exactly how the area code replacement should behave.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Yes â€” these screenshots are very helpful. Hereâ€™s what they show.
+
+## What the DOS area code tool does
+Itâ€™s a **text-based Area Code Finder** with this prompt:
+
+```text
+Enter Area Code to find city or 2 letter abreviation of state to find area code
+Example: California = CA
+
+[A = All] [Q = Quit] ?
+```
+
+So the original behavior supports:
+
+- **3-digit area code** â†’ find city/location
+- **2-letter state/province code** â†’ show area codes for that region
+- **A** â†’ show all entries
+- **Q** â†’ quit
+
+---
+
+## Output format
+The results are grouped by region code and region name, like:
+
+```text
+CA  California area code(s):
+   805 Bakersfield.
+   209 Fresno.
+   213 Los Angeles.
+   916 Sacramento.
+   619 San Diego.
+   415 San Francisco.
+```
+
+and later:
+
+```text
+CT  Connecticut area code(s):
+   203 All locations.
+```
+
+So the viewer is **grouped**, not just a flat list.
+
+---
+
+## Important behavior revealed by screenshots
+
+### 1. It supports **A = All**
+That means your replacement should definitely support:
+- entering `A`
+- displaying the whole directory
+
+### 2. It is **paged**
+The `-- More --` prompt shows:
+- the DOS program pauses after a screenful
+- then continues with additional grouped results
+
+So in the WinForms version, the equivalent would be:
+- one scrollable result window, or
+- page navigation
+
+I recommend **scrollable results**, because itâ€™s simpler and better.
+
+### 3. It groups results by **state/province heading**
+Instead of showing raw sorted lines, it formats them like:
+
+- `CA  California area code(s):`
+- indented entries beneath
+
+That means your current simple `AreaCode,State,Location` flat formatting is not enough if you want to mimic DOS more closely.
+
+### 4. It includes **Canada**
+The screenshots clearly show:
+
+```text
+CN  Canada area code(s):
+```
+
+with entries under it.
+
+So the original data is **not US-only**.
+
+---
+
+## What this means for your replacement
+We should revise the design a bit.
+
+## Better target behavior
+### Input behavior
+- `213` â†’ show `Los Angeles`
+- `CA` â†’ show California grouped listing
+- `A` â†’ show all grouped listings
+- `Q` â†’ close/cancel
+- possibly text location search as an enhancement, though DOS may not support it directly
+
+### Output behavior
+For state/all views, format like:
+
+```text
+CA  California area code(s):
+   805 Bakersfield.
+   209 Fresno.
+   213 Los Angeles.
+```
+
+For area-code lookup, probably:
+
+```text
+213 Los Angeles.
+```
+
+or maybe a small grouped section.
+
+---
+
+## Data model needs one more field
+To match DOS, I recommend changing the CSV from:
+
+```csv
+AreaCode,State,Location
+```
+
+to:
+
+```csv
+RegionCode,RegionName,AreaCode,Location
+```
+
+Example:
+
+```csv
+AL,Alabama,205,All locations.
+AK,Alaska,907,All locations.
+AZ,Arizona,602,All locations.
+CA,California,805,Bakersfield.
+CA,California,209,Fresno.
+CA,California,213,Los Angeles.
+CA,California,916,Sacramento.
+CA,California,619,San Diego.
+CA,California,415,San Francisco.
+CN,Canada,519,London, Ont..
+CN,Canada,514,Montreal, Quebec.
+```
+
+Though because some Canadian locations contain commas, weâ€™d either need:
+- quoted CSV parsing, or
+- use tab-delimited instead
+
+Simplest option: use **pipe-delimited** or **tab-delimited** instead of comma.
+
+---
+
+## Recommendation
+Before I generate the popup form, we should **adjust the area code service and data format** to match what the DOS screenshots actually do.
+
+## Best updated plan
+### Use a file like:
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+with columns:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+```
+
+Example:
+
+```text
+AL|Alabama|205|All locations.
+AK|Alaska|907|All locations.
+AZ|Arizona|602|All locations.
+AR|Arkansas|501|All locations.
+CA|California|805|Bakersfield.
+CA|California|209|Fresno.
+CA|California|213|Los Angeles.
+CA|California|916|Sacramento.
+CA|California|619|San Diego.
+CA|California|415|San Francisco.
+CN|Canada|519|London, Ont..
+CN|Canada|514|Montreal, Quebec.
+```
+
+That avoids CSV-comma problems.
+
+---
+
+## Summary of what the screenshots tell us
+The DOS tool is:
+
+- **prompt-driven**
+- supports **A / Q / 3-digit code / 2-letter region**
+- **grouped by state/province**
+- **paged**
+- includes **Canada**
+- displays region names, not just abbreviations
+
+---
+
+## My recommendation
+We should **rework the area code replacement to match this DOS behavior**, not just clone ZIPKEY search behavior.
+
+If you want, next I can generate:
+
+1. a new `AreaCodeEntry.vb`
+2. a revised `RolodexAreaCodeService.vb`
+3. designed for:
+   - `A`
+   - area code lookup
+   - 2-letter region lookup
+   - grouped formatted output like the DOS tool
+
+That is the best next step.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Hereâ€™s what these screenshots show.
+
+## Images 6 and 7
+These are additional **DOS Area Code Finder results pages**.
+
+They continue the paged `-- More --` listing and show grouped output by region:
+
+- `ID  Idaho area code(s):`
+- `IL  Illinois area code(s):`
+- `IN  Indiana area code(s):`
+- `IA  Iowa area code(s):`
+- `KS  Kansas area code(s):`
+- `KY  Kentucky area code(s):`
+- `LA  Louisiana area code(s):`
+- `ME  Maine area code(s):`
+- `MD  Maryland area code(s):`
+- `MA  Massachusetts area code(s):`
+- `MX  Mexico area code(s):`
+
+Each heading is followed by one or more indented area-code lines, for example:
+
+- `312 Chicago, Aurora, Waukegan.`
+- `217 Springfield.`
+- `502 Louisville, Frankfort, Paducah, Shelbyville.`
+
+### Important new detail
+These screenshots show the data includes **Mexico** too, not just:
+- U.S. states
+- Canada
+
+So the original area code tool is really a **North American area code directory**, not a US-only one.
+
+---
+
+## Images 8 and 9
+These are **ZIPKEY popup screens embedded inside your modern Rolodex app**, not the area-code tool.
+
+### Image 8
+This shows the Rolodex menu on the left and the embedded red ZIPKEY mockup panel on the right.
+
+The red popup says:
+
+- `ZIPKEY, V1.07e current to 06/89`
+- copyright Eric Isaacson
+- evaluation copy/register text
+- instructions:
+  - type a ZIP code
+  - a two-letter state code
+  - or `?` for city-only search
+  - `Esc` to exit
+
+So this confirms your ZIPKEY replacement is imitating the original embedded panel style.
+
+### Image 9
+This is the ZIPKEY popup after a successful lookup.
+
+It shows:
+
+- `State: CA California`
+- `City: SANTA CLARITA`
+- `Zip: 91380`
+
+Then:
+
+```text
+The city is:
+   Santa Clarita
+```
+
+And instructions:
+
+- `Enter` to confirm
+- `Up/Down-arrow for new state`
+- `Esc` to exit
+
+So this confirms your ZIPKEY mockup is using a **red DOS-style info panel** embedded in the menu screen.
+
+---
+
+## What these screenshots imply for area code lookup
+The area-code replacement probably should not be just a generic WinForms search popup.
+
+To match the appâ€™s style, it would ideally behave more like:
+
+- the ZIPKEY embedded mock panel
+- or a DOS-like fullscreen/panel viewer
+- with:
+  - `A = All`
+  - 2-letter region lookup
+  - 3-digit area code lookup
+  - grouped display by region
+  - scroll/page support
+
+And based on the area code screenshots, your data should support:
+- U.S.
+- Canada
+- Mexico
+
+---
+
+## Most important takeaways
+1. **Area Code Finder is grouped by region**
+2. It supports **All / region / area code**
+3. It includes **Canada and Mexico**
+4. Your appâ€™s modern replacements are being styled as **embedded red DOS-like panels**, at least for ZIPKEY
+5. So area code lookup should probably follow that same visual language if you want consistency
+
+## Recommendation
+Before generating more code, Iâ€™d adjust the plan to build the area code feature as:
+
+- a DOS-style embedded popup/panel
+- backed by a North American area code file
+- grouped by region code + region name
+- with `A`, `Q`, region, and area-code input behavior
+
+If you want, I can now generate the **correct data model and service code for that DOS-style area code behavior**, instead of the simpler CSV search version.
+
+## @testsubject117
+
+ok, disregard screenshots 8 and 9, somehow I got those zipkey screenshots mixed up with the area code ones
+
+## Copilot
+
+Got it â€” Iâ€™ll ignore **images 8 and 9**.
+
+## So the useful area code screenshots are:
+- **2**
+- **3**
+- **4**
+- **5**
+- **6**
+- **7**
+
+And those consistently show the DOS **Area Code Finder** behavior.
+
+## Confirmed behavior from those screenshots
+The area code tool:
+
+- prompts with:
+  - **3-digit area code**
+  - **2-letter state/province/country code**
+  - **A = All**
+  - **Q = Quit**
+- displays results in a **paged text listing**
+- groups by **region code + region name**
+- includes:
+  - U.S. states
+  - **Canada (`CN`)**
+  - **Mexico (`MX`)**
+
+## So the correct direction is
+We should build the area code replacement around that DOS behavior, not around the ZIPKEY red popup style.
+
+## Best design now
+### Input modes
+- `A` â†’ show all regions
+- `Q` â†’ close
+- `CA` â†’ show California area codes
+- `213` â†’ show the matching area code and location(s)
+
+### Display style
+A scrollable text results panel is still the best WinForms equivalent for the DOS `-- More --` pages.
+
+### Data format
+We should use a richer file than the earlier simple version.
+
+Recommended format:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+```
+
+Example:
+
+```text
+AL|Alabama|205|All locations.
+CA|California|805|Bakersfield.
+CA|California|209|Fresno.
+CA|California|213|Los Angeles.
+CA|California|916|Sacramento.
+CA|California|619|San Diego.
+CA|California|415|San Francisco.
+CN|Canada|519|London, Ont..
+MX|Mexico|905|Mexico.
+```
+
+That gives us:
+- grouping
+- region names
+- safe handling of commas in location text
+
+## Recommendation
+Yes â€” the right next step is to **replace the current area-code model/service with one based on the DOS screenshots**.
+
+If you want, Iâ€™ll now generate:
+1. a revised `AreaCodeEntry.vb`
+2. a revised `RolodexAreaCodeService.vb`
+3. using the grouped DOS-style data format and behavior
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” here are the revised files to match the DOS area code behavior.
+
+## 1) `AreaCodeEntry.vb`
+
+```vb name=AreaCodeEntry.vb
+Public Class AreaCodeEntry
+    Public Property RegionCode As String
+    Public Property RegionName As String
+    Public Property AreaCode As String
+    Public Property Location As String
+End Class
+```
+
+---
+
+## 2) `RolodexAreaCodeService.vb`
+
+This version supports:
+
+- `A` = all grouped listings
+- `CA` = grouped region lookup
+- `213` = area code lookup
+- `Q` can be handled by the form/menu
+- DOS-style grouped text output
+- `GetAllPages()` returns `List(Of String)` as your form expects
+
+```vb name=RolodexAreaCodeService.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+
+Public Class RolodexAreaCodeService
+
+    Private Shared ReadOnly DataPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+    Private ReadOnly _entries As List(Of AreaCodeEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(DataPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return DataPath
+    End Function
+
+    Public Function Search(input As String) As List(Of AreaCodeEntry)
+        Dim results As New List(Of AreaCodeEntry)
+
+        If String.IsNullOrWhiteSpace(input) Then
+            Return results
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            Return _entries.
+                OrderBy(Function(x) x.RegionCode).
+                ThenBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList()
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim regionCode = trimmed.ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) String.Equals(x.RegionCode, regionCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList()
+
+            Return results
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.AreaCode) AndAlso
+                                  x.AreaCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.RegionCode).
+                ThenBy(Function(x) x.Location).
+                ToList()
+
+            Return results
+        End If
+
+        Return results
+    End Function
+
+    Public Function FormatGroupedResults(entries As List(Of AreaCodeEntry)) As String
+        Dim sb As New StringBuilder()
+
+        If entries Is Nothing OrElse entries.Count = 0 Then
+            sb.AppendLine("No matches found.")
+            Return sb.ToString()
+        End If
+
+        Dim grouped = entries.
+            GroupBy(Function(x) New With {Key .RegionCode = x.RegionCode, Key .RegionName = x.RegionName}).
+            OrderBy(Function(g) g.Key.RegionCode)
+
+        For Each grp In grouped
+            sb.AppendLine(grp.Key.RegionCode & "  " & grp.Key.RegionName & " area code(s):")
+
+            For Each item In grp.OrderBy(Function(x) x.AreaCode).ThenBy(Function(x) x.Location)
+                sb.AppendLine("   " & item.AreaCode.PadRight(4) & " " & item.Location)
+            Next
+
+            sb.AppendLine()
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+    Public Function GetAllPages(Optional linesPerPage As Integer = 35) As List(Of String)
+        Dim pages As New List(Of String)
+
+        If linesPerPage <= 0 Then
+            linesPerPage = 35
+        End If
+
+        Dim allText = FormatGroupedResults(
+            _entries.
+                OrderBy(Function(x) x.RegionCode).
+                ThenBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList())
+
+        If String.IsNullOrWhiteSpace(allText) Then
+            Return pages
+        End If
+
+        Dim lines = allText.Replace(vbCrLf, vbLf).Split(ControlChars.Lf)
+        Dim current As New List(Of String)
+
+        For Each line In lines
+            current.Add(line)
+
+            If current.Count >= linesPerPage Then
+                pages.Add(String.Join(Environment.NewLine, current))
+                current.Clear()
+            End If
+        Next
+
+        If current.Count > 0 Then
+            pages.Add(String.Join(Environment.NewLine, current))
+        End If
+
+        Return pages
+    End Function
+
+    Private Function LoadEntries() As List(Of AreaCodeEntry)
+        Dim results As New List(Of AreaCodeEntry)
+
+        If Not File.Exists(DataPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(DataPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("RegionCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split("|"c)
+            If parts.Length < 4 Then Continue For
+
+            Dim entry As New AreaCodeEntry With {
+                .RegionCode = parts(0).Trim().ToUpperInvariant(),
+                .RegionName = parts(1).Trim(),
+                .AreaCode = parts(2).Trim(),
+                .Location = parts(3).Trim()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.RegionCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.RegionName) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.AreaCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.Location) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+## Required data file format
+This version expects:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+with **pipe-delimited** content like this:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+AL|Alabama|205|All locations.
+AK|Alaska|907|All locations.
+AZ|Arizona|602|All locations.
+AR|Arkansas|501|All locations.
+CA|California|805|Bakersfield.
+CA|California|209|Fresno.
+CA|California|213|Los Angeles.
+CA|California|916|Sacramento.
+CA|California|619|San Diego.
+CA|California|415|San Francisco.
+CA|California|707|Santa Rosa.
+CA|California|408|San Jose.
+CA|California|714|Orange.
+CN|Canada|519|London, Ont..
+CN|Canada|514|Montreal, Quebec.
+CN|Canada|403|Alberta.
+CN|Canada|613|Ottawa, Ont..
+CN|Canada|418|Quebec, Quebec.
+CN|Canada|306|Saskatchewan.
+CN|Canada|416|Toronto, Ont..
+CN|Canada|604|British Columbia.
+CN|Canada|204|Manitoba.
+CN|Canada|807|East Ontario.
+CN|Canada|705|West Ontario.
+CN|Canada|819|NW Quebec.
+CN|Canada|709|Newfoundland.
+CN|Canada|506|New Brunswick.
+CN|Canada|902|Nova Scotia, Prince Edward Island.
+CT|Connecticut|203|All locations.
+DC|District of Columbia|202|Washington.
+DE|Delaware|302|All locations.
+FL|Florida|813|Ft. Myers, Winter Haven.
+FL|Florida|904|Jacksonville.
+FL|Florida|305|Miami, Key West, Ft. Lauderdale.
+GA|Georgia|404|Atlanta, Rome.
+GA|Georgia|912|Waycross.
+HI|Hawaii|808|All locations.
+ID|Idaho|208|All locations.
+IL|Illinois|618|Alton, Mt. Vernon.
+IL|Illinois|312|Chicago, Aurora, Waukegan.
+IL|Illinois|815|Rockford.
+IL|Illinois|217|Springfield.
+IL|Illinois|309|Peoria.
+IN|Indiana|812|Evansville.
+IN|Indiana|219|Gary, South Bend, Warsaw.
+IN|Indiana|317|Indianapolis, Kokomo.
+IA|Iowa|712|Council Bluffs.
+IA|Iowa|515|Des Moines.
+IA|Iowa|319|Dubuque.
+KS|Kansas|316|Wichita, Dodge City.
+KS|Kansas|913|Topeka, Lawrence, Manhattan, Salina.
+KY|Kentucky|502|Louisville, Frankfort, Paducah, Shelbyville.
+KY|Kentucky|606|Winchester.
+LA|Louisiana|504|Baton Rouge, New Orleans.
+LA|Louisiana|318|Lake Charles.
+ME|Maine|207|All locations.
+MD|Maryland|301|All locations.
+MA|Massachusetts|617|Boston, New Bedford, Plymouth, Worchester.
+MA|Massachusetts|413|Springfield.
+MX|Mexico|905|All locations.
+```
+
+---
+
+## Important note
+This is based on the DOS screenshots and is meant to mimic **that older directory behavior**, not the modern full NANP directory yet.
+
+So this is a good compatibility starter file.
+
+## Next step
+If you want, I can now generate the **form-side code changes** needed so:
+
+- `A` shows all area code pages
+- `CA` shows California grouped results
+- `213` shows matching area code results
+- `Q` exits cleanly
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” hereâ€™s the next step.
+
+Because I havenâ€™t seen your current `FrmRolodexMenu.vb` code yet, the safest thing is to give you the **exact handler logic** to replace in the area-code branch, rather than guessing the whole file.
+
+## What this should do
+Based on the DOS screenshots, the Area Code option should support:
+
+- `A` â†’ show all grouped pages
+- `Q` â†’ cancel/exit
+- `CA` â†’ show California grouped results
+- `213` â†’ show matching area code results
+
+---
+
+## Add this helper method to `FrmRolodexMenu.vb`
+
+If you donâ€™t already have one for showing multiline text results, add this method inside the form class:
+
+```vb name=FrmRolodexMenu.vb
+Private Sub ShowAreaCodeResults(title As String, body As String)
+    MessageBox.Show(body, title, MessageBoxButtons.OK, MessageBoxIcon.Information)
+End Sub
+```
+
+If you already have a textbox/popup area for results, use that instead of `MessageBox.Show`.
+
+---
+
+## Replace your Area Code menu handling with this logic
+
+Find the code path that runs when the user selects:
+
+```text
+(G) Look up Area Codes
+```
+
+and replace the area-code lookup portion with this:
+
+```vb name=FrmRolodexMenu.vb
+Private Sub RunAreaCodeLookup()
+    Dim service As New RolodexAreaCodeService()
+
+    If Not service.DataFileExists() Then
+        MessageBox.Show("Area code data file not found:" & Environment.NewLine & service.GetDataFilePath(),
+                        "Area Code Finder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning)
+        Return
+    End If
+
+    Dim userInput As String = InputBox(
+        "Enter Area Code to find city or 2 letter abbreviation of state to find area code." &
+        Environment.NewLine & Environment.NewLine &
+        "[A = All] [Q = Quit]",
+        "Look Up Area Codes")
+
+    If String.IsNullOrWhiteSpace(userInput) Then
+        Return
+    End If
+
+    Dim trimmed = userInput.Trim()
+
+    If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+        Return
+    End If
+
+    If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+        Dim pages = service.GetAllPages()
+
+        If pages Is Nothing OrElse pages.Count = 0 Then
+            MessageBox.Show("No area code data found.",
+                            "Area Code Finder",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim allText As String = String.Join(Environment.NewLine & Environment.NewLine, pages)
+        ShowAreaCodeResults("Area Code Finder - All", allText)
+        Return
+    End If
+
+    Dim results = service.Search(trimmed)
+
+    If results Is Nothing OrElse results.Count = 0 Then
+        MessageBox.Show("No matches found.",
+                        "Area Code Finder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information)
+        Return
+    End If
+
+    Dim formatted = service.FormatGroupedResults(results)
+    ShowAreaCodeResults("Area Code Finder", formatted)
+End Sub
+```
+
+---
+
+## Then wire that method into your menu option
+Wherever your form currently handles the letter:
+
+```text
+G
+```
+
+call:
+
+```vb
+RunAreaCodeLookup()
+```
+
+For example, if you have a `Select Case`, it would look something like:
+
+```vb name=FrmRolodexMenu.vb
+Case "G"
+    RunAreaCodeLookup()
+```
+
+---
+
+## Very important limitation
+Using `MessageBox.Show` for long paged output is only a **temporary bridge**.
+
+It will work, but for `A = All` the content may become:
+- very long
+- cramped
+- not pleasantly scrollable
+
+## Better UI recommendation
+The real next step should be a dedicated form, something like:
+
+- `FrmAreaCodePopup.vb`
+
+with:
+- prompt/input box
+- large multiline results textbox
+- vertical scrollbar
+- DOS-like monospace formatting
+
+That would be much better than stuffing the results into a message box.
+
+---
+
+## So the practical path is
+### For right now
+Use the code above to get the feature working.
+
+### After that
+I strongly recommend I generate:
+
+**`FrmAreaCodePopup.vb`**
+
+so the results are shown properly in a scrollable UI.
+
+---
+
+## One more thing
+If your current `FrmRolodexMenu.vb` already expects a specific method signature or uses an existing popup pattern, I can make this fit exactly â€” but Iâ€™d need to see the relevant area-code section of that file.
+
+## Best next step
+If you want the cleanest result, send me the **area code section of `FrmRolodexMenu.vb`** around line 264, and Iâ€™ll adapt the code exactly to your existing structure.
+
+Or, if you prefer, I can skip that and generate the full **`FrmAreaCodePopup.vb`** now.
+
+## @testsubject117
+
+```
+Imports System.Diagnostics
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                OpenAreaCodes()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+here's the entire code for FrmRolodexMenu.vb: 
+
+## Copilot
+
+Perfect â€” now I can see exactly how your menu is wired.
+
+## Direct answer
+Your current `OpenAreaCodes()` always does this:
+
+```vb
+frm.SetPages(svc.GetAllPages())
+```
+
+So right now it **always shows the full paged listing** and never asks for:
+- `A`
+- `Q`
+- state code
+- area code
+
+That does **not** match the DOS screenshots yet.
+
+---
+
+## Best fix
+Change `OpenAreaCodes()` so it:
+
+1. prompts the user for input
+2. handles:
+   - `A` = all pages
+   - `Q` = quit
+   - `CA` = region results
+   - `213` = area code results
+3. sends the appropriate formatted text into `FrmPagedTextViewer`
+
+---
+
+## Replace only `OpenAreaCodes()` with this
+
+```vb name=FrmRolodexMenu.vb
+Private Sub OpenAreaCodes()
+    Dim svc As New RolodexAreaCodeService()
+
+    If Not svc.DataFileExists() Then
+        MessageBox.Show("Area code data file not found:" & Environment.NewLine & svc.GetDataFilePath(),
+                        "Area Code Finder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning)
+        Return
+    End If
+
+    Dim prompt As String =
+        "Enter Area Code to find city or 2 letter abbreviation of state to find area code" & Environment.NewLine &
+        "Example: California = CA" & Environment.NewLine & Environment.NewLine &
+        "[A = All] [Q = Quit] ?"
+
+    Dim userInput As String = InputBox(prompt, "LOOK UP AREA CODES")
+
+    If String.IsNullOrWhiteSpace(userInput) Then
+        Return
+    End If
+
+    Dim trimmed = userInput.Trim()
+
+    If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+        Return
+    End If
+
+    Using frm As New FrmPagedTextViewer()
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            Dim pages = svc.GetAllPages()
+
+            If pages Is Nothing OrElse pages.Count = 0 Then
+                MessageBox.Show("No area code data found.",
+                                "Area Code Finder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                Return
+            End If
+
+            frm.SetPages(pages)
+            frm.ShowDialog(Me)
+            Return
+        End If
+
+        Dim results = svc.Search(trimmed)
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            MessageBox.Show("No matches found.",
+                            "Area Code Finder",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim formatted As String = svc.FormatGroupedResults(results)
+        frm.SetPages(New List(Of String) From {formatted})
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## What this gives you
+Now the area-code option behaves much closer to DOS:
+
+- `A` â†’ full paged directory
+- `Q` â†’ exit
+- `CA` â†’ California area codes
+- `213` â†’ matching area code lookup
+- results shown in your existing paged viewer
+
+---
+
+## Why this fits your current form
+This works cleanly with your existing structure because:
+
+- you already have `FrmPagedTextViewer`
+- `SetPages()` already expects `List(Of String)`
+- your service already provides:
+  - `GetAllPages()`
+  - `Search()`
+  - `FormatGroupedResults()`
+
+So this is a minimal, safe change.
+
+---
+
+## One note about the DOS prompt wording
+I used:
+
+```text
+Enter Area Code to find city or 2 letter abbreviation of state to find area code
+Example: California = CA
+
+[A = All] [Q = Quit] ?
+```
+
+which matches the screenshots closely, with just corrected spelling for â€œabbreviationâ€.
+
+If you want exact DOS spelling, you can change it back to:
+
+```text
+abreviation
+```
+
+---
+
+## About `FrmPagedTextViewer`
+This solution assumes `FrmPagedTextViewer` can show:
+- one long page
+- or multiple pages
+
+If it works for the full listing already, it should also work for single-result/grouped displays.
+
+---
+
+## Recommendation
+Make this one change first:
+- replace `OpenAreaCodes()`
+
+Then test:
+- `A`
+- `CA`
+- `213`
+- `Q`
+
+If that works, the next polish step would be making the input prompt look more DOS-like instead of using a VB `InputBox`.
+
+If you want, I can help with that next.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30451	'OpenZipKey' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	135	
+
+
+## Copilot
+
+`OpenZipKey()` got dropped or moved when you edited `FrmRolodexMenu.vb`.
+
+## Direct fix
+Make sure this method exists inside the `FrmRolodexMenu` class:
+
+```vb name=FrmRolodexMenu.vb
+Private Sub OpenZipKey()
+    Using frm As New FrmZipKeyPopup()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## Why you got this error
+Your menu handler still contains:
+
+```vb
+Case "H"c
+    OpenZipKey()
+```
+
+So if the `OpenZipKey` method is missing, misspelled, or placed outside the class, youâ€™ll get:
+
+```text
+BC30451 'OpenZipKey' is not declared
+```
+
+---
+
+## Check these 3 things
+### 1. The method exists
+It must be present exactly as:
+
+```vb
+Private Sub OpenZipKey()
+```
+
+### 2. It is inside `Public Class FrmRolodexMenu`
+It must appear before the final:
+
+```vb
+End Class
+```
+
+### 3. The name matches exactly
+This works:
+
+```vb
+OpenZipKey
+```
+
+These would fail:
+- `OpenZIPKey`
+- `OpenZipcode`
+- `OpenZipKeys`
+
+---
+
+## Best placement
+Put it near `OpenAreaCodes()`.
+
+For example:
+
+```vb name=FrmRolodexMenu.vb
+Private Sub OpenAreaCodes()
+    Dim svc As New RolodexAreaCodeService()
+
+    If Not svc.DataFileExists() Then
+        MessageBox.Show("Area code data file not found:" & Environment.NewLine & svc.GetDataFilePath(),
+                        "Area Code Finder",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning)
+        Return
+    End If
+
+    Dim prompt As String =
+        "Enter Area Code to find city or 2 letter abbreviation of state to find area code" & Environment.NewLine &
+        "Example: California = CA" & Environment.NewLine & Environment.NewLine &
+        "[A = All] [Q = Quit] ?"
+
+    Dim userInput As String = InputBox(prompt, "LOOK UP AREA CODES")
+
+    If String.IsNullOrWhiteSpace(userInput) Then
+        Return
+    End If
+
+    Dim trimmed = userInput.Trim()
+
+    If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+        Return
+    End If
+
+    Using frm As New FrmPagedTextViewer()
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            Dim pages = svc.GetAllPages()
+
+            If pages Is Nothing OrElse pages.Count = 0 Then
+                MessageBox.Show("No area code data found.",
+                                "Area Code Finder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                Return
+            End If
+
+            frm.SetPages(pages)
+            frm.ShowDialog(Me)
+            Return
+        End If
+
+        Dim results = svc.Search(trimmed)
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            MessageBox.Show("No matches found.",
+                            "Area Code Finder",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+            Return
+        End If
+
+        Dim formatted As String = svc.FormatGroupedResults(results)
+        frm.SetPages(New List(Of String) From {formatted})
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+
+Private Sub OpenZipKey()
