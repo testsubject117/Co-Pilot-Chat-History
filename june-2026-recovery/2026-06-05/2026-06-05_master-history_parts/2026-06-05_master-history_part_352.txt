@@ -1,0 +1,2000 @@
+﻿
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                OpenLogBook()
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub OpenLogBook()
+        ' Simple year prompt so you can proceed immediately.
+        ' ENTER/blank defaults to current year.
+        Try
+            Dim defaultYear As Integer = DateTime.Now.Year ' e.g. 2026
+            Dim input As String = Microsoft.VisualBasic.Interaction.InputBox(
+                "Enter year (ENTER = current year):",
+                "LOG BOOK",
+                defaultYear.ToString()
+            )
+
+            ' If user cancelled, InputBox returns "" -> treat as default year (DOS-like Enter).
+            Dim chosenYear As Integer = defaultYear
+            If Not String.IsNullOrWhiteSpace(input) Then
+                Dim n As Integer
+                If Integer.TryParse(input.Trim(), n) Then
+                    chosenYear = n
+                End If
+            End If
+
+            Dim twoDigit As Integer
+            If chosenYear >= 0 AndAlso chosenYear <= 99 Then
+                twoDigit = chosenYear
+            Else
+                twoDigit = chosenYear Mod 100
+            End If
+
+            Using f As New FormLogBookMenu(twoDigit)
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to open Log Book:" & Environment.NewLine & ex.Message,
+                            "LOG BOOK",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a thicker border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            ' Keep border inside bounds so it is fully visible; account for pen thickness
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## Notes / expected behavior
+- Press **E** â†’ youâ€™ll get a small â€œEnter yearâ€ prompt.
+  - Leave it blank/cancel â†’ defaults to current year (like DOS Enter).
+  - Enter `2026` or `26` â†’ opens Year 26.
+- Then press **1** in the Log Book menu â†’ type a customer prefix like `PSI` or `PSIBEARI` â†’ Enter.
+- Viewer shows one entry per page; **ENTER** pages; **ESC** exits viewer; returns to log book menu.
+
+## Next improvement (optional but recommended)
+If you want, next we can replace the `InputBox` year prompt with the same **bottom DOS prompt bar** pattern you already have for `J` (so it looks/feels consistent).
+
+## @testsubject117
+
+ok, now it pops up a dialogue window that looks like windows not dos: if I click ok, to accept 2026, a new window pops up with a listing that looks like the log book menu, however, everything is highlighted in blue: 
+
+## Copilot
+
+## Fixes
+1) The â€œWindows-lookingâ€ year dialog is because we used `Interaction.InputBox`. We can replace it with a DOS-style year prompt later (bottom bar + typed input), but first letâ€™s fix the **blue highlight** issue.
+2) The blue highlight happens because the screen is a **TextBox** and itâ€™s selecting text / showing selection focus.
+
+### Quick fix for the blue highlight (recommended)
+In `FormLogBookMenu`, after you set `_txtScreen.Text`, force the caret/selection to the start and hide selection:
+
+- `_txtScreen.SelectionStart = 0`
+- `_txtScreen.SelectionLength = 0`
+- `_txtScreen.HideSelection = True`
+- also ensure `_txtScreen.ShortcutsEnabled = False` (prevents Ctrl+A selecting all)
+
+Iâ€™ll give you a full-file replacement for `FormLogBookMenu.vb` with those changes.
+
+---
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly _txtScreen As TextBox
+    Private ReadOnly _txtPrompt As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        _txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False
+        }
+
+        _txtPrompt = New TextBox() With {
+            .Multiline = False,
+            .Dock = DockStyle.Bottom,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font
+        }
+
+        Me.Controls.Add(_txtScreen)
+        Me.Controls.Add(_txtPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler _txtPrompt.KeyDown, AddressOf OnPromptKeyDown
+
+        ' Prevent any initial selection highlight
+        AddHandler _txtScreen.GotFocus, Sub()
+                                           ClearScreenSelection()
+                                           ' keep menu-key handling on the form
+                                           Me.Focus()
+                                       End Sub
+    End Sub
+
+    Private Sub ClearScreenSelection()
+        Try
+            _txtScreen.SelectionStart = 0
+            _txtScreen.SelectionLength = 0
+        Catch
+            ' ignore
+        End Try
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        _mode = InputMode.Menu
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        _txtScreen.Text = sb.ToString()
+        ClearScreenSelection()
+
+        _txtPrompt.Text = ""
+        _txtPrompt.Visible = False
+
+        ' Focus the form so keypresses go to menu handling, not the textbox.
+        Me.ActiveControl = Nothing
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowBottomPrompt(prompt As String)
+        _txtPrompt.Visible = True
+        _txtPrompt.Text = ""
+        _txtPrompt.Focus()
+
+        RenderMenu(prompt)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode = InputMode.Menu Then
+            Select Case e.KeyCode
+                Case Keys.D1, Keys.NumPad1
+                    _mode = InputMode.ViewOneCustomerPrompt
+                    ShowBottomPrompt("CUSTOMER NAME?")
+                    e.Handled = True
+                    Return
+
+                Case Keys.Q
+                    Me.Close()
+                    e.Handled = True
+                    Return
+            End Select
+        End If
+    End Sub
+
+    Private Sub OnPromptKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = _txtPrompt.Text.Trim()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu("CUSTOMER NAME? (blank cancelled)")
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Dim v As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+            v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Dim v As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+            v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Dim viewer As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+        viewer.SetPages(pages)
+        viewer.ShowDialog(Me)
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+---
+
+## About the year dialog looking â€œWindowsâ€
+Thatâ€™s expected for now because `InputBox` is a standard Windows dialog. Next step (after option 1 is confirmed working) Iâ€™ll replace that with a small **DOS-style year prompt form** (black background, bottom prompt, no Windows-looking controls), or we can even reuse your main menu bottom prompt system.
+
+Tell me:
+1) Does the blue highlight go away with this file?
+2) When you press `1`, does it prompt and show entries as expected?
+
+## @testsubject117
+
+if I pick (1) View one customer it doesn't allow me to type.
+
+## Copilot
+
+Youâ€™re hitting a focus/keyboard routing bug: when you press `1` we *do* show the prompt textbox, but then `ShowBottomPrompt()` calls `RenderMenu()`, and `RenderMenu()` currently clears focus (`Me.ActiveControl = Nothing` + `Me.Focus()`), which steals focus back from the prompt textboxâ€”so you canâ€™t type.
+
+Fix: **donâ€™t force focus to the form when the prompt is active**. Also, render the menu text *before* focusing the prompt.
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+- **File type:** Windows Forms Form
+- **What changed:** `RenderMenu()` accepts a `focusPrompt` flag; `ShowBottomPrompt()` renders without stealing focus; prompt textbox always keeps focus while prompting.
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly _txtScreen As TextBox
+    Private ReadOnly _txtPrompt As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        _txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False
+        }
+
+        _txtPrompt = New TextBox() With {
+            .Multiline = False,
+            .Dock = DockStyle.Bottom,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Visible = False
+        }
+
+        Me.Controls.Add(_txtScreen)
+        Me.Controls.Add(_txtPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler _txtPrompt.KeyDown, AddressOf OnPromptKeyDown
+
+        ' Stop the screen textbox from ever keeping selection focus.
+        AddHandler _txtScreen.GotFocus, Sub()
+                                           ClearScreenSelection()
+                                           If _txtPrompt.Visible Then
+                                               _txtPrompt.Focus()
+                                           Else
+                                               Me.ActiveControl = Nothing
+                                           End If
+                                       End Sub
+    End Sub
+
+    Private Sub ClearScreenSelection()
+        Try
+            _txtScreen.SelectionStart = 0
+            _txtScreen.SelectionLength = 0
+        Catch
+        End Try
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "", Optional focusPrompt As Boolean = False)
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        _txtScreen.Text = sb.ToString()
+        ClearScreenSelection()
+
+        If focusPrompt Then
+            _txtPrompt.Visible = True
+            _txtPrompt.Focus()
+        Else
+            _txtPrompt.Text = ""
+            _txtPrompt.Visible = False
+            Me.ActiveControl = Nothing
+        End If
+    End Sub
+
+    Private Sub ShowBottomPrompt(prompt As String)
+        _txtPrompt.Text = ""
+        _mode = InputMode.ViewOneCustomerPrompt
+
+        ' Render menu with prompt line, and keep focus in the prompt textbox so typing works.
+        RenderMenu(promptLine:=prompt, focusPrompt:=True)
+    End Sub
+
+    Private Sub ReturnToMenu()
+        _mode = InputMode.Menu
+        RenderMenu()
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode <> InputMode.Menu Then
+            ' If prompting, let the prompt textbox handle input.
+            Return
+        End If
+
+        Select Case e.KeyCode
+            Case Keys.D1, Keys.NumPad1
+                ShowBottomPrompt("CUSTOMER NAME?")
+                e.Handled = True
+                Return
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+                Return
+        End Select
+    End Sub
+
+    Private Sub OnPromptKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            ReturnToMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = _txtPrompt.Text.Trim()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            ' Cancel like DOS: return to menu.
+            ReturnToMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ReturnToMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ReturnToMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ReturnToMenu()
+    End Sub
+End Class
+```
+
+### After you paste this:
+- Open Log Book menu
+- Press `1` â†’ cursor should be in the bottom input line and you can type
+- `Enter` runs search
+- `Esc` cancels back to menu
+
+If typing still doesnâ€™t work, tell me **whether the caret shows in the bottom line** when you press `1`â€”that will tell us if the prompt textbox is visible but not focused vs not visible at all.
+
+## @testsubject117
+
+ok, yes, the blue highlight disappeared now. for the text, you have it at the bottom of the screen. that's not where the users for this menu are used to typing. in the original dos menu, that text field for them to type into appears directly next to Customer Name?
+
+## Copilot
+
+Youâ€™re right: DOS shows the input **on the same line as the prompt** (e.g., `CUSTOMER NAME? _`), not in a separate bottom textbox.
+
+### Simple DOS-faithful approach in WinForms
+Use **one single-line textbox** positioned at the exact row/column where the cursor should be, and draw the prompt as normal text in the â€œscreenâ€ textbox.
+
+So for option (1):
+- The big â€œscreenâ€ textbox remains read-only (black background).
+- When prompting, we:
+  1) render the menu + a line `CUSTOMER NAME?`
+  2) measure where that prompt ends
+  3) place a small textbox **immediately after it** (same line)
+- When not prompting, we hide that input textbox.
+
+This will look/feel like DOS.
+
+Below is a **FULL FILE replacement** for `FormLogBookMenu.vb` implementing that.
+
+---
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' DOS "screen"
+    Private ReadOnly _txtScreen As TextBox
+
+    ' Inline input box (appears right after prompt text)
+    Private ReadOnly _txtInlineInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        _txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        ' Inline input overlays on top of the "screen"
+        _txtInlineInput = New TextBox() With {
+            .Multiline = False,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Visible = False
+        }
+
+        Me.Controls.Add(_txtScreen)
+        Me.Controls.Add(_txtInlineInput)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler _txtInlineInput.KeyDown, AddressOf OnInlineInputKeyDown
+
+        ' Keep the screen from showing selection highlight
+        AddHandler _txtScreen.GotFocus, Sub()
+                                           ClearScreenSelection()
+                                           If _txtInlineInput.Visible Then
+                                               _txtInlineInput.Focus()
+                                           Else
+                                               Me.ActiveControl = Nothing
+                                           End If
+                                       End Sub
+
+        AddHandler Me.Resize, Sub() If _txtInlineInput.Visible Then PositionInlineInputAfterPrompt()
+    End Sub
+
+    Private Sub ClearScreenSelection()
+        Try
+            _txtScreen.SelectionStart = 0
+            _txtScreen.SelectionLength = 0
+        Catch
+        End Try
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        _mode = InputMode.Menu
+
+        HideInlineInput()
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        _txtScreen.Text = sb.ToString()
+        ClearScreenSelection()
+
+        Me.ActiveControl = Nothing
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowInlinePrompt(prompt As String)
+        ' Render the menu with the prompt line,
+        ' then overlay an input box right after the prompt text.
+        _mode = InputMode.ViewOneCustomerPrompt
+
+        HideInlineInput()
+        RenderMenu(promptLine:=prompt)
+
+        _txtInlineInput.Text = ""
+        _txtInlineInput.Visible = True
+
+        PositionInlineInputAfterPrompt()
+
+        _txtInlineInput.Focus()
+    End Sub
+
+    Private Sub HideInlineInput()
+        _txtInlineInput.Visible = False
+        _txtInlineInput.Text = ""
+    End Sub
+
+    Private Sub PositionInlineInputAfterPrompt()
+        ' Place the inline textbox on the last line, immediately after the prompt text.
+        ' This is a simple monospaced approximation that works well with Consolas.
+        Dim promptText As String = "CUSTOMER NAME?"
+        Dim screenText As String = _txtScreen.Text
+
+        If String.IsNullOrEmpty(screenText) Then Return
+        If Not _txtInlineInput.Visible Then Return
+
+        ' Find last occurrence of the prompt line (should be last line)
+        Dim idx As Integer = screenText.LastIndexOf(promptText, StringComparison.OrdinalIgnoreCase)
+        If idx < 0 Then
+            ' Fallback: bottom-left
+            _txtInlineInput.Left = _txtScreen.Left + 10
+            _txtInlineInput.Top = _txtScreen.Top + _txtScreen.Height - (_txtInlineInput.Height + 10)
+            _txtInlineInput.Width = 250
+            Return
+        End If
+
+        ' Determine row/col from idx
+        Dim before As String = screenText.Substring(0, idx)
+        Dim lineCount As Integer = 0
+        Dim lastLineStart As Integer = before.LastIndexOf(vbCrLf, StringComparison.Ordinal)
+        If lastLineStart < 0 Then
+            lineCount = 0
+        Else
+            lineCount = before.Split(New String() {vbCrLf}, StringSplitOptions.None).Length - 1
+        End If
+
+        ' Column where input starts = prompt length + 1 space
+        Dim inputCol As Integer = promptText.Length + 1
+
+        ' Convert row/col to pixel position (monospace approximation)
+        Dim charSize As Size = TextRenderer.MeasureText("W", _txtScreen.Font, New Size(Integer.MaxValue, Integer.MaxValue), TextFormatFlags.NoPadding)
+        Dim lineHeight As Integer = charSize.Height
+        Dim charWidth As Integer = charSize.Width
+
+        ' Account for textbox internal margins: approximate with small padding
+        Dim padLeft As Integer = 6
+        Dim padTop As Integer = 6
+
+        Dim x As Integer = _txtScreen.Left + padLeft + (inputCol * charWidth)
+        Dim y As Integer = _txtScreen.Top + padTop + (lineCount * lineHeight)
+
+        ' Clamp inside client area
+        If x < 0 Then x = 0
+        If y < 0 Then y = 0
+
+        _txtInlineInput.Left = x
+        _txtInlineInput.Top = y
+        _txtInlineInput.Height = lineHeight
+        _txtInlineInput.Width = Math.Max(200, Me.ClientSize.Width - x - 30)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode <> InputMode.Menu Then
+            Return
+        End If
+
+        Select Case e.KeyCode
+            Case Keys.D1, Keys.NumPad1
+                ShowInlinePrompt("CUSTOMER NAME?")
+                e.Handled = True
+                Return
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+                Return
+        End Select
+    End Sub
+
+    Private Sub OnInlineInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = _txtInlineInput.Text.Trim()
+        HideInlineInput()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+### Notes
+- This should make typing appear **right next to** `CUSTOMER NAME?` like DOS.
+- Because weâ€™re overlaying a textbox, the positioning depends on monospace font metrics; it should be close with Consolas. If itâ€™s a few pixels off, tell me (and tell me your Windows scaling / DPI setting), and Iâ€™ll tweak the padding/math.
+
+If you want, next we can also remove/hide the unused menu items (5 and 9/U) to match what users actually do.
+
+## @testsubject117
+
+nope, not seeing typing anywhere on the screen
+
+## Copilot
+
+The inline textbox **is there**, but itâ€™s getting positioned off-screen (or under the big textbox) because the â€œrow/col â†’ pixelâ€ math is too fragile in a WinForms TextBox (margins/scroll offsets/DPI). Letâ€™s switch to a *reliable* DOS-style layout:
+
+- Use a **Panel** as the â€œscreenâ€
+- Draw the menu text in a **Label** (monospace)
+- Place the input **TextBox** right next to the prompt label in a bottom row
+
+This will look like DOS (prompt + input on same line) and will always be visible.
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+- **File type:** Windows Forms Form
+- **What this does:** Menu rendered in a big label; when you press `1`, a prompt line appears like:
+  `CUSTOMER NAME?  [typing here]`
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' "Screen" container
+    Private ReadOnly pnlScreen As Panel
+    Private ReadOnly lblScreen As Label
+
+    ' Prompt row (DOS-style: prompt text + input on same line)
+    Private ReadOnly pnlPromptRow As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        pnlScreen = New Panel() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black
+        }
+
+        lblScreen = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .TextAlign = ContentAlignment.TopLeft,
+            .AutoSize = False
+        }
+
+        pnlScreen.Controls.Add(lblScreen)
+
+        pnlPromptRow = New Panel() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 30,
+            .BackColor = Color.Black,
+            .Visible = False
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 10,
+            .Top = 6,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 10,
+            .Top = 6,
+            .Width = 400
+        }
+
+        pnlPromptRow.Controls.Add(lblPrompt)
+        pnlPromptRow.Controls.Add(txtInput)
+
+        Me.Controls.Add(pnlScreen)
+        Me.Controls.Add(pnlPromptRow)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        _mode = InputMode.Menu
+        HidePromptRow()
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        lblScreen.Text = sb.ToString()
+
+        Me.ActiveControl = Nothing
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowPromptRow(prompt As String)
+        pnlPromptRow.Visible = True
+        lblPrompt.Text = prompt & " "
+
+        ' Position input immediately after the prompt label
+        Dim promptWidth As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = lblPrompt.Left + promptWidth
+        txtInput.Width = Math.Max(200, Me.ClientSize.Width - txtInput.Left - 30)
+
+        txtInput.Text = ""
+        txtInput.Focus()
+    End Sub
+
+    Private Sub HidePromptRow()
+        pnlPromptRow.Visible = False
+        lblPrompt.Text = ""
+        txtInput.Text = ""
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode <> InputMode.Menu Then Return
+
+        Select Case e.KeyCode
+            Case Keys.D1, Keys.NumPad1
+                _mode = InputMode.ViewOneCustomerPrompt
+                RenderMenu("CUSTOMER NAME?")
+                ShowPromptRow("CUSTOMER NAME?")
+                e.Handled = True
+                Return
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+                Return
+        End Select
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        HidePromptRow()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+### What you should see now
+- Press `1`
+- The screen shows `CUSTOMER NAME?` and the **cursor is immediately after it** on the same line (DOS-like)
+- You can type `PSIBEARI` and press Enter
+
+If this still doesnâ€™t show typing, tell me: when you press `1`, do you see a **thin input cursor** anywhere on the window? And are you running at non-100% DPI scaling (e.g., 125% / 150%)?
+
+## @testsubject117
+
+now customer name is appear 2 times. once at the top where it belongs, then once at the bottom and I can type next to it, but the typing needs to be up next to the actual real prompt for customer name, not at the bottom: 
+
+## Copilot
+
+Youâ€™re seeing it twice because weâ€™re currently doing **both**:
+- printing `CUSTOMER NAME?` into the main screen text (near the top), **and**
+- showing a separate prompt row at the bottom with `CUSTOMER NAME?` + textbox.
+
+To match DOS, we should do this instead:
+
+- Keep the `CUSTOMER NAME?` line **in the screen text** (where it belongs).
+- Overlay the input textbox **at the same Y-position** as that on-screen prompt line, immediately after the prompt text.
+- Remove the bottom prompt row entirely.
+
+That gives you: `CUSTOMER NAME? psibeari` on the correct line.
+
+Below is a full replacement of `FormLogBookMenu.vb` that:
+- renders the â€œscreenâ€ as a **Label** (monospace)
+- when prompting, finds the **pixel location** of the `CUSTOMER NAME?` line inside the label and overlays a textbox right there
+- no bottom prompt duplication
+
+---
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen container + text
+    Private ReadOnly pnlScreen As Panel
+    Private ReadOnly lblScreen As Label
+
+    ' Inline overlay input (positioned next to the prompt line in the label)
+    Private ReadOnly txtInline As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+    Private _activePromptText As String = ""
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        pnlScreen = New Panel() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black
+        }
+
+        lblScreen = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .TextAlign = ContentAlignment.TopLeft,
+            .AutoSize = False
+        }
+
+        txtInline = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Visible = False
+        }
+
+        pnlScreen.Controls.Add(lblScreen)
+        pnlScreen.Controls.Add(txtInline)
+
+        Me.Controls.Add(pnlScreen)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler txtInline.KeyDown, AddressOf OnInlineKeyDown
+        AddHandler Me.Resize, Sub() If txtInline.Visible Then PositionInlineTextbox()
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        HideInline()
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        lblScreen.Text = sb.ToString()
+
+        _mode = InputMode.Menu
+        _activePromptText = ""
+        Me.ActiveControl = Nothing
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowPromptInline(prompt As String)
+        ' Put the prompt in the screen text, and overlay the textbox next to it.
+        _mode = InputMode.ViewOneCustomerPrompt
+        _activePromptText = prompt
+
+        RenderMenu(promptLine:=prompt)
+
+        txtInline.Text = ""
+        txtInline.Visible = True
+
+        PositionInlineTextbox()
+        txtInline.Focus()
+    End Sub
+
+    Private Sub HideInline()
+        txtInline.Visible = False
+        txtInline.Text = ""
+    End Sub
+
+    Private Sub PositionInlineTextbox()
+        If Not txtInline.Visible Then Return
+        If String.IsNullOrWhiteSpace(_activePromptText) Then Return
+
+        Dim fullText As String = If(lblScreen.Text, "")
+        Dim idx As Integer = fullText.LastIndexOf(_activePromptText, StringComparison.OrdinalIgnoreCase)
+        If idx < 0 Then
+            ' Fallback: top-left
+            txtInline.Left = 10
+            txtInline.Top = 10
+            txtInline.Width = 400
+            Return
+        End If
+
+        ' Determine the line number containing the prompt
+        Dim before As String = fullText.Substring(0, idx)
+        Dim linesBefore As String() = before.Split(New String() {vbCrLf}, StringSplitOptions.None)
+        Dim lineIndex As Integer = linesBefore.Length - 1
+
+        ' For monospaced font: we can compute x by prompt length.
+        ' We'll put the textbox after: prompt + space
+        Dim col As Integer = _activePromptText.Length + 1
+
+        Dim charW As Integer = TextRenderer.MeasureText("W", lblScreen.Font, New Size(Integer.MaxValue, Integer.MaxValue), TextFormatFlags.NoPadding).Width
+        Dim lineH As Integer = TextRenderer.MeasureText("W", lblScreen.Font, New Size(Integer.MaxValue, Integer.MaxValue), TextFormatFlags.NoPadding).Height
+
+        ' Label has no padding; use a small inset so it lines up visually.
+        Dim insetX As Integer = 8
+        Dim insetY As Integer = 6
+
+        Dim x As Integer = insetX + (col * charW)
+        Dim y As Integer = insetY + (lineIndex * lineH)
+
+        ' Place relative to label within the panel
+        txtInline.Left = lblScreen.Left + x
+        txtInline.Top = lblScreen.Top + y
+        txtInline.Height = lineH
+        txtInline.Width = Math.Max(250, pnlScreen.ClientSize.Width - txtInline.Left - 20)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode <> InputMode.Menu Then Return
+
+        Select Case e.KeyCode
+            Case Keys.D1, Keys.NumPad1
+                ShowPromptInline("CUSTOMER NAME?")
+                e.Handled = True
+                Return
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+                Return
+        End Select
+    End Sub
+
+    Private Sub OnInlineKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInline.Text.Trim()
+        HideInline()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+### One caveat (important)
+This uses a monospaced â€œgrid mathâ€ again, but *this time itâ€™s stable* because:
+- the label is not scrollable
+- thereâ€™s no hidden padding like a TextBox control adds internally
+
+If the textbox is still a few pixels off from the prompt, tell me:
+- your Windows display scaling (100% / 125% / 150%)
+and Iâ€™ll adjust `insetX/insetY` to match perfectly.
+
+Also: once this is correct, we can remove unused menu items (5) and (9) per user feedback.
+
+## @testsubject117
+
+nope, no text or typing again
+
+## Copilot
+
+The textbox is being added, but itâ€™s almost certainly ending up **behind the label** (z-order). In WinForms, controls are painted in the order theyâ€™re added: the last added is on top. In the current file we add the label first, then the textbox, *but* `Dock = Fill` on the label can still visually cover the textbox unless we explicitly bring the textbox to front.
+
+So the fix is:
+- after making the textbox visible and positioning it, call `txtInline.BringToFront()`
+- also ensure the label doesnâ€™t steal focus by clicking (optional)
+
+Iâ€™ll give you a corrected full file with that, and also an additional safety: if prompt positioning fails, weâ€™ll place the textbox at a clearly visible fallback position.
+
+## Replace the entire file: `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen container + text
+    Private ReadOnly pnlScreen As Panel
+    Private ReadOnly lblScreen As Label
+
+    ' Inline overlay input (positioned next to the prompt line)
+    Private ReadOnly txtInline As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+    Private _activePromptText As String = ""
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        pnlScreen = New Panel() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black
+        }
+
+        lblScreen = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .TextAlign = ContentAlignment.TopLeft,
+            .AutoSize = False
+        }
+
+        txtInline = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Visible = False,
+            .TabStop = True
+        }
+
+        ' Add label first, then textbox, and force textbox to front when used.
+        pnlScreen.Controls.Add(lblScreen)
+        pnlScreen.Controls.Add(txtInline)
+
+        Me.Controls.Add(pnlScreen)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler txtInline.KeyDown, AddressOf OnInlineKeyDown
+        AddHandler Me.Resize, Sub() If txtInline.Visible Then PositionInlineTextbox()
+
+        ' Prevent clicking the label from trapping focus (optional)
+        AddHandler lblScreen.Click, Sub()
+                                        If txtInline.Visible Then
+                                            txtInline.Focus()
+                                        Else
+                                            Me.ActiveControl = Nothing
+                                            Me.Focus()
+                                        End If
+                                    End Sub
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        HideInline()
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        lblScreen.Text = sb.ToString()
