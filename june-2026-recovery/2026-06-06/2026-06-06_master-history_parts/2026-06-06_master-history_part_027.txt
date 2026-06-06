@@ -1,0 +1,2000 @@
+﻿- [ ] Use `AMiDataStore` as the behavioral truth source
+- [ ] Reconfirm DOS Add Checks prompt order and operator flow
+- [ ] Reconfirm `REALNAME.DAT` and `.PRC` naming/lookup behavior
+- [ ] Keep UI visually and behaviorally aligned with `FormMainMenu` and `FormLedgerMenu`
+- [ ] Avoid modernizing the Add Checks form/workflow
+- [ ] Wire CHECKS menu option 1 to the Add Checks path if needed
+- [ ] Define the exact multi-file transaction steps before coding writes
+- [ ] Implement coordinated write parity for:
+  - [ ] `INVOICE.CHK`
+  - [ ] `LEDGER.CUR`
+  - [ ] `CHECK.INV`
+- [ ] Defer Sales Employee wizard work unless it becomes necessary again
+- [ ] Handle Delete Check / OTHER Check flows after Add Checks is correct
+
+## 3. Single recommended first task
+**Make `FormAddChecks` the true canonical Add Checks path by verifying its DOS prompt flow and defining the exact coordinated transaction it must perform across `INVOICE.CHK`, `LEDGER.CUR`, and `CHECK.INV`.**
+
+## 4. Single best next question
+**In the DOS Add Checks flow, what is the exact operator prompt sequence and validation sequence we need `FormAddChecks` to replicate before we implement the write pipeline?**
+
+If you want, I can turn this into a **clean reusable AMi reload prompt** for future sessions.
+
+## @testsubject117
+
+EXPLAIN WHAT YOU MEAN BY THIS: If you want, I can turn this into a clean reusable AMi reload prompt for future sessions.
+
+## Copilot
+
+I mean I can write you a **short â€œstarter context blockâ€** that you can paste into a new chat so I immediately reload the AMi project correctly.
+
+## Why that helps
+When a new chat starts, I do **not automatically retain** all the detailed project continuity from this conversation.
+
+So a reusable reload prompt would let you quickly restore things like:
+
+- what AMi is
+- which repos matter
+- which repo is the DOS truth source
+- which repo is the VB port
+- where we left off
+- what the current priority is
+- what behavior must be preserved
+- what files matter right now
+- what not to change stylistically
+
+---
+
+## In practice, it would be something like this
+You could paste something like:
+
+> AMi is a DOS GW-BASIC to VB.NET WinForms port.  
+> DOS truth source repo: `testsubject117/AMiDataStore`  
+> Active WinForms port repo: `testsubject117/AmiWinForms`  
+> Chat continuity repo: `testsubject117/Co-Pilot-Chat-History`  
+> Current authoritative continuity anchor: commit `cb8271f` in `AmiWinForms`, which added `CompanyInfo.vb`, `CompanyLookupService.vb`, and `FormAddChecks.vb`.  
+> Original interrupted thread was Sales Employee checks integration, but the correct current resume point is the Add Checks/company groundwork.  
+> Biggest remaining gap is write-side accounting parity, especially coordinated updates across `INVOICE.CHK`, `LEDGER.CUR`, `CHECK.INV`, and `OTHER.CHK`.  
+> Preserve both original DOS workflow semantics and the exact existing DOS-style WinForms implementation pattern already established in the repo.  
+> Match `FormMainMenu` and `FormLedgerMenu` in backgrounds, fonts, buttons, layout rhythm, hotkey/menu presentation, keyboard-first behavior, prompt wording, and navigation style.  
+> Do not modernize the UI unnecessarily.  
+> Current focus: `CompanyInfo.vb`, `CompanyLookupService.vb`, `FormAddChecks.vb`.  
+> Use `AMiDataStore` as the canonical behavior reference before making recommendations or code changes.
+
+That way, instead of rebuilding context from scratch every time, you can just paste that and Iâ€™m immediately aligned.
+
+---
+
+## What â€œclean reusableâ€ means
+I mean:
+- short enough to paste easily
+- specific enough to prevent drift
+- structured enough to preserve the right priorities
+- reusable in future chats without re-explaining everything
+
+---
+
+## Short answer
+A **clean reusable AMi reload prompt** is just a prewritten context summary you can paste into future chats so I instantly know:
+- what the project is
+- where we left off
+- what matters most
+- and what constraints to preserve.
+
+## @testsubject117
+
+you did this for me yesterday and that's what I did today and how you got up to speed, I pasted in the reload from yesterday
+
+## Copilot
+
+Yes â€” exactly. Thatâ€™s what I meant.
+
+You already **used one today**, and it worked the way itâ€™s supposed to:
+- you pasted the reload/handoff block
+- that gave me the project frame quickly
+- then we filled in the missing pieces by checking:
+  - `AMiDataStore`
+  - `AmiWinForms`
+  - `Co-Pilot-Chat-History`
+  - commit `cb8271f`
+  - the May 18 chat export
+
+So when I said:
+
+> â€œIf you want, I can turn this into a clean reusable AMi reload prompt for future sessions.â€
+
+I meant:
+
+## I can write an updated, improved version of the same kind of reload block you already use
+â€”but now it would be based on:
+- the fresh DOS repo scan
+- the fresh WinForms repo scan
+- the recovered May 18 chat continuity
+- the confirmed git state around `cb8271f`
+
+---
+
+## Why I mentioned it
+Because the reload you pasted today was helpful, but we discovered it still had some uncertainty:
+- whether I really had the May 18 chat
+- whether `cb8271f` was confirmed
+- whether the true resume point was still Sales Employee wizard work or had shifted to Add Checks groundwork
+
+Now those ambiguities are resolved.
+
+So I was offering to produce a **better reload block than the one from yesterday**.
+
+---
+
+## In other words
+Not a new concept â€” just an **updated version of the same handoff prompt format** you already had me make before.
+
+---
+
+## Short answer
+**Yes â€” I know. You already used one today.**  
+I was offering to create a **newer, more accurate version** of that same reload block using everything we confirmed in this conversation.
+
+## @testsubject117
+
+oh yes, absolutely please do that, and include everything from all the scans of the repos
+
+## Copilot
+
+Absolutely â€” here is a **fully updated AMi master reload prompt** you can paste into a future chat to bring me up to speed quickly and accurately.
+
+````markdown name=AMI_MASTER_RELOAD_PROMPT.md
+AMi project master reload prompt
+
+You are helping with the AMi project, which is a legacy DOS GW-BASIC application being ported to VB.NET WinForms.
+
+Core repositories
+- DOS truth source / read-only behavioral reference: `testsubject117/AMiDataStore`
+- Active VB.NET WinForms port: `testsubject117/AmiWinForms`
+- Chat continuity / recovery repo: `testsubject117/Co-Pilot-Chat-History`
+
+Authoritative current continuity anchors
+- Latest confirmed implementation anchor in `AmiWinForms`: commit `cb8271f`
+- Commit `cb8271f` added:
+  - `AMiOffice/CompanyInfo.vb`
+  - `AMiOffice/CompanyLookupService.vb`
+  - `AMiOffice/FormAddChecks.vb`
+- The May 18, 2026 continuity export exists in `Co-Pilot-Chat-History` as:
+  - `mon_may_18_2026_uploading_chat_history_to_git_hub_repo.md`
+- That May 18 continuity resolved an ambiguity:
+  - the older interrupted thread was Sales Employee checks integration
+  - but the correct current resume point is now the newer Add Checks/company groundwork represented by `cb8271f`
+
+High-level project understanding
+- `AMiDataStore` is the canonical DOS behavior source.
+- `AmiWinForms` is the implementation target.
+- The WinForms port is substantial and well beyond prototype stage, but it is still incomplete.
+- The strongest parity so far is read/report/inquiry functionality.
+- The largest remaining gap is write-side accounting parity, especially in the CHECKS / cash receipts area.
+- All recommendations and changes must be grounded in DOS behavior first, then implemented in the existing WinForms DOS-style pattern.
+
+Critical rule for reasoning
+Treat `AMiDataStore` as read-only truth for:
+- workflow behavior
+- menu routing
+- prompt order and wording
+- file semantics
+- accounting transaction rules
+- status transitions
+- delete/reset/rebuild behavior
+
+Treat `AmiWinForms` as the place where parity is implemented, but do not invent new workflows that break DOS semantics.
+
+What the DOS application looks like architecturally (`AMiDataStore`)
+The DOS application is:
+- DOS batch driven at startup
+- launched via `AUTOEXEC.BAT` / `LOGIN.BAT`
+- routed through the main menu in `MAINM.ASC`
+- divided across GW-BASIC modules using `CHAIN`
+- sometimes invokes other tools/programs using `SHELL`
+
+Important top-level DOS routing
+- `MAINM.ASC` is the central menu/router
+- Modules are launched through `CHAIN` and `SHELL`
+- There is a strong single-keystroke, keyboard-first operator flow
+- The system is heavily file-coupled and flat-file driven
+
+Important DOS behavioral assumptions that must be preserved
+- keyboard-first menu navigation
+- single-key dispatch
+- DOS-style terse prompts
+- DOS-style prompt order and wording
+- black-screen / utility-operator feel
+- synchronous file access assumptions
+- visible retry/wait behavior when files are in use
+- explicit warnings and confirmations
+- temp-file replacement / rebuild strategies for destructive updates
+- preserve operator expectations, not just data output
+
+Critical DOS accounting file semantics
+- `INVOICE.CHK`
+  - random-access invoice control/status file
+  - contains invoice number, amount, company code, and 1-character status flag
+  - status semantics include unpaid / paid / corrected / void / erased
+- `LEDGER.CUR`
+  - sequential cash receipt / ledger rows
+  - in current DOS flow, this is effectively cash-receipt/check focused
+- `CHECK.INV`
+  - mapping between one check and the invoice(s) it paid
+- `OTHER.CHK`
+  - non-invoice / â€œotherâ€ checks
+- `EMPNAME.DAT`
+  - employee/customer mapping, relevant to sales employee checks/reporting
+- `REALNAME.DAT`
+  - company code â†” human-readable company name mapping
+- `PRC\*.PRC`
+  - per-customer pricing/procedure files that drive invoice-related pricing behavior
+- Also important:
+  - `INVOICE.NUM`
+  - `MONTH.INV`
+  - `JOURNAL.CUR`
+  - yearly `LOGBOOK` files
+  - `VOIDS.DAT`
+
+Most important DOS workflow currently relevant
+Add Checks / cash receipts flow in DOS:
+- validates invoice(s) against `INVOICE.CHK`
+- rejects invoices in disallowed statuses
+- marks invoice(s) as paid
+- appends check/cash-receipt data to `LEDGER.CUR`
+- appends check-to-invoice mapping to `CHECK.INV`
+
+Delete Check flow in DOS:
+- rebuilds temp files / rewrites data
+- removes ledger/check mapping entries
+- resets affected invoices back to unpaid when appropriate
+
+This means Add Checks is not just a form:
+it is a coordinated accounting transaction across multiple files.
+
+Important DOS nuance discovered in scan
+In this DOS variant, invoice posting writes to `JOURNAL.CUR`, `LOGBOOK`, and `INVOICE.CHK`, and `LEDGER.CUR` is effectively more of a cash-receipt/check file than the main invoice-value truth source.
+So accounting truth is distributed across multiple files and must be interpreted carefully.
+
+Current `AmiWinForms` implementation state
+Startup / shell
+- app starts through WinForms startup wiring into `FormMainMenu`
+- there is a DOS-inspired menu shell already in place
+- `DosMenuFormBase` provides DOS-style menu behavior
+- `FormMainMenu` and `FormLedgerMenu` are important style and behavior references
+
+What is already strong in `AmiWinForms`
+The port is much stronger on reading, reporting, and viewing legacy data than on writing it.
+
+Implemented/read-heavy areas include:
+- `LedgerCurReader.vb`
+- `CheckInvReader.vb`
+- `InvoiceChkReader.vb`
+- `OtherChkReader.vb`
+
+Implemented/reporting forms include:
+- ledger view
+- company totals
+- other checks view
+- find by check number
+- find by invoice number
+- checks-that-donâ€™t-balance reporting
+
+Other important implemented pieces
+- `FormEmpNameEditor.vb` exists and writes normalized `EMPNAME.DAT`
+- `FormSalesEmployeeCheckWizard.vb` exists and is substantial, but continuity suggests it is not the main resume point now
+- `LegacyDataPaths.vb` centralizes legacy file locations
+- `CompanyInfo.vb` is a lightweight DTO-like company selection structure
+- `CompanyLookupService.vb` parses `REALNAME.DAT`, normalizes company codes, and derives `.PRC` naming
+- `FormAddChecks.vb` is early UI groundwork for DOS-style Add Check flow
+
+Most important current gap in `AmiWinForms`
+The CHECKS menu and accounting write path are still incomplete.
+
+Specifically, the biggest parity gaps are:
+- Add Checks
+- Delete Checks
+- Add OTHER Checks
+- Delete OTHER Checks
+- coordinated write/update behavior for:
+  - `INVOICE.CHK`
+  - `LEDGER.CUR`
+  - `CHECK.INV`
+  - `OTHER.CHK` where applicable
+- delete/rebuild/reset behavior
+- exact DOS prompt flow and validation sequence
+- full PRC/company operational parity in live workflows
+
+Important state of current menus/forms
+- `FormLedgerMenu` still has key transactional items stubbed or â€œNotYetâ€
+- `FormAddChecks.vb` exists, but continuity and scans indicate it is still groundwork, not a completed transactional path
+- `CompanyLookupService.vb` is useful groundwork but not yet a complete operational DOS validation layer
+- some prompt-driven flows in the WinForms app exist visually but are not fully wired end-to-end
+- the app is read/report strong, but write-path weak
+
+Recovered continuity from May 18 chat export
+The recovered May 18 chat continuity establishes:
+- the original Friday interrupted thread was Sales Employee checks integration work
+- however, after the newer synced code (`cb8271f`), the correct resume point shifted
+- the best current resume point is:
+  - `CompanyInfo.vb`
+  - `CompanyLookupService.vb`
+  - `FormAddChecks.vb`
+- this Add Checks/company groundwork better matches the DOS-faithful next step than continuing Sales Employee wizard work first
+
+How to interpret Sales Employee wizard work now
+- It is part of project history and may still matter later
+- It is not the primary current implementation target unless new evidence shows it should become the real accounting write path
+- For now, treat it as secondary to canonical Add Checks parity work
+
+UI / visual / interaction constraints to preserve
+When working in `AmiWinForms`, preserve the exact existing DOS-style WinForms house style already established.
+
+Use these as key style references:
+- `FormMainMenu.vb`
+- `FormLedgerMenu.vb`
+- `DosMenuFormBase.vb`
+
+Preserve:
+- backgrounds/colors
+- fonts
+- button appearance
+- layout rhythm and spacing
+- hotkey/menu label presentation
+- keyboard-first behavior
+- prompt tone and wording style
+- owner/child form navigation patterns
+- overall DOS-utility feel
+
+Do NOT:
+- modernize the UI into a typical business-form application
+- replace the existing DOS-style interaction model with mouse-first workflows
+- introduce design patterns that visually or behaviorally clash with the current house style
+
+Practical current interpretation
+The project is not blocked on understanding anymore.
+The highest-value next implementation direction is clear:
+make Add Checks the canonical DOS-faithful transactional path in `AmiWinForms`.
+
+Recommended next implementation direction
+1. Start from:
+   - `CompanyInfo.vb`
+   - `CompanyLookupService.vb`
+   - `FormAddChecks.vb`
+2. Confirm exact DOS Add Checks prompt order, validation order, and operator flow from `AMiDataStore`
+3. Wire CHECKS menu option 1 into the Add Checks path if not fully wired yet
+4. Keep the UI and navigation strictly consistent with existing DOS-style WinForms forms
+5. Finalize company lookup / company-code / `.PRC` behavior in DOS terms
+6. Define the exact coordinated transaction semantics before coding writers
+7. Implement coordinated write behavior for:
+   - `INVOICE.CHK`
+   - `LEDGER.CUR`
+   - `CHECK.INV`
+8. After Add Checks is correct, address:
+   - Delete Checks
+   - Add OTHER Checks
+   - Delete OTHER Checks
+
+Single best current resume point
+Resume from the Add Checks/company groundwork represented by:
+- `cb8271f`
+- `CompanyInfo.vb`
+- `CompanyLookupService.vb`
+- `FormAddChecks.vb`
+
+Single most important implementation goal
+Turn `FormAddChecks` into the real DOS-faithful Add Checks transaction path, using `AMiDataStore` as behavioral truth and preserving the existing DOS-style WinForms shell.
+
+If you are unsure what to do next in a future chat
+Default to this question:
+â€œWhat is the exact DOS Add Checks prompt/validation/write sequence that `FormAddChecks` must replicate before implementing the writer pipeline?â€
+
+Short operational reminder
+- DOS truth first
+- WinForms style consistency second
+- transactional parity over cosmetic expansion
+- Add Checks before secondary side paths
+````
+
+## Short version
+This is your new **master reload block**.  
+It includes:
+- the DOS repo scan
+- the WinForms repo scan
+- the recovered May 18 continuity
+- the confirmed `cb8271f` anchor
+- the current resume point
+- the current constraints and next direction
+
+If you want, I can also make:
+1. a **short compact version** for quick pasting, and  
+2. a **max-detail version** like this one.
+
+## @testsubject117
+
+no that's ok, let's just pick up where we left off on friday and get the checks menu finished being wired up
+
+## Copilot
+
+Yes â€” the specific Friday-era wiring work means:
+
+- CHECKS option **1** should stop being a placeholder and open **`FormAddChecks`**
+- Sales Employee submenu option **B** should stop just bouncing back and instead open **`FormSalesEmployeeCheckWizard`**
+
+Thatâ€™s the wiring Iâ€™d do first, and Iâ€™d keep it narrowly scoped so we donâ€™t accidentally jump ahead into unfinished write-path behavior.
+
+## What that means concretely
+In `FormLedgerMenu.vb`:
+- replace the `NotYet("Add Checks to ledger & cash receipts")` action with opening `FormAddChecks` as a dialog
+
+In `FormSalesEmployeesChecksMenu.vb`:
+- replace the current option B behavior that closes/returns to owner
+- instead show `FormSalesEmployeeCheckWizard` as a dialog from that submenu
+
+## Suggested target behavior
+### CHECKS menu option 1
+Conceptually it should become:
+
+```vb
+Using f As New FormAddChecks()
+    f.ShowDialog(Me)
+End Using
+```
+
+### Sales Employee submenu option B
+Conceptually it should become:
+
+```vb
+Using f As New FormSalesEmployeeCheckWizard()
+    f.ShowDialog(Me)
+End Using
+```
+
+## Why this is the right â€œpick up where we left offâ€
+Because it finishes the **menu wiring/navigation layer** without pretending the underlying accounting write pipeline is done.
+
+So it respects both:
+- the older interrupted Friday thread
+- the newer Add Checks groundwork
+
+## Important caution
+This only finishes **wiring**. It does **not** mean:
+- Add Checks is fully implemented
+- employee checks are fully implemented
+- write-side parity is complete
+
+It just gets the CHECKS menu connected to the forms that now exist.
+
+## One more important note
+I canâ€™t make the repo change directly from this turn, but if you want, I can next give you the **exact minimal code edits** for both files so you can paste them in immediately.
+
+## @testsubject117
+
+actually, i don't want you to do that. I want you to first walk me through making sure we don't have any uncommitted changes in my .vb that haven't been pushed. Then, once we're sure things are all matching, I want you to give me the full file coding here, and I'll paste in to each file as needed.
+
+## Copilot
+
+Yes â€” do that first.
+
+## Step 1: check for uncommitted changes in `AmiWinForms`
+In PowerShell:
+
+```powershell
+cd C:\Users\capnkirk\source\repos\AmiWinForms
+git status
+```
+
+### What we want to see
+Best case:
+
+```text
+On branch master
+Your branch is up to date with 'origin/master'.
+
+nothing to commit, working tree clean
+```
+
+### What we saw earlier
+Earlier, you had local uncommitted changes in:
+- `AMiOffice/FormAddChecks.vb`
+- `AMiOffice/FormLedgerMenu.vb`
+
+So first we need to see whether those are still there.
+
+---
+
+## Step 2: if `git status` shows modified files, inspect exactly what changed
+Run:
+
+```powershell
+git diff -- AMiOffice/FormLedgerMenu.vb
+git diff -- AMiOffice/FormAddChecks.vb
+git diff -- AMiOffice/FormSalesEmployeesChecksMenu.vb
+```
+
+That will show whether:
+- you have real local edits you want to keep
+- or theyâ€™re just temporary/unwanted differences
+
+---
+
+## Step 3: make sure local branch matches GitHub
+Run:
+
+```powershell
+git pull
+git log --oneline -n 5
+```
+
+What we expect:
+- `git pull` should say already up to date
+- `git log` should still show `cb8271f` at or near the top unless youâ€™ve made newer commits
+
+---
+
+## Step 4: decide what to do with any local edits
+If `git status` is **clean**, great â€” weâ€™re done checking.
+
+If it shows modified files, you have 3 choices:
+
+### Option A: keep the changes
+If theyâ€™re intentional, either:
+- commit them and push them, or
+- copy them somewhere safe before overwriting files manually later
+
+### Option B: discard the changes
+If they were accidental or experimental:
+
+```powershell
+git restore AMiOffice/FormLedgerMenu.vb
+git restore AMiOffice/FormAddChecks.vb
+git restore AMiOffice/FormSalesEmployeesChecksMenu.vb
+```
+
+### Option C: save them aside before resetting
+If youâ€™re unsure:
+
+```powershell
+mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+copy AMiOffice\FormSalesEmployeesChecksMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+```
+
+Then you can safely restore later if needed.
+
+---
+
+## Step 5: confirm weâ€™re synced before editing
+Once status is clean, run:
+
+```powershell
+git status
+```
+
+We want final confirmation that the working tree is clean before I give you full replacement file contents.
+
+---
+
+# What to send me next
+Paste the output of:
+
+```powershell
+git status
+git pull
+git log --oneline -n 5
+```
+
+If `git status` shows modified files, also paste:
+
+```powershell
+git diff -- AMiOffice/FormLedgerMenu.vb
+git diff -- AMiOffice/FormAddChecks.vb
+git diff -- AMiOffice/FormSalesEmployeesChecksMenu.vb
+```
+
+---
+
+# Then what Iâ€™ll do
+Once we confirm your local files are clean and matching pushed state, Iâ€™ll give you:
+- the **full updated file contents**
+- for each file you need to replace
+- so you can paste them in manually
+
+## Short answer
+**Yes â€” first verify your local repo is clean and matches origin.**  
+After that, Iâ€™ll give you the full file code blocks for the exact files to update.
+
+## @testsubject117
+
+```
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   AMiOffice/FormAddChecks.vb
+        modified:   AMiOffice/FormLedgerMenu.vb
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+## Copilot
+
+You still have local uncommitted changes in exactly those 2 files, so **donâ€™t paste over anything yet**.
+
+## Current state
+Modified:
+- `AMiOffice/FormAddChecks.vb`
+- `AMiOffice/FormLedgerMenu.vb`
+
+Your branch is otherwise aligned with `origin/master`.
+
+---
+
+# Do this next
+We need to see whether those local edits are:
+- important work you want to keep
+- or disposable local drift
+
+Run:
+
+```powershell
+git diff -- AMiOffice/FormLedgerMenu.vb
+git diff -- AMiOffice/FormAddChecks.vb
+```
+
+If you want to be extra safe first, back them up:
+
+```powershell
+mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+```
+
+---
+
+# What weâ€™re looking for
+## If the diffs are junk / accidental
+Then restore them:
+
+```powershell
+git restore AMiOffice/FormLedgerMenu.vb
+git restore AMiOffice/FormAddChecks.vb
+git status
+```
+
+## If the diffs are intentional and you want them
+Then donâ€™t overwrite yet â€” paste the diffs here first so I can account for them before giving you full replacement file content.
+
+---
+
+# Best immediate next step
+Please run and paste:
+
+```powershell
+git diff -- AMiOffice/FormLedgerMenu.vb
+git diff -- AMiOffice/FormAddChecks.vb
+```
+
+## Short answer
+You are **not clean yet**.  
+We need to inspect those two local diffs before moving on.
+
+## @testsubject117
+
+```
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   AMiOffice/FormAddChecks.vb
+        modified:   AMiOffice/FormLedgerMenu.vb
+
+no changes added to commit (use "git add" and/or "git commit -a")
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git diff -- AMiOffice/FormLedgerMenu.vb
+diff --git a/AMiOffice/FormLedgerMenu.vb b/AMiOffice/FormLedgerMenu.vb
+index aac94e1..9aa2a9b 100644
+--- a/AMiOffice/FormLedgerMenu.vb
++++ b/AMiOffice/FormLedgerMenu.vb
+@@ -40,7 +40,11 @@ Partial Public Class FormLedgerMenu
+
+         Dim p = flpLeft
+
+-        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
++        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
++                                                                          Using f As New FormAddChecks()
++                                                                              f.ShowDialog(Me)
++                                                                          End Using
++                                                                      End Sub)
+         AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+         AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+         AddMenuButton(p, "5", "View Companys Totals", Sub()
+@@ -66,10 +70,10 @@ Partial Public Class FormLedgerMenu
+                                                        End Using
+                                                    End Sub)
+         AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+-                                                            Using f As New FormLedgerDoesntBalance()
+-                                                                f.ShowDialog(Me)
+-                                                            End Using
+-                                                        End Sub)
++                                                                     Using f As New FormLedgerDoesntBalance()
++                                                                         f.ShowDialog(Me)
++                                                                     End Using
++                                                                 End Sub)
+         AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                              Using f As New FormSalesEmployeesChecksMenu()
+                                                                  f.ShowDialog(Me)
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git diff -- AMiOffice/FormAddChecks.vb
+diff --git a/AMiOffice/FormAddChecks.vb b/AMiOffice/FormAddChecks.vb
+index 11a0db9..1da80bc 100644
+--- a/AMiOffice/FormAddChecks.vb
++++ b/AMiOffice/FormAddChecks.vb
+@@ -2,23 +2,33 @@
+ Option Explicit On
+
+ Imports System
++Imports System.Collections.Generic
+ Imports System.Drawing
+ Imports System.Windows.Forms
+-Imports System.Collections.Generic
+
+ Public Class FormAddChecks
+     Inherits Form
+
+-    Private lblTitle As Label
+-    Private lblPrompt As Label
+-    Private txtCompanyCode As TextBox
+-    Private btnValidate As Button
+-    Private btnContinue As Button
+-    Private btnCancel As Button
+-    Private lblStatusCaption As Label
+-    Private lblStatus As Label
+-    Private lblMatches As Label
+-    Private lstMatches As ListBox
++    Private ReadOnly pnlHeader As New Panel()
++    Private ReadOnly lblTitle As New Label()
++    Private ReadOnly lblDateTime As New Label()
++    Private ReadOnly tmrClock As New Timer()
++
++    Private ReadOnly pnlMain As New Panel()
++    Private ReadOnly pnlBottom As New Panel()
++
++    Private ReadOnly lblPrompt As New Label()
++    Private ReadOnly txtCompanyCode As New TextBox()
++
++    Private ReadOnly btnValidate As New Button()
++    Private ReadOnly btnContinue As New Button()
++    Private ReadOnly btnEscClose As New Button()
++
++    Private ReadOnly lblStatusCaption As New Label()
++    Private ReadOnly lblStatus As New Label()
++
++    Private ReadOnly lblMatches As New Label()
++    Private ReadOnly lstMatches As New ListBox()
+
+     Private _lookup As CompanyLookupService
+     Private _selectedCompany As CompanyInfo
+@@ -31,17 +41,33 @@ Public Class FormAddChecks
+
+     Public Sub New()
+         MyBase.New()
+-        InitializeCustomComponents()
++        BuildLayout()
+     End Sub
+
+-    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
++    Protected Overrides Sub OnLoad(e As EventArgs)
++        MyBase.OnLoad(e)
++
++        Me.KeyPreview = True
++        Me.StartPosition = FormStartPosition.CenterParent
++        Me.BackColor = Color.FromArgb(32, 32, 32)
++        Me.ForeColor = Color.White
++        Me.Text = "CHECKS"
++        Me.Width = 1000
++        Me.Height = 720
++        Me.MinimumSize = New Size(900, 650)
++
++        UpdateHeaderClock()
++        tmrClock.Interval = 1000
++        AddHandler tmrClock.Tick, AddressOf tmrClock_Tick
++        tmrClock.Start()
++
+         Try
+             Dim realNamePath As String = "\\invoice\MainMenu\Data\REALNAME.DAT"
+
+             _lookup = New CompanyLookupService(realNamePath)
+             _lookup.LoadData()
+
+-            lblStatus.Text = "Enter company code."
++            lblStatus.Text = "Enter company code, then press Enter or click Validate."
+             txtCompanyCode.Focus()
+
+         Catch ex As Exception
+@@ -49,103 +75,176 @@ Public Class FormAddChecks
+                             "Add Checks",
+                             MessageBoxButtons.OK,
+                             MessageBoxIcon.Error)
++
+             lblStatus.Text = "Company data could not be loaded."
+             btnValidate.Enabled = False
+             btnContinue.Enabled = False
++            txtCompanyCode.Enabled = False
++            lstMatches.Enabled = False
+         End Try
+     End Sub
+
+-    Private Sub InitializeCustomComponents()
+-        Me.Text = "Add Checks"
+-        Me.StartPosition = FormStartPosition.CenterScreen
+-        Me.Size = New Size(760, 520)
+-        Me.MinimumSize = New Size(760, 520)
+-        Me.BackColor = Color.Black
+-        Me.ForeColor = Color.Lime
+-        Me.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+-        Me.KeyPreview = True
++    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
++        MyBase.OnFormClosed(e)
++        Try
++            tmrClock.Stop()
++        Catch
++        End Try
++    End Sub
++
++    Private Sub BuildLayout()
++        Me.Controls.Clear()
++
++        pnlHeader.Dock = DockStyle.Top
++        pnlHeader.Height = 78
++        pnlHeader.BackColor = Color.Black
++        pnlHeader.Padding = New Padding(8, 6, 8, 6)
+
+-        lblTitle = New Label()
+-        lblTitle.AutoSize = False
+-        lblTitle.Text = "ADD CHECKS TO CASH RECEIPTS"
+-        lblTitle.TextAlign = ContentAlignment.MiddleCenter
+-        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Bold)
++        lblTitle.AutoSize = True
++        lblTitle.Text = "CHECKS"
++        lblTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+         lblTitle.ForeColor = Color.Yellow
+         lblTitle.BackColor = Color.Black
+-        lblTitle.SetBounds(40, 20, 660, 35)
++        lblTitle.Location = New Point(8, 6)
++
++        lblDateTime.AutoSize = False
++        lblDateTime.Dock = DockStyle.Right
++        lblDateTime.Width = 430
++        lblDateTime.TextAlign = ContentAlignment.MiddleRight
++        lblDateTime.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
++        lblDateTime.ForeColor = Color.Yellow
++        lblDateTime.BackColor = Color.Black
++
++        pnlHeader.Controls.Add(lblDateTime)
++        pnlHeader.Controls.Add(lblTitle)
++
++        pnlBottom.Dock = DockStyle.Bottom
++        pnlBottom.Height = 52
++        pnlBottom.BackColor = Color.FromArgb(32, 32, 32)
++        pnlBottom.Padding = New Padding(0, 10, 0, 0)
++
++        btnEscClose.Text = "(ESC) Close"
++        btnEscClose.AutoSize = False
++        btnEscClose.Width = 160
++        btnEscClose.Height = 30
++        btnEscClose.Anchor = AnchorStyles.Right Or AnchorStyles.Bottom
++        btnEscClose.UseVisualStyleBackColor = False
++        btnEscClose.BackColor = Color.Silver
++        btnEscClose.ForeColor = Color.Black
++        btnEscClose.FlatStyle = FlatStyle.Flat
++        btnEscClose.FlatAppearance.BorderColor = Color.Gainsboro
++        btnEscClose.FlatAppearance.MouseOverBackColor = Color.Gainsboro
++        btnEscClose.FlatAppearance.MouseDownBackColor = Color.DarkGray
++        btnEscClose.FlatAppearance.BorderSize = 1
++        btnEscClose.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
++        AddHandler btnEscClose.Click, AddressOf btnEscClose_Click
++
++        pnlBottom.Controls.Add(btnEscClose)
++        AddHandler pnlBottom.Resize,
++            Sub()
++                btnEscClose.Left = pnlBottom.ClientSize.Width - btnEscClose.Width
++                btnEscClose.Top = pnlBottom.ClientSize.Height - btnEscClose.Height
++            End Sub
++
++        pnlMain.Dock = DockStyle.Fill
++        pnlMain.BackColor = Color.FromArgb(32, 32, 32)
++        pnlMain.Padding = New Padding(36, 26, 36, 20)
+
+-        lblPrompt = New Label()
+         lblPrompt.AutoSize = False
+-        lblPrompt.Text = "Company Code:"
++        lblPrompt.Text = "Enter customer/company code:"
+         lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+-        lblPrompt.ForeColor = Color.Lime
+-        lblPrompt.BackColor = Color.Black
+-        lblPrompt.SetBounds(60, 90, 140, 28)
++        lblPrompt.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
++        lblPrompt.ForeColor = Color.White
++        lblPrompt.BackColor = Color.FromArgb(32, 32, 32)
++        lblPrompt.SetBounds(24, 20, 320, 30)
+
+-        txtCompanyCode = New TextBox()
+         txtCompanyCode.CharacterCasing = CharacterCasing.Upper
+         txtCompanyCode.BorderStyle = BorderStyle.FixedSingle
+-        txtCompanyCode.Font = New Font("Consolas", 12.0!, FontStyle.Bold)
+-        txtCompanyCode.SetBounds(210, 90, 180, 28)
++        txtCompanyCode.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
++        txtCompanyCode.SetBounds(24, 56, 260, 30)
+         txtCompanyCode.MaxLength = 8
++        AddHandler txtCompanyCode.KeyDown, AddressOf txtCompanyCode_KeyDown
+
+-        btnValidate = New Button()
+-        btnValidate.Text = "Validate"
+-        btnValidate.SetBounds(420, 88, 110, 32)
++        btnValidate.Text = "(Enter) Validate"
++        btnValidate.SetBounds(310, 54, 170, 34)
++        StyleActionButton(btnValidate)
+         AddHandler btnValidate.Click, AddressOf btnValidate_Click
+
+-        btnContinue = New Button()
+-        btnContinue.Text = "Continue"
+-        btnContinue.SetBounds(540, 88, 110, 32)
++        btnContinue.Text = "(C) Continue"
++        btnContinue.SetBounds(490, 54, 160, 34)
+         btnContinue.Enabled = False
++        StyleActionButton(btnContinue)
+         AddHandler btnContinue.Click, AddressOf btnContinue_Click
+
+-        btnCancel = New Button()
+-        btnCancel.Text = "Cancel"
+-        btnCancel.SetBounds(540, 430, 110, 32)
+-        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+-
+-        lblStatusCaption = New Label()
+         lblStatusCaption.AutoSize = False
+         lblStatusCaption.Text = "Status:"
+         lblStatusCaption.TextAlign = ContentAlignment.MiddleLeft
+-        lblStatusCaption.ForeColor = Color.Aqua
+-        lblStatusCaption.BackColor = Color.Black
+-        lblStatusCaption.SetBounds(60, 145, 80, 28)
++        lblStatusCaption.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
++        lblStatusCaption.ForeColor = Color.White
++        lblStatusCaption.BackColor = Color.FromArgb(32, 32, 32)
++        lblStatusCaption.SetBounds(24, 112, 90, 28)
+
+-        lblStatus = New Label()
+         lblStatus.AutoSize = False
+-        lblStatus.Text = ""
+         lblStatus.TextAlign = ContentAlignment.MiddleLeft
++        lblStatus.Font = New Font("Segoe UI", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+         lblStatus.ForeColor = Color.White
+         lblStatus.BackColor = Color.Black
+         lblStatus.BorderStyle = BorderStyle.FixedSingle
+-        lblStatus.SetBounds(140, 145, 510, 28)
++        lblStatus.SetBounds(120, 110, 700, 32)
+
+-        lblMatches = New Label()
+         lblMatches.AutoSize = False
+-        lblMatches.Text = "Possible Matches:"
++        lblMatches.Text = "Possible matches:"
+         lblMatches.TextAlign = ContentAlignment.MiddleLeft
+-        lblMatches.ForeColor = Color.Aqua
+-        lblMatches.BackColor = Color.Black
+-        lblMatches.SetBounds(60, 200, 180, 28)
+-
+-        lstMatches = New ListBox()
+-        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
++        lblMatches.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
++        lblMatches.ForeColor = Color.White
++        lblMatches.BackColor = Color.FromArgb(32, 32, 32)
++        lblMatches.SetBounds(24, 170, 180, 28)
++
++        lstMatches.Font = New Font("Segoe UI", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
++        lstMatches.BackColor = Color.Black
++        lstMatches.ForeColor = Color.White
++        lstMatches.BorderStyle = BorderStyle.FixedSingle
+         lstMatches.HorizontalScrollbar = True
+-        lstMatches.SetBounds(60, 230, 590, 180)
++        lstMatches.SetBounds(24, 204, 796, 280)
+         AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
++        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
++
++        pnlMain.Controls.Add(lblPrompt)
++        pnlMain.Controls.Add(txtCompanyCode)
++        pnlMain.Controls.Add(btnValidate)
++        pnlMain.Controls.Add(btnContinue)
++        pnlMain.Controls.Add(lblStatusCaption)
++        pnlMain.Controls.Add(lblStatus)
++        pnlMain.Controls.Add(lblMatches)
++        pnlMain.Controls.Add(lstMatches)
++
++        Me.Controls.Add(pnlMain)
++        Me.Controls.Add(pnlBottom)
++        Me.Controls.Add(pnlHeader)
++    End Sub
++
++    Private Sub StyleActionButton(btn As Button)
++        btn.UseVisualStyleBackColor = False
++        btn.BackColor = Color.Black
++        btn.ForeColor = Color.White
++        btn.FlatStyle = FlatStyle.Flat
++        btn.FlatAppearance.BorderColor = Color.DimGray
++        btn.FlatAppearance.BorderSize = 1
++        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
++        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
++        btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
++        btn.TextAlign = ContentAlignment.MiddleLeft
++    End Sub
+
+-        Me.Controls.Add(lblTitle)
+-        Me.Controls.Add(lblPrompt)
+-        Me.Controls.Add(txtCompanyCode)
+-        Me.Controls.Add(btnValidate)
+-        Me.Controls.Add(btnContinue)
+-        Me.Controls.Add(btnCancel)
+-        Me.Controls.Add(lblStatusCaption)
+-        Me.Controls.Add(lblStatus)
+-        Me.Controls.Add(lblMatches)
+-        Me.Controls.Add(lstMatches)
++    Private Sub tmrClock_Tick(sender As Object, e As EventArgs)
++        UpdateHeaderClock()
++    End Sub
++
++    Private Sub UpdateHeaderClock()
++        Dim now As DateTime = DateTime.Now
++        lblDateTime.Text = now.ToString("dddd") & "  " &
++                           now.ToString("MM-dd-yyyy") & "          " &
++                           now.ToString("hh:mm:ss tt")
+     End Sub
+
+     Private Sub btnValidate_Click(sender As Object, e As EventArgs)
+@@ -165,17 +264,37 @@ Public Class FormAddChecks
+         Me.Close()
+     End Sub
+
+-    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
++    Private Sub btnEscClose_Click(sender As Object, e As EventArgs)
+         _selectedCompany = Nothing
+         Me.DialogResult = DialogResult.Cancel
+         Me.Close()
+     End Sub
+
++    Private Sub txtCompanyCode_KeyDown(sender As Object, e As KeyEventArgs)
++        If e.KeyCode = Keys.Enter Then
++            ValidateCompany()
++            e.Handled = True
++            e.SuppressKeyPress = True
++        End If
++    End Sub
++
+     Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
++        AcceptSelectedMatch()
++    End Sub
++
++    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
++        If e.KeyCode = Keys.Enter Then
++            AcceptSelectedMatch()
++            e.Handled = True
++            e.SuppressKeyPress = True
++        End If
++    End Sub
++
++    Private Sub AcceptSelectedMatch()
+         If lstMatches.SelectedItem Is Nothing Then Exit Sub
+
+         Dim selectedText As String = lstMatches.SelectedItem.ToString()
+-        If selectedText Is Nothing Then Exit Sub
++        If String.IsNullOrWhiteSpace(selectedText) Then Exit Sub
+
+         Dim parts() As String = selectedText.Split("-"c)
+         If parts.Length > 0 Then
+@@ -196,7 +315,7 @@ Public Class FormAddChecks
+         If enteredCode = "" Then
+             lblStatus.Text = "Company code is required."
+             txtCompanyCode.Focus()
+-            Exit Sub
++            Return
+         End If
+
+         If enteredCode.Length > 8 Then
+@@ -210,7 +329,7 @@ Public Class FormAddChecks
+             _selectedCompany = exact
+             lblStatus.Text = exact.CompanyCode & " - " & exact.CompanyName
+             btnContinue.Enabled = True
+-            Exit Sub
++            Return
+         End If
+
+         lblStatus.Text = "Company code not found."
+@@ -227,22 +346,26 @@ Public Class FormAddChecks
+
+         If matches.Count > 0 Then
+             lblStatus.Text = "Company not found. Select a match or enter another code."
++            lstMatches.SelectedIndex = 0
++            lstMatches.Focus()
++        Else
++            txtCompanyCode.Focus()
+         End If
+     End Sub
+
+-    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+-        If e.KeyCode = Keys.Escape Then
+-            btnCancel.PerformClick()
+-            e.Handled = True
+-        ElseIf e.KeyCode = Keys.F5 Then
+-            btnValidate.PerformClick()
+-            e.Handled = True
+-        ElseIf e.KeyCode = Keys.Enter Then
+-            If txtCompanyCode.Focused Then
+-                btnValidate.PerformClick()
+-                e.Handled = True
+-            End If
+-        End If
+-    End Sub
+-
+-End Class
++    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
++        Select Case keyData
++            Case Keys.Escape
++                btnEscClose.PerformClick()
++                Return True
++            Case Keys.C
++                If btnContinue.Enabled Then
++                    btnContinue.PerformClick()
++                    Return True
++                End If
++        End Select
++
++        Return MyBase.ProcessCmdKey(msg, keyData)
++    End Function
++
++End Class
+\ No newline at end of file
+(END)
+```
+
+## Copilot
+
+Good â€” now we know exactly what happened.
+
+## Direct answer
+Your local uncommitted changes are:
+
+### `FormLedgerMenu.vb`
+- **intentional and small**
+- they wire CHECKS option `1` to open `FormAddChecks`
+- this is likely something you want to keep conceptually
+
+### `FormAddChecks.vb`
+- **substantial local redesign**
+- this is **not just a tiny wiring tweak**
+- it significantly changes the formâ€™s visual style and structure
+
+And that second part matters, because it may drift away from the repoâ€™s established DOS-style pattern.
+
+---
+
+# My recommendation
+Before we do anything else:
+
+## Keep a backup of both local files
+Run:
+
+```powershell
+mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+```
+
+That gives you a safe copy of your current work.
+
+---
+
+# Then decide how to proceed
+Because you said:
+
+> once we're sure things are all matching, I want you to give me the full file coding here
+
+the cleanest approach is:
+
+## Restore both files back to committed `origin/master` state first
+Run:
+
+```powershell
+git restore AMiOffice/FormLedgerMenu.vb
+git restore AMiOffice/FormAddChecks.vb
+git status
+```
+
+What we want after that:
+
+```text
+nothing to commit, working tree clean
+```
+
+---
+
+# Why I recommend restoring
+Because right now:
+- `FormLedgerMenu.vb` has a small useful local tweak
+- `FormAddChecks.vb` has a larger local rewrite that may not match the direction we want
+- if I give you full replacement files while your working tree is already drifting, it becomes too easy to lose track of what came from where
+
+So the safest process is:
+
+1. back up local edits
+2. restore to known clean pushed state
+3. confirm clean repo
+4. then I give you full replacement file contents
+5. you paste them in deliberately
+
+That is the most controlled way.
+
+---
+
+# Important interpretation of the current `FormAddChecks` diff
+Your local `FormAddChecks` edit appears to:
+- move away from the original simple black/lime DOS-ish screen
+- introduce a more custom panel/header layout
+- mimic some menu-shell styling
+- add ESC close behavior and keyboard refinements
+
+Some of that may be useful later, but it is **not a trivial sync issue**. Itâ€™s an actual redesign.
+
+So I would **not** treat it as â€œobviously safe to keepâ€ unless you explicitly want that version.
+
+---
+
+# What I want you to do next
+Please run exactly this:
+
+```powershell
+mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+git restore AMiOffice/FormLedgerMenu.vb
+git restore AMiOffice/FormAddChecks.vb
+git status
+```
+
+Then paste the final `git status`.
+
+---
+
+# After that
+Once the repo is clean, Iâ€™ll give you the **full file contents** for the exact files to update.
+
+## Short answer
+You do have local changes, and `FormAddChecks.vb` is a meaningful local redesign.  
+**Back them up, restore to clean committed state, confirm `git status` is clean, and then Iâ€™ll provide full replacement code.**
+
+## @testsubject117
+
+I'm at a line that says (END) how do I break out of this listing
+
+## Copilot
+
+Press **`q`** and then Enter if needed.
+
+Youâ€™re probably inside Gitâ€™s pager (`less`), and:
+
+- **`q`** = quit
+
+## Short answer
+Type:
+
+```text
+q
+```
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AmiWinForms> mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+
+
+    Directory: C:\Users\capnkirk\Desktop
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----         5/19/2026   9:54 AM                ami-backup-temp
+
+
+PS C:\Users\capnkirk\source\repos\AmiWinForms> copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+PS C:\Users\capnkirk\source\repos\AmiWinForms> copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+PS C:\Users\capnkirk\source\repos\AmiWinForms> mkdir C:\Users\capnkirk\Desktop\ami-backup-temp -ErrorAction SilentlyContinue
+PS C:\Users\capnkirk\source\repos\AmiWinForms> copy AMiOffice\FormLedgerMenu.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+PS C:\Users\capnkirk\source\repos\AmiWinForms> copy AMiOffice\FormAddChecks.vb C:\Users\capnkirk\Desktop\ami-backup-temp\
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git restore AMiOffice/FormLedgerMenu.vb
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git restore AMiOffice/FormAddChecks.vb
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+nothing to commit, working tree clean
+
+## Copilot
+
+Perfect â€” youâ€™re clean now.
+
+## Confirmed
+Your local `AmiWinForms` repo is now:
+
+- on `master`
+- up to date with `origin/master`
+- **working tree clean**
+
+So now we can safely proceed from the known committed baseline.
+
+---
+
+# What weâ€™re going to change
+To pick up where Friday left off and finish the CHECKS menu wiring layer, I recommend updating these two files:
+
+1. `AMiOffice/FormLedgerMenu.vb`
+2. `AMiOffice/FormSalesEmployeesChecksMenu.vb`
+
+## What these changes will do
+### `FormLedgerMenu.vb`
+- wire menu option **1** to open `FormAddChecks`
+- leave the other unfinished items alone
+
+### `FormSalesEmployeesChecksMenu.vb`
+- wire option **B** to open `FormSalesEmployeeCheckWizard`
+- instead of merely returning to the parent menu
+
+This keeps the change narrowly focused on **menu wiring**, exactly as requested.
+
+---
+
+# File 1: `AMiOffice/FormLedgerMenu.vb`
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+---
+
+# File 2: `AMiOffice/FormSalesEmployeesChecksMenu.vb`
+
+```vbnet name=AMiOffice/FormSalesEmployeesChecksMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.IO
+
+Public Class FormSalesEmployeesChecksMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        ' Match CHECKS menu sizing + layout
+        Me.Width = 1000
+        Me.Height = 720
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+        flpLeft.AutoScroll = False
+
+        ClearMenu()
+        SetMenuTitle("Sales Employee's checks")
+
+        ' (A) Open EMPNAME.DAT editor (DOS opened EDIT)
+        AddMenuButton(flpLeft, "A", "Modify/View Sales Employee List && their customers", Sub()
+                                                                                              Using f As New FormEmpNameEditor()
+                                                                                                  f.ShowDialog(Me)
+                                                                                              End Using
+                                                                                          End Sub)
+
+        ' (B) Open the employee check wizard
+        AddMenuButton(flpLeft, "B", "Make a check for an Employee.", Sub()
+                                                                         Using f As New FormSalesEmployeeCheckWizard()
+                                                                             f.ShowDialog(Me)
+                                                                         End Using
+                                                                     End Sub)
+
+        ' No (Q); closing handled by base "(ESC) Close"
+    End Sub
+End Class
+```
+
+---
+
+# What to do now
+Paste those two files into:
+
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/FormSalesEmployeesChecksMenu.vb`
+
+Then run:
+
+```powershell
+git status
+```
+
+and, ideally, build/run the app and test:
+
+## Test checklist
+1. Main menu â†’ CHECKS
+2. Press `1`
+   - should open `FormAddChecks`
+3. From CHECKS press `S`
+   - Sales Employee submenu should open
+4. Press `A`
+   - should open EMPNAME editor
+5. Press `B`
+   - should open `FormSalesEmployeeCheckWizard`
+
+---
+
+# Important note
+I intentionally did **not** change `FormAddChecks.vb` yet.  
+That keeps this step focused on wiring only, from a clean baseline.
+
+## Short answer
+You are synced and clean now.  
+Paste in the two full files above, then test the CHECKS menu wiring.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AmiWinForms> git status
+On branch master
+Your branch is up to date with 'origin/master'.
+
+nothing to commit, working tree clean
+
+## Copilot
+
+Great â€” youâ€™re clean and synced.
+
+## Do this now
+Replace these two files with the versions below:
+
+- `AMiOffice/FormLedgerMenu.vb`
+- `AMiOffice/FormSalesEmployeesChecksMenu.vb`
+
+---
+
+```vbnet name=AMiOffice/FormLedgerMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ' No version/build on this menu
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        ' One vertical column, indented left, fixed-width buttons
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        ' Disable the second column entirely
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        ' The bottom ESC Close button is now in the base bottom bar,
+        ' so do NOT add it as a menu button.
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                          Using f As New FormAddChecks()
+                                                                              f.ShowDialog(Me)
+                                                                          End Using
+                                                                      End Sub)
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() OpenViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub OpenViewChecksPromptFlow()
+        Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+        If cust Is Nothing Then Return
+
+        Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+        If chk Is Nothing Then Return
+
+        Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+        If yr Is Nothing Then Return
+
+        Using f As New FormLedgerView()
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function ShowPromptDialog(promptText As String, defaultValue As String) As String
+        Using f As New FormLedgerPrompt(promptText, defaultValue)
+            Dim dr = f.ShowDialog(Me)
+            If dr <> DialogResult.OK Then Return Nothing
+            Return f.Value
+        End Using
+    End Function
+
+    Private NotInheritable Class FormLedgerPrompt
+        Inherits Form
+
+        Private ReadOnly txtValue As New TextBox()
+
+        Public ReadOnly Property Value As String
+            Get
+                Return txtValue.Text
+            End Get
+        End Property
+
+        Public Sub New(promptText As String, defaultValue As String)
+            Me.Text = "CHECKS"
+            Me.StartPosition = FormStartPosition.CenterParent
+            Me.FormBorderStyle = FormBorderStyle.FixedDialog
+            Me.MinimizeBox = False
+            Me.MaximizeBox = False
+            Me.ShowInTaskbar = False
+            Me.ClientSize = New Drawing.Size(620, 140)
+
+            Dim layout As New TableLayoutPanel() With {
+                .Dock = DockStyle.Fill,
+                .Padding = New Padding(10),
+                .ColumnCount = 1,
+                .RowCount = 3
+            }
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+            layout.RowStyles.Add(New RowStyle(SizeType.AutoSize))
+
+            Dim lbl As New Label() With {.AutoSize = True, .Text = promptText}
+
+            txtValue.Dock = DockStyle.Top
+            txtValue.Text = defaultValue
+
+            Dim buttons As New FlowLayoutPanel() With {.Dock = DockStyle.Fill, .FlowDirection = FlowDirection.RightToLeft, .AutoSize = True}
+            Dim ok As New Button() With {.Text = "OK", .DialogResult = DialogResult.OK, .AutoSize = True}
+            Dim cancel As New Button() With {.Text = "Cancel", .DialogResult = DialogResult.Cancel, .AutoSize = True}
+            buttons.Controls.Add(ok)
+            buttons.Controls.Add(cancel)
+
+            layout.Controls.Add(lbl, 0, 0)
+            layout.Controls.Add(txtValue, 0, 1)
+            layout.Controls.Add(buttons, 0, 2)
+
+            Me.Controls.Add(layout)
+            Me.AcceptButton = ok
+            Me.CancelButton = cancel
+        End Sub
+    End Class
+
+End Class
+```
+
+---
+
+```vbnet name=AMiOffice/FormSalesEmployeesChecksMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.IO
+
+Public Class FormSalesEmployeesChecksMenu
+    Inherits DosMenuFormBase
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        ' Match CHECKS menu sizing + layout
+        Me.Width = 1000
+        Me.Height = 720
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+        flpLeft.AutoScroll = False
+
+        ClearMenu()
+        SetMenuTitle("Sales Employee's checks")
+
+        ' (A) Open EMPNAME.DAT editor (DOS opened EDIT)
+        AddMenuButton(flpLeft, "A", "Modify/View Sales Employee List && their customers", Sub()
+                                                                                              Using f As New FormEmpNameEditor()
+                                                                                                  f.ShowDialog(Me)
+                                                                                              End Using
+                                                                                          End Sub)
+
+        ' (B) Open the employee check wizard
+        AddMenuButton(flpLeft, "B", "Make a check for an Employee.", Sub()
+                                                                         Using f As New FormSalesEmployeeCheckWizard()
+                                                                             f.ShowDialog(Me)
+                                                                         End Using
+                                                                     End Sub)
+
+        ' No (Q); closing handled by base "(ESC) Close"
+    End Sub
+End Class
+```
+
+## Then test
+Run the app and verify:
+
+- CHECKS â†’ `1` opens `FormAddChecks`
+- CHECKS â†’ `S` opens Sales Employee menu
+- Sales Employee â†’ `A` opens `FormEmpNameEditor`
+- Sales Employee â†’ `B` opens `FormSalesEmployeeCheckWizard`
+
+## After pasting
+Run:
+
+```powershell
+git status
+```
+
+and tell me whether it shows exactly those two modified files.
+
+## @testsubject117
+
+ok, so hold on. previously, on friday before the crash, we had been discussing and fixing the checks menu. If I recall, the original dos behavior for sales employees checks menu (B) choice, just closes the sales employees checks window and drops the user back to the checks menu, because that's what the original dos app did.
+
+## Copilot
+
+Yes â€” that matches the recovered continuity, and if thatâ€™s the DOS behavior, we should preserve it.
+
+## Direct answer
+If DOS option **B** in **Sales Employeeâ€™s checks** simply:
+- closes that submenu
+- and returns the operator to the already-open **CHECKS** menu
+
+then **we should not wire B to `FormSalesEmployeeCheckWizard`**.
+
+That means my previous recommendation for option B should be corrected to match DOS behavior.
+
+---
+
+## What that implies
+### Keep this behavior in `FormSalesEmployeesChecksMenu.vb`
+Option **B** should remain:
+
+- close this submenu
+- reactivate the owner CHECKS menu
+- do not launch a new form
+
+That is exactly what your current committed file already does.
+
+So if DOS really behaved that way, then the current logic is correct:
+
+```vb
+Me.DialogResult = System.Windows.Forms.DialogResult.OK
+Me.Close()
+
+If Me.Owner IsNot Nothing Then
+    Me.Owner.Activate()
+    Me.Owner.BringToFront()
+End If
+```
+
+---
+
+## Therefore the right change set becomes
+If we are staying faithful to DOS:
+
+### Change only:
+- `FormLedgerMenu.vb`
+  - wire option `1` to `FormAddChecks`
+
+### Do not change:
+- `FormSalesEmployeesChecksMenu.vb`
+  - leave option `B` as â€œclose and return to CHECKSâ€
+
+---
+
+## Why this matters
+This is exactly the kind of thing the project continuity warned about:
+
+- donâ€™t invent a workflow just because a wizard exists
+- preserve DOS operator flow first
+- keep `AmiWinForms` behavior aligned with `AMiDataStore`
+
+So the presence of `FormSalesEmployeeCheckWizard.vb` does **not** automatically mean submenu option B should launch it.
+
+It may still be useful later, but not if DOS B simply returned to CHECKS.
+
+---
+
+## Recommendation now
+Do **not** paste the version of `FormSalesEmployeesChecksMenu.vb` I gave above.
+
+Instead:
+
+- leave `FormSalesEmployeesChecksMenu.vb` alone
+- only update `FormLedgerMenu.vb` for option `1`
+
+---
+
+## Correct next move
+If you want DOS-faithful Friday wiring, the minimal intended change is:
+
+### `FormLedgerMenu.vb`
+Change only this line:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+```
+
+to:
+
+```vb
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                  Using f As New FormAddChecks()
+                                                                      f.ShowDialog(Me)
+                                                                  End Using
+                                                              End Sub)
+```
+
+And leave the Sales Employee submenu behavior as-is.
+
+---
+
+## Short answer
+**Yes â€” if DOS option B just returned to CHECKS, then we should preserve that and not launch the wizard there.**  
+So only `FormLedgerMenu.vb` should change right now.
+
+## @testsubject117
+
+let me verify, I have the dos vm running......
+
+## Copilot
+
+Perfect â€” verify it in the DOS VM first.
+
+## What to check
+Please confirm the exact behavior of:
+
+### CHECKS â†’ `S` â†’ Sales Employeeâ€™s checks â†’ `B`
+Specifically:
+- does it simply close that submenu and return to CHECKS?
+- or does it launch a check-entry flow of some kind?
+
+## Also useful while you're there
+If you can, check option `1` in CHECKS too:
+- what exact text/prompts appear first?
+- does it go immediately to company/customer code entry?
+- what is the first prompt wording?
+
+That will help us make sure `FormAddChecks` is heading in the right direction too.
+
+## Short answer
+Yes â€” verify it in the DOS VM before we change anything else.  
+Once you confirm the exact behavior, weâ€™ll wire only what DOS actually does.
+
+## @testsubject117
+
+I have a series of screenshots from before when you asked this question, the screenshots show all the choices, I will upload them here
+

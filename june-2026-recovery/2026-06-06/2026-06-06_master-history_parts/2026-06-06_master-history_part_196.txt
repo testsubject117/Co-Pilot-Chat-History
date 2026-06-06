@@ -1,0 +1,2000 @@
+﻿            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Try
+            Dim zipKeyFolder As String = "\\invoice\mainmenu\data\phone"
+            Dim zipKeyExe As String = IO.Path.Combine(zipKeyFolder, "ZIPKEY.EXE")
+            Dim zipKeyOvl As String = IO.Path.Combine(zipKeyFolder, "ZIPKEY.OVL")
+
+            If Not IO.File.Exists(zipKeyExe) Then
+                MessageBox.Show(
+                    "ZIPKEY executable was not found:" & Environment.NewLine & zipKeyExe,
+                    "ZIPKEY",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error)
+                Return
+            End If
+
+            If Not IO.File.Exists(zipKeyOvl) Then
+                MessageBox.Show(
+                    "ZIPKEY overlay file was not found:" & Environment.NewLine & zipKeyOvl,
+                    "ZIPKEY",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error)
+                Return
+            End If
+
+            Dim psi As New ProcessStartInfo() With {
+                .FileName = zipKeyExe,
+                .WorkingDirectory = zipKeyFolder,
+                .UseShellExecute = True,
+                .WindowStyle = ProcessWindowStyle.Normal
+            }
+
+            Me.Hide()
+
+            Dim proc As Process = Process.Start(psi)
+
+            If proc IsNot Nothing Then
+                proc.WaitForExit()
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show(
+                "Unable to launch ZIPKEY." & Environment.NewLine & Environment.NewLine & ex.Message,
+                "ZIPKEY",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error)
+        Finally
+            If Not Me.IsDisposed Then
+                Me.Show()
+                Me.Activate()
+            End If
+        End Try
+    End Sub
+End Class
+```
+
+---
+
+## What you should do before testing
+Copy these files into:
+
+`\\invoice\mainmenu\data\phone`
+
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+## Then test
+1. Open Rolodex menu
+2. Press `(H)`
+3. Confirm ZIPKEY launches as its own app
+4. Try typing:
+   - a ZIP
+   - a 2-letter state
+   - `?` for city search
+
+---
+
+## Important likely outcome
+Because this is very old software, one of these may happen:
+
+### Best case
+It launches and works.
+
+### Possible case
+It launches but Windows says it canâ€™t run this app.
+That would suggest:
+- 16-bit executable
+- incompatible subsystem
+- needs DOSBox/vDos/NTVDM-style support
+
+### Another possible case
+It launches but cannot find files
+That would usually mean:
+- wrong working directory
+- missing companion files beyond `ZIPKEY.OVL`
+
+---
+
+## One recommendation
+You can leave `FrmZipKeyPopup.vb` in the project for now, but it is no longer needed if this works.
+
+If you want, next I can help you with the **same Path A treatment for Area Codes** if that should also launch the original DOS executable instead of the current VB viewer.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+The image is a Windows error dialog titled **â€œUnsupported 16-Bit Application.â€**
+
+It says that:
+
+- `\\?\UNC\invoice\mainmenu\data\phone\ZIPKEY.EXE`
+- **cannot start or run**
+- because it is incompatible with the **64-bit version of Windows**
+
+## What that means
+`ZIPKEY.EXE` is a **16-bit application**, and 64-bit Windows does not run 16-bit executables directly.
+
+## Practical implication
+So **Path A, as â€œlaunch ZIPKEY.EXE directly,â€ will not work on this machine**.
+
+## What this tells us next
+Your options are now:
+
+1. **Run ZIPKEY through an emulator or compatibility layer**
+   - DOSBox
+   - vDos
+   - similar DOS environment
+
+2. **Reimplement ZIP lookup in VB**
+   - probably the cleaner long-term solution
+
+## Short version
+The image confirms the failure is **not your VB launch code anymore**.  
+Itâ€™s a **Windows platform limitation**: the original ZIPKEY is 16-bit.
+
+## @testsubject117
+
+Reimplement ZIP lookup in VB, but can we make it look similar?
+
+## Copilot
+
+Yes â€” **absolutely**.  
+We can reimplement ZIP lookup in VB **and make it look very similar to the original ZIPKEY screen**.
+
+## Direct answer
+That is now the best path.
+
+Since the screenshot proves `ZIPKEY.EXE` is a **16-bit app** and cannot run on 64-bit Windows, the right move is:
+
+- keep the **same visual style**
+- keep the **same interaction model**
+- but implement the search logic natively in VB
+
+So the user experience can still feel like ZIPKEY, even though the original exe is gone.
+
+---
+
+## What â€œsimilarâ€ can mean
+We can make the VB version mimic the DOS utility in these ways:
+
+### Visual style
+- black background
+- dark red popup panel
+- white monospace text
+- same title text:
+  - `ZIPKEY, V1.07e current to 06/89`
+- same instruction wording
+- same centered popup layout
+
+### Interaction style
+Allow the same kinds of input:
+- a ZIP code
+- a two-letter state code
+- `?` for city-only search
+
+We can also make it feel old-school by:
+- using a single prompt line
+- using Enter to search
+- Esc to exit
+- showing results in a scrollable text area or list
+
+---
+
+## Most important missing piece
+To reimplement it properly, we need the **ZIP code data source**.
+
+## I need to know one thing next
+Do you already have:
+- a ZIPKEY data file
+- a city/state/zip table
+- or any related files that came with ZIPKEY
+
+In your screenshot I only saw:
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+I did **not** obviously see a ZIP database file, but it may be hidden in:
+- another folder
+- a compiled overlay
+- or bundled in the exe/ovl
+
+---
+
+## If there is no reusable ZIPKEY data file
+We can still implement it using a modern ZIP dataset.
+
+That would likely be easier.
+
+Possible sources:
+- USPS-style ZIP datasets
+- public ZIP/city/state CSV
+- your own internal file if you have one
+
+---
+
+## My recommended design
+### Option A â€” best practical solution
+Create a VB form that looks like ZIPKEY and uses a local CSV/data file.
+
+Behavior:
+- type `91304` â†’ show city/state
+- type `CA` â†’ show ZIPs in California
+- type `?` â†’ prompt for city name and show matching ZIPs
+
+### Option B â€” even closer DOS feel
+Make it a small modal popup that:
+- displays the historical ZIPKEY header
+- uses a command-prompt-like input line
+- pages through results with keyboard only
+
+That would feel very close to the original.
+
+---
+
+## My recommendation
+Yes, we should reimplement it in VB, and yes, we should make it **look similar**.
+
+### Best next step:
+I can build:
+1. a **ZIPKEY-style popup form**
+2. a **simple ZIP lookup service**
+3. placeholder/sample data support first
+4. then wire in a real ZIP dataset
+
+---
+
+## What I need from you now
+Please answer one of these:
+
+### A.
+**Do we already have any ZIP code data file somewhere in the old system?**
+
+If yes, show me the file names.
+
+### B.
+If not, I can still proceed by generating:
+- the VB form
+- the lookup service
+- and a sample data file structure
+
+and then we can plug in a real ZIP dataset afterward.
+
+## Short answer
+**Yes â€” we can absolutely make it look similar.**  
+And now that the exe is confirmed 16-bit, **VB reimplementation is the right move.**
+
+If you want, I can next generate:
+- `FrmZipKeyPopup.vb`
+- `ZipKeyService.vb`
+- `ZipKeyEntry.vb`
+
+in a DOS-style look-and-feel.
+
+## @testsubject117
+
+all I have for zipkey is the files shown in the screenshot
+
+## Copilot
+
+Yes â€” thatâ€™s enough to make the decision.
+
+## Direct answer
+If all you have is whatâ€™s in the screenshot, then we should **reimplement ZIP lookup in VB using a new data source**, while keeping the UI styled like ZIPKEY.
+
+Because with only:
+- `ZIPKEY.EXE`
+- `ZIPKEY.OVL`
+
+and no visible external ZIP database file, we should assume the original data is embedded or otherwise unusable from VB.
+
+So the practical plan is:
+
+1. **keep the ZIPKEY-like appearance**
+2. **replace the engine with VB code**
+3. **use a modern ZIP dataset file**
+
+---
+
+## What I recommend building
+A new VB version of ZIPKEY with:
+
+### same feel
+- black background
+- dark red popup panel
+- white monospace text
+- vintage instruction text
+
+### usable input
+- type a ZIP code
+- type a 2-letter state
+- type `?` for city search
+
+### result behavior
+- show matching records in the popup
+- allow Enter/Esc
+- likely allow Up/Down or paging if multiple matches
+
+---
+
+## Best architecture
+### 1. `FrmZipKeyPopup.vb`
+The UI form that looks like ZIPKEY.
+
+### 2. `ZipKeyService.vb`
+Loads/searches ZIP records from a file.
+
+### 3. `ZipKeyEntry.vb`
+Simple model:
+- ZipCode
+- City
+- State
+
+### 4. data file
+Something like:
+- `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+---
+
+## Example supported searches
+### input:
+`91304`
+
+### result:
+- Canoga Park, CA 91304
+
+### input:
+`CA`
+
+### result:
+- list of California ZIP entries
+
+### input:
+`?`
+then city:
+`Van Nuys`
+
+### result:
+- all matching ZIP codes for Van Nuys, CA and other states if present
+
+---
+
+## Recommendation on scope
+To get this working quickly, Iâ€™d implement:
+
+### Phase 1
+- ZIP lookup by exact ZIP
+- state lookup by 2-letter code
+- city lookup after `?`
+- scrollable results
+
+### Phase 2
+- DOS-like keyboard navigation
+- better paging
+- more exact ZIPKEY phrasing/layout
+
+---
+
+## One important note
+Since you donâ€™t have the original ZIPKEY data, the **search results may not exactly match the legacy program** unless we get a dataset that is similar in vintage or scope.
+
+But for usability, a modern ZIP dataset is probably better anyway.
+
+---
+
+## Next step
+If you want, I can now generate the full first-pass implementation for:
+
+- `ZipKeyEntry.vb`
+- `ZipKeyService.vb`
+- `FrmZipKeyPopup.vb`
+
+with the same retro style and a CSV-backed search design.
+
+If I do that, Iâ€™ll also show you the expected CSV format for `zipcodes.csv`.
+
+## @testsubject117
+
+yes please do
+
+## Copilot
+
+Yes â€” hereâ€™s a full first-pass **VB reimplementation of ZIPKEY** with a retro look and CSV-backed search.
+
+## What this gives you
+- a ZIPKEY-style popup form
+- ZIP search by:
+  - exact ZIP
+  - 2-letter state
+  - `?` then city search
+- black/red old-school UI
+- scrollable result area
+- CSV-backed data source
+
+## Expected CSV location
+Put this file at:
+
+```text
+\\invoice\mainmenu\data\phone\zipcodes.csv
+```
+
+## Expected CSV format
+Header row required:
+
+```csv name=zipcodes.csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+10001,New York,NY
+```
+
+---
+
+# 1) Create `ZipKeyEntry.vb`
+
+```vb name=ZipKeyEntry.vb
+Public Class ZipKeyEntry
+    Public Property ZipCode As String
+    Public Property City As String
+    Public Property State As String
+End Class
+```
+
+---
+
+# 2) Create `ZipKeyService.vb`
+
+```vb name=ZipKeyService.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+
+Public Class ZipKeyService
+
+    Private Shared ReadOnly CsvPath As String = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+    Private _entries As List(Of ZipKeyEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function Search(input As String, Optional citySearchText As String = Nothing) As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If String.IsNullOrWhiteSpace(input) Then
+            Return results
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If trimmed = "?" Then
+            If String.IsNullOrWhiteSpace(citySearchText) Then
+                Return results
+            End If
+
+            Dim cityTerm = citySearchText.Trim().ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.City) AndAlso
+                                  x.City.ToUpperInvariant().Contains(cityTerm)).
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim stateCode = trimmed.ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) String.Equals(x.State, stateCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.ZipCode) AndAlso
+                                  x.ZipCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.ZipCode).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.State).
+                ToList()
+
+            Return results
+        End If
+
+        Return results
+    End Function
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(CsvPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return CsvPath
+    End Function
+
+    Private Function LoadEntries() As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If Not File.Exists(CsvPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(CsvPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("ZipCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New ZipKeyEntry With {
+                .ZipCode = parts(0).Trim(),
+                .City = parts(1).Trim(),
+                .State = parts(2).Trim().ToUpperInvariant()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.ZipCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.City) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+# 3) Replace entire `FrmZipKeyPopup.vb`
+
+```vb name=FrmZipKeyPopup.vb
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+
+Public Class FrmZipKeyPopup
+    Inherits Form
+
+    Private pnlPopup As Panel
+    Private lblHeader As Label
+    Private txtInput As TextBox
+    Private txtResults As TextBox
+    Private lblPrompt As Label
+    Private lblFooter As Label
+
+    Private ReadOnly _svc As New ZipKeyService()
+    Private _cityMode As Boolean = False
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "ZipKey"
+
+        pnlPopup = New Panel() With {
+            .Size = New Size(520, 500),
+            .Location = New Point(190, 50),
+            .BackColor = Color.DarkRed,
+            .BorderStyle = BorderStyle.FixedSingle
+        }
+
+        lblHeader = New Label() With {
+            .Location = New Point(12, 12),
+            .Size = New Size(490, 150),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.TopLeft
+        }
+
+        lblPrompt = New Label() With {
+            .Location = New Point(12, 170),
+            .Size = New Size(490, 24),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Bold),
+            .Text = "Enter ZIP / State / ? for city:"
+        }
+
+        txtInput = New TextBox() With {
+            .Location = New Point(12, 198),
+            .Size = New Size(490, 28),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .Font = New Font("Consolas", 11.0F, FontStyle.Regular)
+        }
+
+        txtResults = New TextBox() With {
+            .Location = New Point(12, 238),
+            .Size = New Size(490, 210),
+            .Multiline = True,
+            .ReadOnly = True,
+            .ScrollBars = ScrollBars.Vertical,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .Font = New Font("Consolas", 10.5F, FontStyle.Regular)
+        }
+
+        lblFooter = New Label() With {
+            .Location = New Point(12, 458),
+            .Size = New Size(490, 24),
+            .ForeColor = Color.White,
+            .BackColor = Color.DarkRed,
+            .Font = New Font("Consolas", 10.0F, FontStyle.Regular),
+            .Text = "ENTER = Search    ESC = Exit"
+        }
+
+        pnlPopup.Controls.Add(lblHeader)
+        pnlPopup.Controls.Add(lblPrompt)
+        pnlPopup.Controls.Add(txtInput)
+        pnlPopup.Controls.Add(txtResults)
+        pnlPopup.Controls.Add(lblFooter)
+        Me.Controls.Add(pnlPopup)
+
+        AddHandler Me.Load, AddressOf FrmZipKeyPopup_Load
+        AddHandler Me.KeyDown, AddressOf FrmZipKeyPopup_KeyDown
+        AddHandler txtInput.KeyDown, AddressOf TxtInput_KeyDown
+        AddHandler Me.Shown, AddressOf FrmZipKeyPopup_Shown
+    End Sub
+
+    Private Sub FrmZipKeyPopup_Load(sender As Object, e As EventArgs)
+        lblHeader.Text =
+            "ZIPKEY, V1.07e current to 06/89" & Environment.NewLine &
+            "Copyright 1989 Eric Isaacson" & Environment.NewLine & Environment.NewLine &
+            "VB REIMPLEMENTATION" & Environment.NewLine &
+            "Styled after the original ZIPKEY" & Environment.NewLine & Environment.NewLine &
+            "Type a ZIP code, a two-letter" & Environment.NewLine &
+            "state code, or ? for a city-" & Environment.NewLine &
+            "only search:"
+    End Sub
+
+    Private Sub FrmZipKeyPopup_Shown(sender As Object, e As EventArgs)
+        txtInput.Focus()
+
+        If Not _svc.DataFileExists() Then
+            txtResults.Text =
+                "ZIP code data file was not found." & Environment.NewLine & Environment.NewLine &
+                _svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Create zipcodes.csv to enable search."
+        End If
+    End Sub
+
+    Private Sub FrmZipKeyPopup_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub TxtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            RunSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RunSearch()
+        If Not _svc.DataFileExists() Then
+            txtResults.Text =
+                "ZIP code data file was not found." & Environment.NewLine & Environment.NewLine &
+                _svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Create zipcodes.csv to enable search."
+            Return
+        End If
+
+        Dim input = txtInput.Text.Trim()
+
+        If _cityMode Then
+            ShowResults(_svc.Search("?", input), "City search: " & input)
+            _cityMode = False
+            lblPrompt.Text = "Enter ZIP / State / ? for city:"
+            txtInput.Clear()
+            txtInput.Focus()
+            Return
+        End If
+
+        If input = "?" Then
+            _cityMode = True
+            lblPrompt.Text = "Enter city name:"
+            txtInput.Clear()
+            txtResults.Text = "City-only search mode." & Environment.NewLine & "Type a city name and press ENTER."
+            txtInput.Focus()
+            Return
+        End If
+
+        Dim results = _svc.Search(input)
+        ShowResults(results, "Search: " & input)
+        txtInput.SelectAll()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub ShowResults(results As List(Of ZipKeyEntry), heading As String)
+        Dim sb As New StringBuilder()
+
+        sb.AppendLine(heading)
+        sb.AppendLine(New String("-"c, 46))
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            sb.AppendLine("No matches found.")
+            txtResults.Text = sb.ToString()
+            Return
+        End If
+
+        For Each item In results.Take(200)
+            sb.AppendLine(item.ZipCode.PadRight(8) &
+                          item.City.PadRight(24) &
+                          item.State)
+        Next
+
+        If results.Count > 200 Then
+            sb.AppendLine()
+            sb.AppendLine("(Showing first 200 matches)")
+        End If
+
+        txtResults.Text = sb.ToString()
+        txtResults.SelectionStart = 0
+        txtResults.SelectionLength = 0
+    End Sub
+End Class
+```
+
+---
+
+# 4) Update `FrmRolodexMenu.vb`
+Since we are no longer trying to launch the 16-bit exe, change `OpenZipKey()` back to simply opening the VB popup:
+
+```vb name=FrmRolodexMenu_OpenZipKey.vb
+Private Sub OpenZipKey()
+    Using frm As New FrmZipKeyPopup()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## What this first version does
+### Search modes
+- `91304` â†’ ZIP search
+- `91` â†’ ZIP prefix search
+- `CA` â†’ state search
+- `?` â†’ switches to city search mode
+
+### Example output
+```text
+Search: CA
+----------------------------------------------
+90001   Los Angeles             CA
+90002   Los Angeles             CA
+...
+```
+
+---
+
+## Important limitation
+This CSV parser is intentionally simple for phase 1.
+
+So for now:
+- your city names should not contain commas in the CSV
+
+Example good row:
+```csv
+91304,Canoga Park,CA
+```
+
+Example problematic row:
+```csv
+12345,Some City, With Comma,CA
+```
+
+If needed later, I can upgrade it to proper CSV parsing.
+
+---
+
+## What you need to do now
+1. Add these 3 files:
+   - `ZipKeyEntry.vb`
+   - `ZipKeyService.vb`
+   - `FrmZipKeyPopup.vb`
+
+2. Make sure `FrmRolodexMenu.vb` uses the popup version of `OpenZipKey()`
+
+3. Create:
+   - `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+4. Put in a few test rows first
+
+---
+
+## Suggested starter CSV
+Use this to smoke-test it:
+
+```csv name=zipcodes.csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+91342,Sylmar,CA
+10001,New York,NY
+30301,Atlanta,GA
+73301,Austin,TX
+```
+
+---
+
+## After you test this
+If it works, next I can improve it to be even more DOS-like by adding:
+- paging
+- arrow-key selection
+- cleaner result formatting
+- better city/state matching
+- closer ZIPKEY wording/layout
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30456	'DataFileExists' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	115	
+Error (active)	BC30456	'GetDataFilePath' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	118	
+Error (active)	BC30456	'DataFileExists' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	140	
+Error (active)	BC30456	'GetDataFilePath' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	143	
+Error (active)	BC30456	'Search' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	151	
+Error (active)	BC30456	'Search' is not a member of 'ZipKeyService'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	168	
+Warning (active)	BC42025	Access of shared member, constant member, enum member or nested type through an instance; qualifying expression will not be evaluated.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Application.Designer.vb	31	
+
+
+## Copilot
+
+That means your project already has a **different `ZipKeyService` class**, and `FrmZipKeyPopup.vb` is binding to that one instead of the new one I described.
+
+## Direct fix
+Either:
+1. replace your existing `ZipKeyService.vb` with the new one, **or**
+2. give the new service a unique name so thereâ€™s no collision
+
+## Best recommendation
+Use a unique name to avoid conflicts.
+
+---
+
+# Do this instead
+
+## 1) Create `RolodexZipKeyService.vb`
+Use this exact file:
+
+```vb name=RolodexZipKeyService.vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+
+Public Class RolodexZipKeyService
+
+    Private Shared ReadOnly CsvPath As String = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+    Private ReadOnly _entries As List(Of ZipKeyEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function Search(input As String, Optional citySearchText As String = Nothing) As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If String.IsNullOrWhiteSpace(input) Then
+            Return results
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If trimmed = "?" Then
+            If String.IsNullOrWhiteSpace(citySearchText) Then
+                Return results
+            End If
+
+            Dim cityTerm = citySearchText.Trim().ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.City) AndAlso
+                                  x.City.ToUpperInvariant().Contains(cityTerm)).
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim stateCode = trimmed.ToUpperInvariant()
+
+            results = _entries.
+                Where(Function(x) String.Equals(x.State, stateCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.City).
+                ThenBy(Function(x) x.ZipCode).
+                ToList()
+
+            Return results
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            results = _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.ZipCode) AndAlso
+                                  x.ZipCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.ZipCode).
+                ThenBy(Function(x) x.City).
+                ThenBy(Function(x) x.State).
+                ToList()
+
+            Return results
+        End If
+
+        Return results
+    End Function
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(CsvPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return CsvPath
+    End Function
+
+    Private Function LoadEntries() As List(Of ZipKeyEntry)
+        Dim results As New List(Of ZipKeyEntry)
+
+        If Not File.Exists(CsvPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(CsvPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("ZipCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New ZipKeyEntry With {
+                .ZipCode = parts(0).Trim(),
+                .City = parts(1).Trim(),
+                .State = parts(2).Trim().ToUpperInvariant()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.ZipCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.City) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+## 2) Update `FrmZipKeyPopup.vb`
+Change this line:
+
+```vb
+Private ReadOnly _svc As New ZipKeyService()
+```
+
+to:
+
+```vb
+Private ReadOnly _svc As New RolodexZipKeyService()
+```
+
+---
+
+## 3) Keep `ZipKeyEntry.vb` as-is
+If you donâ€™t already have that model, use this:
+
+```vb name=ZipKeyEntry.vb
+Public Class ZipKeyEntry
+    Public Property ZipCode As String
+    Public Property City As String
+    Public Property State As String
+End Class
+```
+
+---
+
+## Why this happened
+Your solution likely already contains another class named `ZipKeyService`, and VB resolved to that one.
+
+So `FrmZipKeyPopup.vb` compiled against the wrong class, which is why it says:
+- `DataFileExists` is not a member
+- `GetDataFilePath` is not a member
+- `Search` is not a member
+
+Thatâ€™s a naming collision, not a logic problem.
+
+---
+
+## Ignore this warning for now
+This one is unrelated:
+
+- `BC42025 Access of shared member... Application.Designer.vb`
+
+Thatâ€™s not from the ZIPKEY feature.
+
+---
+
+## Fastest path
+To get unstuck quickest:
+
+### create:
+- `RolodexZipKeyService.vb`
+
+### change:
+- `_svc` to `New RolodexZipKeyService()`
+
+That should clear all six ZIPKEY compile errors.
+
+If you want, I can also give you the **full corrected `FrmZipKeyPopup.vb`** with the renamed service already applied.
+
+## @testsubject117
+
+ok, it works
+
+## Copilot
+
+Excellent â€” **ZIP lookup is now working in VB**.
+
+## Whatâ€™s now accomplished
+You now have a working replacement for `(H) Look up Zip Codes)` that:
+
+- runs on 64-bit Windows
+- keeps a ZIPKEY-like visual style
+- accepts keyboard input properly
+- no longer depends on the 16-bit executable
+
+## Thatâ€™s a good milestone
+Youâ€™ve now handled one of the harder legacy cases:
+- original DOS utility existed
+- original exe could not run
+- replacement was needed
+- and now the feature works again
+
+## Natural next improvements for ZIPKEY
+If you want to refine it further, the most useful upgrades would be:
+
+1. **make it look even closer to the original**
+   - tighter layout
+   - more DOS-like wording
+   - prompt line behavior
+
+2. **better search behavior**
+   - exact ZIP first, then prefix
+   - city + state filtering
+   - better sorting
+
+3. **paging / keyboard navigation**
+   - PgUp/PgDn
+   - arrow keys
+   - DOS-like result stepping
+
+4. **larger real ZIP dataset**
+   - if the current CSV is just test data
+
+## Best next move overall
+From the Rolodex menu, the next logical item is probably:
+
+- **(G) Look up Area Codes**
+
+because itâ€™s the sister feature to ZIP lookup, and likely should be handled the same way:
+- either launch old executable if possible
+- or reimplement in VB with the same look
+
+## My recommendation
+Letâ€™s do **(G) Look up Area Codes** next and make it visually match the new ZIPKEY-style approach.
+
+## @testsubject117
+
+but wait, don't we need to update the .csv file to contain all known zip codes?
+
+## Copilot
+
+Yes â€” **absolutely**.
+
+## Direct answer
+What you have now is the **working ZIPKEY feature shell**, but to make it truly useful, `zipcodes.csv` needs to contain the ZIP records you want it to search.
+
+So yes, the next practical requirement is:
+
+- populate `\\invoice\mainmenu\data\phone\zipcodes.csv`
+- with a real ZIP dataset
+
+## Right now
+If you only loaded a few sample rows, then the feature works technically, but it is only as complete as that file.
+
+---
+
+## What â€œall known zip codesâ€ means
+Usually that would mean a dataset with entries like:
+
+- `ZipCode`
+- `City`
+- `State`
+
+For all U.S. ZIP codes you want supported.
+
+Depending on the source, you may also get:
+- county
+- latitude/longitude
+- time zone
+- preferred city names
+- multiple acceptable city names per ZIP
+
+But for your current VB implementation, only these 3 columns matter:
+
+```csv
+ZipCode,City,State
+```
+
+---
+
+## Important design note
+A real ZIP dataset may include:
+- multiple rows for the same ZIP
+- multiple cities associated with one ZIP
+- preferred vs acceptable city names
+
+That is normal.
+
+Your current implementation can handle multiple rows fine.
+
+---
+
+## Best next step
+Yes, update the CSV with a full dataset.
+
+## Two good options
+### Option A â€” full U.S. ZIP dataset
+Best if you want this to behave like a real ZIP lookup tool.
+
+### Option B â€” only the states/cities your business actually uses
+Best if you want something smaller and simpler.
+
+---
+
+## My recommendation
+Use a **full U.S. ZIP dataset** if possible.
+
+That way:
+- the feature is broadly useful
+- you wonâ€™t keep discovering missing ZIPs later
+
+---
+
+## One important caution
+Before importing a large CSV, make sure the file format matches exactly:
+
+### Required columns:
+```csv
+ZipCode,City,State
+```
+
+### Example:
+```csv
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+10001,New York,NY
+```
+
+If your source has extra columns, thatâ€™s okay **only if**:
+- the first 3 columns are still `ZipCode,City,State`
+- or we adjust the parser
+
+---
+
+## If you want, I can help with either of these next:
+1. **find a good ZIP dataset format and tell you how to shape it**
+2. **upgrade the importer so it can handle richer CSV files safely**
+3. **generate a script/tool to convert a larger ZIP CSV into the exact format your app needs**
+
+## Short answer
+**Yes â€” the CSV absolutely needs to be populated with the ZIP codes you want searchable.**  
+Right now the UI works; next the data needs to be made complete.
+
+## @testsubject117
+
+yes, lets find a good zip format that we can paste into this file
+
+## Copilot
+
+Yes â€” and the **best format for your app** is still a very simple 3-column CSV:
+
+```csv
+ZipCode,City,State
+```
+
+## Best practical recommendation
+Use a dataset that can be normalized into exactly:
+
+- `ZipCode`
+- `City`
+- `State`
+
+That matches your current VB parser directly, with no code changes needed.
+
+---
+
+## Best source choice
+For your use case, there are two broad choices:
+
+### 1. **USPS/Census-style official sources**
+These are authoritative, but they are **not the easiest drop-in fit** for your app. Also, the Census warns that **ZCTAs are not the same as official USPS ZIP Codes**, so theyâ€™re not ideal if you want true mailing ZIP behavior. ([census.gov](https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html?utm_source=openai))
+
+### 2. **A clean ZIP CSV dataset**
+This is the best practical fit for your VB app. A source like Simplemaps specifically offers a **single CSV file** with ZIP data and state abbreviations, and describes it as one entry per ZIP code. ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+## My recommendation
+Use a **simple ZIP CSV dataset** and convert it to your exact format:
+
+```csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+10001,New York,NY
+```
+
+Thatâ€™s the easiest and safest format for your current implementation. ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+---
+
+## Important caveat
+If you want **true USPS-official ZIP behavior**, official USPS data products exist, but they are generally not as simple as â€œdownload one tiny public CSV and paste it in.â€ USPS points users to products like the **City State Product** for ZIP validation/assignment workflows. ([postalpro.usps.com](https://postalpro.usps.com/address-quality/city-state-product?utm_source=openai))
+
+So for a practical WinForms replacement, the clean CSV approach is better.
+
+---
+
+## Recommended target file format
+Your `zipcodes.csv` should look like this:
+
+```csv
+ZipCode,City,State
+00501,Holtsville,NY
+01001,Agawam,MA
+01002,Amherst,MA
+01003,Amherst,MA
+01005,Barre,MA
+```
+
+### Rules
+- header row required
+- no extra commas in city names unless we upgrade the parser
+- state should be **2-letter USPS abbreviation**
+- ZIP should remain **text**, not numeric, so leading zeroes are preserved
+
+That last part matters a lot for ZIPs like `00501`.
+
+---
+
+## Very important formatting warning
+If you open/edit the CSV in Excel, it may try to:
+- strip leading zeroes
+- reformat ZIP codes as numbers
+
+So the safest way is:
+- edit it in a text editor
+- or import/export carefully as text
+
+---
+
+## Best next move
+I recommend this workflow:
+
+1. get a clean ZIP dataset CSV
+2. map it into exactly:
+   - `ZipCode,City,State`
+3. save it as:
+   - `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+---
+
+## If you want the easiest possible import format
+Use this exact structure only:
+
+```csv
+ZipCode,City,State
+91304,Canoga Park,CA
+91406,Van Nuys,CA
+91352,Sun Valley,CA
+91342,Sylmar,CA
+```
+
+---
+
+## My concrete recommendation
+For now, use a **clean single-CSV ZIP dataset** rather than Census ZCTA files, because:
+- Census ZCTAs are approximations, not USPS ZIP Codes ([census.gov](https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html?utm_source=openai))
+- USPS official products are not the easiest direct paste-in format ([postalpro.usps.com](https://postalpro.usps.com/address-quality/city-state-product?utm_source=openai))
+- a simple ZIP CSV is closest to what your app already expects ([simplemaps.com](https://simplemaps.com/resources/us-cities-data?utm_source=openai))
+
+If you want, next I can help you with one of these:
+
+1. **give you a ready-to-use column mapping** from a common ZIP dataset into `ZipCode,City,State`
+2. **update your VB parser** so it can tolerate richer CSV files with extra columns
+3. **help you choose between â€œone row per ZIPâ€ vs â€œmultiple city names per ZIPâ€ behavior**
+
+## @testsubject117
+
+I downloaded a .csv file, can I upload it to you, have you review it, reformat it to match our target format and send it back to me?
+
+## Copilot
+
+Yes â€” upload the CSV and I can review it, tell you whether it matches `ZipCode,City,State`, and reformat it for you.
+
+## What I can do
+Once you upload it, I can:
+- inspect the columns
+- identify which fields map to ZIP / City / State
+- produce a cleaned version in this target format:
+
+```csv
+ZipCode,City,State
+```
+
+- point out any issues like:
+  - leading zero risk
+  - duplicate rows
+  - extra columns
+  - quoted fields / commas in city names
+
+## One expectation to set
+I can definitely **transform and return the cleaned contents**, but how I â€œsend it backâ€ depends on size:
+
+- if itâ€™s small enough, I can paste the cleaned CSV directly
+- if itâ€™s larger, I can give you:
+  - a transformed sample plus exact conversion rules
+  - or a script to convert the full file locally
+  - or, if you want GitHub repo changes and the repo is explicitly provided, I could help write the file there
+
+## Best next step
+Upload the CSV file and Iâ€™ll review it.
+
+## @testsubject117
+
+the file is too large
+
+## Copilot
+
+Yes â€” then the best approach is:
+
+## Direct recommendation
+Paste just:
+1. **the header row**
+2. **10â€“20 sample rows**
+
+and I can tell you exactly how to reformat the full file.
+
+## Even better
+If you want, paste:
+- the first 20 rows
+- and 10 rows from somewhere in the middle
+- and 10 rows from near the end
+
+That helps catch formatting inconsistencies.
+
+## What Iâ€™ll do from that
+I can give you one of these:
+
+### Option A
+A precise mapping like:
+- source column X â†’ `ZipCode`
+- source column Y â†’ `City`
+- source column Z â†’ `State`
+
+### Option B
+A ready-to-run conversion script
+I can generate:
+- PowerShell
+- VB
+- Python
+
+to convert the entire large CSV into:
+
+```csv
+ZipCode,City,State
+```
+
+## Best choice
+Since youâ€™re on Windows and working in VB, I recommend:
+- paste header + sample rows
+- then Iâ€™ll generate a **PowerShell conversion script**
+  
+Thatâ€™ll let you transform the full large file locally in seconds.
+
+## What to paste now
+Please paste:
+- header row
+- first 10â€“20 rows
+
+and Iâ€™ll take it from there.
+
+## @testsubject117
+
+zip	lat	lng	city	state_id	state_name	zcta	parent_zcta	population	density	county_fips	county_name	county_weights	county_names_all	county_fips_all	imprecise	military	timezone
+601	18.18027	-66.75266	Adjuntas	PR	Puerto Rico	TRUE		16669	99.9	72001	Adjuntas	"{""72001"": 98.74, ""72141"": 1.26}"	Adjuntas|Utuado	72001|72141	FALSE	FALSE	America/Puerto_Rico
+602	18.36075	-67.17541	Aguada	PR	Puerto Rico	TRUE		37233	474	72003	Aguada	"{""72003"": 100}"	Aguada	72003	FALSE	FALSE	America/Puerto_Rico
+603	18.45744	-67.12225	Aguadilla	PR	Puerto Rico	TRUE		48448	544.6	72005	Aguadilla	"{""72005"": 99.76, ""72099"": 0.24}"	Aguadilla|Moca	72005|72099	FALSE	FALSE	America/Puerto_Rico
+606	18.16585	-66.93716	Maricao	PR	Puerto Rico	TRUE		5163	45	72093	Maricao	"{""72093"": 82.26, ""72153"": 11.67, ""72121"": 6.06}"	Maricao|Yauco|Sabana Grande	72093|72153|72121	FALSE	FALSE	America/Puerto_Rico
+610	18.2911	-67.12243	Anasco	PR	Puerto Rico	TRUE		25357	263.8	72011	AÃ±asco	"{""72011"": 96.8, ""72099"": 2.83, ""72083"": 0.37}"	AÃ±asco|Moca|Las MarÃ­as	72011|72099|72083	FALSE	FALSE	America/Puerto_Rico
+611	18.27698	-66.80688	Angeles	PR	Puerto Rico	TRUE		1383	50.2	72141	Utuado	"{""72141"": 100}"	Utuado	72141	FALSE	FALSE	America/Puerto_Rico
+612	18.41283	-66.7051	Arecibo	PR	Puerto Rico	TRUE		62908	319	72013	Arecibo	"{""72013"": 98.94, ""72065"": 0.96, ""72017"": 0.1}"	Arecibo|Hatillo|Barceloneta	72013|72065|72017	FALSE	FALSE	America/Puerto_Rico
+616	18.41878	-66.6679	Bajadero	PR	Puerto Rico	TRUE		9717	344.7	72013	Arecibo	"{""72013"": 100}"	Arecibo	72013	FALSE	FALSE	America/Puerto_Rico
+617	18.44598	-66.56006	Barceloneta	PR	Puerto Rico	TRUE		22584	475.1	72017	Barceloneta	"{""72017"": 99.47, ""72054"": 0.43, ""72013"": 0.1}"	Barceloneta|Florida|Arecibo	72017|72054|72013	FALSE	FALSE	America/Puerto_Rico
+622	17.98892	-67.1566	Boqueron	PR	Puerto Rico	TRUE		7664	94.9	72023	Cabo Rojo	"{""72023"": 100}"	Cabo Rojo	72023	FALSE	FALSE	America/Puerto_Rico
+623	18.08429	-67.15336	Cabo Rojo	PR	Puerto Rico	TRUE		39212	386.2	72023	Cabo Rojo	"{""72023"": 100}"	Cabo Rojo	72023	FALSE	FALSE	America/Puerto_Rico
+624	18.05905	-66.71932	Penuelas	PR	Puerto Rico	TRUE		21148	173.9	72111	PeÃ±uelas	"{""72111"": 94.94, ""72113"": 5.06}"	PeÃ±uelas|Ponce	72111|72113	FALSE	FALSE	America/Puerto_Rico
+627	18.41905	-66.86037	Camuy	PR	Puerto Rico	TRUE		32734	272.6	72027	Camuy	"{""72027"": 100}"	Camuy	72027	FALSE	FALSE	America/Puerto_Rico
+631	18.1852	-66.83169	Castaner	PR	Puerto Rico	TRUE		1321	163.2	72081	Lares	"{""72081"": 50.63, ""72001"": 49.37}"	Lares|Adjuntas	72081|72001	FALSE	FALSE	America/Puerto_Rico
+637	18.081	-66.94659	Sabana Grande	PR	Puerto Rico	TRUE		22909	251.5	72121	Sabana Grande	"{""72121"": 94.02, ""72125"": 4.18, ""72079"": 1.8}"	Sabana Grande|San GermÃ¡n|Lajas	72121|72125|72079	FALSE	FALSE	America/Puerto_Rico
+638	18.28462	-66.5137	Ciales	PR	Puerto Rico	TRUE		17319	93.7	72039	Ciales	"{""72039"": 91.88, ""72107"": 7.48, ""72091"": 0.64}"	Ciales|Orocovis|ManatÃ­	72039|72107|72091	FALSE	FALSE	America/Puerto_Rico
+641	18.26742	-66.70212	Utuado	PR	Puerto Rico	TRUE		23831	109.4	72141	Utuado	"{""72141"": 100}"	Utuado	72141	FALSE	FALSE	America/Puerto_Rico
+646	18.43251	-66.28429	Dorado	PR	Puerto Rico	TRUE		35998	660.2	72051	Dorado	"{""72051"": 97.18, ""72143"": 2.82}"	Dorado|Vega Alta	72051|72143	FALSE	FALSE	America/Puerto_Rico
+647	17.96667	-66.94266	Ensenada	PR	Puerto Rico	TRUE		4369	106.7	72055	GuÃ¡nica	"{""72055"": 98.2, ""72079"": 1.8}"	GuÃ¡nica|Lajas	72055|72079	FALSE	FALSE	America/Puerto_Rico
+
+## Copilot
+
+Yes â€” this is a **good source format**, and it can be converted cleanly.
+
+## Direct mapping
+From your file, use:
+
+- `zip` â†’ `ZipCode`
+- `city` â†’ `City`
+- `state_id` â†’ `State`
+
+So your target output should become:
+
+```csv
+ZipCode,City,State
+00601,Adjuntas,PR
+00602,Aguada,PR
+00603,Aguadilla,PR
+00606,Maricao,PR
+00610,Anasco,PR
+...
+```
+
+## Important issue
+Your source ZIP column is currently showing values like:
+
+- `601`
+- `602`
+- `603`
+
+But Puerto Rico ZIPs should be:
+
+- `00601`
+- `00602`
+- `00603`
+
+So the converter **must left-pad ZIPs to 5 digits**.
+
+That is critical.
+
+---
+
+## Good news
+You do **not** need most of the other columns for your app:
+- `lat`
+- `lng`
+- `state_name`
+- `population`
+- `county_name`
+- `timezone`
+- etc.
+
+Your current ZIPKEY VB implementation only needs:
+
+```csv
+ZipCode,City,State
+```
+
+---
+
+# Recommended output format
+Exactly this:
+
+```csv
+ZipCode,City,State
+00601,Adjuntas,PR
+00602,Aguada,PR
+00603,Aguadilla,PR
+00606,Maricao,PR
+00610,Anasco,PR
+00611,Angeles,PR
+00612,Arecibo,PR
+00616,Bajadero,PR
+00617,Barceloneta,PR
+00622,Boqueron,PR
+```
+
+---
+
+# Best way to convert the full file
+Since the file is large, the easiest solution is a **PowerShell script**.
+
+## Use this script
+It will:
+- read your downloaded CSV
+- extract `zip`, `city`, `state_id`
+- pad ZIPs to 5 digits
+- write a clean output file in your target format
+
+```powershell
+# convert-zipcodes.ps1
+
+$inputFile  = "C:\Temp\source-zipcodes.csv"
+$outputFile = "C:\Temp\zipcodes.csv"
+
+$rows = Import-Csv -Path $inputFile
+
+$rows |
+    Select-Object `
+        @{Name='ZipCode'; Expression={ $_.zip.ToString().PadLeft(5, '0') }}, `
+        @{Name='City';    Expression={ $_.city.Trim() }}, `
+        @{Name='State';   Expression={ $_.state_id.Trim().ToUpper() }} |
+    Export-Csv -Path $outputFile -NoTypeInformation
+```
+
+---
+
+## One small cleanup after export
+PowerShell may put quotes around values, like:
+
+```csv
+"ZipCode","City","State"
+"00601","Adjuntas","PR"
+```
+
+That is still valid CSV, and your current parser may or may not like it depending on how strict it is.
+
+### Safer option
+If you want to avoid quoted output entirely, use this version instead:
+
+```powershell
+# convert-zipcodes.ps1
+
+$inputFile  = "C:\Temp\source-zipcodes.csv"
+$outputFile = "C:\Temp\zipcodes.csv"
+
+$rows = Import-Csv -Path $inputFile
+
+"ZipCode,City,State" | Set-Content -Path $outputFile
+
+foreach ($row in $rows) {
+    $zip = $row.zip.ToString().PadLeft(5, '0')
+    $city = ($row.city -replace ',', '').Trim()
+    $state = $row.state_id.Trim().ToUpper()
+
+    "$zip,$city,$state" | Add-Content -Path $outputFile
+}
+```
+
+This version:
+- avoids CSV quotes
+- strips commas from city names just in case
+- creates exactly the format your VB parser expects now
+
+---
+
+# Example converted rows from your sample
+Your sample would become:
+
+```csv
+ZipCode,City,State
+00601,Adjuntas,PR
+00602,Aguada,PR
+00603,Aguadilla,PR
+00606,Maricao,PR
+00610,Anasco,PR
+00611,Angeles,PR
+00612,Arecibo,PR
+00616,Bajadero,PR
+00617,Barceloneta,PR
+00622,Boqueron,PR
+00623,Cabo Rojo,PR
+00624,Penuelas,PR
+00627,Camuy,PR
+00631,Castaner,PR
+00637,Sabana Grande,PR
+00638,Ciales,PR
+00641,Utuado,PR
+00646,Dorado,PR
+00647,Ensenada,PR
+```
+
+---
+
+## Important note about accents
+Your source includes names like:
+- `AÃ±asco`
+- `PeÃ±uelas`
+
+But the `city` column you pasted uses ASCII-friendly values like:
+- `Anasco`
+- `Penuelas`
+
+That is actually convenient for old-system compatibility.
+
+---
+
+## What to do next
+1. save your downloaded source CSV somewhere local
+2. run the PowerShell script
+3. copy the resulting `zipcodes.csv` to:
+
+```text
+\\invoice\mainmenu\data\phone\zipcodes.csv
+```
+
+---
+
+## If you want
+I can also give you:
+1. a version of the script that writes **directly** to `\\invoice\mainmenu\data\phone\zipcodes.csv`
+2. a VB parser improvement so it can handle quoted CSV safely
+3. a quick row-count validation checklist so you can confirm the conversion worked correctly
+
+My recommendation: use the **second PowerShell script** above exactly as-is.
+
+## @testsubject117
+
+here is where the file lives: C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94
+
+## Copilot
+
+Perfect â€” use that folder as the source.
+
+## Direct answer
+If the CSV is inside:
+
+```text
+C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94
+```
+
+then the most likely source file is something like:
+
+```text
+C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.csv
+```
+
+or similarly named.
+
+---
+
+## Recommended PowerShell script
+Use this version and just adjust the input filename if needed.
+
+```powershell
+# convert-zipcodes.ps1
+
+$inputFile  = "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.csv"
+$outputFile = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+
+$rows = Import-Csv -Path $inputFile
+
+"ZipCode,City,State" | Set-Content -Path $outputFile
+
+foreach ($row in $rows) {
+    $zip = $row.zip.ToString().PadLeft(5, '0')
+    $city = ($row.city -replace ',', '').Trim()
+    $state = $row.state_id.Trim().ToUpper()
+
+    "$zip,$city,$state" | Add-Content -Path $outputFile
+}
+```
+
+---
+
+## What this does
+It will:
+- read the Simplemaps ZIP file
+- take only:
+  - `zip`
+  - `city`
+  - `state_id`
+- pad ZIPs to 5 digits
+- write the final file directly to:
+
+```text
+\\invoice\mainmenu\data\phone\zipcodes.csv
+```
+
+---
+
+## Before running it
+Verify the actual CSV filename in that folder.
+
+You can do that in PowerShell with:
+
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94"
+```
+
+If the file is named differently, just swap out:
+
+```powershell
+\uszips.csv
+```
+
+for the real name.
+
+---
+
+## How to run it
+### Option 1
+Save the script as:
+
+```text
+C:\Users\CapnKirk\Downloads\convert-zipcodes.ps1
+```
+
+Then run PowerShell and execute:
+
+```powershell
+C:\Users\CapnKirk\Downloads\convert-zipcodes.ps1
+```
+
+### Option 2
+Paste the commands directly into PowerShell.
+
+---
+
+## Quick validation after running
+Check the first few lines with:
+
+```powershell
+Get-Content "\\invoice\mainmenu\data\phone\zipcodes.csv" -TotalCount 10
+```
+
+You should see something like:
+
+```csv
+ZipCode,City,State
+00601,Adjuntas,PR
+00602,Aguada,PR
+00603,Aguadilla,PR
+...
+```
+
+---
+
+## One important note
+This basic conversion may include duplicate ZIPs with different city names, which is **fine** for your current app.
+
+If you want later, we can decide whether to:
+- keep all rows
+- or collapse to one row per ZIP
+
+For now, I recommend **keeping all rows**.
+
+---
+
+## Best next step
+Run that conversion and test the app with:
+- `00601`
+- `CA`
+- `?` then `New York`
+- `?` then `Aguadilla`
+
+If you want, I can also give you a **deduped version** of the script or a version that sorts the output first.
+
+## @testsubject117
+
+its just a .txt file
+
+## Copilot
+
+Thatâ€™s fine â€” **a `.txt` file is okay** if itâ€™s really CSV-formatted text.
+
+## Direct answer
+If the downloaded file is a text file, we just need to confirm:
+- itâ€™s delimited like CSV
+- and it has the header row you pasted
+
+If so, PowerShell `Import-Csv` can still read it even if the extension is `.txt`.
+
+---
+
+## Use this version
+Just point to the `.txt` file instead of `.csv`.
+
+```powershell
+$inputFile  = "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.txt"
+$outputFile = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+
+$rows = Import-Csv -Path $inputFile -Delimiter "`t"
+
+"ZipCode,City,State" | Set-Content -Path $outputFile
+
+foreach ($row in $rows) {
+    $zip = $row.zip.ToString().PadLeft(5, '0')
+    $city = ($row.city -replace ',', '').Trim()
+    $state = $row.state_id.Trim().ToUpper()
+
+    "$zip,$city,$state" | Add-Content -Path $outputFile
+}
+```
+
+---
+
+## Why I used `-Delimiter "`t"`
+The sample you pasted looks **tab-delimited**, not comma-delimited.
+
+Your header was shown like:
+
+```text
+zip    lat    lng    city    state_id ...
+```
+
+That suggests a **TSV** file even if it has a `.txt` extension.
+
+So:
+- `.txt` extension is fine
+- tab-delimited is likely the important part
+
+---
+
+## If you want to verify first
+Run this in PowerShell:
+
+```powershell
+Get-Content "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.txt" -TotalCount 5
+```
+
+If the columns appear separated by wide spacing/tabs, then the script above is the right one.
+
+---
+
+## If the filename is not `uszips.txt`
+Get the real filename with:
+
+```powershell
+Get-ChildItem "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94"
+```
+
+Then substitute the actual name in `$inputFile`.
+
+---
+
+## Likely final outcome
+Your target file will still become:
+
+```csv
+ZipCode,City,State
+00601,Adjuntas,PR
+00602,Aguada,PR
+00603,Aguadilla,PR
+...
+```
+
+---
+
+## One small correction
+If the source file is truly comma-separated despite being `.txt`, then you would remove this part:
+
+```powershell
+-Delimiter "`t"
+```
+
+But based on what you pasted, I think **tab-delimited** is the correct choice.
+
+## Best next step
+Run that script against the `.txt` file.
+
+If you want, paste the **actual filename** from that folder and Iâ€™ll give you the exact final script with the path filled in.
+
+## @testsubject117
+
+can you send me the powershel script again, but updated to use the correct file location and name? the file name is uszips.txt
+
+## Copilot
+
+Yes â€” hereâ€™s the updated PowerShell script using your exact source location and filename.
+
+```powershell
+$inputFile  = "C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.txt"
+$outputFile = "\\invoice\mainmenu\data\phone\zipcodes.csv"
+
+$rows = Import-Csv -Path $inputFile -Delimiter "`t"
+
+"ZipCode,City,State" | Set-Content -Path $outputFile
+
+foreach ($row in $rows) {
+    $zip = $row.zip.ToString().PadLeft(5, '0')
+    $city = ($row.city -replace ',', '').Trim()
+    $state = $row.state_id.Trim().ToUpper()
+
+    "$zip,$city,$state" | Add-Content -Path $outputFile
+}
+```
+
+## What it does
+- reads `C:\Users\CapnKirk\Downloads\simplemaps_uszips_basicv1.94\uszips.txt`
+- treats it as **tab-delimited**
+- extracts:
+  - `zip`
+  - `city`
+  - `state_id`
+- pads ZIP codes to 5 digits
+- writes the final file to:
+  - `\\invoice\mainmenu\data\phone\zipcodes.csv`
+
+## How to run it
+You can paste it directly into PowerShell, or save it as something like:
+
+```text
+C:\Users\CapnKirk\Downloads\convert-zipcodes.ps1
+```
+
+and run it.
+
+## After running it
+Check the first few lines with:
+
+```powershell
+Get-Content "\\invoice\mainmenu\data\phone\zipcodes.csv" -TotalCount 10
+```
+
+You should see:
+
+```csv
+ZipCode,City,State

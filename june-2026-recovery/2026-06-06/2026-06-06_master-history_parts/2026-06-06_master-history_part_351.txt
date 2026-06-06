@@ -1,0 +1,2000 @@
+﻿        Dim qtyAcc As String = If(QtyAcceptedOrReceived, "")
+        Dim qtyRej As String = If(QtyRejected, "")
+        Dim mat As String = If(Material, "")
+        Dim ht As String = If(HeatTreat, "")
+        Dim rsn As String = If(RejectReason, "")
+        Dim st As String = If(Status, "")
+
+        ' Align in a readable fixed-width style.
+        Return
+            $"Customer: {cust}    Part#: {part}    {d}" & vbCrLf &
+            $"Invoice#: {inv}     P.O.#: {po}     Status: {st}" & vbCrLf &
+            $"Qty Acc/Rec: {qtyAcc}     Qty Rejected: {qtyRej}     Mat: {mat}" & vbCrLf &
+            $"Heat Treat: {ht}     Rsn Rej: {rsn}" & vbCrLf &
+            $"Spec: {spec}"
+    End Function
+End Class
+```
+
+---
+
+## File 2 â€” `LogBookReader.vb` (Class)
+Reads `\\invoice\mainmenu\data\LOGBOOK.<yy>` where `<yy>` is `00`â€“`99` (two digits). Assumes **12 lines per entry** as you confirmed.
+
+```vbnet name=LogBookReader.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+
+Public Class LogBookReader
+
+    Private ReadOnly _baseDir As String
+
+    Public Sub New(baseDir As String)
+        _baseDir = baseDir
+    End Sub
+
+    Public Shared Function NormalizeTwoDigitYear(input As String, defaultYear As Integer) As Integer
+        Dim t As String = If(input, "").Trim()
+        If t.Length = 0 Then
+            Return defaultYear Mod 100
+        End If
+
+        Dim n As Integer
+        If Not Integer.TryParse(t, n) Then
+            Return defaultYear Mod 100
+        End If
+
+        ' Accept 2-digit or 4-digit.
+        If n >= 0 AndAlso n <= 99 Then Return n
+        If n >= 1900 AndAlso n <= 2999 Then Return n Mod 100
+
+        Return defaultYear Mod 100
+    End Function
+
+    Public Function GetLogBookPath(twoDigitYear As Integer) As String
+        Dim yy As String = twoDigitYear.ToString("00")
+        Return Path.Combine(_baseDir, $"LOGBOOK.{yy}")
+    End Function
+
+    Public Iterator Function ReadEntries(twoDigitYear As Integer) As IEnumerable(Of LogBookEntry)
+        Dim path As String = GetLogBookPath(twoDigitYear)
+        If Not File.Exists(path) Then
+            Throw New FileNotFoundException("Log book file not found.", path)
+        End If
+
+        Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            Using sr As New StreamReader(fs)
+                Dim buffer As New List(Of String)(capacity:=12)
+
+                While True
+                    Dim line As String = sr.ReadLine()
+                    If line Is Nothing Then Exit While
+
+                    buffer.Add(line)
+
+                    If buffer.Count = 12 Then
+                        Yield ParseEntry(buffer)
+                        buffer.Clear()
+                    End If
+                End While
+
+                ' If there is a partial entry at EOF, ignore it (defensive).
+            End Using
+        End Using
+    End Function
+
+    Private Shared Function ParseEntry(lines As List(Of String)) As LogBookEntry
+        ' Expected 12 lines per entry.
+        Dim e As New LogBookEntry()
+
+        Dim dateRaw As String = Unquote(lines(0))
+        Dim cust As String = Unquote(lines(1))
+        Dim part As String = Unquote(lines(2))
+
+        Dim invRaw As String = lines(3).Trim()
+        Dim po As String = Unquote(lines(4))
+        Dim spec As String = Unquote(lines(5))
+        Dim qtyAcc As String = Unquote(lines(6))
+        Dim qtyRej As String = Unquote(lines(7))
+        Dim mat As String = Unquote(lines(8))
+        Dim ht As String = Unquote(lines(9))
+        Dim rsn As String = Unquote(lines(10))
+        Dim st As String = Unquote(lines(11))
+
+        e.Customer = cust.Trim()
+        e.Part = part.Trim()
+        e.PONumber = po.Trim()
+        e.Spec = spec.Trim()
+        e.QtyAcceptedOrReceived = qtyAcc.Trim()
+        e.QtyRejected = qtyRej.Trim()
+        e.Material = mat.Trim()
+        e.HeatTreat = ht.Trim()
+        e.RejectReason = rsn.Trim()
+        e.Status = st.Trim()
+
+        Dim inv As Integer
+        If Integer.TryParse(invRaw, inv) Then
+            e.InvoiceNumber = inv
+        End If
+
+        ' Dates appear like 01-02-2014 in your sample.
+        Dim d As Date
+        If Date.TryParseExact(dateRaw.Trim(),
+                              "MM-dd-yyyy",
+                              CultureInfo.InvariantCulture,
+                              DateTimeStyles.None,
+                              d) Then
+            e.EntryDate = d
+        End If
+
+        Return e
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t As String = s.Trim()
+
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2)
+        End If
+
+        Return t
+    End Function
+
+End Class
+```
+
+---
+
+## File 3 â€” `FrmDosPagedViewer.vb` (Windows Forms Form)
+A DOS-style pager:
+- **ENTER** = next page
+- **ESC** = quit (closes form)
+- shows bottom hint line: `[ENTER = More]   [ESC = Quit]`
+- also supports â€œend of logâ€ page like DOS
+
+```vbnet name=FrmDosPagedViewer.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmDosPagedViewer
+    Inherits Form
+
+    Private ReadOnly _txt As TextBox
+    Private ReadOnly _lblHint As Label
+
+    Private _pages As List(Of String) = New List(Of String)()
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        Me.Text = "Viewer"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(900, 650)
+
+        _txt = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Dock = DockStyle.Fill,
+            .Font = Me.Font
+        }
+
+        _lblHint = New Label() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = Me.Font,
+            .Text = "[ENTER = More]   [ESC = Quit]"
+        }
+
+        Me.Controls.Add(_txt)
+        Me.Controls.Add(_lblHint)
+
+        AddHandler Me.KeyDown, AddressOf OnViewerKeyDown
+    End Sub
+
+    Public Sub SetPages(pages As IEnumerable(Of String))
+        _pages = New List(Of String)(If(pages, Array.Empty(Of String)()))
+        _pageIndex = 0
+        Render()
+    End Sub
+
+    Public Sub SetSinglePage(text As String)
+        SetPages(New String() {If(text, "")})
+    End Sub
+
+    Private Sub OnViewerKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            If _pageIndex < _pages.Count - 1 Then
+                _pageIndex += 1
+                Render()
+            Else
+                ' DOS typically stays on last page until ESC; do the same.
+                ' (If you want Enter to close on last page, tell me and Iâ€™ll change it.)
+            End If
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub Render()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then
+            _txt.Text = ""
+            Return
+        End If
+
+        _txt.Text = _pages(_pageIndex)
+        _txt.SelectionStart = 0
+        _txt.SelectionLength = 0
+    End Sub
+End Class
+```
+
+---
+
+## What Iâ€™ll generate next (once you say â€œgoâ€)
+To actually complete **(E) Log Book** end-to-end (year prompt â†’ menu â†’ option 1/2/3/4 searches â†’ viewer paging), I need to output two more FULL FILES:
+
+1) **`FormLogBookMenu.vb`** (Windows Forms Form)  
+   - Shows menu
+   - Prompts (customer/invoice/PO/spec/anything)
+   - Calls `LogBookReader` and uses `FrmDosPagedViewer`
+
+2) **Updated `FormMainMenu.vb`** (Windows Forms Form)  
+   - `E` prompts for year like DOS
+   - Opens `FormLogBookMenu` with the chosen year
+
+### Two small questions before I generate those
+1) Confirm you want the Log Book menu form named **`FormLogBookMenu`** (not `Frm...`).
+2) In your Windows port, do you already have a central constant for the data folder, or should I hardcode:
+   - `\\invoice\mainmenu\data`
+   into `FormLogBookMenu` (I can also make it configurable at the top of the file).
+
+Reply with those two answers and Iâ€™ll produce the remaining full files.
+
+## @testsubject117
+
+OK, GOING TO JUMP BACK A BIT. back on button (6) I wasn't sure what spec numbers were, so I asked the users. originally I used cadmium, which might have been right, but now the users responded with spec codes to try: AS7477, ASTM-E-1444, and ASTM-E-1417. I started testing on the Dos virtual machine. if I click (6) then choose enter for 2026, then I entered the spec number at prompt, here's what I got.: 
+
+## Copilot
+
+Youâ€™ve now captured the *successful* DOS behavior for **(6) Scan entire logbook to find customers with a certain Spec or Part Number**â€”and it confirms exactly what we should implement in the Windows port.
+
+## What DOS (6) is really doing (based on your screenshots)
+1) Prompt: **â€œEnter Part or all of the Spec to search for?â€** (you entered `AS7477`)
+2) It then iterates through â€œyearsâ€, printing status like:
+   - `LOG BOOK does'nt exist for the year of 1..9`
+   - `Scanning the year of 1910`, `1911`, `1912`, â€¦ (this is the DOS â€œ19xxâ€ weirdness)
+3) While scanning, it prints **matching customer abbreviations** on the console (e.g., `3VFASTEN`, `CALSREW`, `ACUFASTA`, etc.).
+4) Then it opens a generated Word document **`LOGSPEC.DOC`** containing formatted match lines like:
+
+- `Customer: ...  Part#: ...  Spec: ...`
+- additional lines containing spec text (itâ€™s doing substring matches inside the spec field)
+- `Invoice #: ...`
+
+So: **(6) = cross-year scan + report generation + open report**.
+
+### Important behavioral detail
+Your successful report shows **spec strings that contain AS7477 plus other tokens** (e.g. `AS7477D/ASTM E 1417-05...`). This confirms the search is a **case-insensitive substring** search within the *Spec field*, not strict equals.
+
+---
+
+# Windows port: what we should implement for (6)
+Given you do **not** want a Word dependency, the closest/best equivalent is:
+
+### Windows Implementation (recommended)
+- Prompt: â€œEnter part or all of the Spec to search for?â€
+- Scan all available `LOGBOOK.<yy>` files in the data directory (`\\invoice\mainmenu\data`)
+  - Rather than the DOS â€œ1910..1922â€ nonsense, we scan actual files that exist.
+- For each entry whose `Spec` contains the search term (case-insensitive):
+  - output a formatted report line(s):
+    - Customer, Part, Invoice#, Date, Spec
+- Show results in our `FrmDosPagedViewer` (ENTER=More, ESC=Quit)
+- Optionally offer â€œExportâ€¦â€ later (write to `.txt`)
+
+This will be faster, more reliable, and still matches what users need: â€œfind all customers/jobs with spec Xâ€.
+
+---
+
+# Next code to generate (FULL FILE) â€” Iâ€™m ready, but need your two answers
+Earlier you asked me to ask before generating full files and to state type (Class/Form/etc.). Iâ€™m ready to generate these FULL FILES next:
+
+1) **`FormLogBookMenu.vb`** *(Windows Forms Form)*  
+   - Implements the menu and prompts for (1)/(2)/(3)/(4)/(6)/(8) initially
+   - Uses `LogBookReader` and `FrmDosPagedViewer`
+
+2) **`FrmRawLogBookFindAnything.vb`** *(Windows Forms Form)* for option (8)  
+   - Prompt term
+   - Load the raw text of `LOGBOOK.<yy>`
+   - **F3 = find next**, ESC = exit (DOS-like)
+
+But I need two confirmations from you first (you didnâ€™t answer them earlier):
+
+## A) Form name
+Do you want the log book menu form named exactly:
+- **`FormLogBookMenu`** (recommended; matches your `FormMainMenu`), yes/no?
+
+## B) Data path source
+Do you want me to **hardcode** the UNC path:
+- `\\invoice\mainmenu\data`
+inside `FormLogBookMenu.vb`,
+or should I reference an existing setting/constant in your app (e.g., `LegacyDataPaths.BaseDataDir`)?
+
+If you tell me the name of your existing data-path helper, Iâ€™ll use it. If not, Iâ€™ll hardcode with a single constant at the top so itâ€™s easy to change.
+
+---
+
+## One tiny optional detail
+For (6), should the scan be:
+- **All years found in the folder** (scan all `LOGBOOK.*` files), or
+- **Only the selected year** (e.g., 26)?
+
+DOS says â€œscan entire logbookâ€ and clearly scans many years, so I recommend scanning **all `LOGBOOK.*` files**.
+
+---
+
+Reply with:
+1) `FormLogBookMenu`: yes/no  
+2) Data path: hardcode UNC vs use existing helper (tell me its name if it exists)  
+3) (6) scan scope: all `LOGBOOK.*` vs selected year only
+
+Then Iâ€™ll output the next full file(s).
+
+## @testsubject117
+
+I will now also try ASTM-E numbers and paste results here: I'm not sure why it says scanning the year of 1911. there would be no results from the year 1911 because no technology existed then. does it mean line 1911?
+
+## Copilot
+
+Itâ€™s not line 1911 â€” itâ€™s (buggy/legacy) **year scanning**.
+
+### Why DOS says â€œScanning the year of 1911â€
+The routine for option **(6)** is almost certainly looping over a **2â€‘digit year value** (00â€“99) and then turning it into a 4â€‘digit year by doing something like:
+
+- `fullYear = 1900 + yy`
+
+So:
+- `yy = 10` â†’ â€œScanning the year of **1910**â€
+- `yy = 11` â†’ â€œScanning the year of **1911**â€
+- etc.
+
+That matches exactly what youâ€™re seeing, and it also matches the â€œLOG BOOK doesnâ€™t exist for the year of 6/7/8/9â€ lines: itâ€™s checking for year `06`, `07`, `08`, `09` first, not literal 1906â€“1909.
+
+In a modern sense, that code *should* have been:
+- `fullYear = 2000 + yy` (for 2010, 2011, â€¦)
+or smarter rollover logic â€” but it wasnâ€™t.
+
+So yes: the **data is really 2010/2011/etc**, but DOS is *printing the wrong century*.
+
+### Your results prove it
+Your Word report clearly includes:
+- invoice numbers in the 500k+ range
+- specs like `ASTM-E-1444`
+- customers you recognize
+
+Those are obviously modern records. The â€œ1911â€ text is just a display artifact from that `1900 + yy` conversion.
+
+---
+
+## What we should do in the Windows port
+We should **not replicate the century bug**. We should:
+
+- Scan actual files that exist in `\\invoice\mainmenu\data`, like:
+  - `LOGBOOK.14` (your sample)
+  - `LOGBOOK.26`
+- When we display progress, show:
+  - `Scanning LOGBOOK.14 (2014)` or `Scanning year 2014`
+  - i.e., interpret `yy` as **2000â€“2099** unless you explicitly tell me you have 19xx logbooks.
+
+That keeps the output sane and avoids confusion for users.
+
+---
+
+## What your ASTM-E test tells us about option (6)
+Your `ASTM-E-1444` run generated a `LOGSPEC.DOC` containing matches where the spec field includes `ASTM-E-1444` (case/format variations like line breaks still match).
+
+So for Windows:
+- Search should be **case-insensitive substring**.
+- Ideally normalize punctuation minimally (e.g., treat `ASTM E 1444` vs `ASTM-E-1444` as similar). We can do this by searching both raw and a â€œnormalizedâ€ version where we remove spaces/hyphens.
+
+If you want that, say so; otherwise weâ€™ll implement literal case-insensitive substring first.
+
+---
+
+## Next step (code) â€” I need 2 confirmations from you
+To generate the remaining **FULL FILE** code for the Log Book menu + option (6), confirm:
+
+1) Form name: **`FormLogBookMenu`** (yes/no)
+2) Data path: should I **hardcode** `\\invoice\mainmenu\data` in the file (simple, explicit), or do you have an existing `LegacyDataPaths.BaseDataDir` (tell me the exact name) that I should call instead?
+
+Once you confirm those, Iâ€™ll produce the next full files:
+- `FormLogBookMenu.vb` *(WinForms Form)* â€” menu + prompts + option routing
+- `LogBookSearch.vb` *(Class/Module)* â€” helpers to build pages and perform searches, including (6) scan-all-years report
+
+## @testsubject117
+
+using ASTM-E1417:  Also, users responded saying they don't use the BF Goodrich (U) menu choice.
+
+## Copilot
+
+Goodâ€”your `ASTM-E1417` run confirms two more things we should mirror in the Windows port:
+
+1) **Search is tolerant of formatting variants**  
+   Your input `ASTM-E1417` still matched output containing `ASTM-E-1417-05` (extra hyphen and suffix). So this is effectively â€œcontains these characters in orderâ€, not strict token matching.
+
+2) **The report format is consistent**  
+   The generated report repeats:
+   - `Customer: ...  Part#: ...  Spec: ...`
+   - the full spec text (often wraps to next line)
+   - `Invoice #: ...`
+
+And thanks for confirming: **(U)/(9) is not used**. In the Windows port we should remove it or disable it (preferably hide it to reduce clutter unless you want strict DOS parity).
+
+---
+
+## To implement this search behavior well (Windows)
+For option (6), I recommend we do **two matching strategies**:
+
+- **Raw contains (case-insensitive)**: `Spec.Contains(term)`
+- **Normalized contains**: compare `Normalize(term)` against `Normalize(spec)` where normalization:
+  - uppercase
+  - remove spaces, dashes, slashes
+  - remove repeated punctuation
+
+So:
+- user term `ASTM-E1417` normalizes to `ASTME1417`
+- spec `ASTM-E-1417-05` normalizes to `ASTME141705`
+â†’ contains match succeeds.
+
+This will make users happy because they donâ€™t have to guess punctuation.
+
+---
+
+## Ready to generate the next FULL FILES â€” but I still need your two confirmations
+To proceed (without touching any repo), Iâ€™m going to generate **FULL FILE code** for:
+
+1) **`FormLogBookMenu.vb`** *(Windows Forms Form)*  
+2) **`FrmRawLogBookFindAnything.vb`** *(Windows Forms Form; F3 find-next)*  
+3) **`LogBookSearch.vb`** *(Module/Class; builds pages; implements option 6 cross-year scan)*
+
+Before I do that, confirm these two items so I donâ€™t guess wrong:
+
+### 1) Form naming
+Do you want the log book menu form named **`FormLogBookMenu`**? (yes/no)
+
+### 2) Data path usage
+Should I hardcode the data path as:
+- `\\invoice\mainmenu\data`
+or do you already have a known VB constant/property to use instead (e.g., `LegacyDataPaths.BaseDataDir`)?
+
+If you want hardcode, just say: **â€œHardcode UNCâ€**.
+
+---
+
+### One extra preference (since U is unused)
+Do you want the Windows Log Book menu to:
+- **Hide** (5) and (U)/(9) entirely, or
+- Show them but display â€œ(Not used)â€ / disable selection?
+
+Reply with:
+- `FormLogBookMenu = yes`
+- `Hardcode UNC` (or your existing path helper name)
+- `Hide unused` vs `Disable unused`
+
+â€¦and Iâ€™ll output the full files.
+
+## @testsubject117
+
+how long do you think it will take to complete wiring up the log book menu?
+
+## Copilot
+
+If we **only wire up the Log Book menu UI + viewer + parser** (so `(E)` opens the menu, keys 1/2/3/4/6/8 do the right prompts, and results display with **ENTER=More / ESC back**) itâ€™s roughly:
+
+- **4â€“8 hours** to get it working end-to-end in a typical WinForms VB project, assuming no surprises with your existing menu framework and key handling.
+- **1â€“2 days** if we include polish + edge cases (missing/corrupt logbook files, partial records, performance on large files, better formatting, and matching quirks like the DOS â€œEND OF LOG BOOKâ€¦â€ page).
+
+### Breakdown (realistic)
+1) **Core infrastructure (1â€“2 hrs)**
+   - `LogBookEntry` + `LogBookReader` (12-line records)
+   - Year normalization (`2026`/`26` â†’ `26`)
+   - Load from `\\invoice\mainmenu\data`
+
+2) **DOS-style paging viewer (0.5â€“1.5 hrs)**
+   - You already have the `FrmDosPagedViewer` skeleton; minor tweaks for exact hints and â€œEND OF LOG BOOKâ€ screens.
+
+3) **Log Book menu form + prompts (2â€“4 hrs)**
+   - Render the menu screen
+   - Bottom-line prompt input behavior
+   - Route options:
+     - (1) customer filter
+     - (2) all customers
+     - (3) invoice filter (substring)
+     - (4) PO filter (substring)
+     - (6) spec scan (across all `LOGBOOK.*`)
+     - (8) â€œfind anythingâ€ (raw viewer + F3 next)
+
+4) **Option (6) report output (1â€“3 hrs)**
+   - Cross-file scan + normalized matching (handles `ASTM-E1417` vs `ASTM-E-1417-05`)
+   - Build pages for viewer
+
+5) **Test pass / fixups (1â€“4 hrs)**
+   - Validate with a few known customers/specs/invoices
+   - Ensure ESC always returns to menu
+   - Confirm paging matches DOS expectations
+
+### What can make it take longer
+- If your current `FormMainMenu` relies on a specific input model (KeyPress vs KeyDown, focus traps).
+- If logbook files have occasional deviations from 12-line records.
+- If option (8) needs to mimic the DOS red-screen more closely than a read-only text viewer.
+
+If you tell me whether you want **only (1)/(2)/(4)/(6)** first (minimal useful set), we can get a functional version in the **4â€“6 hour** range and then add (3)/(8) after.
+
+## @testsubject117
+
+what did we decide was next on the list after the logbook?
+
+## Copilot
+
+After **(E) Log Book** is wired up, the next items we lined up (based on your earlier â€œquick visible winsâ€ list) were:
+
+1) **(Q) Word Processor**
+2) **(R) Find Word Processor Text**
+3) **(T) Change Date/Time**
+
+Notes based on what youâ€™ve learned since:
+- **(U) BFGOODRICH floppy update**: users say they **donâ€™t use it**, so it drops off the priority list (either omit or leave disabled).
+- **(5) last date of business** inside Log Book: users **donâ€™t use it**, so we can skip or mark â€œnot usedâ€.
+
+If you want, we can treat **Q + R** as a single milestone (theyâ€™re tightly related), then do **T**.
+
+## @testsubject117
+
+lets start wiring up the logbook, beginning with (1) View one Customer
+
+## Copilot
+
+## Plan
+Weâ€™ll implement just enough to make **(E) â†’ Log Book Menu â†’ (1) View one customer** work end-to-end with real data from `\\invoice\mainmenu\data\LOGBOOK.<yy>`.
+
+To do that (without touching your repo), Iâ€™m going to generate **FULL FILE** code for 4 files:
+
+1) `LogBookEntry.vb` *(Class)* â€” record model + DOS-style formatting  
+2) `LogBookReader.vb` *(Class)* â€” reads 12-line entries from `LOGBOOK.<yy>`  
+3) `FrmDosPagedViewer.vb` *(WinForms Form)* â€” ENTER=More, ESC=Quit paging  
+4) `FormLogBookMenu.vb` *(WinForms Form)* â€” shows menu + implements option (1)
+
+### Two quick confirmations (so I donâ€™t guess wrong)
+1) Do you want the form named **`FormLogBookMenu`** (as written), yes?  
+2) Should I **hardcode** the data path as `\\invoice\mainmenu\data` inside the form for now, yes?
+
+If you say â€œyes/yesâ€, Iâ€™ll paste all 4 full files immediately.
+
+In the meantime, here is **File #4** (the new form) ready to go (it depends on the 3 earlier files you already got from me; if you want I can repost them too).
+
+---
+
+## File â€” `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    ' TODO: If you already have a central path helper, replace this constant with that call.
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen elements (simple, no designer file)
+    Private ReadOnly _txtScreen As TextBox
+    Private ReadOnly _txtPrompt As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        _txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font
+        }
+
+        _txtPrompt = New TextBox() With {
+            .Multiline = False,
+            .Dock = DockStyle.Bottom,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font
+        }
+
+        Me.Controls.Add(_txtScreen)
+        Me.Controls.Add(_txtPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler _txtPrompt.KeyDown, AddressOf OnPromptKeyDown
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        _mode = InputMode.Menu
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        _txtScreen.Text = sb.ToString()
+
+        _txtPrompt.Text = ""
+        _txtPrompt.Visible = False
+        _txtScreen.Focus()
+    End Sub
+
+    Private Sub ShowBottomPrompt(prompt As String)
+        _txtPrompt.Visible = True
+        _txtPrompt.Text = ""
+        _txtPrompt.Focus()
+
+        ' Put the prompt on the screen area (like DOS bottom prompt line).
+        RenderMenu(prompt)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode = InputMode.Menu Then
+            Dim keyChar As Char = ChrW(e.KeyValue)
+
+            Select Case e.KeyCode
+                Case Keys.D1, Keys.NumPad1
+                    _mode = InputMode.ViewOneCustomerPrompt
+                    ShowBottomPrompt("CUSTOMER NAME?")
+                    e.Handled = True
+                    Return
+
+                Case Keys.Q
+                    Me.Close()
+                    e.Handled = True
+                    Return
+            End Select
+        End If
+    End Sub
+
+    Private Sub OnPromptKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = _txtPrompt.Text.Trim()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu("CUSTOMER NAME? (blank cancelled)")
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim matches As New List(Of LogBookEntry)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' DOS appears to use abbreviated customer keys; support prefix match.
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    matches.Add(entry)
+                End If
+            Next
+        Catch ex As Exception
+            Dim v As New FrmDosPagedViewer()
+            v.Text = "LOG BOOK"
+            v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End Try
+
+        If matches.Count = 0 Then
+            Dim v As New FrmDosPagedViewer()
+            v.Text = "LOG BOOK"
+            v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End If
+
+        ' Convert to pages. Simplest: 1 entry per page (very DOS-like).
+        Dim pages As New List(Of String)()
+        For Each m In matches
+            pages.Add(m.FormatForDosViewer())
+        Next
+
+        ' Add the DOS end screen as the last page.
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Dim viewer As New FrmDosPagedViewer()
+        viewer.Text = "LOG BOOK"
+        viewer.SetPages(pages)
+        viewer.ShowDialog(Me)
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+---
+
+### What you need to do to test (once you paste the other 3 files too)
+- Add these files to your project.
+- From wherever you handle Main Menu `(E)`, open:
+  - `Dim f As New FormLogBookMenu(26) : f.ShowDialog()`
+- Press `1`, type `PSIBEARI`, press Enter â†’ you should get pages of entries from `LOGBOOK.26`.
+
+---
+
+If you answer the two confirmations (â€œyes to FormLogBookMenuâ€ and â€œyes to hardcode UNCâ€), Iâ€™ll paste **FULL FILES** for the other three dependencies again (so you have a complete copy/paste set in one place) and then weâ€™ll wire `(E)` after option (1) works.
+
+## @testsubject117
+
+yes to both questions
+
+## Copilot
+
+## Great â€” proceeding with FULL FILES (no repo changes)
+You confirmed:
+- Form name: **`FormLogBookMenu`**
+- Data path: **hardcode** `\\invoice\mainmenu\data`
+
+Below are the **complete, copy/paste-ready** files you need for **(1) View one customer** to work.
+
+---
+
+## File 1 â€” `LogBookEntry.vb` (Class)
+```vbnet name=LogBookEntry.vb
+Option Strict On
+Option Explicit On
+
+Public Class LogBookEntry
+    Public Property EntryDate As Date?
+    Public Property Customer As String = ""
+    Public Property Part As String = ""
+    Public Property InvoiceNumber As Integer?
+    Public Property PONumber As String = ""
+    Public Property Spec As String = ""
+    Public Property QtyAcceptedOrReceived As String = ""
+    Public Property QtyRejected As String = ""
+    Public Property Material As String = ""
+    Public Property HeatTreat As String = ""
+    Public Property RejectReason As String = ""
+    Public Property Status As String = ""
+
+    Public Function FormatForDosViewer() As String
+        ' A readable DOS-style block. Adjust labels if you want 1:1 with the legacy display.
+        Dim d As String = If(EntryDate.HasValue, EntryDate.Value.ToString("MM-dd-yyyy"), "")
+        Dim inv As String = If(InvoiceNumber.HasValue, InvoiceNumber.Value.ToString(), "")
+        Dim po As String = If(PONumber, "")
+        Dim cust As String = If(Customer, "")
+        Dim part As String = If(Part, "")
+        Dim spec As String = If(Spec, "")
+        Dim qtyAcc As String = If(QtyAcceptedOrReceived, "")
+        Dim qtyRej As String = If(QtyRejected, "")
+        Dim mat As String = If(Material, "")
+        Dim ht As String = If(HeatTreat, "")
+        Dim rsn As String = If(RejectReason, "")
+        Dim st As String = If(Status, "")
+
+        Return
+            $"Customer: {cust}    Part#: {part}    {d}" & vbCrLf &
+            $"Invoice#: {inv}     P.O.#: {po}     Status: {st}" & vbCrLf &
+            $"Qty Acc/Rec: {qtyAcc}     Qty Rejected: {qtyRej}     Mat: {mat}" & vbCrLf &
+            $"Heat Treat: {ht}     Rsn Rej: {rsn}" & vbCrLf &
+            $"Spec: {spec}"
+    End Function
+End Class
+```
+
+---
+
+## File 2 â€” `LogBookReader.vb` (Class)
+```vbnet name=LogBookReader.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+
+Public Class LogBookReader
+
+    Private ReadOnly _baseDir As String
+
+    Public Sub New(baseDir As String)
+        _baseDir = baseDir
+    End Sub
+
+    Public Function GetLogBookPath(twoDigitYear As Integer) As String
+        Dim yy As String = twoDigitYear.ToString("00")
+        Return Path.Combine(_baseDir, $"LOGBOOK.{yy}")
+    End Function
+
+    Public Iterator Function ReadEntries(twoDigitYear As Integer) As IEnumerable(Of LogBookEntry)
+        Dim path As String = GetLogBookPath(twoDigitYear)
+        If Not File.Exists(path) Then
+            Throw New FileNotFoundException("Log book file not found.", path)
+        End If
+
+        Using fs As New FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+            Using sr As New StreamReader(fs)
+                Dim buffer As New List(Of String)(capacity:=12)
+
+                While True
+                    Dim line As String = sr.ReadLine()
+                    If line Is Nothing Then Exit While
+
+                    buffer.Add(line)
+
+                    If buffer.Count = 12 Then
+                        Yield ParseEntry(buffer)
+                        buffer.Clear()
+                    End If
+                End While
+
+                ' Defensive: ignore partial record at EOF if present.
+            End Using
+        End Using
+    End Function
+
+    Private Shared Function ParseEntry(lines As List(Of String)) As LogBookEntry
+        ' Expected 12 lines per entry.
+        Dim e As New LogBookEntry()
+
+        Dim dateRaw As String = Unquote(lines(0))
+        Dim cust As String = Unquote(lines(1))
+        Dim part As String = Unquote(lines(2))
+
+        Dim invRaw As String = lines(3).Trim()
+        Dim po As String = Unquote(lines(4))
+        Dim spec As String = Unquote(lines(5))
+        Dim qtyAcc As String = Unquote(lines(6))
+        Dim qtyRej As String = Unquote(lines(7))
+        Dim mat As String = Unquote(lines(8))
+        Dim ht As String = Unquote(lines(9))
+        Dim rsn As String = Unquote(lines(10))
+        Dim st As String = Unquote(lines(11))
+
+        e.Customer = cust.Trim()
+        e.Part = part.Trim()
+        e.PONumber = po.Trim()
+        e.Spec = spec.Trim()
+        e.QtyAcceptedOrReceived = qtyAcc.Trim()
+        e.QtyRejected = qtyRej.Trim()
+        e.Material = mat.Trim()
+        e.HeatTreat = ht.Trim()
+        e.RejectReason = rsn.Trim()
+        e.Status = st.Trim()
+
+        Dim inv As Integer
+        If Integer.TryParse(invRaw, inv) Then
+            e.InvoiceNumber = inv
+        End If
+
+        ' Date format from your sample: 01-02-2014
+        Dim d As Date
+        If Date.TryParseExact(dateRaw.Trim(),
+                              "MM-dd-yyyy",
+                              CultureInfo.InvariantCulture,
+                              DateTimeStyles.None,
+                              d) Then
+            e.EntryDate = d
+        End If
+
+        Return e
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t As String = s.Trim()
+
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2)
+        End If
+
+        Return t
+    End Function
+
+End Class
+```
+
+---
+
+## File 3 â€” `FrmDosPagedViewer.vb` (Windows Forms Form)
+```vbnet name=FrmDosPagedViewer.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmDosPagedViewer
+    Inherits Form
+
+    Private ReadOnly _txt As TextBox
+    Private ReadOnly _lblHint As Label
+
+    Private _pages As List(Of String) = New List(Of String)()
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        Me.Text = "Viewer"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(900, 650)
+
+        _txt = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Dock = DockStyle.Fill,
+            .Font = Me.Font
+        }
+
+        _lblHint = New Label() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = Me.Font,
+            .Text = "[ENTER = More]   [ESC = Quit]"
+        }
+
+        Me.Controls.Add(_txt)
+        Me.Controls.Add(_lblHint)
+
+        AddHandler Me.KeyDown, AddressOf OnViewerKeyDown
+    End Sub
+
+    Public Sub SetPages(pages As IEnumerable(Of String))
+        _pages = New List(Of String)(If(pages, Array.Empty(Of String)()))
+        _pageIndex = 0
+        Render()
+    End Sub
+
+    Public Sub SetSinglePage(text As String)
+        SetPages(New String() {If(text, "")})
+    End Sub
+
+    Private Sub OnViewerKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            If _pageIndex < _pages.Count - 1 Then
+                _pageIndex += 1
+                Render()
+            Else
+                ' Stay on last page until ESC (DOS-like).
+            End If
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub Render()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then
+            _txt.Text = ""
+            Return
+        End If
+
+        _txt.Text = _pages(_pageIndex)
+        _txt.SelectionStart = 0
+        _txt.SelectionLength = 0
+    End Sub
+End Class
+```
+
+---
+
+## File 4 â€” `FormLogBookMenu.vb` (Windows Forms Form)
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly _txtScreen As TextBox
+    Private ReadOnly _txtPrompt As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        _txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font
+        }
+
+        _txtPrompt = New TextBox() With {
+            .Multiline = False,
+            .Dock = DockStyle.Bottom,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font
+        }
+
+        Me.Controls.Add(_txtScreen)
+        Me.Controls.Add(_txtPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler _txtPrompt.KeyDown, AddressOf OnPromptKeyDown
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = "")
+        _mode = InputMode.Menu
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+        Dim header As String = "LOG BOOK"
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine(header)
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(9) Update BFGOODRICH spec list from floppy disk")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+        If promptLine.Length > 0 Then sb.AppendLine(promptLine)
+
+        _txtScreen.Text = sb.ToString()
+
+        _txtPrompt.Text = ""
+        _txtPrompt.Visible = False
+        _txtScreen.Focus()
+    End Sub
+
+    Private Sub ShowBottomPrompt(prompt As String)
+        _txtPrompt.Visible = True
+        _txtPrompt.Text = ""
+        _txtPrompt.Focus()
+        RenderMenu(prompt)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If _mode = InputMode.Menu Then
+            Select Case e.KeyCode
+                Case Keys.D1, Keys.NumPad1
+                    _mode = InputMode.ViewOneCustomerPrompt
+                    ShowBottomPrompt("CUSTOMER NAME?")
+                    e.Handled = True
+                    Return
+
+                Case Keys.Q
+                    Me.Close()
+                    e.Handled = True
+                    Return
+            End Select
+        End If
+    End Sub
+
+    Private Sub OnPromptKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = _txtPrompt.Text.Trim()
+
+        If _mode = InputMode.ViewOneCustomerPrompt Then
+            RunViewOneCustomer(input)
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu("CUSTOMER NAME? (blank cancelled)")
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.Customer IsNot Nothing AndAlso
+                   entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+
+                    pages.Add(entry.FormatForDosViewer())
+                End If
+            Next
+        Catch ex As Exception
+            Dim v As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+            v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End Try
+
+        If pages.Count = 0 Then
+            Dim v As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+            v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+            v.ShowDialog(Me)
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Dim viewer As New FrmDosPagedViewer() With {.Text = "LOG BOOK"}
+        viewer.SetPages(pages)
+        viewer.ShowDialog(Me)
+
+        RenderMenu()
+    End Sub
+End Class
+```
+
+---
+
+## Quick test harness (you add wherever convenient)
+To verify option (1) immediately, temporarily call:
+
+```vbnet
+Dim f As New FormLogBookMenu(26)
+f.ShowDialog()
+```
+
+Then press:
+- `1` â†’ type `PSIBEARI` â†’ Enter
+- ENTER pages forward; ESC exits viewer; ESC again closes menu form
+
+---
+
+When you confirm this works, the next step is to wire `(E)` from your main menu into:
+- year prompt (Enter defaults to 2026)
+- normalize year to two-digit
+- `New FormLogBookMenu(twoDigitYear).ShowDialog()`
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30481	'Class' statement must end with a matching 'End Class'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	4	
+Error (active)	BC30027	'End Function' expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	18	
+Error (active)	BC30654	'Return' statement in a Function, Get, or Operator must return a value.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	33	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	34	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	34	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	34	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	35	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	35	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	35	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	36	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	36	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	36	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	37	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	37	
+Error (active)	BC30648	String constants must end with a double quote.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	38	
+Warning (active)	BC42104	Variable 'part' is used before it has been assigned a value. A null reference exception could result at runtime.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	24	
+Warning (active)	BC42104	Variable 'spec' is used before it has been assigned a value. A null reference exception could result at runtime.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\LogBookEntry.vb	25	
+
+
+## Copilot
+
+Those errors are coming from `LogBookEntry.vb` and are almost certainly due to the way VB parses **multi-line string concatenation**. In VB.NET you canâ€™t split a `Return "..." & vbCrLf &` expression across lines unless you use explicit line-continuation (`_`) or put the whole thing on one line.
+
+Iâ€™ll fix `LogBookEntry.vb` by building the output with a `StringBuilder` (most robust), which will eliminate the â€œEnd Function expected / string constant must endâ€ cascade.
+
+## Replace the entire file: `LogBookEntry.vb` (Class)
+```vbnet name=LogBookEntry.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Text
+
+Public Class LogBookEntry
+    Public Property EntryDate As Date?
+    Public Property Customer As String = ""
+    Public Property Part As String = ""
+    Public Property InvoiceNumber As Integer?
+    Public Property PONumber As String = ""
+    Public Property Spec As String = ""
+    Public Property QtyAcceptedOrReceived As String = ""
+    Public Property QtyRejected As String = ""
+    Public Property Material As String = ""
+    Public Property HeatTreat As String = ""
+    Public Property RejectReason As String = ""
+    Public Property Status As String = ""
+
+    Public Function FormatForDosViewer() As String
+        ' A readable DOS-style block. Adjust labels later if you want 1:1 with the legacy display.
+        Dim d As String = If(EntryDate.HasValue, EntryDate.Value.ToString("MM-dd-yyyy"), "")
+        Dim inv As String = If(InvoiceNumber.HasValue, InvoiceNumber.Value.ToString(), "")
+        Dim po As String = If(PONumber, "")
+        Dim cust As String = If(Customer, "")
+        Dim partValue As String = If(Part, "")
+        Dim specValue As String = If(Spec, "")
+        Dim qtyAcc As String = If(QtyAcceptedOrReceived, "")
+        Dim qtyRej As String = If(QtyRejected, "")
+        Dim mat As String = If(Material, "")
+        Dim ht As String = If(HeatTreat, "")
+        Dim rsn As String = If(RejectReason, "")
+        Dim st As String = If(Status, "")
+
+        Dim sb As New StringBuilder()
+
+        sb.Append("Customer: ").Append(cust).Append("    ")
+        sb.Append("Part#: ").Append(partValue).Append("    ")
+        sb.AppendLine(d)
+
+        sb.Append("Invoice#: ").Append(inv).Append("     ")
+        sb.Append("P.O.#: ").Append(po).Append("     ")
+        sb.AppendLine("Status: " & st)
+
+        sb.Append("Qty Acc/Rec: ").Append(qtyAcc).Append("     ")
+        sb.Append("Qty Rejected: ").Append(qtyRej).Append("     ")
+        sb.AppendLine("Mat: " & mat)
+
+        sb.Append("Heat Treat: ").Append(ht).Append("     ")
+        sb.AppendLine("Rsn Rej: " & rsn)
+
+        sb.Append("Spec: ").Append(specValue)
+
+        Return sb.ToString()
+    End Function
+End Class
+```
+
+### Why this fixes it
+- No multi-line `Return "..." & ...` continuation issues.
+- Also removes those warnings you saw (`part` / `spec` used before assignment) by renaming to `partValue` / `specValue` and ensuring theyâ€™re always initialized.
+
+---
+
+## If you still get a compile error after this
+Paste the **first ~60 lines** of your `LogBookEntry.vb` as it exists on disk (sometimes a stray quote pasted from elsewhere can poison the file), and Iâ€™ll pinpoint it.
+
+Once `LogBookEntry.vb` compiles, we can move on to the next likely integration hiccup: your project may require `Imports System.IO` / WinForms references depending on how itâ€™s structuredâ€”but weâ€™ll tackle those one at a time.
+
+## @testsubject117
+
+when I built it then ran it, the log book when clicked: 
+
+## Copilot
+
+That message box is coming from your **existing Main Menu handler**â€”you still have the stub for `(E) LOGBOOK` wired to `"Not implemented yet: View Log Book (LOGBOOK)"`.
+
+To proceed with **(1) View one customer**, you need to change that handler to open the new form:
+
+- prompt for year (or just hardcode `26` temporarily)
+- `Dim f As New FormLogBookMenu(twoDigitYear) : f.ShowDialog()`
+
+Because you asked for **FULL FILE** changes and you havenâ€™t shown me your `FormMainMenu.vb` (or whatever file contains that stub), I canâ€™t safely generate a full replacement for it yet.
+
+## Fastest next step (pick one)
+
+### Option A (best): paste the full file that contains that MessageBox
+Please paste the FULL contents of the file where you see this code (or search for the exact string):
+- `Not implemented yet: View Log Book (LOGBOOK)`
+
+If you donâ€™t know the file, use Visual Studio **Find in Files** for that string and tell me:
+- the filename
+- and ideally paste the whole file
+
+Then Iâ€™ll return a **FULL FILE** replacement that wires `(E)` correctly.
+
+### Option B (quick temporary test harness)
+If you just want to test the logbook form right now without touching the menu, add a temporary button/menu item anywhere and put:
+
+```vbnet
+Dim f As New FormLogBookMenu(26)
+f.ShowDialog()
+```
+
+This bypasses the main menu stub entirely.
+
+---
+
+## When you paste the main menu file, I will implement:
+- `(E)` â†’ show prompt: â€œEnter year (ENTER = current year)â€
+  - accept `2026` / `26` / blank
+  - normalize to two-digit
+- open `FormLogBookMenu(twoDigitYear)`
+
+Reply with the file contents (or at least the file name + the block around that MessageBox) and Iâ€™ll generate the full replacement.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow per request)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels) - increased per request
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Was 18; moved up another 5px -> 23
+    Private Const PromptLiftPx As Integer = 23
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    ' Ignore everything else; keep waiting (DOS-like)
+                    Return
+            End Select
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        ' Container provides the gray strip visible both above and below the prompt box.
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        ' Inner prompt is the black box with white text.
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        ' Draw a thicker border around the prompt box
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            ' Keep border inside bounds so it is fully visible; account for pen thickness
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+## Do this: replace `FormMainMenu.vb` with the full file below
+Itâ€™s the same file you pasted, with **only one functional change**: the `"E"` case is now wired to open the Log Book menu.
+
+- **File type:** Windows Forms Form (`Partial Public Class FormMainMenu`)
+- **What changed:** `Case "E"` now opens a year prompt (using your existing DOS-style bottom prompt bar pattern, but via an `InputBox` to keep it simple and safe for now), normalizes to a 2â€‘digit year, then opens `FormLogBookMenu`.
+
+> If you want the year prompt to be the same â€œbottom bar interactive inputâ€ style as DOS, we can do that next; this gets you unblocked immediately.
+
+```vbnet name=FormMainMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow per request)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels) - increased per request
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Was 18; moved up another 5px -> 23
+    Private Const PromptLiftPx As Integer = 23
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
