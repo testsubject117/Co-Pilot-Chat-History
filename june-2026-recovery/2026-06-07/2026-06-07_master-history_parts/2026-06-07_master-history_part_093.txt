@@ -1,0 +1,2000 @@
+﻿        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceStatus.BackColor = pnlInvoice.BackColor
+        lblInvoiceStatus.ForeColor = Color.White
+        lblInvoiceStatus.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+        dgvInvoice.BackgroundColor = Color.Black
+        dgvInvoice.GridColor = Color.DimGray
+        dgvInvoice.BorderStyle = BorderStyle.FixedSingle
+        dgvInvoice.EnableHeadersVisualStyles = False
+        dgvInvoice.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgvInvoice.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgvInvoice.ColumnHeadersDefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        dgvInvoice.DefaultCellStyle.BackColor = Color.Black
+        dgvInvoice.DefaultCellStyle.ForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.SelectionBackColor = Color.FromArgb(48, 48, 48)
+        dgvInvoice.DefaultCellStyle.SelectionForeColor = Color.White
+        dgvInvoice.DefaultCellStyle.Font = New Font("Consolas", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgvInvoice.RowHeadersVisible = False
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+        AddHandler dgv.DataBindingComplete, AddressOf OnMainGridDataBindingComplete
+
+        Controls.Add(dgv)
+        Controls.Add(pnlInvoice)
+        Controls.Add(topPanel)
+    End Sub
+
+    Private Sub OnMainGridDataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        If dgv.Columns.Contains("DateText") Then
+            dgv.Columns("DateText").HeaderText = "Date"
+        End If
+
+        If dgv.Columns.Contains("CheckNumber") Then
+            dgv.Columns("CheckNumber").HeaderText = "Check #"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiffText") Then
+            dgv.Columns("InvoiceDiffText").HeaderText = "Invoice Diff"
+        End If
+
+        If dgv.Columns.Contains("InvoiceDiffText") Then
+            dgv.Columns("InvoiceDiffText").DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight
+            dgv.Columns("InvoiceDiffText").Width = 95
+        End If
+
+        If dgv.Columns.Contains("Amount") Then
+            dgv.Columns("Amount").DefaultCellStyle.Format = "G29"
+        End If
+    End Sub
+
+    Private Sub ApplyInitialFilters()
+        txtCustomer.Text = InitialCustomerFilter.Trim()
+        txtCheck.Text = InitialCheckFilter.Trim()
+
+        Dim yearText As String = InitialYearFilter.Trim()
+        If yearText <> "" AndAlso cmbYear.Items.Contains(yearText) Then
+            cmbYear.SelectedItem = yearText
+        End If
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("")
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("")
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2)
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+
+        If _invIndexReady Then
+            Dim i As Integer
+            For i = 0 To list.Count - 1
+                Dim entry = list(i)
+                Dim invoiceNumbers As List(Of Long) = GetInvoiceNumbersForEntry(entry)
+
+                If String.IsNullOrWhiteSpace(entry.InvoiceDiffText) AndAlso invoiceNumbers.Count > 0 Then
+                    entry.InvoiceDiffText = "0"
+                End If
+            Next
+        End If
+
+        dgv.DataSource = Nothing
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim invoiceNumbers As List(Of Long) = GetInvoiceNumbersForEntry(entry)
+
+        If invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        ' Legacy DOS file flow for check/invoice detail:
+        '   - LEDGER.CUR supplies the selected check row in the main grid
+        '   - CHECK.INV supplies the list of invoice numbers attached to that check
+        '   - INVOICE.CHK supplies invoice detail (amount, company, status)
+        '     for each invoice using direct random-access lookup:
+        '
+        '         recordNumber = invoiceNumber - 75000
+        '
+        ' Original DOS "View Checks" did not inline invoice detail on the ledger screen;
+        ' this lower grid is a modern enhancement built from the correct legacy file roles.
+        '
+        ' Important: invoice detail lookup must not depend on CHECK.INV containing amount
+        ' or status information. CHECK.INV is only the relationship/bridge file.
+        Dim i As Integer
+        For i = 0 To invoiceNumbers.Count - 1
+            Dim invNo As Long = invoiceNumbers(i)
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{SafeTrim(entry.CheckNumber)}  |  Customer: {SafeTrim(entry.Customer)}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Function GetInvoiceNumbersForEntry(entry As LedgerEntry) As List(Of Long)
+        If entry Is Nothing Then
+            Return New List(Of Long)()
+        End If
+
+        Dim keys As List(Of String) = BuildCandidateKeys(entry.Customer, entry.CheckNumber)
+
+        Dim i As Integer
+        For i = 0 To keys.Count - 1
+            Dim key As String = keys(i)
+            Dim invoiceNumbers As List(Of Long) = Nothing
+
+            If _invIndex.TryGetValue(key, invoiceNumbers) AndAlso invoiceNumbers IsNot Nothing AndAlso invoiceNumbers.Count > 0 Then
+                Return New List(Of Long)(invoiceNumbers)
+            End If
+        Next
+
+        Return New List(Of Long)()
+    End Function
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+
+                        Dim bi As Integer
+                        For bi = 0 To blocks.Count - 1
+                            Dim b = blocks(bi)
+                            Dim keys As List(Of String) = BuildCandidateKeys(b.CustomerCode, b.CheckNumber)
+                            Dim parsedInvoices As New List(Of Long)()
+
+                            If b.Invoices IsNot Nothing Then
+                                Dim ii As Integer
+                                For ii = 0 To b.Invoices.Count - 1
+                                    Dim invStr As String = b.Invoices(ii)
+                                    Dim invNo As Long
+                                    If Long.TryParse(SafeTrim(invStr), invNo) Then
+                                        If Not parsedInvoices.Contains(invNo) Then
+                                            parsedInvoices.Add(invNo)
+                                        End If
+                                    End If
+                                Next
+                            End If
+
+                            Dim ki As Integer
+                            For ki = 0 To keys.Count - 1
+                                Dim key As String = keys(ki)
+                                If key = "" Then Continue For
+
+                                Dim lst As List(Of Long) = Nothing
+                                If Not idx.TryGetValue(key, lst) Then
+                                    lst = New List(Of Long)()
+                                    idx(key) = lst
+                                End If
+
+                                Dim pi As Integer
+                                For pi = 0 To parsedInvoices.Count - 1
+                                    Dim invNo As Long = parsedInvoices(pi)
+                                    If Not lst.Contains(invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            Next
+                        Next
+                    End If
+                Catch
+                End Try
+
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(
+                            Sub()
+                                _invIndex = idx
+                                _invIndexReady = True
+                                ApplyFilters()
+                                OnMainGridSelectionChanged()
+                            End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildCandidateKeys(code As String, checkNum As String) As List(Of String)
+        Dim results As New List(Of String)()
+
+        Dim codeTrimmed As String = SafeTrim(code)
+        Dim checkTrimmed As String = SafeTrim(checkNum)
+
+        Dim codeUpper As String = codeTrimmed.ToUpperInvariant()
+        Dim checkUpper As String = checkTrimmed.ToUpperInvariant()
+
+        Dim codeCompact As String = codeUpper.Replace(" ", "")
+        Dim checkCompact As String = checkUpper.Replace(" ", "")
+
+        AddUnique(results, codeUpper & "|" & checkUpper)
+        AddUnique(results, codeTrimmed & "|" & checkTrimmed)
+        AddUnique(results, codeCompact & "|" & checkUpper)
+        AddUnique(results, codeUpper & "|" & checkCompact)
+        AddUnique(results, codeCompact & "|" & checkCompact)
+
+        Return results
+    End Function
+
+    Private Shared Sub AddUnique(list As List(Of String), value As String)
+        If list Is Nothing Then Return
+        If String.IsNullOrWhiteSpace(value) Then Return
+
+        Dim i As Integer
+        For i = 0 To list.Count - 1
+            If String.Equals(list(i), value, StringComparison.OrdinalIgnoreCase) Then
+                Return
+            End If
+        Next
+
+        list.Add(value)
+    End Sub
+
+    Private Shared Function SafeTrim(value As String) As String
+        Return If(value, "").Trim()
+    End Function
+
+End Class
+```
+
+## What I added
+Only comments:
+- on `_invIndex`
+- inside `ShowInvoiceDetails`
+
+## What I did not change
+- no logic
+- no names
+- no event wiring
+- no UI behavior
+
+If you want, next I can also give you a **very short commit message + longer commit description** for these successful fixes.
+
+## @testsubject117
+
+ok
+
+## Copilot
+
+Here are clean commit notes you can use.
+
+## Commit message
+```text
+Fix legacy check invoice detail lookup and document DOS file relationships
+```
+
+## Longer commit description
+```text
+Restore working invoice detail lookup for selected ledger checks.
+
+Summary:
+- Keep ledger check list sourced from LEDGER.CUR
+- Load invoice-number links from CHECK.INV
+- Load invoice detail from INVOICE.CHK using direct legacy record math:
+  recordNumber = invoiceNumber - 75000
+
+Key fixes:
+- Stop hard-rejecting INVOICE.CHK records based on the decoded first field
+- Treat the first field as advisory and use direct slot lookup for amount/company/status
+- Preserve working invoice detail enrichment for the lower grid in FormLedgerView
+- Disable problematic analyzer/build settings in the project file to avoid Roslyn internal compiler crashes
+- Add comments documenting the DOS relationship between LEDGER.CUR, CHECK.INV, and INVOICE.CHK
+
+Legacy behavior note:
+- Original DOS View Checks used LEDGER.CUR only for summary display
+- CHECK.INV is the bridge from checks to invoice numbers
+- INVOICE.CHK is the invoice master/status store
+- The modern lower invoice grid is a deliberate enhancement built on correct legacy file semantics
+```
+
+## Very short alternative commit message
+```text
+Fix CHECK.INV to INVOICE.CHK invoice detail lookup
+```
+
+## If you want a second commit just for comments
+### Commit message
+```text
+Add developer notes for legacy DOS check and invoice file flow
+```
+
+### Description
+```text
+Document how LEDGER.CUR, CHECK.INV, and INVOICE.CHK work together and explain the direct record lookup rule:
+invoiceNumber - 75000
+```
+
+If you want, I can also help you decide whether this should be:
+- one commit
+- or split into two commits.
+
+## @testsubject117
+
+for right now, let's move forward wiring buttons. I want to get the checks menu done today
+
+## Copilot
+
+Yes â€” letâ€™s keep momentum and finish the Checks menu.
+
+## Best next step
+We should make a quick checklist of the **Checks menu buttons/options** you want wired, then do them in the safest order:
+
+1. buttons that just **open an existing form**
+2. buttons that **filter an existing form**
+3. buttons that need **new file integration**
+4. buttons that need **write/update logic**
+
+## Based on what weâ€™ve already discussed, the likely checks-related items are:
+- **View Checks**
+- **Add Checks**
+- **Delete Checks**
+- **Find invoices paid by a check**
+- **Find check by invoice number**
+- maybe **print** or **reports**
+
+## Fastest way to move
+Send me either:
+
+### Option A
+A screenshot/list of the Checks menu items you want wired today
+
+**or**
+
+### Option B
+Just type them like this:
+```text
+1. View Checks
+2. Add Checks
+3. Delete Checks
+4. Find invoices paid by check
+5. Find check by invoice
+```
+
+Then Iâ€™ll tell you:
+- which ones are already done
+- which ones are partially done
+- the exact order we should wire them today
+
+## My recommendation
+Do the **read-only buttons first**, because theyâ€™re fastest and safest:
+- view checks
+- find invoices by check
+- find check by invoice
+
+Then do:
+- add check
+- delete check
+
+because those touch multiple legacy files and are easier to get wrong.
+
+Send me the menu list and Iâ€™ll turn it into an action plan immediately.
+
+## @testsubject117
+
+I'm confused. I was just going back over the checks menu, we already had (1) and (2) wired up, but now (1) says it isn't impletmented yet, (2) says it isnt' implemented yet, (3) view checks is working since we just worked on it, (5) view company totals is working, but needs to be revised as it doesn't match dos look, (6) and (7) are not implemented yet, (8) view other checks is implemented but doesn't match dos look, (9) find a check # does work, but does not match dos look, (0) Find an invoice # also works but does not match dos look, (A) find checks that don't balance works but does not match dos look, and (S) sales employees checks works and looks exactly as it should
+
+## Copilot
+
+Got it â€” hereâ€™s the direct state of the **Checks** menu based on what you just said.
+
+## Current status
+
+### Working
+- **(3) View Checks** â€” working
+- **(5) View Company Totals** â€” working, but UI/style needs DOS-match revision
+- **(8) View Other Checks** â€” working, but UI/style needs DOS-match revision
+- **(9) Find a Check #** â€” working, but UI/style needs DOS-match revision
+- **(0) Find an Invoice #** â€” working, but UI/style needs DOS-match revision
+- **(A) Find Checks That Donâ€™t Balance** â€” working, but UI/style needs DOS-match revision
+- **(S) Sales Employees Checks** â€” working and looks correct
+
+### Not working / currently showing not implemented
+- **(1)** â€” was wired before, now says not implemented
+- **(2)** â€” was wired before, now says not implemented
+- **(6)** â€” not implemented
+- **(7)** â€” not implemented
+
+---
+
+## What this means
+We have **two different categories** of work:
+
+### Category 1: broken regressions
+These should be first:
+- **(1)** was working before, now not implemented
+- **(2)** was working before, now not implemented
+
+That suggests either:
+- the menu dispatch got changed
+- button handlers got disconnected
+- case labels no longer point to the correct forms/actions
+
+### Category 2: cosmetic DOS-match cleanup
+These already function:
+- (5)
+- (8)
+- (9)
+- (0)
+- (A)
+
+These are lower risk and can be polished after wiring is stable.
+
+### Category 3: true missing implementations
+- (6)
+- (7)
+
+These are actual new work.
+
+---
+
+# Recommended order for today
+
+## First: fix regressions
+1. **(1)**
+2. **(2)**
+
+Because if they used to work, these are probably quick wins.
+
+## Second: finish missing functions
+3. **(6)**
+4. **(7)**
+
+## Third: cosmetic DOS-style cleanup
+5. **(5)**
+6. **(8)**
+7. **(9)**
+8. **(0)**
+9. **(A)**
+
+Only after all menu options function.
+
+---
+
+# What I need from you next
+To fix this efficiently, I need to see the code that dispatches the **Checks menu** choices.
+
+## Please paste one of these:
+- the form/code module that handles the Checks menu keypress/button selection
+- or the method with the menu cases for `(1)`, `(2)`, `(3)`, etc.
+
+Iâ€™m looking for code like:
+```vb
+Select Case choice
+    Case "1"
+    Case "2"
+    Case "3"
+```
+
+or button click handlers for the checks screen.
+
+---
+
+## Why
+If (1) and (2) used to work and now donâ€™t, the problem is probably not the forms themselves â€” itâ€™s likely the **menu routing**.
+
+So the fastest fix is to inspect the **Checks menu dispatcher** first.
+
+Paste that code and Iâ€™ll tell you exactly:
+- why (1) and (2) fell back to not implemented
+- what to restore
+- and what (6) and (7) should map to next.
+
+## @testsubject117
+
+wouldn't that be formledgermenu.vb?
+
+## Copilot
+
+Yes â€” **most likely `FormLedgerMenu.vb`**.
+
+## Direct answer
+If that is the screen where the **Checks menu options (1,2,3...A,S,0)** are handled, then yes, that is exactly what I need.
+
+## Please paste:
+- **all of `FormLedgerMenu.vb`**
+
+or at least the part that:
+- builds the menu
+- handles button clicks / key presses
+- routes choices `(1)` through `(S)`
+
+## Why this is probably the right file
+Because your problem sounds like **menu dispatch**, not form logic:
+
+- `(1)` says not implemented
+- `(2)` says not implemented
+- `(3)` opens correctly
+- others open but with style differences
+
+That usually means the menu form is deciding what to launch, and some cases are missing or pointing to placeholder code.
+
+So yes â€” **`FormLedgerMenu.vb` is the right place to inspect first**.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormLedgerMenu
+    Inherits DosMenuFormBase
+
+    Private Enum ViewChecksPromptStep
+        None = 0
+        Customer = 1
+        CheckNumber = 2
+        Year = 3
+    End Enum
+
+    Private ReadOnly pnlPromptHost As New Panel()
+    Private ReadOnly pnlPromptSeparator As New Panel()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtPrompt As New TextBox()
+
+    Private _viewChecksPromptStep As ViewChecksPromptStep = ViewChecksPromptStep.None
+    Private _viewChecksCustomer As String = ""
+    Private _viewChecksCheckNumber As String = ""
+    Private _viewChecksYear As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        SetMenuTitle("CHECKS")
+
+        ShowVersionInHeader = False
+        UpdateHeaderClock()
+
+        StretchButtonsToPanelWidth = False
+        ButtonFixedWidthPx = 620
+        flpLeft.Padding = New Padding(24, 0, 0, 0)
+
+        flpRight.Visible = False
+        flpRight.Enabled = False
+
+        flpLeft.AutoScroll = False
+
+        Me.Width = 1000
+        Me.Height = 720
+
+        BuildLedgerMenu()
+        TightenChecksMenuButtons()
+        BuildInlinePromptUi()
+    End Sub
+
+    Private Sub BuildLedgerMenu()
+        ClearMenu()
+
+        Dim p = flpLeft
+
+        AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+        AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+        AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+        AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                          Using f As New FormLedgerCompanyTotals()
+                                                              f.ShowDialog(Me)
+                                                          End Using
+                                                      End Sub)
+        AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+        AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+        AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                       Using f As New FormOtherChecksView()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                    Using f As New FormFindByCheckNumber()
+                                                        f.ShowDialog(Me)
+                                                    End Using
+                                                End Sub)
+        AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                       Using f As New FormFindByInvoiceNumber()
+                                                           f.ShowDialog(Me)
+                                                       End Using
+                                                   End Sub)
+        AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                     Using f As New FormLedgerDoesntBalance()
+                                                                         f.ShowDialog(Me)
+                                                                     End Using
+                                                                 End Sub)
+        AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                             Using f As New FormSalesEmployeesChecksMenu()
+                                                                 f.ShowDialog(Me)
+                                                             End Using
+                                                         End Sub)
+    End Sub
+
+    Private Sub TightenChecksMenuButtons()
+        For Each c As Control In flpLeft.Controls
+            Dim btn = TryCast(c, Button)
+            If btn IsNot Nothing Then
+                btn.Height = 30
+                btn.Margin = New Padding(3, 3, 3, 4)
+                btn.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+            End If
+        Next
+    End Sub
+
+    Private Sub BuildInlinePromptUi()
+        pnlPromptHost.Visible = False
+        pnlPromptHost.Dock = DockStyle.Bottom
+        pnlPromptHost.Height = 96
+        pnlPromptHost.BackColor = Color.FromArgb(32, 32, 32)
+        pnlPromptHost.Padding = New Padding(12, 8, 12, 10)
+
+        pnlPromptSeparator.Dock = DockStyle.Top
+        pnlPromptSeparator.Height = 2
+        pnlPromptSeparator.BackColor = Color.Silver
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Dock = DockStyle.Top
+        lblPrompt.Height = 28
+        lblPrompt.TextAlign = ContentAlignment.MiddleLeft
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = pnlPromptHost.BackColor
+        lblPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblPrompt.Padding = New Padding(0, 8, 0, 0)
+
+        txtPrompt.Dock = DockStyle.Top
+        txtPrompt.Height = 30
+        txtPrompt.BorderStyle = BorderStyle.FixedSingle
+        txtPrompt.BackColor = Color.Black
+        txtPrompt.ForeColor = Color.White
+        txtPrompt.Font = New Font("Consolas", 13.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtPrompt.MaxLength = 100
+        txtPrompt.Margin = New Padding(0, 6, 0, 0)
+
+        AddHandler txtPrompt.KeyDown, AddressOf OnPromptTextBoxKeyDown
+
+        pnlPromptHost.Controls.Add(txtPrompt)
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptHost.Controls.Add(pnlPromptSeparator)
+
+        Controls.Add(pnlPromptHost)
+        pnlPromptHost.BringToFront()
+    End Sub
+
+    Private Sub BeginViewChecksPromptFlow()
+        _viewChecksCustomer = ""
+        _viewChecksCheckNumber = ""
+        _viewChecksYear = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.Customer
+
+        ShowPrompt("Enter customer name [Enter = all customers] ?", "")
+    End Sub
+
+    Private Sub ShowPrompt(promptText As String, currentValue As String)
+        lblPrompt.Text = promptText
+        txtPrompt.Text = currentValue
+        pnlPromptHost.Visible = True
+        txtPrompt.SelectionStart = txtPrompt.TextLength
+        txtPrompt.SelectionLength = 0
+        txtPrompt.Focus()
+    End Sub
+
+    Private Sub HidePrompt()
+        pnlPromptHost.Visible = False
+        lblPrompt.Text = ""
+        txtPrompt.Text = ""
+        _viewChecksPromptStep = ViewChecksPromptStep.None
+        Me.Focus()
+    End Sub
+
+    Private Sub OnPromptTextBoxKeyDown(sender As Object, e As KeyEventArgs)
+        If _viewChecksPromptStep = ViewChecksPromptStep.None Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            e.Handled = True
+            HidePrompt()
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then
+            Return
+        End If
+
+        e.SuppressKeyPress = True
+        e.Handled = True
+
+        Dim value As String = txtPrompt.Text.Trim()
+
+        Select Case _viewChecksPromptStep
+            Case ViewChecksPromptStep.Customer
+                _viewChecksCustomer = value
+                _viewChecksPromptStep = ViewChecksPromptStep.CheckNumber
+                ShowPrompt("Enter Check Number [Enter = All Checks] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.CheckNumber
+                _viewChecksCheckNumber = value
+                _viewChecksPromptStep = ViewChecksPromptStep.Year
+                ShowPrompt("Enter Year [Enter = All Years] ?", "")
+                Return
+
+            Case ViewChecksPromptStep.Year
+                _viewChecksYear = value
+                HidePrompt()
+                OpenLedgerViewWithPromptValues()
+                Return
+        End Select
+    End Sub
+
+    Private Sub OpenLedgerViewWithPromptValues()
+        Using f As New FormLedgerView()
+            f.InitialCustomerFilter = _viewChecksCustomer
+            f.InitialCheckFilter = _viewChecksCheckNumber
+            f.InitialYearFilter = NormalizeYearFilter(_viewChecksYear)
+            f.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Function NormalizeYearFilter(value As String) As String
+        Dim s As String = If(value, "").Trim()
+
+        If s = "" Then
+            Return ""
+        End If
+
+        Dim yearNum As Integer
+        If Integer.TryParse(s, yearNum) Then
+            If s.Length <= 2 Then
+                If yearNum <= 79 Then
+                    Return (2000 + yearNum).ToString()
+                Else
+                    Return (1900 + yearNum).ToString()
+                End If
+            End If
+
+            If s.Length = 4 Then
+                Return s
+            End If
+        End If
+
+        Return s
+    End Function
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this confirms it.
+
+## Direct answer
+`FormLedgerMenu.vb` currently has **(1), (2), (6), and (7)** hardwired to `NotYet(...)`.
+
+So they are not â€œmysteriously brokenâ€ â€” they are explicitly set back to placeholder behavior in this file.
+
+These lines are the reason:
+
+```vbnet
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+```
+
+---
+
+# What this means
+So the next question is **not** â€œwhy are they broken?â€  
+The answer is: because this menu currently tells them to show the placeholder.
+
+The real question is:
+
+## What should (1), (2), (6), and (7) open?
+
+---
+
+# Best next step
+We need to identify the forms that already exist for:
+
+- **(1) Add Checks to ledger & cash receipts**
+- **(2) Delete Checks**
+- **(6) Add OTHER Checks**
+- **(7) Delete OTHER Checks**
+
+Because if you already wired them earlier, those forms may still exist â€” the menu just got reverted.
+
+---
+
+## Fastest way to find them
+Please tell me **any class names** you remember, or paste a list of files/forms that look relevant.
+
+Examples might be names like:
+- `FormAddChecks`
+- `FormLedgerAddChecks`
+- `FormDeleteChecks`
+- `FormOtherChecksAdd`
+- `FormOtherChecksDelete`
+
+If you donâ€™t know, I can help you search systematically.
+
+---
+
+# Probable fix pattern
+Once we know the form names, these lines become something like:
+
+```vbnet
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+    Using f As New FormWhateverAddChecksIsCalled()
+        f.ShowDialog(Me)
+    End Using
+End Sub)
+```
+
+and similarly for `(2)`, `(6)`, `(7)`.
+
+---
+
+# So right now we have a clear status
+## Definitely implemented in menu
+- (3)
+- (5)
+- (8)
+- (9)
+- (0)
+- (A)
+- (S)
+
+## Definitely placeholder only
+- (1)
+- (2)
+- (6)
+- (7)
+
+---
+
+# Easiest next move
+If you want, I can help identify existing forms for those four options.
+
+### Please paste one of:
+1. a list of your form files from Solution Explorer, or
+2. the names of anything that looks like add/delete checks or other checks forms.
+
+Then Iâ€™ll tell you exactly what each menu button should be wired to.
+
+## @testsubject117
+
+here is a screenshot of solution explorer tree, does this help?: 
+
+## Copilot
+
+Yes â€” that helps a lot.
+
+## Direct answer
+You already have the forms for **(1)** and **(2)**:
+
+- **(1)** should almost certainly open `FormAddChecks.vb`
+- **(2)** should almost certainly open `FormDeleteCheck.vb`
+
+So those two can be wired immediately.
+
+---
+
+## What the screenshot tells us
+
+Visible relevant forms:
+
+- `FormAddChecks.vb`
+- `FormDeleteCheck.vb`
+- `FormOtherChecksView.vb`
+- `FormFindByCheckNumber.vb`
+- `FormFindByInvoiceNumber.vb`
+- `FormLedgerCompanyTotals.vb`
+- `FormLedgerDoesntBalance.vb`
+- `FormSalesEmployeeCheckWizard.vb`
+- `FormSalesEmployeesChecksMenu.vb`
+
+So the regression is just menu routing, not missing forms.
+
+---
+
+# Update these menu lines
+
+## Replace this:
+```vbnet
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub() NotYet("Add Checks to ledger & cash receipts"))
+AddMenuButton(p, "2", "Delete Checks", Sub() NotYet("Delete Checks"))
+```
+
+## With this:
+```vbnet
+AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                  Using f As New FormAddChecks()
+                                                                      f.ShowDialog(Me)
+                                                                  End Using
+                                                              End Sub)
+AddMenuButton(p, "2", "Delete Checks", Sub()
+                                           Using f As New FormDeleteCheck()
+                                               f.ShowDialog(Me)
+                                           End Using
+                                       End Sub)
+```
+
+---
+
+# About (6) and (7)
+From the screenshot, I do **not** see obvious forms for:
+
+- Add OTHER Checks
+- Delete OTHER Checks
+
+I only see:
+- `FormOtherChecksView.vb`
+
+So right now:
+
+- **(6)** probably truly is not implemented yet
+- **(7)** probably truly is not implemented yet
+
+Unless those actions live inside some differently named form we havenâ€™t identified.
+
+---
+
+# What I recommend right now
+## Immediate quick win
+Wire **(1)** and **(2)** now.
+
+That gets rid of the false â€œnot implementedâ€ regression.
+
+---
+
+# Your updated `BuildLedgerMenu()` section
+Here is the exact replacement block for the top part:
+
+```vbnet
+Private Sub BuildLedgerMenu()
+    ClearMenu()
+
+    Dim p = flpLeft
+
+    AddMenuButton(p, "1", "Add Checks to ledger & cash receipts", Sub()
+                                                                      Using f As New FormAddChecks()
+                                                                          f.ShowDialog(Me)
+                                                                      End Using
+                                                                  End Sub)
+    AddMenuButton(p, "2", "Delete Checks", Sub()
+                                               Using f As New FormDeleteCheck()
+                                                   f.ShowDialog(Me)
+                                               End Using
+                                           End Sub)
+    AddMenuButton(p, "3", "View Checks", Sub() BeginViewChecksPromptFlow())
+    AddMenuButton(p, "5", "View Companys Totals", Sub()
+                                                      Using f As New FormLedgerCompanyTotals()
+                                                          f.ShowDialog(Me)
+                                                      End Using
+                                                  End Sub)
+    AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+    AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+    AddMenuButton(p, "8", "View OTHER Checks", Sub()
+                                                   Using f As New FormOtherChecksView()
+                                                       f.ShowDialog(Me)
+                                                   End Using
+                                               End Sub)
+    AddMenuButton(p, "9", "Find a Check #", Sub()
+                                                Using f As New FormFindByCheckNumber()
+                                                    f.ShowDialog(Me)
+                                                End Using
+                                            End Sub)
+    AddMenuButton(p, "0", "Find an Invoice #", Sub()
+                                                   Using f As New FormFindByInvoiceNumber()
+                                                       f.ShowDialog(Me)
+                                                   End Using
+                                               End Sub)
+    AddMenuButton(p, "A", "Find Checks that don't balance.", Sub()
+                                                                 Using f As New FormLedgerDoesntBalance()
+                                                                     f.ShowDialog(Me)
+                                                                 End Using
+                                                             End Sub)
+    AddMenuButton(p, "S", "Sales Employee's checks", Sub()
+                                                         Using f As New FormSalesEmployeesChecksMenu()
+                                                             f.ShowDialog(Me)
+                                                         End Using
+                                                     End Sub)
+End Sub
+```
+
+---
+
+# After that
+Test:
+
+1. Checks menu option **1**
+2. Checks menu option **2**
+
+If both open correctly, then weâ€™ve fixed the regression.
+
+---
+
+# Then next
+After that, we can decide whether todayâ€™s remaining work should be:
+
+### Option A
+figure out whether `(6)` and `(7)` already exist under unexpected names
+
+or
+
+### Option B
+start DOS-look cleanup for the already-working screens
+
+My recommendation:
+- fix `(1)` and `(2)` first
+- then check whether `(6)` and `(7)` exist anywhere under other names
+
+If you want, after you test `(1)` and `(2)`, I can help identify whether **SalesEmployeeCheckWizard** might actually relate to one of the OTHER Checks workflows or not.
+
+## @testsubject117
+
+yay!!!! buttons (1) and (2) are now working again, I fully tested them. so they're good to go. as for (6) and (7), no we never implemented them at all
+
+## Copilot
+
+Excellent â€” then todayâ€™s wiring status is now clear.
+
+## Checks menu status now
+
+### Fully working
+- **(1)** Add Checks to ledger & cash receipts
+- **(2)** Delete Checks
+- **(3)** View Checks
+- **(5)** View Company Totals *(works, DOS-style polish later)*
+- **(8)** View OTHER Checks *(works, DOS-style polish later)*
+- **(9)** Find a Check #
+- **(0)** Find an Invoice #
+- **(A)** Find Checks that donâ€™t balance
+- **(S)** Sales Employeeâ€™s checks
+
+### Not implemented
+- **(6)** Add OTHER Checks
+- **(7)** Delete OTHER Checks
+
+---
+
+# Best next move
+If your goal is to get the **Checks menu done today**, then the only real unfinished functional items are:
+
+- **(6) Add OTHER Checks**
+- **(7) Delete OTHER Checks**
+
+So we should work on those next.
+
+---
+
+# Before coding them, we need one thing clear
+What exactly are **OTHER Checks** in your DOS system?
+
+Because â€œOTHER Checksâ€ could mean different things:
+
+- non-invoice checks
+- miscellaneous receipts
+- checks not tied to customer invoices
+- adjustment entries
+- special ledger items in a separate file
+
+Since **View OTHER Checks** already exists, the fastest path is probably to inspect how that screen reads its data. That will tell us:
+- what file backs OTHER checks
+- what fields exist
+- what add/delete should modify
+
+---
+
+## Best next step
+Please paste:
+
+- `FormOtherChecksView.vb`
+
+And if it uses a reader/repository class, also paste that file after.
+
+That will let me determine:
+- what â€œOTHER Checksâ€ are
+- what storage file they use
+- how (6) and (7) should behave
+
+---
+
+## Why this is the right order
+If we inspect the view first, we can implement add/delete against the same data model rather than guessing.
+
+So yes â€” weâ€™re in good shape:
+- regressions fixed
+- now only true missing features remain
+
+Paste `FormOtherChecksView.vb` next and Iâ€™ll map out `(6)` and `(7)`.
+
+## @testsubject117
+
+I'm also going to use the DOS VM to walk through choices (6) and (7) and get screenshots of each screen and send to you
+
+## Copilot
+
+Perfect â€” thatâ€™s the best move.
+
+## Direct answer
+Yes, please do that.
+
+For **(6) Add OTHER Checks** and **(7) Delete OTHER Checks**, screenshots from the DOS VM will be more valuable than guessing from filenames alone.
+
+## What to capture
+For each option, please grab screenshots of:
+
+1. the **first prompt/screen**
+2. each **next step**
+3. any **input fields**
+4. any **validation/error messages**
+5. the **confirmation step**
+6. the **final result**
+7. if possible, the related **View OTHER Checks** result before/after
+
+## Especially useful details
+If visible in the DOS screens, I want to know:
+
+- what file name is shown, if any
+- what fields are entered
+- whether customer code is used
+- whether date/check number/reference/amount are entered
+- whether invoices are involved at all
+- whether delete is by:
+  - check number
+  - line selection
+  - date/customer/check combo
+- whether it rewrites a file or just marks something deleted
+
+## Best workflow
+While you do that, we already know:
+
+- (6) and (7) are the only real missing Checks menu functions
+- the rest are functionally in place
+
+So once you send the screenshots, I can help translate them into:
+- screen flow
+- expected behavior
+- implementation plan
+
+## Bonus
+If the DOS screen mentions a file name or if you can correlate changes in the data files after doing (6)/(7), that would be even better.
+
+Send the screenshots when ready, and Iâ€™ll help you map them.
+
+## @testsubject117
+
+here's the screenshots for (6). each filename is numbered according to it's place in the order of the menu: 
+
+## Copilot
+
+Yes â€” this helps a lot.
+
+## What (6) appears to be
+**(6) Add OTHER Checks** is for checks that are **not tied to invoices**.
+
+The DOS screen literally says:
+
+- â€œThis is usually for over payments or checks that are Not paying for invoicesâ€
+
+So this is a separate check-entry workflow for **miscellaneous / non-invoice / overpayment checks**.
+
+---
+
+## Input flow shown by your screenshots
+The DOS flow for **(6)** appears to be:
+
+1. **Company Name [Q = Quit] ?**
+2. **Check # ?**
+3. **Check Reference ?**
+4. **Date [Enter = current date] ?** with DOS-style date mask shown
+5. likely next step after that is amount and save/confirm, but we havenâ€™t seen it yet
+
+From your screenshots, after entering date it appears to return to the start, which suggests one of these:
+
+- the save completed and the screen reset for the next entry, or
+- there are more prompts you didnâ€™t capture, or
+- a required later field was defaulted or skipped in your test path
+
+---
+
+## Very important inference
+Because **View OTHER Checks** already exists, the underlying data probably already has:
+
+- company/customer
+- check number
+- reference
+- date
+- amount
+
+So Add OTHER Checks is likely just creating a record in the same file that `FormOtherChecksView` reads.
+
+---
+
+# What I need next
+To implement `(6)` correctly, I now need to know the storage model.
+
+## Please send next:
+- `FormOtherChecksView.vb`
+
+That will show:
+- what file it reads
+- what fields an OTHER check has
+- what add/delete must write
+
+---
+
+# Also: one more DOS screenshot pass would help
+If possible, please capture the next test more completely for option **(6)**:
+
+## I want to see:
+- what happens **after date**
+- whether there is an **amount prompt**
+- whether there is a **confirmation prompt**
+- what exact success message appears, if any
+- whether the new record appears in **View OTHER Checks**
+
+That will tell us whether we need:
+- just company / check / ref / date / amount
+or
+- more fields / validation
+
+---
+
+# Current working spec for (6), based on screenshots
+### Screen title
+`***** Add A Check *****`
+
+### Purpose text
+â€œThis is usually for over payments or checks that are Not paying for invoicesâ€
+
+### Known prompts
+- Company Name `[Q = Quit]`
+- Check #
+- Check Reference
+- Date `[Enter = current date]`
+
+### Likely behavior
+- creates a new â€œOTHER checkâ€ record
+- does **not** link to invoices
+- probably writes to the same source used by **View OTHER Checks**
+
+---
+
+# Next step
+Paste `FormOtherChecksView.vb`, and Iâ€™ll turn this into an implementation plan for button **(6)**.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This set of screenshots shows the later steps of DOS menu option **(6) Add A Check** for **OTHER checks**.
+
+## What the screens show
+
+### Screen 1
+The DOS screen title is:
+
+- `***** Add A Check *****`
+
+The instruction line says:
+
+- â€œThis is usually for over payments or checks that are Not paying for invoicesâ€
+
+The entered fields shown are:
+
+- **Company Name**: `PSIBEARI`
+- **Check #**: `7791`
+- **Check Reference**: `12345678`
+- **Date**: `05-20-2026`
+- **Check Amount**: `1.02`
+
+The cursor is now at the next prompt:
+
+- **Reason Why ?**
+
+So this confirms that after date, DOS asks for:
+1. **Check Amount**
+2. **Reason Why**
+
+---
+
+### Screen 2
+This is the confirmation screen after all fields are entered.
+
+It shows a summary of the entered values:
+
+- Company Name: `PSIBEARI`
+- Check #: `7791`
+- Check Reference: `12345678`
+- Date: `05-20-2026`
+- Check Amount: `1.02`
+- Reason Why: `test`
+
+Then DOS shows three choices:
+
+- **[A = Add this Check]**
+- **[R = Re-enter Check]**
+- **[Q = Quit]**
+
+So the workflow includes a review/confirmation step before saving.
+
+---
+
+### Screen 3
+This appears to be another data-entry example from the same flow, showing:
+
+- Company Name: `PSIBEARI`
+- Check #: `7791`
+- Check Reference: `12345678`
+- Date: `05-20-2026`
+- **Check Amount: `.02`**
+
+This likely demonstrates that DOS accepts small decimal amounts entered without a leading zero.
+
+---
+
+## Confirmed workflow for option (6)
+So **Add OTHER Checks** now appears to be:
+
+1. Company Name `[Q = Quit]`
+2. Check #
+3. Check Reference
+4. Date `[Enter = current date]`
+5. Check Amount
+6. Reason Why
+7. Confirmation screen:
+   - `A = Add this Check`
+   - `R = Re-enter Check`
+   - `Q = Quit`
+
+---
+
+## Meaning of OTHER checks
+These are checks that are **not applied to invoices**, typically:
+
+- overpayments
+- miscellaneous checks
+- checks not paying invoice balances
+
+And they include a required or at least prompted **Reason Why** field, which distinguishes them from normal invoice-paying checks.
+
+---
+
+## Important implementation implication
+The OTHER checks data model likely needs these fields:
+
+- company/customer name
+- check number
+- check reference
+- date
+- amount
+- reason why
+
+That means `FormOtherChecksView.vb` should tell us where those fields are stored and how they are displayed.
+
+If you want, the next best step is still:
+- paste `FormOtherChecksView.vb`
+
+and I can help map this DOS flow into the new `(6)` form.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+
+Public Class FormOtherChecksView
+
+    Private Const ScreenTitle As String = "Other Checks"
+
+    Private ReadOnly txtCompany As New TextBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    Private _all As New List(Of OtherCheckEntry)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 750
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 45}
+        top.Controls.Add(New Label() With {.Text = "Company contains:", .AutoSize = True, .Padding = New Padding(0, 10, 0, 0)})
+
+        txtCompany.Width = 250
+        top.Controls.Add(txtCompany)
+
+        btnRefresh.Text = "Refresh"
+        top.Controls.Add(btnRefresh)
+
+        lblTotal.AutoSize = True
+        lblTotal.Padding = New Padding(20, 10, 0, 0)
+        top.Controls.Add(lblTotal)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+
+        Controls.Add(dgv)
+        Controls.Add(top)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilter()
+            End Sub
+        AddHandler txtCompany.TextChanged, Sub() ApplyFilter()
+
+        LoadData()
+        ApplyFilter()
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.OtherChk
+
+        ' Clear current view so we don't show stale rows if load fails.
+        _all = New List(Of OtherCheckEntry)()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            lblTotal.Text = "OTHER.CHK was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all = OtherChkReader.ReadAll(path)
+        Catch ex As Exception
+            _all = New List(Of OtherCheckEntry)()
+            lblTotal.Text = "Unable to read OTHER.CHK from: " & path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilter()
+        Dim s = txtCompany.Text.Trim()
+        Dim q = _all.AsEnumerable()
+
+        If s <> "" Then
+            q = q.Where(Function(x) If(x.Company, "").IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(x) x.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Great â€” now we know the storage file.
+
+## Direct answer
+`FormOtherChecksView.vb` confirms that **OTHER checks are read from `OTHER.CHK`** via:
+
+- `LegacyDataPaths.OtherChk`
+- `OtherChkReader.ReadAll(path)`
+
+So menu options:
+
+- **(6)** Add OTHER Checks
+- **(7)** Delete OTHER Checks
+
+should almost certainly **write to / modify `OTHER.CHK`**.
+
+---
+
+# What we know now about OTHER checks
+
+## Source file
+- `OTHER.CHK`
+
+## Reader already exists
+- `OtherChkReader.ReadAll(path)`
+
+## Record model
+- `OtherCheckEntry`
+
+## Fields definitely present in the view
+- company
+- amount
+
+## Fields strongly implied by DOS screenshots
+- company
+- check number
+- reference
+- date
+- amount
+- reason why
+
+So the next thing we need is the exact file layout.
+
+---
+
+# Best next step
+Please paste:
+
+- `OtherChkReader.vb`
+
+That will tell us:
+- exact record format
+- field lengths/types
+- whether itâ€™s fixed-width or sequential
+- what add/delete must write
+
+---
+
+# Why this matters
+With the DOS screenshots, we now know the **screen flow** for `(6)`.
+With `FormOtherChecksView.vb`, we now know the **target file** is `OTHER.CHK`.
+
+The missing link is the **actual record structure** from `OtherChkReader.vb`.
+
+Once we have that, I can help you build:
+- `FormAddOtherCheck`
+- `FormDeleteOtherCheck`
+
+or whatever names you want,
+without guessing at the data format.
+
+---
+
+# Current functional spec for (6)
+### DOS prompts
+1. Company Name `[Q = Quit]`
+2. Check #
+3. Check Reference
+4. Date `[Enter = current date]`
+5. Check Amount
+6. Reason Why
+7. Confirmation:
+   - A = Add this Check
+   - R = Re-enter Check
+   - Q = Quit
+
+### Data destination
+- `OTHER.CHK`
+
+---
+
+# Likely spec for (7)
+We donâ€™t know yet, but it will probably:
+- identify an OTHER check
+- remove it from `OTHER.CHK` or rewrite file without it
+
+Weâ€™ll know more after:
+- DOS screenshots for `(7)`
+- `OtherChkReader.vb`
+
+Paste `OtherChkReader.vb` next.
+
+## @testsubject117
+
+let me add the 2 screenshots for (7) now: 
+
+## Copilot
+
+Excellent â€” that gives us a pretty clear functional spec for **(7) Delete OTHER Checks**.
+
+## What the DOS screenshots show for (7)
+
+### Screen 1: initial prompt
+Title:
+
+- `***** Delete A Check *****`
+
+Instruction line:
+
+- â€œThis is usually for over payments or checks that are Not paying for invoicesâ€
+
+Prompt:
+
+- **Check # to Delete [Q=Quit]?**
+
+So delete begins by entering a **check number**, not company name.
+
+---
+
+### Screen 2: confirmation screen
+After entering the check number, DOS shows the matched record:
+
+- Company Name: `PSIBEARI`
+- Check #: `7791`
+- Check Reference: `12345678`
+- Date: `05-20-2026`
+- Check Amount: `1.02`
+- Reason Why: `test`
+
+Then it offers:
+
+- **[D = Delete this Check]**
+- **[K = Keep this Check]**
+
+So delete flow is:
+
+1. enter check number
+2. locate matching OTHER check
+3. show full record
+4. confirm delete or keep
+
+---
+
+# Confirmed functional spec
+
+## (6) Add OTHER Checks
+Prompts:
+1. company name `[Q=Quit]`
+2. check #
+3. check reference
+4. date `[Enter=current date]`
+5. check amount
+6. reason why
+7. confirm:
+   - A = Add this Check
+   - R = Re-enter Check
+   - Q = Quit
+
+## (7) Delete OTHER Checks
+Prompts:
+1. check # to delete `[Q=Quit]`
+2. show matching record details
+3. confirm:
+   - D = Delete this Check
+   - K = Keep this Check
+
+---
+
+# Important implication
+Delete appears to operate by **check number lookup** against `OTHER.CHK`.
+
+That means if duplicate check numbers exist in `OTHER.CHK`, we may need to verify whether DOS:
+- stops on the first match
+- or walks multiple matches
+
+From your screenshots, it looks like it shows a single matched record.  
+So initial implementation can likely:
+- find the first matching check number
+- confirm delete
+- rewrite `OTHER.CHK` without that record
+
+---
+
+# Next critical piece
+We still need the file format before implementing safely.
+
+## Please paste:
+- `OtherChkReader.vb`
+
+If there is also:
+- `OtherCheckEntry` class definition
+- or a repository/writer for OTHER.CHK
+
+paste that too.
+
+---
+
+# What I can do once I see that
+Iâ€™ll be able to help you define exactly:
+
+- whether `OTHER.CHK` is fixed-length or sequential
+- how to write new records for (6)
+- how to remove a record for (7)
+- whether we should build two new forms or reuse an existing pattern
+
+So yes â€” the screenshots were very helpful.  
+Next step is definitely `OtherChkReader.vb`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class OtherChkReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of OtherCheckEntry)
+        Dim results As New List(Of OtherCheckEntry)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim lines As New List(Of String)(rawLines.Length)
+
+        For Each raw In rawLines
+            If raw Is Nothing Then Continue For
+
+            ' Remove DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+            If s = "" Then Continue For
+
+            lines.Add(s)
+        Next
+
+        Dim i As Integer = 0
+        While i + 5 < lines.Count
+            results.Add(New OtherCheckEntry With {
+                .Company = Unquote(lines(i)),
+                .DateText = Unquote(lines(i + 1)),
+                .CheckNumber = Unquote(lines(i + 2)),
+                .Amount = ParseDecimal(lines(i + 3)),
+                .Reference = Unquote(lines(i + 4)),
+                .ReasonWhy = Unquote(lines(i + 5))
+            })
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            Return s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class OtherCheckEntry
+    Public Property Company As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+    Public Property ReasonWhy As String
+End Class
+```
+
+## Copilot
+
+Perfect â€” now we have enough to implement (6) and (7).
+
+## Direct answer
+`OTHER.CHK` is a **text file**, not fixed-width random-access.
+
+Each OTHER check is stored as **6 consecutive lines**:
+
+1. `Company`
+2. `DateText`
+3. `CheckNumber`
+4. `Amount`
+5. `Reference`
+6. `ReasonWhy`
+
+So:
+
+- **Add OTHER Checks** = append 6 lines
+- **Delete OTHER Checks** = remove one 6-line record and rewrite file
+
+---
+
+# Confirmed `OTHER.CHK` format
+
+From `OtherChkReader.ReadAll()`:
+
+```text
+line 1 = Company
+line 2 = Date
+line 3 = CheckNumber
+line 4 = Amount
+line 5 = Reference
+line 6 = ReasonWhy
+```
+
+Reader behavior also shows:
+- quoted lines may exist
+- blank lines are ignored
+- DOS EOF marker `Chr(26)` may appear at end of file
+
+---
+
+# What this means for implementation
+
+## (6) Add OTHER Checks
+Should:
+1. collect:
+   - company
+   - check number
+   - reference
+   - date
+   - amount
+   - reason why
+2. show confirmation
+3. append a new 6-line block to `OTHER.CHK`
+
+## (7) Delete OTHER Checks
+Should:
+1. prompt for check number
+2. find first matching `OtherCheckEntry`
+3. show details
+4. if confirmed delete:
+   - reload all entries
+   - remove the matched entry
+   - rewrite `OTHER.CHK`
+
+---

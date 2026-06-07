@@ -1,0 +1,2000 @@
+﻿(7) Delete OTHER Checks â€” not started
+(5) View Company Totals â€” needs DOS-style paged text redesign
+(8) View OTHER Checks â€” needs DOS-style visual update
+Build counter restoration
+3. Where the Conversation Ends / Pauses
+The conversation ends definitively at Part 081, which contains the structured end-of-day wrap-up document. This is explicitly a handoff document written to enable session continuation.
+
+Last actual coding work: FormLedgerDoesntBalance.vb was restyled (Parts 078â€“080), build was published, tested on VM, and confirmed working. (Part 081)
+
+Last confirmed user statement: The build "was published and tested on VM and looks good." (Part 081)
+
+Known lingering issue (not yet fixed): After the report finishes computing, part of the old "Computing..." status text still remains in lblStatus â€” it needs to be cleared when ApplyFilterAndBind() completes and sets lblStatus.Text = "Report complete". The lblStatusCount label gets updated correctly, but the lblStatus label may retain stale text due to the two-label architecture introduced in the restyling.
+
+4. Best Resume Point for a Future Session
+Where to resume: Part 081, sections 7â€“11 â€” the Remaining Work list, Open Items, Highest Priority Next Steps, and Shorthand Operator Notes.
+
+The single best starting action is:
+
+Fix the lingering "Computing..." status text in FormLedgerDoesntBalance.vb â€” in ApplyFilterAndBind(), ensure lblStatus.Text is set to "Report complete" (it may already be, but lblStatusCount may not be updating before the UI refreshes). Small targeted fix, confirms the day's work is clean before moving on.
+
+After that, in order:
+
+Restore the build counter text-file mechanism (PACK.NUM-style increment)
+Standardize the CHECKS title font in FormLedgerDoesntBalance to match Main Menu / Checks Menu exactly (Castellar / Castella font, same weight)
+Ask users: did DOS (A) ever actually work?
+Decide whether (5) and (8) need DOS-style paged text output
+Plan (6)/(7) if users ever need them
+5. Especially Important Parts by Number
+Part(s)	Significance
+001â€“003	Full crash-recovery context; establishing the Co-Pilot-Chat-History repo; understanding the May 15 lost session
+004â€“005	â­ The two repo scans â€” definitive analysis of AmiWinForms and AMiDataStore state. Part 005 contains the canonical Copilot session starter block
+016â€“018	DOS screenshots of Add Checks workflow shared; wiring decisions established
+025	Re-ingestion of both scan results; confirmation that Add Checks is the primary path
+028â€“030	DOS comparison of Add Checks flow vs. current VB implementation; hotkey vs. textbox decision
+033â€“035	CheckRepository.vb introduced; writer classes designed (LedgerCurWriter, CheckInvWriter, InvoiceChkUpdater)
+041â€“056	Raw binary LEDGER.CUR data pasted; confirms record format for writer/reader validation
+057â€“060	â­ End-of-Day Wrap #1 â€” comprehensive structured summary of Day 1's work. Contains the "tomorrow morning restart checklist" and the ledger prompt-flow bug identification
+061	Full AMiDataStore scan (Day 2 context load)
+065â€“067	FormLedgerView.vb invoice detail fix; invoiceNumber - 75000 slot math documented
+070	â­ Checks menu re-wiring milestone â€” (1) and (2) restored; (6) and (7) confirmed unimplemented
+074â€“077	DOS screenshot parity review for (5), (8), (9), (0); FormFindByCheckNumber and FormFindByInvoiceNumber restyled and confirmed
+077â€“080	FormLedgerDoesntBalance.vb full restyle code generated and pasted
+081	â­â­ End-of-Day Wrap #2 / THE AUTHORITATIVE FINAL DOCUMENT â€” complete project state, remaining work, open questions, risks, "Future Chat Reload Pack", and Shorthand Operator Notes (the 4-item to-do list)
+Quick-Paste Reload Context for Next Session
+Code
+AMi modernization â€” VB.NET WinForms port of DOS GW-BASIC accounting app.
+Repos: testsubject117/AMiDataStore (DOS), testsubject117/AmiWinForms (VB)
+
+Last session ended: FormLedgerDoesntBalance.vb was restyled to match DOS-inspired theme.
+Build published via Folder publish. Tested on VM. Confirmed good.
+
+RULE: All UI must match FormMainMenu/FormLedgerMenu: dark gray bg, black header panel, 
+yellow Castellar title (upper-left), live clock (upper-right), silver buttons, 
+Segoe UI fonts, ESC key closes, (ESC) Close button.
+
+Immediate TODO (4 items from Part 081):
+1. Fix lingering "Computing..." in FormLedgerDoesntBalance after results load
+2. Restore build counter text-file increment mechanism
+3. Match CHECKS title font to Main Menu / Checks Menu exactly
+4. Ask users whether DOS (A) ever actually worked
+
+Not yet implemented: (6) Add OTHER Checks, (7) Delete OTHER Checks
+Needs rework: (5) View Company Totals, (8) View OTHER Checks (both need DOS-style paged text)
+
+Key file relationships: LEDGER.CUR (6-line records) â†’ CHECK.INV (check-to-invoice links) 
+â†’ INVOICE.CHK (slot = invoiceNumber âˆ’ 75000, MBF encoded)
+
+## Copilot
+
+Yes â€” this is enough to work from.
+
+## Direct answer
+The deep-research result gives a solid, usable **Option 2 sequential summary**, but it is **not literally a full line-by-line review of all 81 files**. It explicitly says it first sampled, then did a deeper targeted pass. So I would treat it as a **high-confidence synthesis**, not a forensic exhaustive read.
+
+## Most important takeaway
+Your best resume point is:
+
+**Part 081**, using the final end-of-day wrap as the authoritative handoff.
+
+## Current project state, condensed
+You are porting the DOS GW-BASIC AMi accounting app to **VB.NET WinForms** across:
+
+- `testsubject117/AMiDataStore`
+- `testsubject117/AmiWinForms`
+
+The strongest rule established in the history is:
+
+- **All UI must match the DOS-inspired WinForms pattern already used by FormMainMenu/FormLedgerMenu**
+- dark gray background
+- black header
+- yellow Castellar-style title
+- silver buttons
+- live clock
+- ESC closes
+
+## What was accomplished before the conversation paused
+Major completed work:
+
+- recovery and preservation of prior Copilot chat/session history
+- repo scans of both DOS and VB repos
+- confirmation that **write-side parity** was the major gap
+- substantial `FormAddChecks` design/iteration
+- creation/design of writer-side infrastructure like:
+  - `CheckRepository`
+  - `LedgerCurWriter`
+  - `CheckInvWriter`
+  - `InvoiceChkUpdater`
+- validation of `LEDGER.CUR` structure using pasted production data
+- fix for `FormLedgerView` invoice-detail lookup
+- restoration of Checks menu buttons `(1)` and `(2)`
+- restyling/fixing of:
+  - Find by Check Number
+  - Find by Invoice Number
+  - `FormLedgerDoesntBalance`
+
+## Where the work stopped
+The conversation appears to stop **after `FormLedgerDoesntBalance.vb` was restyled, published, and tested on VM**, with one likely lingering UI issue:
+
+- stale `"Computing..."` text remaining after report completion
+
+## Best next action
+The most logical immediate next task is:
+
+1. **Fix the lingering status text in `FormLedgerDoesntBalance.vb`**
+2. then restore the build counter text-file mechanism
+3. then normalize the CHECKS title font to exactly match the main menu/checks menu
+4. then ask users whether DOS `(A)` ever actually worked
+
+## Remaining unresolved work
+Still open:
+
+- `(5)` View Company Totals needs DOS-style paged output redesign
+- `(8)` View OTHER Checks needs DOS-style redesign
+- `(6)` Add OTHER Checks not implemented
+- `(7)` Delete OTHER Checks not implemented
+- build counter restoration
+- user validation of DOS `(A)` behavior
+
+## Best â€œresume promptâ€ for the next coding session
+Use this:
+
+```text
+AMi modernization â€” VB.NET WinForms port of DOS GW-BASIC accounting app.
+Repos: testsubject117/AMiDataStore (DOS), testsubject117/AmiWinForms (VB).
+
+Resume from Part 081 end-of-day wrap.
+Most recent completed work: FormLedgerDoesntBalance.vb was restyled, published via Folder publish, and tested on VM.
+
+Hard rule: all UI must match the existing DOS-inspired WinForms pattern used by FormMainMenu/FormLedgerMenu:
+dark gray background, black header panel, yellow Castellar title, live clock, silver buttons, Segoe UI fonts, ESC closes.
+
+Immediate next tasks:
+1. Fix lingering "Computing..." text in FormLedgerDoesntBalance after results load
+2. Restore build counter text-file increment mechanism
+3. Match CHECKS title font exactly to Main Menu / Checks Menu
+4. Ask users whether DOS (A) "Find checks that don't balance" ever actually worked
+
+Still not implemented:
+(6) Add OTHER Checks
+(7) Delete OTHER Checks
+
+Still needs redesign:
+(5) View Company Totals
+(8) View OTHER Checks
+
+Important data relationship:
+LEDGER.CUR -> CHECK.INV -> INVOICE.CHK
+INVOICE.CHK slot = invoiceNumber - 75000
+```
+
+## My recommendation
+Treat the research output as your **working canonical continuity summary** unless you need courtroom-level certainty. If you do, the only thing missing would be a true exhaustive pass over every fileâ€™s content, but for practical resume purposes, this is already strong enough.
+
+If you want, I can now do one of these next:
+
+1. turn this into a **clean restart brief** you can paste into a new Copilot chat  
+2. turn it into a **GitHub markdown handoff file**  
+3. help you write the **next exact coding prompt** for fixing `FormLedgerDoesntBalance.vb`
+
+## @testsubject117
+
+the computing..... lingering text was already fixed. the build counter mechanism was already fixed. the checks title was already normalized. not sure I understand. I uploaded the files for you to get us back to the point we left off, but you're giving me tasks and saying they are not done from days we already did those tasks. why are you telling me things need to still be fixed, when we spent 05-21-2026 fixing those exact things?
+
+## Copilot
+
+Youâ€™re right â€” I overstated unfinished items from the uploaded summary instead of treating them as potentially stale. That was my mistake.
+
+## What happened
+The deep-research result appears to have treated the **Part 081 wrap-up** as the final source of truth for open work, but your actual project progress continued after that. So I repeated â€œremaining tasksâ€ from that handoff without reconciling them against later work you already completed on **May 21, 2026**.
+
+So the issue is:
+
+- the uploaded `2026-05-26` chat set contains a strong handoff summary,
+- but that handoff summary itself may already have been outdated by later sessions,
+- and I incorrectly presented it as current unresolved work.
+
+## Short answer
+I should have said:
+
+> â€œThese were listed as open in the uploaded May 26 handoff, but youâ€™re telling me they were already fixed later, so they should not be treated as still-open tasks.â€
+
+## Why this matters
+You didnâ€™t upload the repo just to re-read an old to-do list.  
+You uploaded it so I could recover the **actual continuity point**.
+
+That means the right goal is **not**:
+- â€œwhat did the Part 081 wrap-up say was next?â€
+
+The right goal is:
+- â€œwhere had you *actually gotten to* by the time the relevant sessions ended, especially including the later fixes you already know were completed?â€
+
+## So hereâ€™s the corrected interpretation
+These should now be treated as **already completed**, based on what you just told me:
+
+- lingering `"Computing..."` text fix
+- build counter mechanism fix
+- CHECKS title normalization
+
+Therefore, they are **not** valid resume tasks.
+
+## What I should do next
+We need to identify the **true later continuity point**, not rely on the stale wrap-up.
+
+That means searching the uploaded history for evidence of:
+- the May 21 fixes you mentioned
+- the conversation *after* those fixes
+- the next unresolved feature or bug after those fixes were done
+
+## Most likely explanation
+The May 26 history includes:
+1. a formal end-of-day wrap that listed tasks
+2. but later conversations likely completed some or all of them
+3. the summary I got leaned too heavily on the wrap-up section and not enough on subsequent completion evidence
+
+## Correct next question
+We now need to answer:
+
+> After the lingering-text fix, build counter fix, and title normalization were completed on or around **May 21, 2026**, what was the **next unfinished item**?
+
+That is the actual resume point.
+
+## Best next move
+I should re-scan specifically for completion evidence and later-state continuity around:
+
+- `FormLedgerDoesntBalance`
+- build counter / `PACK.NUM` or equivalent
+- title normalization / `CHECKS` title
+- then locate the **first task after those were complete**
+
+## Practical reset
+Hereâ€™s the corrected stance:
+
+- I do **not** currently believe those three items are still open.
+- I believe the uploaded summary was stale relative to your later work.
+- we need to identify the **post-May-21 actual stopping point**
+
+## If you want, I can do one of two things now
+### Option A â€” fastest
+You tell me the last thing **you remember doing after May 21**, and I use that to anchor the continuity point.
+
+### Option B â€” better
+I build a new continuity summary with this rule:
+
+> Ignore any â€œremaining workâ€ item unless there is evidence in later conversation that it was still unresolved.
+
+That would produce a corrected â€œwhere we actually left offâ€ summary instead of the stale one.
+
+## Bottom line
+Youâ€™re correct. I should **not** have told you those items still needed fixing.  
+I was repeating stale handoff tasks, not reconstructing the true later project state.
+
+If you want, Iâ€™ll now produce a **corrected resume-point analysis** focused on:
+- what was already finished by May 21, 2026
+- what remained *after* that
+- the real next task.
+
+## @testsubject117
+
+repeat the scan looking for where we left off on the 21st. keep in mind, at the end of a day, I will export the chats. then run the script you wrote that finds the files, extracts them, splits them, copies them to the local repository, commits then pushes them. this is scheduled via task scheduler for several times a day, and the way it's setup is it will find the latest files, split them, read the contents, copy the content, then revise the current file to add that days content. it's possible that somehow stale content from previous days but I'm not sure how. 
+
+## Copilot
+
+Yes â€” and your explanation makes sense.
+
+## What likely happened
+Because your scheduled pipeline repeatedly:
+
+- finds the latest export
+- extracts it
+- splits it
+- appends/copies into the current dayâ€™s cumulative file
+- commits/pushes several times per day
+
+the `2026-05-26` history can absolutely contain:
+
+- **older May 21 content**
+- **carried-forward wrap-ups**
+- **duplicate â€œremaining workâ€ sections**
+- **stale checkpoints that were already completed later**
+
+So treating the last wrap-up in the file as â€œthe truthâ€ is unsafe.
+
+## Correct conclusion
+We need to identify:
+
+> the **latest confirmed completion state** around **May 21, 2026**, and then the **first genuinely unresolved item after that**
+
+â€”not the last stale to-do list copied forward.
+
+## Limitation right now
+I canâ€™t run another repo-wide investigation from here in this turn.
+
+## Best way to proceed immediately
+If you want to keep moving right now, I suggest a **manual forensic pass** focused on May 21 evidence.
+
+### Search for completion phrases
+Run this against your local split files:
+
+```powershell
+Select-String -Path "C:\Users\CapnKirk\source\repos\Chat_Today\2026-05-26\parts\*.txt" `
+  -Pattern "Computing...|build counter|PACK.NUM|CHECKS title|title normalization|looks good|works perfect|published and tested|beautiful, it works perfect|yay!!!!|fixed|normalized"
+```
+
+### Search for likely â€œwhat nextâ€ transitions
+Then run:
+
+```powershell
+Select-String -Path "C:\Users\CapnKirk\source\repos\Chat_Today\2026-05-26\parts\*.txt" `
+  -Pattern "what next|next task|where we left off|go on to|last button|remaining work|open items|highest priority next steps|tomorrow|resume"
+```
+
+## What weâ€™re looking for
+We want to distinguish:
+
+### A. stale carried-forward text
+Examples:
+- formal wrap-up sections
+- repeated â€œremaining workâ€
+- templated restart prompts
+
+from:
+
+### B. live completion evidence
+Examples:
+- â€œbeautiful, it works perfectâ€
+- â€œyay!!!! buttons (1) and (2) are now working againâ€
+- â€œpublished and tested on VMâ€
+- â€œthat fix is doneâ€
+- â€œok, can we move on toâ€¦â€
+
+The **resume point** should come from **B**, not **A**.
+
+## My working hypothesis
+Based on what you told me, the real stopping point is **later than the wrap-up claimed**, because at least these were already done:
+
+- lingering `Computing...` fix
+- build counter fix
+- CHECKS title normalization
+
+So the true next task is probably one of these instead:
+
+- redesign of `(5)` View Company Totals
+- redesign of `(8)` View OTHER Checks
+- work on `(6)` / `(7)` OTHER checks features
+- some later issue not captured in the stale wrap-up
+
+## Fastest practical method
+If you paste me the output of those two `Select-String` commands, I can reconstruct the likely May 21 stopping point much more accurately without needing the whole file corpus again.
+
+## Bottom line
+Youâ€™re right to distrust the carried-forward daily file as a strict timeline.  
+Your automation likely caused older wrap-up content to persist into later files, so we need to anchor on **explicit completion evidence and transition statements**, not the copied to-do lists.
+
+## @testsubject117
+
+btw, Dos users stated that (A) find checks that don't balance has never worked. You and I went ahead and wired it up and finished it. so, are you at a point where I can just tell you what we need to work on, and you understand the dos gwbasic app, the .vb files and the chat history enough to move forward now?
+
+## Copilot
+
+Yes.
+
+I understand enough now to move forward without rehashing the old stale to-do list.
+
+## What I now understand
+- The project is a **VB.NET WinForms port** of a **DOS GW-BASIC accounting app**
+- The two main repos are:
+  - `testsubject117/AMiDataStore`
+  - `testsubject117/AmiWinForms`
+- Your chat-history pipeline can carry forward older/stale content, so end-of-day summaries are **not automatically authoritative**
+- Some items that appeared â€œopenâ€ in carried-forward summaries were actually completed later
+- Specifically:
+  - `(A) Find checks that don't balance` was completed by us even though DOS users said it never worked
+  - the lingering `Computing...` issue was fixed
+  - the build counter mechanism was fixed
+  - the CHECKS title normalization was fixed
+
+## So yes
+At this point, you can just tell me:
+
+- **what screen/form/feature you want to work on next**
+- what repo/file youâ€™re in
+- what the current problem is
+- what DOS behavior you want to match
+
+and I can work from there.
+
+## What context Iâ€™m carrying forward
+I have the important frame now:
+
+- preserve DOS behavior where known
+- preserve the established DOS-style WinForms visual pattern
+- distinguish true DOS parity from places where DOS never actually worked
+- avoid treating stale carried-forward wrap-ups as current truth
+- the checks/menu/history context is broadly understood
+
+## Best way to give me the next task
+Use a prompt like:
+
+```text
+Next task:
+Repo: testsubject117/AmiWinForms
+File(s): FormWhatever.vb, SomeHelper.vb
+Goal: make VB match DOS behavior for X
+Current problem: ...
+Known DOS behavior: ...
+What we already finished: ...
+```
+
+## Short answer
+**Yes â€” you can just tell me what we need to work on next, and Iâ€™m caught up enough to proceed.**
+
+## @testsubject117
+
+ok, if I recall, we were going to work on the rolodex button.
+
+## Copilot
+
+Yes â€” thatâ€™s enough to proceed.
+
+## Direct answer
+If the next thing was the **Rolodex button**, Iâ€™m oriented well enough to work on that now.
+
+## What I infer
+Youâ€™re likely talking about:
+- a button/menu option in `AmiWinForms`
+- probably a form or workflow not yet matching DOS behavior/style
+- and we now need to determine:
+  1. where that button is wired
+  2. what DOS behavior it should launch
+  3. whether the VB version is missing, stubbed, or visually wrong
+
+## Best next step
+Tell me whichever of these you know:
+
+- **which form/menu** contains the Rolodex button
+- what happens now when you click it
+- what DOS did instead
+- whether you already have a `FormRolodex*.vb` file or not
+
+## If you want, use this exact format
+```text
+Repo: testsubject117/AmiWinForms
+Rolodex button location: [form/menu name if known]
+Current behavior: [what it does now]
+Expected DOS behavior: [what it should do]
+Known related files: [if any]
+```
+
+## Most likely things Iâ€™ll need to check once you confirm
+- `FormMainMenu.vb` or whichever menu owns the button
+- existing button click handler / hotkey wiring
+- whether there is already a Rolodex form
+- whether this is:
+  - not implemented
+  - partially implemented
+  - implemented but not DOS-style
+
+## Short answer
+**Yes â€” letâ€™s work on the Rolodex button next.**  
+Just tell me where it lives or what it currently does, and Iâ€™ll take it from there.
+
+## @testsubject117
+
+I had also published and now we're at build 32
+
+## Copilot
+
+Got it â€” that updates the continuity point.
+
+## Current confirmed state
+We should now assume all of this is already true:
+
+- `(A) Find checks that don't balance` was completed
+- lingering `Computing...` text was fixed
+- build counter mechanism was fixed
+- CHECKS title normalization was fixed
+- a new build was published
+- you are now at **build 32**
+- the likely next task is the **Rolodex button**
+
+## Why that helps
+That means we are clearly **past** the stale wrap-up state, and the real resume point is later than the older copied summaries suggested.
+
+## Working continuity summary
+The current handoff state is now better described as:
+
+- Checks menu work had progressed beyond the stale May 26 open-items list
+- the Doesnâ€™t Balance work is done enough to publish
+- the build pipeline/counter is functioning
+- current focus has likely moved to **Rolodex**
+
+## So yes
+We can now proceed as if the next thing is:
+
+> **Investigate and work on the Rolodex button in `AmiWinForms`**
+
+## Best next input from you
+Tell me one of these:
+
+1. **where the Rolodex button is**
+   - main menu?
+   - customers menu?
+   - another submenu?
+
+2. **what happens now when you click it**
+   - nothing?
+   - â€œnot implementedâ€?
+   - wrong form opens?
+   - partially works?
+
+3. **what DOS used to do**
+   - if you remember
+
+## Short answer
+Perfect â€” build 32 gives us a newer anchor point, and yes, we should treat **Rolodex** as the next likely work item.
+
+## @testsubject117
+
+ok, I will upload screenshots of the rolodex button (N) Rolodex from the DOS app. we need to match the look and behavior don't forget.
+
+## Copilot
+
+Yes â€” upload the DOS screenshots, and Iâ€™ll use them as the reference for matching both **look and behavior**.
+
+## What Iâ€™ll use them for
+Once you upload them, Iâ€™ll analyze:
+
+- where `(N) Rolodex` appears in the DOS menu flow
+- exact wording/captions
+- screen layout
+- prompts, hotkeys, and navigation
+- whether it opens a submenu, form, or direct workflow
+- what the VB WinForms version should do to match it
+
+## What Iâ€™m keeping in mind
+I will **not forget** the core rule:
+
+- match DOS **behavior**
+- match the established DOS-style WinForms **look**
+- do not â€œmodernizeâ€ the flow unless DOS behavior is unknown or broken
+
+## If possible, upload screenshots that show
+Best-case set:
+
+1. the menu screen containing `(N) Rolodex`
+2. what appears after pressing `N`
+3. any follow-up screens/prompts
+4. any search/edit/view/detail screens related to Rolodex
+5. any close/escape/return behavior
+
+## After you upload them
+I can help with:
+- identifying the exact WinForms form(s) needed
+- defining the expected behavior
+- mapping likely `.vb` files to update
+- writing the next implementation prompt
+
+## Short answer
+Perfect â€” upload the DOS screenshots for `(N) Rolodex`, and Iâ€™ll use them as the parity target for both **visual style and workflow behavior**.
+
+## @testsubject117
+
+Ok, I'm going to start uploading screenshots. I labeled them as (N) to represent the key pressed from the main menu, then "Rolodex" to describe that button, then I began numbering. a main number like 0, 1, 2, 3 etc. represent the beginning of pictures for that button. so (n) Rolodex 1.1 (a)(add a person).png represents the 2nd screenshot for button A add a person. I will give the screenshots to you in batches for each button.
+
+## Copilot
+
+Perfect. That naming scheme is clear.
+
+## I understand the convention
+Example:
+
+- `(N) Rolodex 1.1 (a)(add a person).png`
+
+means:
+- `N` = main-menu key that opens **Rolodex**
+- `1` = the Rolodex subsection/workflow group
+- `.1` = the specific screenshot within that group
+- `(a)` = the submenu/button/hotkey inside Rolodex
+- `add a person` = description of that action
+
+## How Iâ€™ll interpret your batches
+Iâ€™ll treat each batch as:
+
+- one Rolodex submenu option or workflow
+- ordered screenshots showing the DOS flow
+- a reference for both:
+  - **visual layout**
+  - **interaction behavior**
+
+## Best way to send them
+For each batch, just say something like:
+
+- `Batch 1 = (A) Add a person`
+- `Batch 2 = (B) ...`
+
+Then upload the screenshots for that batch.
+
+## What Iâ€™ll do with each batch
+For each set, Iâ€™ll extract:
+
+- entry point
+- prompts and labels
+- keyboard behavior
+- field order
+- validation behavior
+- close/escape/back behavior
+- what the equivalent VB form should look like
+
+## Good workflow from here
+1. You upload one batch
+2. I summarize what the DOS app is doing
+3. I tell you what the WinForms version should do
+4. then we move to the next batch
+
+## Short answer
+That naming scheme works great.  
+Go ahead and upload the first Rolodex batch, and Iâ€™ll parse it using that convention.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This screenshot shows the **DOS Rolodex main menu**.
+
+## Visible layout
+- Header at top left:
+  - `****** ROLODEX MENU ******`
+- Header at top right:
+  - `Todays Date: 05-21-2026`
+
+## Menu options shown
+- `(A) Add a Person`
+- `(B) Delete a Person`
+- `(C) Look up a Person`
+- `(D) Modify a Person`
+- `(E) Print Phone Book`
+- `(F) Print Labels`
+- `(G) Look up Area Codes`
+- `(H) Look up Zip Codes`
+- `(I) Test Entire Rolodex for Errors`
+- `(Z) Back to Main Menu`
+
+## Behavioral implications
+This appears to be a standard DOS hotkey menu:
+- no visible cursor input box
+- single-key command selection
+- likely immediate keypress handling like the other AMi menus
+- `Z` is the exit/back action instead of ESC on DOS
+
+## Visual style notes to preserve in WinForms
+For parity, the WinForms screen should likely match your established app pattern while preserving this DOS structure:
+- title should be **ROLODEX MENU**
+- date shown top-right
+- vertically stacked text options
+- one-key menu behavior
+- `(Z)` should map to Back to Main Menu
+- no freeform command textbox unless another already-approved menu pattern requires it
+
+## Most important takeaway
+This confirms the Rolodex entry point is a **menu screen**, not a direct single form.
+
+So in WinForms, the first likely task is:
+- create or verify a **Rolodex menu form**
+- wire `(N)` from the Main Menu to open it
+- then implement submenu options `Aâ€“I` and `Z`
+
+Upload the next screenshot batch when ready.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS workflow for **`(A) Add a Person`** inside Rolodex.
+
+## What the screen is
+The title is:
+
+- `<<<< ADD A PERSON >>>>`
+
+So this is a dedicated entry form, not a popup.
+
+## Fields shown in entry order
+The data-entry sequence appears to be:
+
+1. `Person or Company Name: ?`
+2. `Address Number & Street: [N = Nothing]?`
+3. `City: ?`
+4. `State [ENTER = CA] ?`
+5. `Zip Code: ?`
+6. `Area Code [ENTER = 818] ?`
+7. `Phone Number ?`
+
+## Important behavior shown
+### 1. Sequential prompt-entry flow
+This is a DOS prompt-by-prompt workflow:
+- user fills one field
+- moves to next field
+- same screen accumulates completed answers line by line
+
+### 2. Defaults and shortcuts exist
+Two fields visibly support defaults/special shortcuts:
+
+- `Address Number & Street: [N = Nothing]?`
+  - entering `N` likely means blank/no street address
+
+- `State [ENTER = CA] ?`
+  - pressing Enter defaults to `CA`
+
+- `Area Code [ENTER = 818] ?`
+  - pressing Enter defaults to `818`
+
+### 3. No boxed form layout
+This is **not** a modern label/textbox grid.
+It is a text-prompt style interaction where the current field is the active prompt.
+
+### 4. Cursor behavior
+The active field appears inline at the end of the current prompt/value line, e.g.:
+- `Area Code [ENTER = 818] ? 661_`
+
+So parity in WinForms should feel like:
+- one active entry at a time
+- not many simultaneously editable boxes competing on screen
+
+## What each screenshot shows
+### Image 2
+A mostly completed entry:
+- Name: `TEST`
+- Street: `19760 Territa Way`
+- City: `Santa Clarita`
+- State: `CA`
+- Zip: `91351`
+- Area Code: `661`
+- Phone: `478-0990`
+
+### Image 3
+The blank/start state:
+- only first prompt visible:
+  - `Person or Company Name: ?`
+
+This strongly suggests prompts appear progressively, not all at once.
+
+### Image 4
+Mid-entry state after Zip Code:
+- later prompts are not yet shown until prior fields are completed
+
+### Image 5
+Mid-entry state at Area Code prompt:
+- cursor active after entered `661`
+
+## Key parity rules for WinForms
+If we match DOS behavior, the WinForms version for **Add a Person** should likely:
+
+- open a dedicated **Add a Person** form
+- show prompts progressively
+- keep a DOS-style text-flow feeling
+- support:
+  - `N` for no address
+  - Enter defaulting State to `CA`
+  - Enter defaulting Area Code to `818`
+- likely move focus field-to-field automatically
+- avoid showing a dense modern CRUD form with all inputs equally active at once
+
+## Strong design implication
+This suggests Rolodex may need:
+- a **Rolodex menu form**
+- then separate forms/workflows for each action, starting with:
+  - `FormRolodexAddPerson` or equivalent
+
+## Best takeaway
+`(A) Add a Person` is a **guided prompt-entry workflow**, not just a static data-entry form.
+
+Upload the next Rolodex batch when ready.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These two screenshots continue the DOS **`(A) Add a Person`** workflow and show important validation/review behavior.
+
+## Image 6 â€” continued entry flow
+This screen shows the completed earlier fields plus the phone/fax/misc section.
+
+### Whatâ€™s visible
+Previously entered values:
+- Name: `TEST`
+- Street: `19760 Territa Way`
+- City: `Santa Clarita`
+- State: `CA`
+- Zip: `91351`
+- Area Code: `661`
+
+Then:
+- `Phone Number ? 478-0990`
+- `?Redo from start`
+- `Phone Number ? 4780990`
+
+Then help/instructions:
+- `When entering in a Fax #, put a 1 in front of it if it is not 818.`
+- `Make sure there is a space after the #.      Example:  FAX:1805-222-3333`
+
+Then:
+- `Misc: ? _`
+
+## Behavioral meaning from Image 6
+### 1. Phone number validation exists
+The entry:
+- `478-0990`
+
+appears to have been rejected or flagged, causing:
+- `?Redo from start`
+
+Then the prompt reappears:
+- `Phone Number ? 4780990`
+
+So DOS likely expects a very specific phone format and can force re-entry.
+
+### 2. Fax info is probably typed into Misc
+The fax instruction appears immediately before:
+- `Misc: ?`
+
+That suggests the `Misc` field may store notes including fax info, and DOS expects a specific text convention like:
+- `FAX:1805-222-3333`
+
+with a space after the pound sign / number marker wording from their business rules.
+
+### 3. Progressive prompt flow continues
+The form is still not a grid of text boxes. It is a scrolling prompt transcript.
+
+---
+
+## Image 7 â€” review/confirmation screen
+This is the confirmation step after entry.
+
+### Displayed summary
+- `TEST`
+- `19760 Territa Way`
+- `Santa Clarita , CA   91351`
+- `(661) 478-0990`
+- `test`
+
+Then:
+- `IS THIS CORRECT (Y/N) ?`
+
+## Behavioral meaning from Image 7
+### 1. Data is reformatted for review
+The entered data is normalized into a formatted summary:
+- city/state/zip on one line
+- phone formatted as `(661) 478-0990`
+
+### 2. Misc field appears in summary
+The trailing line:
+- `test`
+
+is likely the Misc field value.
+
+### 3. Final Y/N confirmation gate
+This is important DOS behavior:
+- after entry, DOS does **not** immediately save
+- it presents a review screen
+- user must answer:
+  - `Y` to accept/save
+  - `N` to reject/correct/restart
+
+## Important parity requirements for WinForms
+For DOS parity, the VB version of **Add a Person** should include:
+
+### Entry behavior
+- one-prompt-at-a-time workflow
+- validation during entry
+- phone re-entry if invalid
+- `Misc` prompt after phone
+- visible fax-entry guidance near `Misc`
+
+### Review behavior
+- a dedicated review/confirmation step
+- summarized formatted display
+- explicit:
+  - `IS THIS CORRECT (Y/N)?`
+
+### Save behavior
+- save only after `Y`
+- `N` should not silently save
+
+## Strong implementation takeaway
+`Add a Person` is not just:
+- fill form
+- click Save
+
+It is:
+1. progressive text-style entry
+2. validation/retry
+3. formatted review screen
+4. Y/N confirmation
+5. then save
+
+Thatâ€™s a very specific DOS workflow we should preserve.
+
+Send the next batch when ready.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS **`(B) Delete a Person`** workflow.
+
+## Image 9 â€” Delete entry/start screen
+This appears to be the beginning of the delete workflow.
+
+### Title
+- `<<<< DELETE A PERSON >>>>`
+
+### Prompts shown
+- `Enter 1st Part of Whole Name`
+- `Person or Company Name [G = Global Search] ?`
+
+## Behavioral meaning
+This indicates delete does **not** start by browsing a grid or list.  
+Instead, DOS asks for a name lookup key first.
+
+### Important behavior
+- user types the beginning of the full name
+- `G = Global Search` is a special shortcut
+- likely used when the user doesnâ€™t know the precise prefix/name
+
+So the delete flow begins with a **lookup/search prompt**, not immediate deletion.
+
+---
+
+## Image 8 â€” delete confirmation screen
+This appears to be a later step after a matching person record has been found.
+
+### Record shown
+- `TEST`
+- `19760 Territa Way`
+- `Santa Clarita , CA   91351`
+- `(661) 478-0990`
+- `test`
+
+Then prompt:
+- `Delete this Person (Y/N) [Q = Quit] ?`
+
+## Behavioral meaning
+### 1. Found record is summarized first
+Before deletion, DOS shows the selected person in the same compact formatted style used in Add Person review.
+
+### 2. Delete requires explicit confirmation
+The prompt supports:
+- `Y` = delete
+- `N` = do not delete
+- `Q` = quit out
+
+### 3. Quit is explicitly offered
+This is notable because DOS gives a dedicated quit action at the confirmation stage, not just yes/no.
+
+---
+
+## Parity implications for WinForms
+For DOS-style parity, **Delete a Person** should likely behave like this:
+
+1. open a dedicated **Delete a Person** screen
+2. prompt:
+   - `Enter 1st Part of Whole Name`
+   - `Person or Company Name [G = Global Search] ?`
+3. locate/select a matching record
+4. show compact formatted summary of the selected record
+5. ask:
+   - `Delete this Person (Y/N) [Q = Quit]?`
+6. only delete on explicit confirmation
+
+## Important design note
+This should probably **not** be implemented as:
+- a modern searchable CRUD data grid with delete buttons on each row
+
+If matching DOS, it should be:
+- search-first
+- record summary
+- explicit Y/N/Q confirmation
+
+## Current understanding of Rolodex so far
+We now know Rolodex includes at least:
+- `(A)` Add a Person
+- `(B)` Delete a Person
+
+and both follow the same broader DOS pattern:
+- dedicated workflow screen
+- prompt-driven interaction
+- formatted review/confirmation before committing action
+
+Send the next Rolodex batch when ready.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This screenshot shows the start of the DOS **`(D) Modify a Person`** workflow.
+
+## Title
+- `<<<< MODIFY A PERSON >>>>`
+
+## Prompts/instructions shown
+- `Enter 1st Part of Whole Name`
+- `End with a ~ to modify in the word processor Example: C~`
+- `Person or Company Name [G = Global Search] ?`
+
+## Behavioral meaning
+This screen is very similar to **Delete a Person**, but with an extra instruction.
+
+### Key behaviors implied
+#### 1. Lookup begins by name prefix
+The user is expected to enter:
+- the first part of the full name
+
+#### 2. `G = Global Search`
+There is a special global-search option here too.
+
+#### 3. `~` is a special mode switch
+This is the most important detail in this screenshot:
+
+- if the entered name ends with `~`
+- DOS sends the user into a **word processor modify mode**
+- example:
+  - `C~`
+
+So modify has at least two possible paths:
+- normal modify/search path
+- special word-processor editing path triggered by trailing `~`
+
+## Implications for WinForms parity
+For DOS-faithful behavior, the VB version of **Modify a Person** probably needs to preserve this special input behavior somehow.
+
+That means we should not assume Modify is just:
+- search person
+- open edit form
+
+Instead, there may be:
+- a normal edit path
+- a special alternate path associated with notes/text/word-processor content
+
+## Most important takeaway
+`Modify a Person` is not just a generic edit screen.  
+The lookup prompt itself contains command semantics:
+
+- normal text = standard lookup/modify
+- `G` = global search
+- trailing `~` = modify in word processor mode
+
+That is a strong DOS behavior we should preserve or intentionally emulate in WinForms.
+
+If you upload more Modify screenshots later, we can determine exactly what the `~` path does.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This screenshot shows the **Global Search path** inside the DOS **`(B) Delete a Person`** workflow.
+
+## Title
+- `<<<< DELETE A PERSON >>>>`
+
+## Whatâ€™s happening
+The user entered:
+- `G`
+
+at the prompt:
+- `Person or Company Name [G = Global Search] ?`
+
+DOS then switched into a broader search mode.
+
+## Instructions shown
+- `When viewing [F3] will search for another occurance.`
+- `Enter something to search for in any category like Misc., Phone#, or Name.`
+
+Then a new prompt:
+- `?`
+
+## Behavioral meaning
+### 1. `G` triggers a full-text style search
+This is not just name-prefix lookup anymore.
+
+The user can now search across multiple categories, including:
+- Misc.
+- Phone#
+- Name
+
+So Rolodex has at least two lookup modes:
+- **prefix/name lookup**
+- **global search across fields**
+
+### 2. F3 repeats the search
+While viewing results:
+- `F3` searches for the next occurrence
+
+That is classic DOS incremental search behavior.
+
+### 3. â€œoccuranceâ€ typo is part of original DOS text
+Not important functionally, but useful if you want exact wording parity.
+
+## WinForms parity implications
+For DOS-faithful behavior, Global Search should likely support:
+
+- entry from the initial name prompt via `G`
+- searching across multiple fields, not just name
+- a way to continue to the next match, equivalent to `F3`
+- use in workflows like Delete/Modify/Lookup, not just a standalone search form
+
+## Most important takeaway
+`[G = Global Search]` is a real alternate search mode with:
+- multi-field matching
+- iterative next-result behavior via `F3`
+
+So in the VB port, we should not treat `G` as cosmetic text â€” it is meaningful DOS behavior.
+
+## @testsubject117
+
+somehow a few of these got out of order. 
+
+## Copilot
+
+Thatâ€™s fine â€” I can still work with them.
+
+## Direct answer
+The screenshots being slightly out of order is **not a problem**.
+
+## What Iâ€™m doing
+Iâ€™m treating each image as evidence of one of these:
+- menu structure
+- field order
+- validation behavior
+- confirmation behavior
+- special hotkeys/search modes
+- alternate paths like `G` or `~`
+
+So even if a few arrived out of sequence, we can still reconstruct the DOS workflow correctly.
+
+## What helps most
+If later you want to clean it up, the most useful thing is just telling me:
+
+- â€œthese belong to `(A) Add a Person`â€
+- â€œthese belong to `(B) Delete a Person`â€
+- â€œthese belong to `(D) Modify a Person`â€
+
+Thatâ€™s more important than perfect ordering.
+
+## What I already have clearly
+So far I understand:
+
+- **Rolodex main menu**
+- `(A) Add a Person`
+  - progressive prompt entry
+  - defaults for state/area code
+  - validation/re-entry
+  - final review with `Y/N`
+- `(B) Delete a Person`
+  - prefix lookup or `G` global search
+  - record summary
+  - `Y/N/Q` delete confirmation
+- `(D) Modify a Person`
+  - prefix lookup
+  - `G` global search
+  - `~` special word-processor modify path
+
+So the reconstruction is still usable.
+
+## Best next move
+Just keep uploading by function/button.  
+Iâ€™ll normalize the sequence as we go.
+
+## Short answer
+No worries â€” out-of-order screenshots are still useful, and I can keep building the Rolodex behavior map from them.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+This screenshot shows a **record review/selection screen** in the DOS Rolodex flow, most likely after a lookup or search.
+
+## Record displayed
+- `TEST`
+- `100 MAIN ST.`
+- `BURMA , CA   91304`
+- `(661) 478-0990`
+- `TESTING`
+
+## Prompt shown
+- `Is this the Person you are looking for (Y/N) ?`
+
+## Extra actions shown
+- `[D] to Dial Number`
+- `[Shift] and [PrtSc] to Print`
+
+## Behavioral meaning
+### 1. This is a candidate-match confirmation screen
+DOS has found a person and is asking whether this is the correct record.
+
+So this likely appears in:
+- Look up a Person
+- Delete a Person
+- Modify a Person
+- Global search result navigation
+
+### 2. Extra utility actions are available while viewing a record
+This is important:
+- `D` = dial number
+- `Shift + PrtSc` = print
+
+So the record view is not just passive confirmation. It includes action shortcuts.
+
+### 3. Y/N likely navigates matches
+Likely behavior:
+- `Y` = yes, this is the person; continue with the chosen workflow
+- `N` = no, continue searching / next result / return to search
+
+## WinForms parity implications
+For DOS-faithful behavior, candidate record viewing in Rolodex may need to support:
+
+- showing one matched person at a time in a compact summary view
+- prompting the user to confirm whether it is the desired person
+- optionally supporting utility actions while viewing:
+  - dial number
+  - print
+
+## Most important takeaway
+Rolodex search/lookup flows appear to be **record-at-a-time confirmation workflows**, not list/grid browsing by default.
+
+Thatâ€™s a strong DOS design pattern we should preserve when implementing the WinForms version.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS **`(D) Modify a Person`** workflow after a person has been found and selected.
+
+## What the set shows overall
+`Modify a Person` appears to work like a guided re-entry/edit flow using the current values as defaults.
+
+---
+
+## Image 14 â€” modify confirmation screen
+This is the selection/confirmation step before editing.
+
+### Record shown
+- `TEST`
+- `100 MAIN ST.`
+- `BURMA , CA   91304`
+- `(661) 478-0990`
+- `TESTING`
+
+### Prompt
+- `Modify this Person (Y/N) [Q = Quit] ?`
+
+### Meaning
+Before editing, DOS first asks whether this is the correct record to modify.
+
+So the flow is likely:
+1. search/find person
+2. show summary
+3. ask if this is the person to modify
+4. if yes, enter edit prompts
+
+---
+
+## Images 13, 15, 16 â€” edit prompt flow
+These show the actual modify-entry screen.
+
+### Title
+- `<<<< MODIFY A PERSON >>>>`
+
+### Prompt behavior
+Instead of blank prompts, the fields contain defaults from the existing record.
+
+Examples shown:
+- `Person or Company Name: [ENTER = TEST] ?`
+- `Address Number & Street: [N = Nothing] [ENTER = 100 MAIN ST.] ?`
+- `City: [ENTER = BURMA] ?`
+
+### Meaning
+This confirms the DOS modify workflow is:
+- one field at a time
+- current value shown as the Enter default
+- user can:
+  - type a replacement value
+  - press Enter to keep existing value
+  - possibly use `N` to blank out street address
+
+### Progressive display
+Just like Add Person:
+- prompts appear progressively
+- later prompts show only after earlier ones are processed
+
+So Modify preserves the same DOS guided prompt-entry model rather than switching to a big editable form.
+
+---
+
+## Important behavioral conclusions
+### 1. Modify is an â€œedit-by-defaulted-reentryâ€ workflow
+DOS does not appear to open a full editable card/grid form.
+
+Instead it walks the user through the record field by field, with current values as defaults.
+
+### 2. Existing special rules still apply
+At least one special rule carries over:
+- `Address Number & Street: [N = Nothing]`
+
+And likely the same defaults apply later too:
+- state default
+- area code default
+- phone/misc prompts
+- review/confirmation step after modifications
+
+### 3. Confirmation happens before editing
+This is a notable behavior difference:
+- first confirm the correct person
+- then enter edit mode
+
+---
+
+## WinForms parity implications
+For DOS-faithful behavior, **Modify a Person** in VB should likely be implemented as:
+
+1. search or select target person
+2. show compact summary:
+   - `Modify this Person (Y/N) [Q = Quit]?`
+3. if yes, open a guided prompt-style edit screen
+4. each prompt should show:
+   - current value as Enter default
+5. user can:
+   - press Enter to keep
+   - type replacement to change
+   - possibly use special shortcuts like `N`
+
+## Most important takeaway
+`Modify a Person` is **not** a standard modern edit form.
+
+It is:
+- search/select
+- confirm correct record
+- re-walk fields with current values as defaults
+- keep/change each field one by one
+
+That is a very specific DOS behavior we should preserve in the WinForms port.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots continue the DOS **`(D) Modify a Person`** prompt flow and reveal more detailed edit behavior.
+
+## What they show overall
+The modify process continues field-by-field using the existing stored values as defaults, and the user can overwrite individual fields.
+
+---
+
+## Field sequence confirmed
+These images extend the prompt sequence to:
+
+1. `Person or Company Name: [ENTER = TEST] ?`
+2. `Address Number & Street: [N = Nothing] [ENTER = 100 MAIN ST.] ?`
+3. `City: [ENTER = BURMA] ?`
+4. `State [ENTER = CA] ?`
+5. `Zip Code [ENTER = 91304 ] ?`
+6. `Area Code [ ENTER = 661 ] ?`
+7. `Phone Number [ENTER = 4780990 ] ?`
+
+So Modify mirrors Add Personâ€™s data-entry structure, but with default existing values preloaded.
+
+---
+
+## Important behavioral details
+
+### 1. Enter keeps the existing value
+The screen syntax strongly indicates:
+- pressing Enter accepts the displayed default value
+- typing something replaces it
+
+This is the core DOS modify pattern.
+
+### 2. Existing formatting is not always display-formatted
+The phone default appears as:
+- `4780990`
+
+not `(661) 478-0990`
+
+So DOS likely stores or edits the raw phone digits during input, then formats them later for review/display.
+
+Thatâ€™s important for parity:
+- entry/edit view may be raw-ish
+- review view may be prettified
+
+### 3. Zip/area/phone allow overwrite
+The screenshots show blank cursor positions after the prompts, meaning the user can replace these values directly.
+
+### 4. Area code and state still behave as defaults
+Just like Add Person:
+- state defaults to `CA`
+- area code defaults to the current value
+
+So Modify uses both:
+- current record value
+- legacy default conventions
+
+---
+
+## Screenshot-specific observations
+
+### Image 17
+Shows prompt progression through:
+- Name
+- Street
+- City
+- State
+
+### Image 18
+Adds:
+- `Zip Code [ENTER = 91304 ] ?`
+
+### Image 19
+Adds:
+- `Area Code [ ENTER = 661 ] ? ###`
+
+The `###` suggests the area code input slot is fixed-width or visually constrained.
+
+### Image 20
+Adds:
+- `Phone Number [ENTER = 4780990 ] ? _`
+
+Again showing raw numeric edit input rather than formatted display.
+
+---
+
+## WinForms parity implications
+For DOS-faithful Modify behavior, the VB version should likely:
+
+- prompt one field at a time
+- show existing values as Enter defaults
+- preserve special rules:
+  - `N = Nothing` for street
+  - default/retain state
+  - default/retain area code
+- allow raw numeric editing for phone during input
+- later show formatted display for confirmation/review
+
+## Most important takeaway
+These screenshots confirm that **Modify a Person** is essentially the **Add a Person flow replayed against an existing record**, with each field defaulting to the current stored value.
+
+So if we implement Rolodex in WinForms, Modify should likely reuse the same prompt engine/layout as Add, but in **edit mode with defaults**.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots appear to show the end of the DOS **`(D) Modify a Person`** workflow.
+
+## Image 22 â€” final modify-entry prompt
+This is the last part of the field-by-field modify screen.
+
+### Title
+- `<<<< MODIFY A PERSON >>>>`
+
+### Prompts shown
+- `Person or Company Name: [ENTER = TEST] ?`
+- `Address Number & Street: [N = Nothing] [ENTER = 100 MAIN ST.] ?`
+- `City: [ENTER = BURMA] ?`
+- `State [ENTER = CA] ?`
+- `Zip Code [ENTER = 91304 ] ? ____`
+- `Area Code [ ENTER = 661 ] ? ###`
+- `Phone Number [ENTER = 4780990 ] ?`
+
+Then instructions:
+- `When entering in a Fax #, put a 1 in front of it if it is not 818.`
+- `Make sure there is a space after the #.      Example:  FAX:1805-222-3333`
+
+Then final field:
+- `Misc: [A = Append] [ENTER = TESTING] ?`
+
+## Important modify behavior revealed here
+### 1. `Misc` supports append mode
+This is new and very important:
+
+- `Misc: [A = Append] [ENTER = TESTING] ?`
+
+So in Modify mode, the Misc field supports:
+- **Enter** = keep existing Misc text
+- **A** = append to existing Misc text
+- presumably typing new text = replace it
+
+That is specific DOS behavior we should preserve.
+
+### 2. Fax guidance appears during modify too
+Same as Add Person:
+- fax content is likely stored via Misc conventions
+- DOS provides inline instructions during data entry
+
+### 3. Modify field set mirrors Add Person fully
+This confirms Modify includes the same final Misc step and is effectively a full guided re-entry/edit of the card.
+
+---
+
+## Image 21 â€” final review confirmation
+This is the post-edit review screen.
+
+### Displayed summary
+- `TEST`
+- `100 MAIN ST.`
+- `BURMA , CA   91304`
+- `(661) 478-0990`
+- `TESTING`
+
+Then:
+- `Is this correct (Y/N) ?`
+
+## Behavioral meaning
+After the modify prompts finish, DOS shows a formatted summary and asks for final confirmation.
+
+So Modify follows this pattern:
+
+1. find/select person
+2. confirm correct target person
+3. walk through editable fields with defaults
+4. show final formatted result
+5. ask:
+   - `Is this correct (Y/N)?`
+
+That is essentially parallel to Add Person, but against an existing record.
+
+---
+
+## WinForms parity implications
+For DOS-faithful Modify behavior, the VB implementation should support:
+
+- one-field-at-a-time guided editing
+- Enter retains current values
+- `N` clears/means no street
+- `A` appends to Misc instead of replacing it
+- fax-entry guidance near Misc
+- a final formatted Y/N review screen before saving
+
+## Most important takeaway
+The biggest new detail here is:
+
+> **Modify Personâ€™s Misc field has a special append mode: `[A = Append]`.**
+
+Thatâ€™s a very DOS-specific behavior and should be preserved in the WinForms port if you want true parity.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS **`(E) Print Phone Book`** workflow from the Rolodex menu.
+
+## Important overall observation
+This workflow appears to run **directly from the Rolodex menu screen itself**, with prompts appended below the menu rather than switching to a separate print form.
+
+Thatâ€™s a key DOS behavior.
+
+---
+
+## What the user presses
+The user selects:
+- `E`
+
+and DOS begins asking print options inline.
+
+A visible instruction also appears:
+- `Hit CAPS/LOCK Button`
+
+That likely relates to printer/output behavior or expected keyboard state.
+
+---
+
+## Prompt sequence shown
+
+### Step 1
+- `Do you want to print your customers only (Y/N) ?`
+
+The user examples show both:
+- `Yes`
+- `No`
+
+### Step 2
+- `Do you want High Quality but slow print (Y/N) ?`
+
+Again, examples show:
+- `Yes`
+- `No`
+
+### Step 3
+- `Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)`
+
+This indicates:
+- user can filter by first letter
+- Enter means print all
+- Esc cancels/quits
+
+### Step 4 / printer readiness
+One screenshot shows:
+- `PRINTER IS NOT READY!, Get it ready and hit [ENTER]?`
+
+So DOS checks printer readiness and blocks until ready.
+
+---
+
+## Screenshot-by-screenshot
+
+### Image 23
+- user pressed `E`
+- prompt shown:
+  - `Do you want to print your customers only (Y/N) ?`
+
+### Image 24
+- first answer recorded:
+  - `Yes`
+- next prompt shown:
+  - `Do you want High Quality but slow print (Y/N) ?`
+
+### Image 25
+- both answers recorded:
+  - customers only = `Yes`
+  - high quality = `Yes`
+- now asks for first-letter filter:
+  - `(Enter = All) (Esc = Quit)`
+
+### Image 26
+- shows another run with:
+  - customers only = `No`
+  - high quality = `No`
+- first-letter filter prompt appears
+- then printer readiness error:
+  - `PRINTER IS NOT READY!, Get it ready and hit [ENTER]?`
+
+---
+
+## Behavioral meaning
+### 1. Inline menu-driven workflow
+Unlike Add/Modify/Delete, this does not appear to open a dedicated screen.  
+It keeps the Rolodex menu visible and appends prompts beneath it.
+
+### 2. Multi-step print options
+Phone book printing includes:
+- customer-only filter
+- print-quality mode
+- first-letter filter
+
+### 3. Explicit keyboard semantics
+- Enter = All
+- Esc = Quit
+
+### 4. Hardware-readiness check
+DOS checks whether the printer is ready before proceeding.
+
+---
+
+## WinForms parity implications
+For DOS-faithful behavior in VB, **Print Phone Book** should likely preserve this general flow:
+
+1. choose Rolodex menu option `(E)`
+2. prompt:
+   - customers only? Y/N
+3. prompt:
+   - high quality but slow? Y/N
+4. prompt:
+   - first letter to print
+   - Enter = All
+   - Esc = Quit
+5. if printing device/output target not ready, show readiness prompt/error
+
+## Design note
+In WinForms, exact printer-ready hardware semantics may need adaptation, but the workflow logic should still match DOS:
+- sequential questions
+- optional letter filter
+- cancel path
+- print starts only after options are gathered
+
+## Most important takeaway
+`(E) Print Phone Book` is a **menu-inline sequential print wizard**, not a standalone browse screen.  
+That distinction matters for true DOS-style parity.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS **`(F) Print Labels`** workflow from the Rolodex menu.
+
+## Overall pattern
+Like **Print Phone Book**, this appears to run **inline on the Rolodex menu screen**, not on a separate dedicated form.
+
+---
+
+## What happens
+The user selects:
+- `F`
+
+Then DOS starts asking print-related questions below the menu.
+
+---
+
+## Prompt sequence shown
+
+### Image 27
+After pressing `F`, DOS asks:
+- `Do you want to print your customers only (Y/N) ?`
+
+### Image 28
+After answering:
+- `No`
+
+DOS then asks:
+- `Enter 1st Letter to start with [Enter = A]`
+
+---
+
+## Behavioral meaning
+### 1. Print Labels has a simpler prompt flow than Print Phone Book
+From these screenshots, the visible flow is:
+
+1. customers only? `Y/N`
+2. choose first starting letter
+   - Enter defaults to `A`
+
+Unlike Print Phone Book, these screenshots do **not** show:
+- high-quality/slow print prompt
+- explicit Esc quit text
+- printer-not-ready message
+
+Those may exist later, but they are not shown here.
+
+### 2. Start-letter filtering is used
+Rather than â€œpeople you want to printâ€ wording, this uses:
+- `Enter 1st Letter to start with [Enter = A]`
+
+So label printing likely begins at a selected alphabetical point.
+
+### 3. Runs from the menu itself
+Again, the Rolodex menu remains visible while the prompts appear underneath.
+
+---
+
+## WinForms parity implications
+For DOS-faithful behavior, **Print Labels** in VB should likely:
+
+- launch from the Rolodex menu
+- ask sequential inline-style questions or use a DOS-style prompt form
+- include:
+  - customer-only Y/N
+  - first-letter starting point
+  - Enter default of `A`
+
+## Most important takeaway
+`(F) Print Labels` is another **menu-inline prompt workflow**, and it is similar to Print Phone Book but appears to use a simpler option set centered around:
+- customer-only filter
+- alphabetical starting letter
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show the DOS **`(G) Look up Area Codes`** feature.
+
+## What the feature does
+It lets the user search area-code data in at least two ways:
+- by entering an **area code** to find the city/state
+- by entering a **2-letter state abbreviation** to find that state's area codes
+
+It also supports a full listing mode.
+
+---
+
+## Image 30 â€” entry/search screen
+This appears to be the initial Area Codes prompt screen.
+
+### Title
+- `<<< LOOK UP AREA CODES >>>`
+
+### Instructions
+- `Enter Area Code to find city or 2 letter abreviation of state to find area code`
+- `Example: California = CA`
+
+### Prompt options
+- `[A = All] [Q = Quit] ?`
+
+## Behavioral meaning
+This confirms the input modes:
+- numeric area code lookup
+- 2-letter state lookup
+- `A` for full/all listing
+- `Q` to quit
+
+---
+
+## Images 31, 29, 32 â€” area code listing output
+These show the output/listing view.
+
+### Header shown
+- `** Area Code Finder **`
+- `(C) Dean Beimer 1989`
+
+So this appears to be based on an older standalone area-code database/program integrated into the app.
+
+### Paging indicator
+- `-- More --`
+
+This indicates the output is paged and likely waits for a keypress between screens.
+
+### Listing structure
+Results are grouped by state or region, for example:
+- `Alabama area code(s):`
+- `Alaska area code(s):`
+- `California area code(s):`
+- `Connecticut area code(s):`
+- `Delaware area code(s):`
+- `District of Columbia area code(s):`
+- `Florida area code(s):`
+- `Georgia area code(s):`
+- `Hawaii area code(s):`
+- `Canada area code(s):`
+
+Each state then lists area codes and associated cities/coverage, e.g.:
+- `805 Bakersfield.`
+- `213 Los Angeles.`
+- `619 San Diego.`
+- `415 San Francisco.`
+
+or:
+- `205 All locations.`
+
+## Behavioral meaning
+### 1. `A = All` likely opens the paged master listing
+The listing screens strongly suggest that choosing `A` displays the whole database with paging.
+
+### 2. Results are text-report style, not interactive grids
+This is clearly a text viewer/listing, not a data-entry form or editable list.
+
+### 3. Paging matters
+`-- More --` is part of the behavior:
+- user likely advances page-by-page
+- DOS-style scrolling/pause behavior should be considered in WinForms parity
+
+---
+
+## WinForms parity implications
+For DOS-faithful behavior, **Look up Area Codes** in VB should likely support:
+
+1. an input screen with:
+   - area code lookup
+   - 2-letter state lookup
+   - `A = All`
+   - `Q = Quit`
+2. a DOS-style output view showing results as monospaced text
+3. paging or a scrollable report-style viewer for long output
+4. preserved wording/layout where practical
+
+## Most important takeaway
+`(G) Look up Area Codes` is basically a **text-based reference/search utility** embedded in Rolodex:
+- prompt-driven input
+- report-style paged output
+- supports all-listing mode and targeted lookup mode
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These two screenshots are additional **paged output screens** from the DOS **`(G) Look up Area Codes`** feature.
+
+## What they show
+They continue the `A = All` or broad listing/report view of area codes by state/region.
+
+### Image 33 includes
+- `Idaho area code(s):`
+- `Illinois area code(s):`
+- `Indiana area code(s):`
+- `Iowa area code(s):`
+- beginning of `Kansas area code(s):`
+
+Examples shown:
+- `208 All locations.`
+- `312 Chicago, Aurora, Waukegan.`
+- `217 Springfield.`
+- `317 Indianapolis, Kokomo.`
+- `515 Des Moines.`
+
+### Image 34 includes
+- continuation of `Kansas area code(s):`
+- `Kentucky area code(s):`
+- `Louisiana area code(s):`
+- `Maine area code(s):`
+- `Maryland area code(s):`
+- `Massachusetts area code(s):`
+- beginning of `Mexico area code(s):`
+
+Examples shown:
+- `502 Louisville, Frankfort, Paducah, Shelbyville.`
+- `504 Baton Rouge, New Orleans.`
+- `207 All locations.`
+- `301 All locations.`
+- `617 Boston, New Bedford, Plymouth, Worchester.`
+
+## Behavioral meaning
+### 1. This confirms a multi-page alphabetical listing
+The report continues alphabetically through states/regions.
+
+### 2. `-- More --` is persistent paging behavior
+Each page ends with:
+- `-- More --`
+
+So the DOS app is clearly pausing output a page at a time.
+
+### 3. Geographic scope goes beyond U.S. states
+The listing includes:
+- Canada
+- Mexico
+
+So the area-code database is broader than just U.S. states.
+
+## WinForms parity implication
+For parity, the VB version of **Look up Area Codes** should not be reduced to a tiny one-result dialog only. It should support:
+- long-form report viewing
+- paging or at least a scrollable monospaced viewer
+- all-listing mode across multiple pages of results
+
+## Most important takeaway
+These screenshots reinforce that **Look up Area Codes** is a **paged textual reference report**, not just a simple one-off lookup prompt.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show two different DOS Rolodex features:
+
+- **Image 35:** `(I) Test Entire Rolodex for Errors`
+- **Images 36â€“37:** `(H) Look up Zip Codes`
+
+---
+
+# Image 35 â€” `(I) Test Entire Rolodex for Errors`
+
+## Whatâ€™s shown
+The Rolodex menu remains visible, and below it DOS displays:
+
+- `Checking Rolodex for Errors...     [ESC] to Exit`
+- `Testing the Zâ€™s`
+- `Hit [ENTER] to continue?`
+
+## Behavioral meaning
+### 1. Runs inline from the menu
+Like some print operations, this feature appears to execute directly on the Rolodex menu screen rather than switching to a separate form.
+
+### 2. Iterative/stepwise validation
+The message:
+- `Testing the Zâ€™s`
+
+suggests DOS checks records in alphabetical groups or batches.

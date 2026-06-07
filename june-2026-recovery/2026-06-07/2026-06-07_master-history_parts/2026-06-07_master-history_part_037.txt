@@ -1,0 +1,2000 @@
+﻿    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+```
+
+Everything else can remain for the first test.
+
+---
+
+## If it still crashes after switching to net8
+Then the next suspect is your dynamic compile item manipulation here:
+
+```xml
+<Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+```
+
+especially this part:
+
+```xml
+<ItemGroup>
+  <Compile Remove="$(BuildInfoFile)" />
+  <Compile Include="$(BuildInfoFile)" Visible="false" />
+</ItemGroup>
+```
+
+If we need to, I can simplify that next.
+
+But donâ€™t change both things at once unless necessary â€” isolate one variable first.
+
+---
+
+## My recommendation order
+### Try in this order:
+1. switch to **`net8.0-windows`**
+2. clean `bin/obj`
+3. rebuild
+
+### If still broken:
+4. Iâ€™ll simplify the `GenerateBuildInfo` target next
+
+---
+
+## Short answer
+Yes â€” I think the real issue is in the project configuration, and the most likely culprit is **`net10.0-windows`**.  
+Change it to **`net8.0-windows`** first and rebuild.
+
+## @testsubject117
+
+can you just send me the whole file?
+
+## Copilot
+
+Yes â€” hereâ€™s the full `.vbproj` file with the **main fix applied**: target framework changed from **`net10.0-windows`** to **`net8.0-windows`**.
+
+Use this as your full replacement:
+
+```xml name=AMiOffice.vbproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <!-- Versioning policy:
+         - AssemblyVersion: changes rarely (typically major releases only)
+         - FileVersion: changes every Publish (uses BuildNumber)
+         - InformationalVersion: semver + build metadata -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Ensure BuildNumber is never blank for normal builds -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <!-- Update every Publish -->
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+
+    <!-- What Windows shows as "Product version" -->
+    <ProductVersion>$(Version)</ProductVersion>
+
+    <!-- Human-facing / marketing version -->
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+  </ItemGroup>
+
+  <Target Name="IncrementBuildCounter" BeforeTargets="Publish">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)'))</BuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(BuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- Convert first line item into a real property -->
+    <PropertyGroup>
+      <BuildNumber>$([System.String]::Copy('%(BuildCounterLines2.Identity)'))</BuildNumber>
+    </PropertyGroup>
+
+    <Message Text="GenerateBuildInfo: BuildCounterFile=$(BuildCounterFile) BuildNumber=$(BuildNumber)" Importance="high" />
+
+    <!-- Trim + fallback -->
+    <PropertyGroup>
+      <BuildNumber>$([System.String]::Copy('$(BuildNumber)').Trim())</BuildNumber>
+      <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## After you paste it
+Do this exactly:
+
+1. save the `.vbproj`
+2. close Visual Studio
+3. delete the projectâ€™s `bin` folder
+4. delete the projectâ€™s `obj` folder
+5. reopen Visual Studio
+6. rebuild
+
+## If it still fails
+If it still crashes after this, send me the **new error list**, because then the next thing Iâ€™ll do is simplify the `GenerateBuildInfo` target.
+
+## @testsubject117
+
+don't I now need to download and install .net v8? 
+
+## Copilot
+
+Yes â€” **if .NET 8 isnâ€™t already installed on your machine, youâ€™ll need it** to build a project targeting `net8.0-windows`.
+
+## Direct answer
+Changing the project to:
+
+```xml
+<TargetFramework>net8.0-windows</TargetFramework>
+```
+
+means your machine needs the **.NET 8 SDK** installed.
+
+---
+
+## But first, check before installing
+You may already have it.
+
+Open a terminal and run:
+
+```powershell
+dotnet --list-sdks
+```
+
+If you see something like:
+
+```text
+8.0.xxx
+```
+
+then you already have the SDK and do **not** need to install it.
+
+---
+
+## If you do need it
+Install the **.NET 8 SDK**  
+not just the runtime.
+
+You need the **SDK** because you are building the project.
+
+---
+
+## Important distinction
+### Runtime
+Lets apps run
+
+### SDK
+Lets you:
+- build
+- compile
+- restore
+- publish
+
+You need the **SDK**.
+
+---
+
+## My recommendation
+If this machine is your dev machine, having both is fine:
+
+- .NET 8 SDK
+- .NET 10 SDK
+
+Your project can still target 8 even if 10 is also installed.
+
+---
+
+## One more option
+If you donâ€™t want to install .NET 8 yet, you can also try to keep .NET 10 and simplify the project file further to work around the Roslyn issue.
+
+So you have 2 paths:
+
+### Option A â€” recommended
+Install .NET 8 SDK and target:
+```xml
+net8.0-windows
+```
+
+### Option B
+Stay on .NET 10 and troubleshoot the project/SDK interaction more deeply
+
+Given your crash, I think **Option A is much more practical**.
+
+---
+
+## Short answer
+Yes â€” **if `dotnet --list-sdks` does not show any 8.0 SDK**, then youâ€™ll need to install the **.NET 8 SDK**.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	NETSDK1005	Assets file 'C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\obj\project.assets.json' doesn't have a target for 'net8.0-windows'. Ensure that restore has run and that you have included 'net8.0-windows' in the TargetFrameworks for your project.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Sdks\Microsoft.NET.Sdk\targets\Microsoft.PackageDependencyResolution.targets	266	
+
+
+## Copilot
+
+Good â€” this is progress.
+
+## Direct answer
+This is **not** the old Roslyn crash anymore.
+
+Now the error is simply:
+
+- the project is targeting **`net8.0-windows`**
+- but your restore/build assets were not generated for that target yet
+
+Most likely because:
+1. **.NET 8 SDK is not installed**, or
+2. restore hasnâ€™t been rerun cleanly after changing the target framework
+
+---
+
+## What this error means
+`NETSDK1005` here usually means:
+
+- `obj\project.assets.json` was created for a different framework before
+- and/or the SDK needed for the new framework is missing
+
+---
+
+## What to do now
+### Step 1: check installed SDKs
+Run:
+
+```powershell
+dotnet --list-sdks
+```
+
+### If you do **not** see `8.0.xxx`
+Then yes, you need to install the **.NET 8 SDK**.
+
+---
+
+### Step 2: after installing .NET 8 SDK
+Run this from the project folder:
+
+```powershell
+dotnet restore
+```
+
+Then:
+
+```powershell
+dotnet build
+```
+
+---
+
+## If you already have .NET 8 installed
+Then do this:
+
+1. close Visual Studio
+2. delete:
+   - `bin`
+   - `obj`
+3. open terminal in the project folder
+4. run:
+
+```powershell
+dotnet restore
+dotnet build
+```
+
+That forces regeneration of `project.assets.json` for `net8.0-windows`.
+
+---
+
+## Why this is actually good news
+Because now youâ€™re seeing a **normal SDK error** instead of an internal compiler fatal error.
+
+That means switching off `net10.0-windows` likely helped.
+
+---
+
+## Short answer
+You now either need to:
+
+- **install the .NET 8 SDK**, if it isnâ€™t installed  
+or
+- run a clean **restore** so `project.assets.json` gets rebuilt for `net8.0-windows`
+
+## Next step
+Run:
+
+```powershell
+dotnet --list-sdks
+```
+
+and tell me whether `8.0.x` appears.
+
+## @testsubject117
+
+PS C:\Users\capnkirk\source\repos\AmiWinForms> dotnet --list-sdks
+10.0.300 [C:\Program Files\dotnet\sdk]
+
+## Copilot
+
+Yes â€” that confirms it.
+
+## Direct answer
+You **do not have the .NET 8 SDK installed**.
+
+Right now you only have:
+
+```text
+10.0.300
+```
+
+So if the project targets:
+
+```xml
+net8.0-windows
+```
+
+you need to install the **.NET 8 SDK**.
+
+---
+
+## What to install
+Install:
+
+- **.NET 8 SDK**
+
+Not just:
+- runtime
+- hosting bundle
+
+You need the **SDK**.
+
+---
+
+## After installing
+Run:
+
+```powershell
+dotnet --list-sdks
+```
+
+You should then see something like:
+
+```text
+8.0.xxx [C:\Program Files\dotnet\sdk]
+10.0.300 [C:\Program Files\dotnet\sdk]
+```
+
+Then from your solution/project folder run:
+
+```powershell
+dotnet restore
+dotnet build
+```
+
+Or reopen Visual Studio and rebuild.
+
+---
+
+## Important
+It is completely fine to have both:
+- .NET 8 SDK
+- .NET 10 SDK
+
+installed side by side.
+
+Your project will use the one matching its target/framework needs.
+
+---
+
+## Short answer
+Yes â€” you need to install the **.NET 8 SDK**, because your machine currently only has **.NET 10.0.300** installed.
+
+## @testsubject117
+
+I also don't like changing the .net version mid project. seems like it would cause additional issues.
+
+## Copilot
+
+Thatâ€™s reasonable â€” **and I agree you donâ€™t have to change frameworks yet**.
+
+## Direct answer
+If you donâ€™t want to switch the project from **.NET 10** to **.NET 8** mid-project, then **donâ€™t**.  
+We can instead keep `net10.0-windows` and fix the actual project/config issue.
+
+Given your concern, I think thatâ€™s the better next move.
+
+---
+
+## What changed in the diagnosis
+Your first crash suggested:
+- either a VB/Roslyn bug in .NET 10
+- or a bad project/compiler setting
+
+Switching to .NET 8 was a practical workaround, **not the only solution**.
+
+If you want to stay clean and avoid framework churn, we should revert back to:
+
+```xml
+<TargetFramework>net10.0-windows</TargetFramework>
+```
+
+and then simplify the project file until the crash disappears.
+
+---
+
+# Recommended path now
+## Step 1 â€” change the project back to .NET 10
+Change this line back:
+
+```xml
+<TargetFramework>net8.0-windows</TargetFramework>
+```
+
+to:
+
+```xml
+<TargetFramework>net10.0-windows</TargetFramework>
+```
+
+---
+
+## Step 2 â€” simplify the suspicious custom build logic
+The most suspicious thing in your `.vbproj` now is **not** the forms.
+
+Itâ€™s this custom target:
+
+- `GenerateBuildInfo`
+- dynamic `Compile Remove/Include`
+- generated VB file before compile
+
+That is exactly the kind of thing that can trip Roslyn/SDK behavior.
+
+---
+
+## What I would do next
+Keep .NET 10, but temporarily **remove the generated build info target**.
+
+That means removing these parts from the project file:
+
+- `<BuildInfoFile>...`
+- `<Compile Remove="$(BuildInfoFile)" />`
+- the whole `<Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">...</Target>`
+
+You can keep the publish counter target if you want, but for now Iâ€™d simplify aggressively.
+
+---
+
+# Here is the full safer `.vbproj` for .NET 10
+Replace your project file with this:
+
+```xml name=AMiOffice.vbproj
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <Target Name="IncrementBuildCounter" BeforeTargets="Publish">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)'))</BuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(BuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+</Project>
+```
+
+---
+
+## Why this helps
+This removes the custom generated compile file behavior, which is the most suspicious project-level complication.
+
+So we keep:
+- your current framework
+- your current app model
+- your publish counter
+
+But remove:
+- the dynamically generated `BuildInfo.g.vb` compile manipulation
+
+---
+
+## After replacing the project file
+Do this:
+
+1. save
+2. close Visual Studio
+3. delete `bin`
+4. delete `obj`
+5. reopen
+6. rebuild
+
+---
+
+## Short answer
+Youâ€™re right â€” changing framework mid-project is not ideal.  
+So the better move is to **switch the project back to .NET 10 and simplify the `.vbproj` instead**.
+
+## @testsubject117
+
+ok, it looks like thats working now. so did we get everything replaced and working so far?
+
+## Copilot
+
+Yes â€” **it sounds like the build-system problem is fixed**, and the code changes you pasted are in place.
+
+## Whatâ€™s done so far
+You now have the main `LEDGER.CUR` pieces back in place:
+
+- `LegacyDataPaths.vb` points to the real file
+- `LedgerCurReader` reads `LEDGER.CUR`
+- `LedgerEntry` exists
+- `LedgerCurWriter.vb` exists
+- `FormLedgerView.vb` is using `LEDGER.CUR`
+- `FormAddChecks.vb` is set to append to `LEDGER.CUR`
+- `FormDeleteCheck.vb` is set to rewrite/remove from `LEDGER.CUR`
+
+And the `.vbproj` issue appears to be stabilized.
+
+---
+
+## But â€œworkingâ€ and â€œfully correctâ€ are not exactly the same yet
+### What I believe is working now
+At a high level, the flow should now be:
+
+- **View Checks** â†’ reads real ledger records
+- **Add Check** â†’ appends a ledger record
+- **Delete Check** â†’ removes a ledger record
+
+That means the app is back on the real DOS-backed file path rather than the temporary repository path.
+
+---
+
+## What is probably still incomplete
+There are a few things that are likely still not fully DOS-faithful yet:
+
+### 1. Add Checks only writes `LEDGER.CUR`
+Right now your add flow writes:
+
+- customer
+- date
+- check #
+- amount
+- reference
+- invoice diff = `"0"`
+
+But it does **not yet** appear to update:
+- `CHECK.INV`
+- `INVOICE.CHK`
+- invoice paid/unpaid state
+- any linked invoice metadata
+
+So it is probably enough for **View Checks**, but maybe not enough for full accounting behavior.
+
+---
+
+### 2. Delete Check only removes from `LEDGER.CUR`
+Your delete screen currently says:
+
+> Reset the Invoices to UnPaid
+
+But the current code only removes the entry from `LEDGER.CUR`.
+
+It does **not yet**:
+- purge related `.INV` entries
+- reset invoice records
+- update `CHECK.INV`
+- update `INVOICE.CHK`
+
+So the UI text is ahead of the actual backend behavior.
+
+---
+
+### 3. `InvoiceDiffText` is currently forced to `"0"`
+That may be acceptable as a temporary placeholder, but if DOS calculated it from invoices, we may eventually want to compute it properly.
+
+---
+
+## So the honest answer
+### Yes:
+We **did** replace the main checks source so it uses **real `LEDGER.CUR`** again.
+
+### No:
+We are probably **not finished** if the goal is full original DOS behavior.
+
+---
+
+## What I recommend you test right now
+Before changing anything else, do these tests:
+
+### Test 1 â€” View existing checks
+- Open **View Checks**
+- confirm old real records appear
+
+### Test 2 â€” Add a test check
+- add a small fake/test check
+- confirm it appears in View Checks
+- confirm it was written into `LEDGER.CUR`
+
+### Test 3 â€” Delete that test check
+- delete the same check
+- confirm it disappears from View Checks
+- confirm it was removed from `LEDGER.CUR`
+
+### Test 4 â€” Watch for side effects
+Check whether anything else in the app expects:
+- `CHECK.INV`
+- `INVOICE.CHK`
+- invoice paid/unpaid flags
+
+because those may now be out of sync after add/delete
+
+---
+
+## Bottom line
+**We have the main `LEDGER.CUR` replacement working conceptually.**  
+But **invoice-linking behavior is almost certainly not fully restored yet**.
+
+So Iâ€™d say:
+
+- **main ledger/check file path: yes, replaced**
+- **build issue: yes, fixed**
+- **full DOS-equivalent check/invoice behavior: probably not finished yet**
+
+---
+
+## Best next step
+Run the app and test these three functions:
+
+1. **View Checks**
+2. **Add Check**
+3. **Delete Check**
+
+Then tell me exactly:
+- what works
+- what doesnâ€™t
+- what looks wrong on screen
+- whether invoices are supposed to update too
+
+If you want, after that I can help you with the **next layer: `CHECK.INV` / invoice syncing**.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Itâ€™s a **â€œView Checksâ€** window in a desktop accounting-style app with a DOS-inspired black screen look.
+
+### Whatâ€™s on the screen
+- Title at the top: **`***** View Checks *****`**
+- Filter line shows:
+  - **Customer: ALL**
+  - **Check #: ALL**
+  - **Year: ALL**
+
+### Main area
+A table/grid lists check records with columns:
+
+- **Customer**
+- **Check #**
+- **Reference**
+- **Date**
+- **Amount**
+- **Difference**
+
+The color scheme is:
+- black background
+- white text
+- yellow column headers
+
+### Example rows shown
+The visible rows include entries like:
+- `2SKIS` / check `5238` / reference `3` / date `02-08-1996` / amount `35.00`
+- many `3DMANUFA` entries with different check numbers, references, dates, and amounts
+
+Examples for `3DMANUFA` include:
+- check `1` / `1-FIRE` / `07-08-2008` / `738.75`
+- check `1006` / `0031197551` / `09-01-2016` / `1464.00`
+- check `1137` / `0031197551` / `11-07-2016` / `1256.25`
+
+### Bottom area
+- A total line reads: **`Total Amount: $78272966.70`**
+- There is a **Close** button in the lower-right corner.
+
+### Overall impression
+It looks like a restored legacy ledger/check viewer:
+- modern WinForms grid
+- styled to resemble an old DOS accounting screen
+- currently displaying all checks from the ledger file without any active filtering
+
+If you want, I can also tell you **what in this screenshot suggests the code is working correctly** and what still looks potentially off.
+
+## @testsubject117
+
+so you want me to now click (1) add checks to ledger cash receipts and add a small fake check?
+
+## Copilot
+
+Yes â€” **thatâ€™s the right next test**.
+
+## Direct answer
+Go ahead and click:
+
+**`(1) Add Checks To Ledger Cash Receipts`**
+
+Then add **one small fake test check**.
+
+---
+
+## Why this test matters
+Weâ€™ve confirmed:
+- the project builds again
+- View Checks is showing real `LEDGER.CUR` data
+
+Now we need to verify that **Add Check** actually writes a new record into `LEDGER.CUR`.
+
+---
+
+## Best test values
+Use something easy to find and easy to delete afterward.
+
+For example:
+
+- **Company Name:** `TESTVENDOR`
+- **Check Amount:** `12.34`
+- **Lowest Invoice:** `-1`
+- **Check Number:** `999991`
+- **Date:** `05-19-2026`
+- **Check Reference:** `TESTREF`
+
+That should make the test record very easy to spot.
+
+---
+
+## What to do after saving it
+After you finish the Add Check flow:
+
+1. open **View Checks**
+2. search for:
+   - customer = `TESTVENDOR`
+   - or check # = `999991`
+3. confirm the new row appears
+
+---
+
+## Then do one more check
+If possible, also verify the actual file changed:
+
+- open `LEDGER.CUR`
+- confirm a new 6-line record was appended
+
+You should expect something like:
+
+```text
+"TESTVENDOR"
+"05-19-2026"
+"999991"
+"0"
+12.34
+"TESTREF"
+```
+
+---
+
+## After that
+If the record appears correctly, the next test is:
+
+- open **Delete Check**
+- delete that same fake check
+- confirm it disappears
+
+---
+
+## Short answer
+Yes â€” add **one small fake check** now through:
+
+**`(1) Add Checks To Ledger Cash Receipts`**
+
+Use a clearly fake/test value so we can verify add/delete safely.
+
+## @testsubject117
+
+yep, it adds, appears in ledger.cur, then deletes, and is removed from ledger.cur
+
+## Copilot
+
+Perfect â€” **that means the core ledger flow is working now**.
+
+## Direct answer
+So yes, at this point we have successfully restored the main `LEDGER.CUR` behavior for:
+
+- **View Checks**
+- **Add Checks**
+- **Delete Checks**
+
+And youâ€™ve verified it both:
+- in the UI
+- and directly in `LEDGER.CUR`
+
+Thatâ€™s a big milestone.
+
+---
+
+## What is confirmed working
+### 1. View Checks
+- reads real `LEDGER.CUR`
+- displays existing records correctly
+
+### 2. Add Checks
+- appends a new record to `LEDGER.CUR`
+- new record shows up in the UI
+
+### 3. Delete Check
+- removes the record from `LEDGER.CUR`
+- deleted record disappears from the UI
+
+So the app is no longer relying on the temporary check repository for the primary check ledger flow.
+
+---
+
+## What is probably still not restored
+This is the one important caveat:
+
+### Invoice-linking behavior is still probably incomplete
+Your current add/delete flow does **not** appear to also update:
+- `CHECK.INV`
+- `INVOICE.CHK`
+- invoice paid/unpaid state
+- any `.INV` file relationships
+
+So if the original DOS app did more than just maintain `LEDGER.CUR`, that part is likely still pending.
+
+---
+
+## But if your immediate goal was:
+> get checks viewing/adding/deleting working again against the real ledger file
+
+Then the answer is:
+
+**Yes, that part is working.**
+
+---
+
+## What I would do next
+You now have two sensible choices:
+
+### Option 1 â€” stop here for now
+If your immediate need was to get the checks ledger functioning again, this is a good checkpoint.
+
+### Option 2 â€” restore invoice synchronization next
+If DOS also:
+- tied checks to invoice ranges
+- marked invoices paid/unpaid
+- updated `CHECK.INV` and `INVOICE.CHK`
+
+then thatâ€™s the next subsystem to rebuild.
+
+---
+
+## My recommendation
+Since youâ€™ve already verified add/delete against live data, Iâ€™d suggest the next question should be:
+
+**When a check is added or deleted, what other legacy files are supposed to change besides `LEDGER.CUR`?**
+
+Most likely:
+- `CHECK.INV`
+- `INVOICE.CHK`
+
+If you want, we can trace that next.
+
+---
+
+## Short answer
+Yes â€” the real `LEDGER.CUR` flow is now working end to end for:
+- add
+- view
+- delete
+
+That part is fixed.
+
+## @testsubject117
+
+lets do: When a check is added or deleted, what other legacy files are supposed to change besides LEDGER.CUR?
+
+Most likely:
+
+CHECK.INV
+INVOICE.CHK
+If you want, we can trace that next.
+
+## Copilot
+
+Yes â€” we can trace that next, but I need the repo or the relevant source files.
+
+## Direct answer
+I can help determine exactly what should change besides `LEDGER.CUR`, but I **canâ€™t inspect your repository yet** because the repo I tried (`testsubject117/AMiOffice`) isnâ€™t accessible or doesnâ€™t exist from here.
+
+So the fastest path is:
+
+### either
+send me the repository in exact `owner/repo` form
+
+### or
+paste the files that likely contain the legacy check/invoice update logic.
+
+---
+
+## What I need to inspect
+Please send any of these you have:
+
+1. code for **Add Checks**
+2. code for **Delete Check**
+3. anything mentioning:
+   - `CHECK.INV`
+   - `INVOICE.CHK`
+   - `.INV`
+   - `paid`
+   - `unpaid`
+   - `cash receipts`
+   - `ledger`
+
+Best candidates:
+- old DOS-port logic files
+- helper classes that read/write invoice files
+- any code that scans invoice ranges
+
+---
+
+## What weâ€™re trying to answer
+When a check is added or deleted, we want to know whether the original system also updated:
+
+- `CHECK.INV`
+- `INVOICE.CHK`
+- invoice status flags
+- invoice balances
+- cross-reference files
+- purge/reset behavior on delete
+
+---
+
+## Best next step
+Paste whichever file is most likely to contain this logic first.
+
+A good starting point would be:
+- any file that currently references `CHECK.INV`
+- or any file that currently references `INVOICE.CHK`
+
+If you want, I can guide this as a file hunt:
+1. search your project for `CHECK.INV`
+2. paste the matches
+3. then search for `INVOICE.CHK`
+4. paste those matches
+
+That will let me reconstruct the intended legacy behavior quickly.
+
+## @testsubject117
+
+it isn't testsubject117/amioffice, it's testsubject117/AMiDataStore
+
+## Copilot
+
+Yes â€” based on the legacy source, **checks affect more than `LEDGER.CUR`**.
+
+## Direct answer
+When a check is added or deleted, the old system also updated at least:
+
+- **`CHECK.INV`**
+- **`INVOICE.CHK`**
+
+And on delete, it also used temporary files:
+
+- **`LEDGER.TMP`**
+- **`CHECK.TMP`**
+
+The search results are limited and may be incomplete, but the core behavior is clear from the matches we found. You can view more search results in GitHub code search here: `repo:testsubject117/AMiDataStore "CHECK.INV" OR "INVOICE.CHK" OR "LEDGER.CUR"`.
+
+---
+
+## What the old code shows
+
+### On **add check**
+In `LL.L`, the add flow:
+1. updates invoice records in `INVOICE.CHK`,
+2. appends the check to `LEDGER.CUR`,
+3. appends invoice-link data to `CHECK.INV`. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ
+
+The relevant add sequence is:
+
+- write invoice status/amount changes,
+- then:
+  - `OPEN "LEDGER.CUR" FOR APPEND`
+  - `WRITE#1,N2$:WRITE#1,DT$:WRITE#1,CNUM$:WRITE#1,"":WRITE#1,CHKAMT:WRITE#1,RF$`
+- then:
+  - `OPEN "CHECK.INV" FOR APPEND`
+  - `WRITE#1,N2$;CNUM$;RF$;DT$;CHKAMT;CT`
+  - followed by each invoice number. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+So `CHECK.INV` is the check-to-invoice cross-reference file, and `INVOICE.CHK` is the invoice master/status file. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+---
+
+### On **delete check**
+In `LL.L`, delete does **not** just remove a ledger row.
+
+It:
+1. rewrites `CHECK.INV` into `CHECK.TMP`, omitting the deleted check,
+2. for the deleted checkâ€™s invoice list, opens `INVOICE.CHK`,
+3. resets each linked invoice flag to unpaid,
+4. replaces `LEDGER.CUR` with `LEDGER.TMP`,
+5. replaces `CHECK.INV` with `CHECK.TMP`. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+The key lines are:
+- `OPEN "CHECK.INV" FOR INPUT`
+- `OPEN "CHECK.TMP" FOR OUTPUT`
+- if matching check is found, iterate invoice list
+- `OPEN "INVOICE.CHK" SHARED AS #3 LEN=26`
+- `LSET FLAG$="J"`
+- then:
+  - `KILL "ledger.cur":NAME "LEDGER.TMP" AS "LEDGER.CUR"`
+  - `KILL "check.inv":NAME "CHECK.TMP" AS "CHECK.INV"` îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+That means your current delete flow is only partially restored right now.
+
+---
+
+## What `INVOICE.CHK` appears to store
+Other files in the repo show `INVOICE.CHK` is a fixed-length random-access file with fields:
+
+- invoice number
+- amount
+- customer/company
+- flag/status
+
+For example:
+- `FIELD #3,9 AS INUM$,8 AS AMT$,8 AS CO$,1 AS FLAG$` appears repeatedly. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ
+
+The add/fix utilities suggest:
+- `FLAG$="J"` means unpaid/open
+- `FLAG$="C"` may mean zero/closed
+- other statuses may exist too. That last part is an inference from the maintenance scripts. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ
+
+---
+
+## So what is missing in your current WinForms port?
+
+### Current add
+You currently:
+- append to `LEDGER.CUR`
+
+You are **not yet**:
+- writing `CHECK.INV`
+- updating `INVOICE.CHK`
+
+### Current delete
+You currently:
+- remove from `LEDGER.CUR`
+
+You are **not yet**:
+- removing the corresponding entry from `CHECK.INV`
+- finding linked invoices from `CHECK.INV`
+- resetting those invoice flags in `INVOICE.CHK`
+
+---
+
+## Practical conclusion
+If you want DOS-faithful behavior, the check workflow should be:
+
+### Add check
+1. determine invoices being paid
+2. update those invoices in `INVOICE.CHK`
+3. append check summary to `LEDGER.CUR`
+4. append check-to-invoice mapping to `CHECK.INV`
+
+### Delete check
+1. remove check from `LEDGER.CUR`
+2. remove check mapping from `CHECK.INV`
+3. use that mapping to reset linked invoices in `INVOICE.CHK`
+
+---
+
+## Most important evidence
+The strongest add evidence is from `LL.L` lines around 1340â€“1380, where the program appends to both `LEDGER.CUR` and `CHECK.INV`. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+The strongest delete evidence is from `LL.L` lines around 3810â€“3950, where the program rewrites `CHECK.INV` and resets invoice flags in `INVOICE.CHK`. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+---
+
+## Recommended next step
+We should next build/read these formats in your port:
+
+1. **`CheckInvReader/Writer`** for `CHECK.INV`
+2. **`InvoiceChkReader/Writer`** for `INVOICE.CHK`
+3. then wire:
+   - `FormAddChecks` to update all 3 files
+   - `FormDeleteCheck` to reverse all 3 files
+
+If you want, I can sketch the likely record structure for `CHECK.INV` next and help you implement it.
+
+## @testsubject117
+
+yes
+
+## Copilot
+
+Yes â€” hereâ€™s the next piece.
+
+## Direct answer
+`CHECK.INV` appears to store **one variable-length record per check**:
+
+1. customer name
+2. check number
+3. reference
+4. date
+5. check amount
+6. count of linked invoices
+7. then that many invoice numbers
+
+That structure is directly implied by the legacy add/delete code. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+---
+
+## Likely `CHECK.INV` record format
+
+From the add logic in `LL.L`:
+
+```basic
+WRITE#1,N2$;CNUM$;RF$;DT$;CHKAMT;CT
+FOR X=1 TO CT:WRITE#1,Y:NEXT
+```
+
+So each record is:
+
+```text
+Customer
+CheckNumber
+Reference
+Date
+CheckAmount
+InvoiceCount
+Invoice1
+Invoice2
+...
+InvoiceN
+```
+
+Where:
+- `CT` = number of invoices linked to that check
+- the following `CT` values are invoice numbers. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel1îˆ
+
+---
+
+## How delete uses it
+Delete reads `CHECK.INV` like this:
+
+```basic
+INPUT#2,N2$,CNUM$,RF$,DT$,CHKAMT,CT
+FOR X=1 TO CT:INPUT#2,HOLD(X):NEXT
+```
+
+That confirms the same layout:
+- 6 header values
+- then `CT` invoice numbers. îˆ€citeîˆ‚turn0commentaryto=multi_tool_use.parallel0îˆ
+
+---
+
+## What this means for your port
+Youâ€™ll want a record model something like:
+
+```vbnet
+Public Class CheckInvRecord
+    Public Property Customer As String
+    Public Property CheckNumber As String
+    Public Property Reference As String
+    Public Property DateText As String
+    Public Property CheckAmount As Decimal
+    Public Property InvoiceNumbers As List(Of Integer)
+End Class
+```
+
+And the file reader/writer should:
+- read 6 values first
+- then read `InvoiceCount` more values
+- repeat until EOF
+
+---
+
+# Step 1: create `CheckInvRecord.vb`
+
+```vbnet name=CheckInvRecord.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+
+Public Class CheckInvRecord
+    Public Property Customer As String
+    Public Property CheckNumber As String
+    Public Property Reference As String
+    Public Property DateText As String
+    Public Property CheckAmount As Decimal
+    Public Property InvoiceNumbers As List(Of Integer)
+
+    Public Sub New()
+        InvoiceNumbers = New List(Of Integer)()
+    End Sub
+End Class
+```
+
+---
+
+# Step 2: create `CheckInvReader.vb`
+
+```vbnet name=CheckInvReader.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports Microsoft.VisualBasic
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvRecord)
+        Dim results As New List(Of CheckInvRecord)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Using sr As New StreamReader(path)
+            While Not sr.EndOfStream
+                Dim customer As String = ReadValue(sr)
+                If customer Is Nothing Then Exit While
+
+                Dim checkNumber As String = ReadValue(sr)
+                Dim reference As String = ReadValue(sr)
+                Dim dateText As String = ReadValue(sr)
+                Dim amountText As String = ReadValue(sr)
+                Dim countText As String = ReadValue(sr)
+
+                Dim record As New CheckInvRecord()
+                record.Customer = customer
+                record.CheckNumber = checkNumber
+                record.Reference = reference
+                record.DateText = dateText
+
+                Dim amt As Decimal = 0D
+                Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, amt)
+                record.CheckAmount = amt
+
+                Dim count As Integer = 0
+                Integer.TryParse(countText, NumberStyles.Any, CultureInfo.InvariantCulture, count)
+
+                For i As Integer = 1 To count
+                    Dim invText As String = ReadValue(sr)
+                    Dim invNo As Integer = 0
+                    Integer.TryParse(invText, NumberStyles.Any, CultureInfo.InvariantCulture, invNo)
+                    record.InvoiceNumbers.Add(invNo)
+                Next
+
+                results.Add(record)
+            End While
+        End Using
+
+        Return results
+    End Function
+
+    Private Shared Function ReadValue(sr As StreamReader) As String
+        If sr.EndOfStream Then Return Nothing
+
+        Dim line As String = sr.ReadLine()
+        If line Is Nothing Then Return Nothing
+
+        line = line.Trim()
+
+        If line.Length >= 2 AndAlso line.StartsWith("""", StringComparison.Ordinal) AndAlso line.EndsWith("""", StringComparison.Ordinal) Then
+            Return line.Substring(1, line.Length - 2)
+        End If
+
+        Return line
+    End Function
+End Class
+```
+
+---
+
+# Step 3: create `CheckInvWriter.vb`
+
+```vbnet name=CheckInvWriter.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, records As IEnumerable(Of CheckInvRecord))
+        Dim lines As New List(Of String)()
+
+        For Each record In records
+            lines.AddRange(ToLines(record))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, record As CheckInvRecord)
+        Dim lines = ToLines(record)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Private Shared Function ToLines(record As CheckInvRecord) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(record.Customer))
+        lines.Add(Quote(record.CheckNumber))
+        lines.Add(Quote(record.Reference))
+        lines.Add(Quote(record.DateText))
+        lines.Add(record.CheckAmount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(record.InvoiceNumbers.Count.ToString(CultureInfo.InvariantCulture))
+
+        For Each invNo In record.InvoiceNumbers
+            lines.Add(invNo.ToString(CultureInfo.InvariantCulture))
+        Next
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+# Step 4: add path for `CHECK.INV`
+In your `LegacyDataPaths.vb`, add:
+
+```vbnet
+Public Shared ReadOnly CheckInv As String = Path.Combine(DataDirectory, "CHECK.INV")
+```
+
+So that class includes both:
+- `LedgerCur`
+- `CheckInv`
+
+---
+
+# Step 5: what we do after this
+Once these are in place, the next step is:
+
+## Update Add Checks
+When adding a check:
+- append to `LEDGER.CUR`
+- append matching invoice list to `CHECK.INV`
+
+## Update Delete Check
+When deleting a check:
+- remove from `LEDGER.CUR`
+- remove matching record from `CHECK.INV`
+- use that recordâ€™s invoice list to reset `INVOICE.CHK`
+
+---
+
+## Important note
+Right now your Add Check form is using `-1 = No Auto Scan`, and you are not yet actually building an invoice list from the entered range.
+
+So until we rebuild that behavior, `CHECK.INV` records may temporarily have:
+- zero invoices
+or
+- manually inferred invoice list later
+
+That means `CHECK.INV` support can be added now, but full fidelity depends on reconstructing the invoice scan logic too.
+
+---
+
+## Best next move
+If you want, send me your current `LegacyDataPaths.vb`, and then Iâ€™ll give you the **exact next code change** to make Add Checks start writing `CHECK.INV` too.
+
+## @testsubject117
+
+CheckInvRecord.vb should be created as a class or form?
+
+## Copilot
+
+A **class**.
+
+## Direct answer
+`CheckInvRecord.vb` should be a **plain class file**, **not** a form.
+
+Itâ€™s just a data model to hold one `CHECK.INV` record.
+
+---
+
+## It should look like this
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+
+Public Class CheckInvRecord
+    Public Property Customer As String
+    Public Property CheckNumber As String
+    Public Property Reference As String
+    Public Property DateText As String
+    Public Property CheckAmount As Decimal
+    Public Property InvoiceNumbers As List(Of Integer)
+
+    Public Sub New()
+        InvoiceNumbers = New List(Of Integer)()
+    End Sub
+End Class
+```
+
+---
+
+## In Visual Studio
+Create it as:
+
+- **Add > Class**
+- name it:
+  - `CheckInvRecord.vb`
+
+Not:
+- Windows Form
+- User Control
+- Component
+
+---
+
+## Same for these too
+These should also be plain class/code files:
+
+- `CheckInvReader.vb`
+- `CheckInvWriter.vb`
+
+---
+
+## Rule of thumb
+Use a **form** only if it displays UI.
+
+Use a **class** if it:
+- stores data
+- reads files
+- writes files
+- contains helper logic
+
+So `CheckInvRecord.vb` is definitely a **class**.
+
+## @testsubject117
+
+ok, I added that file
+
+## Copilot
+
+Good â€” next add the two helper classes.
+
+## Create these as plain **Class** files
+
+### `CheckInvReader.vb`
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvRecord)
+        Dim results As New List(Of CheckInvRecord)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Using sr As New StreamReader(path)
+            While Not sr.EndOfStream
+                Dim customer As String = ReadValue(sr)
+                If customer Is Nothing Then Exit While
+
+                Dim checkNumber As String = ReadValue(sr)
+                Dim reference As String = ReadValue(sr)
+                Dim dateText As String = ReadValue(sr)
+                Dim amountText As String = ReadValue(sr)
+                Dim countText As String = ReadValue(sr)
+
+                Dim record As New CheckInvRecord()
+                record.Customer = customer
+                record.CheckNumber = checkNumber
+                record.Reference = reference
+                record.DateText = dateText
+
+                Dim amt As Decimal = 0D
+                Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, amt)
+                record.CheckAmount = amt
+
+                Dim count As Integer = 0
+                Integer.TryParse(countText, count)
+
+                For i As Integer = 1 To count
+                    Dim invText As String = ReadValue(sr)
+                    Dim invNo As Integer = 0
+                    Integer.TryParse(invText, invNo)
+                    record.InvoiceNumbers.Add(invNo)
+                Next
+
+                results.Add(record)
+            End While
+        End Using
+
+        Return results
+    End Function
+
+    Private Shared Function ReadValue(sr As StreamReader) As String
+        If sr.EndOfStream Then Return Nothing
+
+        Dim line As String = sr.ReadLine()
+        If line Is Nothing Then Return Nothing
+
+        line = line.Trim()
+
+        If line.Length >= 2 AndAlso line.StartsWith("""", StringComparison.Ordinal) AndAlso line.EndsWith("""", StringComparison.Ordinal) Then
+            Return line.Substring(1, line.Length - 2)
+        End If
+
+        Return line
+    End Function
+End Class
+```
+
+---
+
+### `CheckInvWriter.vb`
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, records As IEnumerable(Of CheckInvRecord))
+        Dim lines As New List(Of String)()
+
+        For Each record In records
+            lines.AddRange(ToLines(record))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, record As CheckInvRecord)
+        Dim lines As List(Of String) = ToLines(record)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line As String In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Private Shared Function ToLines(record As CheckInvRecord) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(record.Customer))
+        lines.Add(Quote(record.CheckNumber))
+        lines.Add(Quote(record.Reference))
+        lines.Add(Quote(record.DateText))
+        lines.Add(record.CheckAmount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(record.InvoiceNumbers.Count.ToString(CultureInfo.InvariantCulture))
+
+        For Each invNo As Integer In record.InvoiceNumbers
+            lines.Add(invNo.ToString(CultureInfo.InvariantCulture))
+        Next
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+## Then update `LegacyDataPaths.vb`
+Add this line inside the class:
+
+```vbnet
+Public Shared ReadOnly CheckInv As String = Path.Combine(DataDirectory, "CHECK.INV")
+```
+
+So youâ€™ll have both:
+- `LedgerCur`
+- `CheckInv`
+
+---
+
+## After that
+Send me your current `LegacyDataPaths.vb`, and Iâ€™ll give you the exact next change to make **Add Checks** also write `CHECK.INV`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+
+Public Class CheckInvRecord
+    Public Property Customer As String
+    Public Property CheckNumber As String
+    Public Property Reference As String
+    Public Property DateText As String
+    Public Property CheckAmount As Decimal
+    Public Property InvoiceNumbers As List(Of Integer)
+
+    Public Sub New()
+        InvoiceNumbers = New List(Of Integer)()
+    End Sub
+End Class
+```
+I already have a file called checkinvreader.vb: 
+
+## Copilot
+
+That `CheckInvRecord.vb` file looks good.
+
+## Direct answer
+If you already have a `CheckInvReader.vb`, **donâ€™t create a second one**.  
+Instead, paste the contents of your existing `CheckInvReader.vb` here and Iâ€™ll tell you whether to keep it, replace it, or modify it.
+
+---
+
+## Same rule for writer
+If you already also have:
+- `CheckInvWriter.vb`
+
+then paste that too before creating anything new.
+
+---
+
+## What I need next
+Please send:
+
+1. `CheckInvReader.vb`
+2. `CheckInvWriter.vb` if it already exists
+3. `LegacyDataPaths.vb`
+
+Then Iâ€™ll give you the exact next step without duplicating files.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Collections.Generic
+
+Public Class CheckInvRecord
+    Public Property Customer As String
+    Public Property CheckNumber As String
+    Public Property Reference As String
+    Public Property DateText As String
+    Public Property CheckAmount As Decimal
+    Public Property InvoiceNumbers As List(Of Integer)
+
+    Public Sub New()
+        InvoiceNumbers = New List(Of Integer)()
+    End Sub
+End Class
+```
+
+## Copilot
+
+Thatâ€™s still the `CheckInvRecord.vb` file, and itâ€™s fine.
+
+## Direct answer
+I still need the contents of your existing:
+

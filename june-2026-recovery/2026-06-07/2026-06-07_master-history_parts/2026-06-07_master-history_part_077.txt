@@ -1,0 +1,2000 @@
+﻿
+        lblResult.Text =
+            $"Invoice {invNo} was paid by:" & Environment.NewLine &
+            $"Customer: {hit.CustomerCode}" & Environment.NewLine &
+            $"Check #:  {hit.CheckNumber}" & Environment.NewLine &
+            $"Date:     {hit.DateText}" & Environment.NewLine &
+            $"Amount:   {hit.Amount:C}" & Environment.NewLine &
+            $"Invoices on that check: {hit.InvoiceCount}"
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this is another straightforward DOS-flow rewrite.
+
+## Direct answer
+The current `FormFindByInvoiceNumber` is functionally close, but the UI/flow is wrong for DOS:
+
+- Windows controls
+- button-driven
+- one label summary
+- no DOS-style result screen
+- no â€œPlease Wait...â€
+- no full invoice list display
+
+DOS wants:
+- prompt-style search
+- `-1 = Quit`
+- `Please Wait...`
+- show the matching **check**
+- include the full invoice list for that check
+- Enter returns to menu
+
+So this form should be rewritten.
+
+---
+
+# What needs to change
+## Current behavior
+- exact invoice match
+- first block containing invoice
+- summary label only
+
+## DOS behavior
+- prompt for invoice number
+- `-1` quits
+- show please wait
+- display full check record
+- display full invoice list from that check
+- Enter returns
+
+---
+
+# Good news
+Your current search logic is basically the right search model:
+
+```vb
+Dim hit = _all.FirstOrDefault(
+    Function(b) b.Invoices IsNot Nothing AndAlso
+                b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+)
+```
+
+Thatâ€™s probably correct for DOS:
+- find first check block containing that invoice
+
+We just need to replace the UI and output style.
+
+---
+
+# Replace `FormFindByInvoiceNumber.vb` with this
+
+```vb name=FormFindByInvoiceNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _showingResult As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtInvoice.Focus()
+        txtInvoice.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Check that Payed for an Invoice >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 420
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter the Invoice Number [-1 = Quit] ?"
+
+        txtInvoice.Left = 440
+        txtInvoice.Top = 55
+        txtInvoice.Width = 140
+        txtInvoice.BorderStyle = BorderStyle.FixedSingle
+        txtInvoice.BackColor = Color.Black
+        txtInvoice.ForeColor = Color.Gainsboro
+        txtInvoice.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtInvoice)
+        Controls.Add(txtOutput)
+
+        AddHandler txtInvoice.KeyDown, AddressOf TxtInvoice_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If keyData = Keys.Enter AndAlso _showingResult Then
+            Close()
+            Return True
+        End If
+
+        If keyData = Keys.Q AndAlso _showingResult Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtInvoice_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        Dim invNo As String = txtInvoice.Text.Trim()
+
+        If invNo = "-1" Then
+            Close()
+            Return
+        End If
+
+        If invNo = "" Then
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please Wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            _showingResult = False
+            txtOutput.Text =
+                "No check was found for invoice # " & invNo & "." & Environment.NewLine &
+                Environment.NewLine &
+                "Press ESC to quit."
+            Return
+        End If
+
+        _showingResult = True
+        txtOutput.Text = BuildResultText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildResultText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [Q = Quit] ?")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# Why this matches DOS better
+It changes the form from:
+- modern input/find dialog
+- summary text only
+
+to:
+- DOS-style prompt
+- black screen
+- `-1 = Quit`
+- `Please Wait...`
+- full check display
+- invoice list for the check
+- Enter returns to menu
+
+---
+
+# One note about the bottom prompt
+You noticed DOS says:
+- `Hit ENTER to look for another check`
+
+but Enter actually just returns to menu.
+
+So this version keeps that DOS wording, while implementing the actual behavior you observed:
+- Enter closes the form
+- `Q` closes too
+
+Thatâ€™s the right compromise if your goal is matching the real DOS experience.
+
+---
+
+# Same limitation as before
+There is still no `Reference` field in `CheckInvBlock`, so this version does not invent one.
+
+If later you identify where DOS gets that value, I can add it.
+
+---
+
+# Recommendation
+Paste this in, rebuild, and test with:
+- a known invoice like `724700`
+- `-1`
+- blank input
+- bad invoice number
+
+If it works and looks right, Iâ€™d call `(0)` done too.
+
+## @testsubject117
+
+ok, if I hit -1 it closes. if I leave the field blank it does nothing, if I put in a bad invoice number the windows closes
+
+## Copilot
+
+That means two behaviors need tightening.
+
+## Direct answer
+We should change `(0)` so that:
+
+- `-1` closes â€” **keep**
+- blank input should **stay on the prompt** â€” **keep/do nothing is fine**
+- bad invoice number should **not close the window**
+  - it should show a DOS-style â€œnot foundâ€ message and wait for another action
+
+So the bug is the **bad-invoice path is falling through to close behavior**.
+
+---
+
+# Why itâ€™s happening
+Most likely:
+- after showing the â€œnot foundâ€ message, some Enter/Esc handling is still treating the form as done
+- or `_showingResult` / key routing is allowing the form to close unintentionally
+
+We want this split:
+
+## Prompt mode
+- Enter = search
+- `-1` = close
+- blank = remain on prompt
+- bad invoice = show not found, remain in prompt/search state
+
+## Result mode
+- Enter = close/return to menu
+- `Q` = close
+- Esc = close
+
+---
+
+# Fix
+Use this updated `FormFindByInvoiceNumber.vb`.
+
+```vb name=FormFindByInvoiceNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _showingResult As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtInvoice.Focus()
+        txtInvoice.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Check that Payed for an Invoice >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 420
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter the Invoice Number [-1 = Quit] ?"
+
+        txtInvoice.Left = 440
+        txtInvoice.Top = 55
+        txtInvoice.Width = 140
+        txtInvoice.BorderStyle = BorderStyle.FixedSingle
+        txtInvoice.BackColor = Color.Black
+        txtInvoice.ForeColor = Color.Gainsboro
+        txtInvoice.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtInvoice)
+        Controls.Add(txtOutput)
+
+        AddHandler txtInvoice.KeyDown, AddressOf TxtInvoice_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If _showingResult Then
+            If keyData = Keys.Enter Then
+                Close()
+                Return True
+            End If
+
+            If keyData = Keys.Q Then
+                Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtInvoice_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        _showingResult = False
+
+        Dim invNo As String = txtInvoice.Text.Trim()
+
+        If invNo = "-1" Then
+            Close()
+            Return
+        End If
+
+        If invNo = "" Then
+            txtOutput.Clear()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please Wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            txtOutput.Text =
+                "No check was found for invoice # " & invNo & "." & Environment.NewLine &
+                Environment.NewLine &
+                "Enter another invoice number, or type -1 to quit."
+            txtInvoice.Focus()
+            txtInvoice.SelectAll()
+            Return
+        End If
+
+        _showingResult = True
+        txtOutput.Text = BuildResultText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildResultText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [Q = Quit] ?")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# What changed
+## Bad invoice no longer closes
+Now it does this instead:
+```text
+No check was found for invoice # XXXXX.
+
+Enter another invoice number, or type -1 to quit.
+```
+
+and keeps focus in the invoice field.
+
+## Blank input
+Still just stays on the prompt.
+
+## Result mode only
+Only when a real result is displayed do:
+- Enter close
+- `Q` close
+
+That prevents the bad-invoice path from behaving like a completed result.
+
+---
+
+# Expected behavior now
+- `-1` â†’ close
+- blank â†’ remain open
+- bad invoice â†’ show message, stay open
+- valid invoice â†’ show result
+- Enter on result â†’ close
+- `Q` on result â†’ close
+- Esc anytime â†’ close
+
+---
+
+# Next step
+Replace the form with this updated version and test those four cases again.  
+If that works, `(0)` should be done too.
+
+## @testsubject117
+
+yes, now when I type 111777 I get a message back that says no check was found for invoice #111777, enter another invoice number or type -1 to quit. except there is no place to type an invoice number other than the spot where we already typed one. so we might want to change the wording a bit so the user understands. instead of "Enter another invoice number, or type -1 to quit. Can we say "Replace Invoice # with another valid Invoice # then hit enter. Removing the or type -1 to quit completely and just place a close button at the bottom right like our other menus
+
+## Copilot
+
+Yes â€” that wording change makes sense, and yes, we can do that.
+
+## Direct recommendation
+Change the not-found message to something like:
+
+**`Replace Invoice # with another valid Invoice #, then hit ENTER.`**
+
+And yes, remove:
+- `or type -1 to quit`
+
+If you want to make it more obvious for VB users, adding a **Close** button at the bottom-right is reasonable.
+
+---
+
+# Important design note
+This is a small departure from strict DOS behavior, because DOS uses keyboard-only quit prompts.
+
+But your reasoning is good:
+- in VB, the field is already visible
+- the message currently implies a fresh prompt area
+- a visible Close button improves clarity for a Windows user
+
+So this is a good usability adjustment.
+
+---
+
+# Recommended behavior
+## Keep:
+- `-1` still works if typed in the box
+- Enter still performs search
+- valid result still shows DOS-style screen
+- Enter on valid result still returns to menu
+
+## Change:
+- not-found message wording
+- add Close button in bottom-right
+
+---
+
+# Minimal changes to the current form
+You only need to:
+
+1. add a Close button
+2. change the not-found text
+
+---
+
+# Updated `FormFindByInvoiceNumber.vb`
+
+```vb name=FormFindByInvoiceNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+    Private ReadOnly btnClose As New Button()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _showingResult As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtInvoice.Focus()
+        txtInvoice.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Check that Payed for an Invoice >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 420
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter the Invoice Number [-1 = Quit] ?"
+
+        txtInvoice.Left = 440
+        txtInvoice.Top = 55
+        txtInvoice.Width = 140
+        txtInvoice.BorderStyle = BorderStyle.FixedSingle
+        txtInvoice.BackColor = Color.Black
+        txtInvoice.ForeColor = Color.Gainsboro
+        txtInvoice.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 460
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnClose.Text = "Close"
+        btnClose.Width = 90
+        btnClose.Height = 30
+        btnClose.Left = ClientSize.Width - btnClose.Width - 12
+        btnClose.Top = ClientSize.Height - btnClose.Height - 12
+        btnClose.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
+        btnClose.BackColor = Color.Black
+        btnClose.ForeColor = Color.Gainsboro
+        AddHandler btnClose.Click, Sub() Close()
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtInvoice)
+        Controls.Add(txtOutput)
+        Controls.Add(btnClose)
+
+        AddHandler txtInvoice.KeyDown, AddressOf TxtInvoice_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If _showingResult Then
+            If keyData = Keys.Enter Then
+                Close()
+                Return True
+            End If
+
+            If keyData = Keys.Q Then
+                Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtInvoice_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        _showingResult = False
+
+        Dim invNo As String = txtInvoice.Text.Trim()
+
+        If invNo = "-1" Then
+            Close()
+            Return
+        End If
+
+        If invNo = "" Then
+            txtOutput.Clear()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please Wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            txtOutput.Text =
+                "No check was found for invoice # " & invNo & "." & Environment.NewLine &
+                Environment.NewLine &
+                "Replace Invoice # with another valid Invoice #, then hit ENTER."
+            txtInvoice.Focus()
+            txtInvoice.SelectAll()
+            Return
+        End If
+
+        _showingResult = True
+        txtOutput.Text = BuildResultText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildResultText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [Q = Quit] ?")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# What changed
+## New button
+- visible **Close** button bottom-right
+
+## New not-found text
+Now says:
+```text
+No check was found for invoice # 111777.
+
+Replace Invoice # with another valid Invoice #, then hit ENTER.
+```
+
+That matches the actual UI better.
+
+---
+
+# One small suggestion
+If you want, we could also change the prompt label from:
+
+```text
+Enter the Invoice Number [-1 = Quit] ?
+```
+
+to something more VB-appropriate like:
+
+```text
+Enter the Invoice Number:
+```
+
+since youâ€™re adding a Close button anyway.
+
+But if you still want the DOS prompt preserved, leave it as-is.
+
+---
+
+# My recommendation
+Use this wording change + Close button.
+
+That gives you:
+- DOS-like result display
+- clearer retry behavior
+- more obvious exit path for Windows users
+
+If you want, I can also give you a version that hides the Close button while a valid DOS-style result is on screen, so the result view stays more faithful.
+
+## @testsubject117
+
+ok, that's good. I'm not sure I like the close button though, it's small and a different look and size than we have already been using.
+
+## Copilot
+
+Agreed â€” if it looks visually out of place, donâ€™t keep it.
+
+## Direct recommendation
+Remove the Close button.
+
+Your revised message already solves the confusion:
+- user sees the same input box
+- message tells them to replace the invoice number and press Enter
+
+Thatâ€™s enough.
+
+---
+
+# Best choice here
+Keep the DOS-like form clean and consistent:
+- no extra button
+- retry by editing the existing invoice field
+- `-1` still works
+- Esc still works
+- valid result still closes on Enter
+
+That will feel more consistent with the other DOS-style rewrites youâ€™ve done.
+
+---
+
+# What to change
+## Remove:
+- `btnClose` field
+- button creation code
+- `Controls.Add(btnClose)`
+
+## Keep:
+the revised not-found message:
+```text
+Replace Invoice # with another valid Invoice #, then hit ENTER.
+```
+
+---
+
+# Updated version without the Close button
+
+```vb name=FormFindByInvoiceNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _showingResult As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtInvoice.Focus()
+        txtInvoice.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Check that Payed for an Invoice >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 420
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter the Invoice Number [-1 = Quit] ?"
+
+        txtInvoice.Left = 440
+        txtInvoice.Top = 55
+        txtInvoice.Width = 140
+        txtInvoice.BorderStyle = BorderStyle.FixedSingle
+        txtInvoice.BackColor = Color.Black
+        txtInvoice.ForeColor = Color.Gainsboro
+        txtInvoice.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtInvoice)
+        Controls.Add(txtOutput)
+
+        AddHandler txtInvoice.KeyDown, AddressOf TxtInvoice_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If _showingResult Then
+            If keyData = Keys.Enter Then
+                Close()
+                Return True
+            End If
+
+            If keyData = Keys.Q Then
+                Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtInvoice_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        _showingResult = False
+
+        Dim invNo As String = txtInvoice.Text.Trim()
+
+        If invNo = "-1" Then
+            Close()
+            Return
+        End If
+
+        If invNo = "" Then
+            txtOutput.Clear()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please Wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            txtOutput.Text =
+                "No check was found for invoice # " & invNo & "." & Environment.NewLine &
+                Environment.NewLine &
+                "Replace Invoice # with another valid Invoice #, then hit ENTER."
+            txtInvoice.Focus()
+            txtInvoice.SelectAll()
+            Return
+        End If
+
+        _showingResult = True
+        txtOutput.Text = BuildResultText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildResultText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [Q = Quit] ?")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# My recommendation
+This is the better version:
+- cleaner
+- more consistent with your other DOS-style screens
+- no weird out-of-place button
+- clearer retry instructions
+
+If this one behaves well in testing, Iâ€™d call **(0) Find an Invoice #** done too.
+
+## @testsubject117
+
+I don't want to remove the close button, just change its size and coloring to match the rest of the app
+
+## Copilot
+
+Yes â€” thatâ€™s the better fix.
+
+## Direct answer
+Keep the **Close** button, but style it to match the rest of your app.
+
+So:
+- same size as your other forms
+- same colors
+- same placement conventions
+
+That gives you the usability benefit without making it look out of place.
+
+---
+
+# What to change
+From the version with the Close button, just update the button styling.
+
+Since I donâ€™t have your exact shared button style helper, the safest improvement is:
+
+- make it wider/taller
+- use standard dark DOS-like colors
+- remove the tiny default-button feel
+
+---
+
+# Replace just the button setup with this
+In `BuildScreen()`, use:
+
+```vb
+btnClose.Text = "Close"
+btnClose.Width = 120
+btnClose.Height = 36
+btnClose.Left = ClientSize.Width - btnClose.Width - 12
+btnClose.Top = ClientSize.Height - btnClose.Height - 12
+btnClose.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
+btnClose.FlatStyle = FlatStyle.Popup
+btnClose.BackColor = Color.Black
+btnClose.ForeColor = Color.Gainsboro
+btnClose.TabStop = True
+AddHandler btnClose.Click, Sub() Close()
+```
+
+---
+
+# If you want it a little more classic-looking
+Try this instead:
+
+```vb
+btnClose.Text = "Close"
+btnClose.Width = 120
+btnClose.Height = 36
+btnClose.Left = ClientSize.Width - btnClose.Width - 12
+btnClose.Top = ClientSize.Height - btnClose.Height - 12
+btnClose.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
+btnClose.FlatStyle = FlatStyle.Flat
+btnClose.BackColor = Color.Black
+btnClose.ForeColor = Color.Gainsboro
+btnClose.FlatAppearance.BorderColor = Color.Gainsboro
+btnClose.FlatAppearance.BorderSize = 1
+btnClose.TabStop = True
+AddHandler btnClose.Click, Sub() Close()
+```
+
+That usually blends better with black-background forms.
+
+---
+
+# My recommendation
+Use the **FlatStyle.Flat** version if the rest of your app uses dark custom-styled controls.  
+Use **Popup** if your app uses more standard WinForms buttons.
+
+---
+
+# So the final approach is
+- keep the clearer â€œreplace invoice numberâ€ message
+- keep the Close button
+- just restyle it to match your app
+
+If you want, I can give you the **full final version** of `FormFindByInvoiceNumber.vb` with the restyled Close button already included.
+
+## @testsubject117
+
+what if I send you a screenshot of how the checks menu already looks, can you match that?
+
+## Copilot
+
+Yes â€” absolutely.
+
+## Direct answer
+Send a screenshot of the **Checks menu** with the button style you want matched, and I can tune the **Close** button to fit that look.
+
+Thatâ€™s actually the best way to do it, because then I can match:
+- size
+- colors
+- border style
+- font feel
+- spacing/placement
+
+---
+
+# What to send
+A screenshot that clearly shows:
+- one or more existing buttons
+- the surrounding form background
+- if possible, a button in normal state and hovered/focused state
+
+If the Checks menu doesnâ€™t actually use buttons, send a screenshot from any screen in your VB app that has the style you want copied.
+
+---
+
+# Even better
+If you happen to know the shared helper or style code used for those buttons, send that too. For example:
+- a helper method that styles buttons
+- a base form
+- any code that sets `FlatStyle`, colors, font, size, padding
+
+Then I can match it more precisely instead of approximating from the screenshot alone.
+
+---
+
+# Best next step
+Send the screenshot, and Iâ€™ll tell you exactly how to style the Close button to match the rest of the app.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Itâ€™s a dark-themed **CHECKS** menu screen in the VB app.
+
+## Main layout
+- A window titled **CHECKS**
+- Dark charcoal/gray background
+- Large black header panel across the top
+
+## Header
+- On the left: large yellow **CHECKS** title in a serif-style font
+- On the right: yellow date/time text:
+  - `Wednesday 05-20-2026`
+  - `04:24:42 PM`
+
+## Menu area
+A vertical stack of black rectangular menu buttons with light borders and bold white text, including:
+
+- `(1) Add Checks to ledger cash receipts`
+- `(2) Delete Checks`
+- `(3) View Checks`
+- `(5) View Companys Totals`
+- `(6) Add OTHER Checks`
+- `(7) Delete OTHER Checks`
+- `(8) View OTHER Checks`
+- `(9) Find a Check #`
+- `(0) Find an Invoice #`
+- `(A) Find Checks that don't balance.`
+- `(S) Sales Employee's checks`
+
+These buttons are:
+- black fill
+- thin light-gray border
+- bold white text
+- consistent width and height
+- left-aligned in a single column
+
+## Bottom-right button
+There is already a styled close button that matches the app:
+- light gray fill
+- dark text
+- labeled **`(ESC) Close`**
+- bottom-right aligned
+- wider and flatter than a default WinForms button
+
+---
+
+# Important styling takeaway
+Yes â€” this gives us a clear target.
+
+The Close button for the invoice screen should match this existing button style:
+- light gray background
+- dark bold text
+- wider rectangular size
+- bottom-right placement
+- label format like **`(ESC) Close`**
+
+So yes, now we can match it much more accurately.
+
+## @testsubject117
+
+ok, please send me the replacement code for formfindbyinvoicenumber.vb
+
+## Copilot
+
+Yes â€” hereâ€™s the full replacement for `FormFindByInvoiceNumber.vb`, with the **Close** button styled to better match your Checks menu.
+
+```vb name=FormFindByInvoiceNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+    Private ReadOnly btnClose As New Button()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _showingResult As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtInvoice.Focus()
+        txtInvoice.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.FromArgb(34, 34, 34)
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Check that Payed for an Invoice >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 420
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter the Invoice Number [-1 = Quit] ?"
+
+        txtInvoice.Left = 440
+        txtInvoice.Top = 55
+        txtInvoice.Width = 140
+        txtInvoice.BorderStyle = BorderStyle.FixedSingle
+        txtInvoice.BackColor = Color.Black
+        txtInvoice.ForeColor = Color.Gainsboro
+        txtInvoice.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        btnClose.Text = "(ESC) Close"
+        btnClose.Width = 160
+        btnClose.Height = 30
+        btnClose.Left = ClientSize.Width - btnClose.Width - 12
+        btnClose.Top = ClientSize.Height - btnClose.Height - 12
+        btnClose.Anchor = AnchorStyles.Bottom Or AnchorStyles.Right
+        btnClose.FlatStyle = FlatStyle.Standard
+        btnClose.BackColor = Color.Silver
+        btnClose.ForeColor = Color.Black
+        btnClose.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btnClose.TabStop = True
+        AddHandler btnClose.Click, Sub() Close()
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtInvoice)
+        Controls.Add(txtOutput)
+        Controls.Add(btnClose)
+
+        AddHandler txtInvoice.KeyDown, AddressOf TxtInvoice_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If _showingResult Then
+            If keyData = Keys.Enter Then
+                Close()
+                Return True
+            End If
+
+            If keyData = Keys.Q Then
+                Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtInvoice_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        _showingResult = False
+
+        Dim invNo As String = txtInvoice.Text.Trim()
+
+        If invNo = "-1" Then
+            Close()
+            Return
+        End If
+
+        If invNo = "" Then
+            txtOutput.Clear()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please Wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            txtOutput.Text =
+                "No check was found for invoice # " & invNo & "." & Environment.NewLine &
+                Environment.NewLine &
+                "Replace Invoice # with another valid Invoice #, then hit ENTER."
+            txtInvoice.Focus()
+            txtInvoice.SelectAll()
+            Return
+        End If
+
+        _showingResult = True
+        txtOutput.Text = BuildResultText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildResultText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [Q = Quit] ?")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+## What this includes
+- DOS-style invoice search flow
+- `-1` closes
+- blank input does nothing
+- bad invoice shows retry guidance
+- valid invoice shows the matching check and full invoice list
+- Enter on a valid result closes
+- `Q` on a valid result closes
+- bottom-right **`(ESC) Close`** button styled closer to your existing Checks menu
+
+If you want, after you test it, I can also give you one more polish pass to make the **header/title area** look even closer to your existing Checks screen.
+
+## @testsubject117
+
+yep, there you go, perfect! ok, can we go on to the last button we need to fix on this menu?
+
+## Copilot
+
+Yes â€” absolutely, letâ€™s do the last one.
+
+## Direct answer
+Youâ€™ve now got **(0) Find an Invoice #** working and looking right, so yes:  
+send the **last Checks-menu item that still doesnâ€™t match DOS**, and weâ€™ll finish it.
+
+---
+
+# Where you are now
+Youâ€™ve cleaned up a big chunk of this menu:
+
+- **(5) View Company Totals**
+- **(8) View OTHER Checks**
+- **(9) Find a Check #**
+- **(0) Find an Invoice #**
+
+Thatâ€™s real progress.
+
+---
+
+# What to send for the last one
+Same format as before is perfect:
+
+1. what DOS does
+2. what VB does now
+3. DOS screenshots
+4. current VB screenshot if useful
+5. the `.vb` file for that screen
+
+Send it over and Iâ€™ll help you match it.
+
+## @testsubject117
+
+This last one is (A) Find checks that don't balance. and I think the logic here was already worked out to make sure it's performing the same function as dos, it just doesn't look like the rest of the app. this is the list that you had coded so no invoice was yellow and if there was an invoice it's pink.
+
+## Copilot
+
+Yes â€” this is the last one, and the problem looks purely **presentation/interaction**, not logic.
+
+## Direct answer
+If the balancing logic already matches DOS, then for **(A) Find checks that donâ€™t balance**, the thing to fix is the UI:
+
+### Current VB
+- spreadsheet/grid view
+- colored rows
+- column headers
+- scrollable table
+- very Windows/data-entry feel
+
+### What it should become
+Based on the pattern of the rest of this menu, it should almost certainly be converted into a **DOS-style text report screen**:
+- black background
+- monospace text
+- paged output
+- Enter to continue
+- return to Checks menu at end
+
+So yes â€” this should be rewritten as a report viewer, not a `DataGridView`.
+
+---
+
+# What I can infer already
+Your current grid is showing two DOS-meaningful categories:
+
+## yellow rows
+- no invoices found
+- note says `No CHECK.INV mapping`
+
+## pink rows
+- invoices exist
+- but totals donâ€™t balance against the check amount
+
+That logic sounds fine.  
+The issue is that DOS almost certainly would not present this as a sortable spreadsheet.
+
+---
+
+# Most likely DOS behavior
+I suspect `(A)` behaves similarly to the other report/list items:
+
+- run the mismatch scan
+- maybe brief â€œplease waitâ€
+- display a paged text report
+- one screenful at a time
+- Enter advances
+- return to Checks menu when finished
+
+But I do **not** want to guess the exact report layout without seeing DOS.
+
+---
+
+# What I need next
+Please send:
+
+1. DOS screenshot(s) for `(A) Find checks that donâ€™t balance`
+2. the current `.vb` file for this screen
+
+That will tell us:
+- whether DOS groups â€œno invoice mappingâ€ separately from â€œout of balanceâ€
+- whether it prints customer/date/check#/amount/delta/note
+- whether it pages one line at a time or one full screen at a time
+- whether it pauses at top/bottom like the totals screen
+- what exact wording it uses
+
+---
+
+# My current recommendation
+Do **not** keep the grid.
+
+Even before seeing DOS, Iâ€™d say the end state should likely be:
+- DOS-like report output
+- text-only rows
+- Enter paging
+- no colored spreadsheet
+
+If you send the DOS screenshots and the current form code, I can convert this final item the same way we did the others.
+
+---
+
+# Short version
+Yes â€” `(A)` looks like the logic is already right, but the **UI is still wrong**.  
+Send the DOS screenshots and the current `.vb` file, and weâ€™ll make this last screen match the rest.
+
+## @testsubject117
+
+ALSO, I've noticed the dos vm doesn't do anything when I hit (A) Find Checks that don't balance. I am not sure if this actually ever did anything. I will have to ask the users tomorrow. For now, let's keep what we have and just color it and style it more to look like dos. if the flow is different or needs to be completely changed, we can visit that another day.
+
+## Copilot
+
+Yes â€” thatâ€™s the right call.
+
+## Direct answer
+Since:
+- DOS currently appears to do nothing for `(A)`,
+- the balancing logic in VB is already useful,
+- and you may get clarification from users tomorrow,
+
+the best move **for now** is:
+
+### keep the existing logic and grid
+but
+### restyle it to visually fit the DOS-inspired app better
+
+That is a good temporary finish.
+
+---
+
+# Best approach for now
+Instead of rewriting the feature flow, just make the current screen feel consistent with the rest of the Checks menu:
+
+## Keep
+- the current mismatch detection
+- the current columns
+- the current yellow/pink distinction
+
+## Change
+- form background/header styling
+- grid colors
+- fonts
+- selection colors
+- button styling
+- overall dark DOS-like feel
+
+---
+
+# Recommended visual direction
+Based on your current app style, Iâ€™d aim for:
+
+## Form
+- dark charcoal background
+- black header strip
+- yellow title text
+- yellow date/time if that screen has a header
+
+## Grid
+- dark background overall
+- darker header row
+- light text
+- keep mismatch highlighting, but tune it
+
+## Row colors
+You currently have:
+- pale yellow = no invoice mapping
+- pale pink = invoice mismatch
+
+That concept is good, but for better consistency you could use more muted DOS-ish tones:
+
+### No invoice mapping
+- dark olive / muted yellow background
+- black or very dark text
+
+### Out of balance
+- muted rose / dusty red background
+- black or very dark text
+
+That keeps meaning while avoiding spreadsheet pastel feel.
+
+## Buttons
+- any Close / Refresh / Export buttons should match the Checks menu style:
+  - silver/light gray
+  - dark bold text
+  - wider flat rectangular look
+
+---
+
+# What I need from you to give exact replacement code
+Please paste the `.vb` file for this screen.
+
+Likely something like:
+- `FormFindChecksThatDontBalance.vb`
+- `FormCheckBalanceExceptions.vb`
+- or similar
+
+Once I see the current form code, I can give you a **styling-focused replacement** without changing the underlying logic.
+
+---
+
+# Good plan
+Your staged approach is smart:
+
+## today
