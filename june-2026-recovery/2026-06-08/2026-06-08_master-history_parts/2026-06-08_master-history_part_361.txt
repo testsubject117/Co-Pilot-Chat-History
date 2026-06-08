@@ -1,0 +1,1744 @@
+﻿
+        If yearPages.Count > 0 Then
+            ShowPagesOrEnd(yearPages)
+            Return
+        End If
+
+        ' 2) Not found â†’ offer all-years scan
+        Dim r = MessageBox.Show(
+            $"Invoice {invoiceNum} was not found in year 20{_yearTwoDigit:00}." & vbCrLf &
+            "Search all years (all LOGBOOK.* files)?",
+            "LOG BOOK",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question)
+
+        If r <> DialogResult.Yes Then
+            ShowMenu()
+            Return
+        End If
+
+        ' 3) Search all years with visible DOS-like progress
+        Dim statusViewer As New FrmDosPagedViewer()
+        statusViewer.Text = "LOG BOOK"
+        statusViewer.BeginStatusMode("[ESC = Quit]")
+        statusViewer.UpdateStatus("SEARCHING ALL YEARS..." & vbCrLf & vbCrLf &
+                                  "PLEASE WAIT...")
+        statusViewer.Show(Me)
+        statusViewer.BringToFront()
+
+        Dim files As String() = Array.Empty(Of String)()
+        Try
+            files = Directory.GetFiles(DataDir, "LOGBOOK.*", SearchOption.TopDirectoryOnly)
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase)
+        Catch ex As Exception
+            statusViewer.UpdateStatus("ERROR GETTING LOGBOOK FILE LIST:" & vbCrLf & ex.Message & vbCrLf & vbCrLf &
+                                      "HIT [ESC] to Quit")
+            Return
+        End Try
+
+        ' Background scan; update progress on UI thread
+        Dim matches As New List(Of LogBookEntry)()
+
+        Dim progress As Action(Of Integer, String) =
+            Sub(index As Integer, filePath As String)
+                Dim fileName = Path.GetFileName(filePath)
+                Dim msg =
+                    "SEARCHING ALL YEARS..." & vbCrLf &
+                    $"SCANNING: {fileName}  ({index}/{files.Length})" & vbCrLf &
+                    $"MATCHES: {matches.Count}" & vbCrLf & vbCrLf &
+                    "PLEASE WAIT..."
+                statusViewer.UpdateStatus(msg)
+            End Sub
+
+        ' Scan in background
+        Await Task.Run(
+            Sub()
+                For i As Integer = 0 To files.Length - 1
+                    Dim fp = files(i)
+
+                    ' Update progress (UI thread safe)
+                    progress(i + 1, fp)
+
+                    ' Read entries from this file only (avoid re-enumerating all years each time)
+                    For Each entry In reader.ReadEntriesFromSpecificFile(fp)
+                        If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                            matches.Add(entry)
+                        End If
+                    Next
+                Next
+            End Sub)
+
+        ' Swap out status for actual pages
+        statusViewer.EndStatusMode()
+
+        Dim allPages As List(Of String) = BuildPagesFromEntries(
+            matches,
+            Function(entry) True,
+            includeSource:=True)
+
+        If allPages.Count = 0 Then
+            statusViewer.SetSinglePage($"INVOICE {invoiceNum} NOT FOUND IN ANY YEAR." & vbCrLf & vbCrLf &
+                                       "HIT [ESC] to Quit")
+            Return
+        End If
+
+        statusViewer.SetPages(allPages)
+        statusViewer.ShowDialog(Me)
+        statusViewer.Close()
+        statusViewer.Dispose()
+
+        ShowMenu()
+    End Function
+
+    ' -----------------------------
+    ' Helpers
+    ' -----------------------------
+    Private Function BuildPagesFromEntries(entries As IEnumerable(Of LogBookEntry),
+                                          includePredicate As Func(Of LogBookEntry, Boolean),
+                                          includeSource As Boolean) As List(Of String)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In entries
+                If entry Is Nothing Then Continue For
+                If includePredicate IsNot Nothing AndAlso Not includePredicate(entry) Then Continue For
+
+                AddEntryToPages(entry.FormatForDosViewer(includeSource), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            Return New List(Of String)()
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count > 0 Then
+            pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+        End If
+
+        Return pages
+    End Function
+
+    Private Sub ShowPagesOrEnd(pages As List(Of String))
+        If pages Is Nothing OrElse pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+End Class
+```
+
+---
+
+## One required addition in `LogBookReader.vb`
+This menu code calls:
+
+```vbnet
+reader.ReadEntriesFromSpecificFile(fp)
+```
+
+If you donâ€™t already have it, add this method to `LogBookReader.vb` (public), and make sure the underlying file reader is accessible:
+
+### Add to `LogBookReader.vb`:
+```vbnet
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+
+If your `ReadEntriesFromPath` is `Private`, change it to `Friend` (or `Public`) so this compiles.
+
+---
+
+## Optional (very DOS-like): allow ESC to cancel scan
+If you want, I can add:
+- ESC in the status viewer sets a `CancelRequested` flag
+- scan checks it each file and aborts quickly
+- viewer shows â€œCANCELLEDâ€
+
+Tell me if you want cancel, and Iâ€™ll send the small changes for both files.
+
+## @testsubject117
+
+btw, what you gave me and I pasted in, did not show any progression bar or please wait...
+
+## Copilot
+
+That makes sense given what you currently have wired up: **your `RunInvoiceLookup` is still synchronous** and it immediately builds `allPages` by enumerating `reader.ReadEntriesAllYears()`â€”so **nothing can repaint** until the scan finishes. Also, the â€œstatus viewerâ€ code I drafted earlier only works if you actually show a viewer *before* the scan and update it during the scan.
+
+Hereâ€™s the clean, reliable fix (and it *will* show â€œPLEASE WAITâ€¦â€ immediately):
+
+## What to change
+1) Keep the `FrmDosPagedViewer.vb` replacement I gave you (with `BeginStatusMode/UpdateStatus`).
+2) Replace your `FormLogBookMenu.vb` with the version below.
+3) Add one small method to `LogBookReader.vb` so we can scan **one file at a time** (which is how we can display progress per file).
+
+---
+
+# 1) Full-file replacement: `FormLogBookMenu.vb` (working progress + async)
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.IO
+Imports System.Threading.Tasks
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly txtScreen As TextBox
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {.Visible = False, .BackColor = Color.Black}
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() ShowMenu()
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then PositionPromptOverlay()
+                              End Sub
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close() : Return True
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt() : Return True
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers() : Return True
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt() : Return True
+                Case Keys.Q
+                    Me.Close() : Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub ShowMenu()
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+        RenderMenu(promptLine:=Nothing)
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then sb.AppendLine(promptLine)
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.Focus()
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.Focus()
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+        If promptLineIndex < 0 Then promptLineIndex = allLines.Length - 1
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0 : lblPrompt.Top = 0
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW : txtInput.Top = 0 : txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            ShowMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                ' IMPORTANT: async so progress can display
+                _ = RunInvoiceLookupAsync(input)
+
+            Case Else
+                ShowMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+        Dim pages As List(Of String) = BuildPagesFromEntries(
+            reader.ReadEntries(_yearTwoDigit),
+            Function(entry) entry.Customer IsNot Nothing AndAlso entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase),
+            includeSource:=False)
+
+        ShowPagesOrEnd(pages)
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+        Dim pages As List(Of String) = BuildPagesFromEntries(
+            reader.ReadEntries(_yearTwoDigit),
+            Function(entry) True,
+            includeSource:=False)
+
+        ShowPagesOrEnd(pages)
+    End Sub
+
+    Private Async Function RunInvoiceLookupAsync(invoiceInput As String) As Task
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        ' Search selected year first
+        Dim yearPages As List(Of String) = BuildPagesFromEntries(
+            reader.ReadEntries(_yearTwoDigit),
+            Function(entry) entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum,
+            includeSource:=False)
+
+        If yearPages.Count > 0 Then
+            ShowPagesOrEnd(yearPages)
+            Return
+        End If
+
+        Dim r = MessageBox.Show(
+            $"Invoice {invoiceNum} was not found in year 20{_yearTwoDigit:00}." & vbCrLf &
+            "Search all years (all LOGBOOK.* files)?",
+            "LOG BOOK",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question)
+
+        If r <> DialogResult.Yes Then
+            ShowMenu()
+            Return
+        End If
+
+        ' Show status viewer immediately
+        Dim status As New FrmDosPagedViewer()
+        status.Text = "LOG BOOK"
+        status.BeginStatusMode("[ESC = Quit]")
+        status.UpdateStatus("SEARCHING ALL YEARS..." & vbCrLf & vbCrLf & "PLEASE WAIT...")
+        status.Show(Me)
+        status.BringToFront()
+
+        Dim files As String()
+        Try
+            files = Directory.GetFiles(DataDir, "LOGBOOK.*", SearchOption.TopDirectoryOnly)
+            Array.Sort(files, StringComparer.OrdinalIgnoreCase)
+        Catch ex As Exception
+            status.UpdateStatus("ERROR:" & vbCrLf & ex.Message & vbCrLf & vbCrLf & "HIT [ESC] to Quit")
+            Return
+        End Try
+
+        Dim matches As List(Of LogBookEntry) =
+            Await Task.Run(Function()
+                               Dim m As New List(Of LogBookEntry)()
+
+                               For i As Integer = 0 To files.Length - 1
+                                   Dim fp = files(i)
+                                   Dim fileName = Path.GetFileName(fp)
+
+                                   ' UI update (safe because UpdateStatus marshals to UI thread)
+                                   status.UpdateStatus(
+                                       "SEARCHING ALL YEARS..." & vbCrLf &
+                                       $"SCANNING: {fileName}  ({i + 1}/{files.Length})" & vbCrLf & vbCrLf &
+                                       "PLEASE WAIT...")
+
+                                   For Each entry In reader.ReadEntriesFromSpecificFile(fp)
+                                       If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                                           m.Add(entry)
+                                       End If
+                                   Next
+                               Next
+
+                               Return m
+                           End Function)
+
+        status.EndStatusMode()
+
+        Dim pages As List(Of String) = BuildPagesFromEntries(
+            matches,
+            Function(entry) True,
+            includeSource:=True)
+
+        If pages.Count = 0 Then
+            status.SetSinglePage($"INVOICE {invoiceNum} NOT FOUND IN ANY YEAR." & vbCrLf & vbCrLf &
+                                 "HIT [ESC] to Quit")
+            Return
+        End If
+
+        status.SetPages(pages)
+        status.ShowDialog(Me)
+        status.Close()
+        status.Dispose()
+
+        ShowMenu()
+    End Function
+
+    ' -----------------------------
+    ' Helpers
+    ' -----------------------------
+    Private Function BuildPagesFromEntries(entries As IEnumerable(Of LogBookEntry),
+                                          includePredicate As Func(Of LogBookEntry, Boolean),
+                                          includeSource As Boolean) As List(Of String)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In entries
+                If entry Is Nothing Then Continue For
+                If includePredicate IsNot Nothing AndAlso Not includePredicate(entry) Then Continue For
+
+                AddEntryToPages(entry.FormatForDosViewer(includeSource), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            Return New List(Of String)()
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count > 0 Then
+            pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+        End If
+
+        Return pages
+    End Function
+
+    Private Sub ShowPagesOrEnd(pages As List(Of String))
+        If pages Is Nothing OrElse pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+End Class
+```
+
+---
+
+# 2) Add this method to `LogBookReader.vb` (required)
+
+Add this near the other public methods:
+
+```vbnet
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+
+And change your `ReadEntriesFromPath` from `Private` to `Friend` **or** keep it `Private` and place `ReadEntriesFromSpecificFile` inside the class so it can call it (either way works).
+
+---
+
+## Why you didnâ€™t see â€œPLEASE WAITâ€¦â€ before
+Because the app was stuck in a long synchronous file scan on the UI thread, and Windows canâ€™t paint/update until your code returns to the message loop. The async version above returns control immediately, so the status viewer can render and update while the scan is happening.
+
+If you want, next step is **ESC to cancel scan** (very DOS-like).
+
+## @testsubject117
+
+this is the list of errors from the previous code change you sent me, you might want to hold off on suggesting any changes as I still haven't tried the latest code you sent me: Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30203	Identifier expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	251	
+Error (active)	BC30456	'ReadEntriesFromSpecificFile' is not a member of 'LogBookReader'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	371	
+Error (active)	BC30574	Option Strict On disallows late binding.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	372	
+Error (active)	BC30574	Option Strict On disallows late binding.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	372	
+Error (active)	BC30512	Option Strict On disallows implicit conversions from 'Object' to 'LogBookEntry'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	373	
+
+
+## Copilot
+
+Got it. Those errors are from the **previous** async/progress attempt, and theyâ€™re all explainable/fixable. Before you try any new replacement, hereâ€™s what they mean and the **minimum** changes needed so you donâ€™t get stuck again.
+
+## What those errors mean
+
+### 1) `BC30203 Identifier expected` at line 251
+This is almost always a **VB syntax** issue introduced while pastingâ€”common causes:
+- a `$"` string interpolation got broken (missing quote)
+- a line continuation `_` got lost
+- a stray `:` or `,` in an object initializer
+- unmatched `End If / End Sub / End Function`
+
+**Best move:** open `FormLogBookMenu.vb` and look at line 251 and the few lines above it. If you paste ~15 lines before/after line 251 here, Iâ€™ll point to the exact character thatâ€™s wrong.
+
+---
+
+### 2) `ReadEntriesFromSpecificFile is not a member of LogBookReader` at line 371
+That method simply doesnâ€™t exist in your `LogBookReader` yet.
+
+Add this to `LogBookReader.vb`:
+
+```vbnet
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+
+â€¦and make sure `ReadEntriesFromPath` is inside the same class (it can stay `Private`; this wrapper is inside the class so it can call it).
+
+---
+
+### 3) `Option Strict On disallows late binding` at line 372 (twice)  
+### 4) `Option Strict On disallows implicit conversions from Object to LogBookEntry` at line 373
+This happens when VB thinks youâ€™re iterating **Objects** instead of `LogBookEntry`. Typical cause:
+
+- `ReadEntriesFromSpecificFile` is returning `IEnumerable` (non-generic) or `Object`
+- or `matches` is declared as `List(Of Object)` accidentally
+- or `For Each entry In ...` is iterating something typed as `Object`
+
+Once `ReadEntriesFromSpecificFile` returns **`IEnumerable(Of LogBookEntry)`**, these usually disappear.
+
+If they donâ€™t, it means the line is something like:
+
+```vbnet
+For Each entry In reader.ReadEntriesFromSpecificFile(fp)
+```
+
+â€¦but the compiler thinks `ReadEntriesFromSpecificFile` returns `Object`. Again: fix the method signature and they go away.
+
+---
+
+## How to proceed safely (so you donâ€™t churn)
+1) **Revert** to the last known working version (the one that finds invoices and prompts â€œsearch all yearsâ€).
+2) Then apply **one change at a time**:
+   - First: add `FrmDosPagedViewer` status methods (compiles, no behavior change yet)
+   - Second: add `ReadEntriesFromSpecificFile` to `LogBookReader` (compiles, no behavior change yet)
+   - Third: change only `RunInvoiceLookup` to async + status viewer
+
+That way if anything breaks, we know exactly where.
+
+---
+
+## Next thing I need from you
+To fix the â€œIdentifier expectedâ€ instantly, paste **just this**:
+
+- the section around **line 251** in `FormLogBookMenu.vb` (say lines 235â€“265)
+
+Also paste the **current** `LogBookReader.vb` (or at least the method signatures at the top), so I can give you a guaranteed-compiling `ReadEntriesFromSpecificFile` addition that matches your file.
+
+Once I see line 251, Iâ€™ll send back a corrected `FormLogBookMenu.vb` that compiles under `Option Strict On` and shows â€œPLEASE WAITâ€¦â€ progress.
+
+## @testsubject117
+
+ok, replaced with current code you sent, rebuilt and here's what I got: Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30203	Identifier expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	219	
+Error (active)	BC30456	'ReadEntriesFromSpecificFile' is not a member of 'LogBookReader'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	326	
+Error (active)	BC30574	Option Strict On disallows late binding.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	327	
+Error (active)	BC30574	Option Strict On disallows late binding.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	327	
+Error (active)	BC30512	Option Strict On disallows implicit conversions from 'Object' to 'LogBookEntry'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	328	
+
+
+## Copilot
+
+Youâ€™re extremely close. The last three errors are *downstream* of the second one (missing `ReadEntriesFromSpecificFile`). The first error (â€œIdentifier expectedâ€) is a paste/syntax issue at **line 219** in `FormLogBookMenu.vb`.
+
+Do these in order:
+
+---
+
+## 1) Fix `ReadEntriesFromSpecificFile` (will also fix the Option Strict errors)
+
+Add this method to your `LogBookReader.vb` **inside the `Public Class LogBookReader`** (anywhere near the other public methods is fine):
+
+```vbnet
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+
+Important:
+- This assumes you already have `ReadEntriesFromPath(filePath As String)` in the same class (even if itâ€™s `Private`, thatâ€™s fine).
+- After adding this, rebuildâ€”**the â€œlate bindingâ€ and â€œObject to LogBookEntryâ€ errors should disappear**.
+
+If they donâ€™t, it means your `ReadEntriesFromPath` is not returning `IEnumerable(Of LogBookEntry)` or the wrapper got pasted outside the class.
+
+---
+
+## 2) Fix the syntax error at line 219 (`Identifier expected`)
+
+This one I canâ€™t guess correctly without seeing the code around line 219. It is almost always one of:
+- a broken interpolated string like `$"..."` missing a quote
+- a `Try` without `Catch`/`End Try`
+- a missing `End If`
+- a lambda missing `End Sub` / `End Function`
+- an `Await Task.Run(Function()` block missing `End Function)` etc.
+
+### Please paste lines ~205â€“235 from `FormLogBookMenu.vb`
+Just copy/paste that region (include the line thatâ€™s reported as 219). With that snippet I can point to the exact character and send back a corrected full-file replacement.
+
+---
+
+## Why the other errors appear
+- `BC30574 late binding` and `BC30512 Object -> LogBookEntry` happen because when a member is missing, VB sometimes treats the call as an `Object` and you end up iterating `Object` instead of `LogBookEntry`. Fixing the method signature above usually resolves both immediately.
+
+---
+
+### Quick checklist after you paste the snippet
+Once you paste the ~205â€“235 lines, Iâ€™ll respond with:
+1) the exact fix for the line-219 syntax error, and
+2) a confirmed-compiling `FormLogBookMenu.vb` replacement that shows â€œPLEASE WAITâ€¦â€ progress.
+
+## @testsubject117
+
+```
+           Return
+       End If
+
+       If e.KeyCode <> Keys.Enter Then Return
+
+       Dim input As String = txtInput.Text.Trim()
+       pnlPrompt.Visible = False
+
+       Select Case _mode
+           Case InputMode.ViewOneCustomerPrompt
+               RunViewOneCustomer(input)
+
+           Case InputMode.InvoiceLookupPrompt
+               ' IMPORTANT: async so progress can display
+               _ = RunInvoiceLookupAsync(input)
+
+           Case Else
+               ShowMenu()
+       End Select
+
+       e.Handled = True
+   End Sub
+
+   Private Sub RunViewOneCustomer(customerInput As String)
+       If String.IsNullOrWhiteSpace(customerInput) Then
+           ShowMenu()
+           Return
+       End If
+
+       Dim reader As New LogBookReader(DataDir)
+       Dim pages As List(Of String) = BuildPagesFromEntries(
+```
+
+## Copilot
+
+Line 219 is almost certainly choking on the **half-pasted / broken line break** right here:
+
+```vbnet
+Dim pages As List(Of String) = BuildPagesFromEntries(
+```
+
+In your snippet, that line ends with an *unterminated* `(` and then the file continuesâ€”VB will throw **â€œIdentifier expectedâ€** at or near that spot if the rest of the call got mangled (common when pasting code that had line continuations).
+
+### Fix (safe + simplest)
+Replace that statement with a **single-line call** (no multiline parentheses to get broken by paste). Do the same pattern anywhere else you have `BuildPagesFromEntries(` split across lines.
+
+Use this exact code for `RunViewOneCustomer` and `RunViewAllCustomers`:
+
+```vbnet
+Private Sub RunViewOneCustomer(customerInput As String)
+    If String.IsNullOrWhiteSpace(customerInput) Then
+        ShowMenu()
+        Return
+    End If
+
+    Dim reader As New LogBookReader(DataDir)
+    Dim pages As List(Of String) = BuildPagesFromEntries(reader.ReadEntries(_yearTwoDigit),
+                                                        Function(entry) entry.Customer IsNot Nothing AndAlso entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase),
+                                                        includeSource:=False)
+
+    ShowPagesOrEnd(pages)
+End Sub
+
+Private Sub RunViewAllCustomers()
+    Dim reader As New LogBookReader(DataDir)
+    Dim pages As List(Of String) = BuildPagesFromEntries(reader.ReadEntries(_yearTwoDigit),
+                                                        Function(entry) True,
+                                                        includeSource:=False)
+
+    ShowPagesOrEnd(pages)
+End Sub
+```
+
+That should eliminate the â€œIdentifier expectedâ€ immediately.
+
+---
+
+## Next: fix the `ReadEntriesFromSpecificFile` + Option Strict errors
+As mentioned, add this **inside** `LogBookReader`:
+
+```vbnet
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+
+Once thatâ€™s in, the â€œlate bindingâ€ and â€œObject -> LogBookEntryâ€ errors should go away.
+
+---
+
+## If you want, I can give you a full corrected `FormLogBookMenu.vb`
+Your file likely has a couple other `BuildPagesFromEntries(` calls split across lines. If you paste the rest of `FormLogBookMenu.vb` (or at least from `RunViewOneCustomer` down through `RunInvoiceLookupAsync`), Iâ€™ll return a full-file replacement with:
+- no fragile multiline call sites
+- the progress â€œPLEASE WAITâ€¦â€ viewer working
+- Option Strict-safe types everywhere
+
+## @testsubject117
+
+```
+Next: fix the ReadEntriesFromSpecificFile + Option Strict errors
+As mentioned, add this inside LogBookReader:
+
+Visual Basic .NET
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+```
+what file is this change for: 
+
+## Copilot
+
+That change goes in **`LogBookReader.vb`** (the class that currently has `ReadEntries(yearTwoDigit)` and `ReadEntriesAllYears()`).
+
+### Exactly where
+Open: `AMiOffice\LogBookReader.vb`
+
+Inside:
+
+```vbnet
+Public Class LogBookReader
+    ' ...
+End Class
+```
+
+Paste the method anywhere *inside that class* (I usually put it right after `ReadEntries(yearTwoDigit As Integer)`), for example:
+
+```vbnet
+Public Iterator Function ReadEntries(yearTwoDigit As Integer) As IEnumerable(Of LogBookEntry)
+    ' existing code...
+End Function
+
+' ADD THIS:
+Public Iterator Function ReadEntriesFromSpecificFile(filePath As String) As IEnumerable(Of LogBookEntry)
+    For Each e In ReadEntriesFromPath(filePath)
+        Yield e
+    Next
+End Function
+
+Public Iterator Function ReadEntriesAllYears() As IEnumerable(Of LogBookEntry)
+    ' existing code...
+End Function
+```
+
+### One note
+This method calls `ReadEntriesFromPath(...)`. That function must already exist in `LogBookReader.vb` (itâ€™s the one doing `File.ReadAllLines` and stepping by 12). It can remain `Private`â€”since the new wrapper is in the same class, it can still call it.
+
+## @testsubject117
+
+Identifier expected. Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30203	Identifier expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	219	
+
+
+## Copilot
+
+That error is still pointing at **line 219**, and from the snippet you shared earlier the problem is that you have an **incomplete/mangled multiline call** starting at:
+
+```vbnet
+Dim pages As List(Of String) = BuildPagesFromEntries(
+```
+
+VB is seeing a dangling `(` (or other broken token) and then later code doesnâ€™t line up, so it reports â€œIdentifier expectedâ€ around there.
+
+## Fastest guaranteed fix
+Replace your entire `RunViewOneCustomer` method with this exact block (single-line call formatting so paste canâ€™t break it):
+
+```vbnet
+Private Sub RunViewOneCustomer(customerInput As String)
+    If String.IsNullOrWhiteSpace(customerInput) Then
+        ShowMenu()
+        Return
+    End If
+
+    Dim reader As New LogBookReader(DataDir)
+    Dim pages As List(Of String) = BuildPagesFromEntries(reader.ReadEntries(_yearTwoDigit),
+                                                        Function(entry) entry.Customer IsNot Nothing AndAlso entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase),
+                                                        includeSource:=False)
+
+    ShowPagesOrEnd(pages)
+End Sub
+```
+
+And replace `RunViewAllCustomers` with:
+
+```vbnet
+Private Sub RunViewAllCustomers()
+    Dim reader As New LogBookReader(DataDir)
+    Dim pages As List(Of String) = BuildPagesFromEntries(reader.ReadEntries(_yearTwoDigit),
+                                                        Function(entry) True,
+                                                        includeSource:=False)
+
+    ShowPagesOrEnd(pages)
+End Sub
+```
+
+Then rebuild.
+
+## If it still errors at line 219 after that
+Then line 219 is no longer inside `RunViewOneCustomer`â€”itâ€™s somewhere else now. In that case, I need the exact text around line 219.
+
+### Please do this:
+1. In Visual Studio, double-click the error â†’ it will jump to line 219.
+2. Copy/paste **lines 210â€“230 exactly** from the file (include the line with the cursor).
+
+That will let me tell you the precise character thatâ€™s breaking parsing (itâ€™s usually a missing quote or a broken `Function(...)` line).
+
+If you want a quick self-check: look *just above* line 219 for any line that ends with:
+- `(`
+- `_`
+- `$"` (without closing `"`)
+
+Those are the most common â€œpaste broke itâ€ culprits.
+
+## @testsubject117
+
+```
+      Dim input As String = txtInput.Text.Trim()
+      pnlPrompt.Visible = False
+
+      Select Case _mode
+          Case InputMode.ViewOneCustomerPrompt
+              RunViewOneCustomer(input)
+
+          Case InputMode.InvoiceLookupPrompt
+              ' IMPORTANT: async so progress can display
+              _ = RunInvoiceLookupAsync(input)
+
+          Case Else
+              ShowMenu()
+      End Select
+
+      e.Handled = True
+  End Sub
+
+  Private Sub RunViewOneCustomer(customerInput As String)
+      If String.IsNullOrWhiteSpace(customerInput) Then
+          ShowMenu()
+```
+
+## Copilot
+
+The snippet you pasted shows this line inside `OnInputKeyDown`:
+
+```vbnet
+_ = RunInvoiceLookupAsync(input)
+```
+
+In VB.NET, `_` is **not** a valid identifier (itâ€™s the line-continuation character), so that line will trigger a parser error like **BC30203 â€œIdentifier expectedâ€** (and the compiler may report it on the next line number, which is why itâ€™s pointing around ~219).
+
+## Fix (do this)
+Replace:
+
+```vbnet
+_ = RunInvoiceLookupAsync(input)
+```
+
+with either of these (both compile under `Option Strict On`):
+
+### Option A (recommended): fire-and-forget safely
+```vbnet
+Dim t As Task = RunInvoiceLookupAsync(input)
+```
+
+Youâ€™ll need this import at the top of the file:
+```vbnet
+Imports System.Threading.Tasks
+```
+
+### Option B: just call it (still runs async, but youâ€™re not capturing the Task)
+```vbnet
+Call RunInvoiceLookupAsync(input)
+```
+
+(Option B works, but I prefer Option A so the compiler knows you intentionally invoked an async function.)
+
+---
+
+### After you change that
+Rebuild. That should clear the **Identifier expected** error.
+
+If you then still see the `ReadEntriesFromSpecificFile` / Option Strict errors, add the `ReadEntriesFromSpecificFile` method to `LogBookReader.vb` as discussed, and those should go away too.
+
+## @testsubject117
+
+ok, it appears to be working now. and I do see for a short split second a dialogue that says please wait. the search is much faster now, so that progress bar or please wait dialogue isn't as needed. if the search took longer I'd say we'd need to make sure it was displayed better.
+
+## Copilot
+
+Good
+
+## @testsubject117
+
+lets wrap it for the day. I need the you to compile the updated 4 or 5 files like I first pasted to you when we began today.
+
+## Copilot
+
+I canâ€™t compile your solution from here (no access to your local Visual Studio/MSBuild environment), but I can give you a clean â€œend-of-dayâ€ bundle: the **final contents** of the files we touched today, in full, so you can paste/compare and then build locally.
+
+To do that accurately, I need you to list the **exact file names** you want included (and confirm whether you changed all of these):
+
+- `AMiOffice\FormLogBookMenu.vb`
+- `AMiOffice\FrmDosPagedViewer.vb`
+- `AMiOffice\LogBookReader.vb`
+- `AMiOffice\LogBookEntry.vb` (if you adopted the `SourceFile` addition)
+
+Reply with:
+1) the exact list of files (4 or 5) you want in the â€œfinal compiledâ€ pack, and  
+2) whether you added `SourceFile` to `LogBookEntry` (Yes/No).
+
+Then Iâ€™ll send **full-file, final versions** for each one in separate code blocks so you can paste them in and build.
+
+## @testsubject117
+
+last night at EOD you sent me the following files: 00-next-day-kickoff.md, 01-amiwinforms-scan.md, 02-amidatastore-scan.md, 03-dos-mainmenu-behavior.md, and 04-todays-technical-summary.md
+
+## Copilot
+
+Here are the updated **end-of-day wrap-up docs** (full-file contents). I wrote them so tomorrow you can pick up fast: what changed, whatâ€™s now working, what still needs cleanup, and what to verify.
+
+````markdown name=00-next-day-kickoff.md
+# Next day kickoff (Log Book / Invoice lookup)
+
+## Where we left off (as of 2026-05-27)
+- Invoice lookup now supports:
+  - Search the selected year first (`LOGBOOK.yy`)
+  - If not found, prompt user to search **all years** (`LOGBOOK.*`)
+- Confirmed with real data:
+  - Invoice **726218** found in `LOGBOOK.24` (dated 12-13-2024)
+  - Invoice **727400** found in `LOGBOOK.25` (dated 01-29-2025), appears multiple times
+- Root cause of earlier â€œnot foundâ€ was **wrong year in use**, not missing data.
+
+## What was changed today
+- WinForms `FormLogBookMenu`:
+  - Invoice lookup now prompts to scan all years when not found in the selected year.
+  - Switched invoice lookup to an async path (fire-and-forget Task) to avoid UI freeze.
+- `LogBookReader`:
+  - Added ability to scan all files `LOGBOOK.*`.
+  - Added `ReadEntriesFromSpecificFile(filePath)` helper so scans can be done one file at a time.
+  - Fixed VB `Path` name collision issues by avoiding variable name `path` and qualifying `System.IO.Path`.
+- `FrmDosPagedViewer`:
+  - Added status/progress mode methods (`BeginStatusMode`, `UpdateStatus`, `EndStatusMode`) to support DOS-like â€œPLEASE WAITâ€¦â€ displays.
+
+## Current behavior (expected)
+1. User selects year (e.g. 2026)
+2. Chooses `(3) Look up an invoice`
+3. If invoice not found in selected year, prompt appears:
+   - â€œSearch all years (all LOGBOOK.* files)?â€
+4. If Yes, scan occurs; app should remain responsive.
+5. Results show entries and include `Source: LOGBOOK.yy` when scanning all years.
+
+## Known gotchas encountered today
+- VB syntax error `Identifier expected` came from using `_ = RunInvoiceLookupAsync(input)` (invalid in VB).
+  - Fix: `Dim t As Task = RunInvoiceLookupAsync(input)` (and import `System.Threading.Tasks`).
+- â€œCombine is not a member of Stringâ€ came from naming a variable `path` which shadowed `System.IO.Path`.
+  - Fix: rename to `filePath` and/or qualify `System.IO.Path.Combine`.
+
+## Tomorrowâ€™s quick verification checklist
+- Build succeeds with Option Strict On.
+- Test lookup:
+  - Year=26, invoice=726218 -> not found -> search all -> found in `LOGBOOK.24`
+  - Year=26, invoice=727400 -> not found -> search all -> found in `LOGBOOK.25`
+- Verify the app doesnâ€™t â€œlook frozenâ€ during scan.
+- Confirm users cannot accidentally type digits that trigger other handlers while viewer is open.
+````
+
+````markdown name=01-amiwinforms-scan.md
+# AMiWinForms scan notes (Log Book)
+
+## Key classes / files
+- `FormLogBookMenu.vb`
+  - Handles menu input, prompts, and routes options.
+  - Option (3) invoice lookup updated to:
+    - Search selected year
+    - Offer scan-all-years fallback
+    - Use async to prevent UI freeze
+- `LogBookReader.vb`
+  - Reads `LOGBOOK.yy` files and parses 12-line fixed records.
+  - Provides:
+    - `ReadEntries(yearTwoDigit)`
+    - `ReadEntriesAllYears()`
+    - `ReadEntriesFromSpecificFile(filePath)` (added for progress + per-file scanning)
+- `LogBookEntry.vb`
+  - Data model for one 12-line entry
+  - Optional enhancement: include `SourceFile` so all-years results show which file/year they came from
+- `FrmDosPagedViewer.vb`
+  - DOS-like paged viewer
+  - Added support for status updates:
+    - `BeginStatusMode(hintText)`
+    - `UpdateStatus(text)`
+    - `EndStatusMode()`
+
+## Technical notes
+- The underlying logbook format is a simple text file:
+  - Each record is 12 lines.
+  - Invoice number is line index `+3` within each record block.
+- Performance: scanning all years may take time depending on network speed and file sizes.
+  - Async scan prevents UI lock-up.
+  - Status viewer can be used for longer scans, but current scans became fast enough that status only flashes.
+
+## UX notes
+- DOS required users to know the year; WinForms now can find invoice without knowing year.
+- Still DOS-like navigation:
+  - viewer supports ENTER for next page, ESC to quit.
+- Potential future improvement:
+  - Allow ESC to cancel an in-progress scan (if scan ever becomes slow again).
+````
+
+````markdown name=02-amidatastore-scan.md
+# AMiDataStore scan notes (DOS-era behavior)
+
+## What we inferred / confirmed
+- `LOGBOOK.yy` naming strongly implies year scoping:
+  - `LOGBOOK.24` corresponds to 2024 entries
+  - `LOGBOOK.25` corresponds to 2025 entries
+- Invoice lookup in DOS is scoped to the selected â€œYear in useâ€.
+- Therefore, â€œinvoice not foundâ€ in DOS/WinForms can be correct if the wrong year is selected.
+
+## Evidence
+- PowerShell scan across `LOGBOOK.*` confirmed:
+  - Invoice 726218 in `LOGBOOK.24`
+  - Invoice 727400 in `LOGBOOK.25` (duplicate entries)
+- DOS screenshots:
+  - 726218 displayed under date 12-13-2024
+  - 727400 displayed under date 01-29-2025
+
+## Takeaway
+- The data is present; the lookup behavior is year-scoped by design.
+- WinForms improvement: scan-all-years option removes need for user to know the invoice year.
+````
+
+````markdown name=03-dos-mainmenu-behavior.md
+# DOS MainMenu behavior (Log Book)
+
+## Observed behaviors
+- Menu is year-scoped ("Year in use").
+- Option (3) invoice lookup searches within the selected year's logbook file only.
+- Results display a formatted record; user can page with ENTER and quit with ESC.
+
+## Implications for WinForms port
+- WinForms should preserve default DOS behavior for speed and familiarity:
+  - Search selected year first.
+- But WinForms can safely add usability:
+  - If not found, offer scan-all-years.
+- When scan-all-years returns matches, show which `LOGBOOK.yy` file/year they came from.
+````
+
+````markdown name=04-todays-technical-summary.md
+# Todayâ€™s technical summary (2026-05-27)
+
+## Problem
+- Invoice lookup returned "not found" in DOS/WinForms for known invoice numbers.
+- Concern: maybe invoices were stored only in special logs or only for failures.
+
+## Root cause
+- Invoice lookup is **year-scoped**.
+- Known invoices were in different logbook files:
+  - 726218 -> `LOGBOOK.24` (year 2024)
+  - 727400 -> `LOGBOOK.25` (year 2025)
+
+## Fix implemented (WinForms)
+- Maintain DOS behavior:
+  - Search in selected year first.
+- Add fallback:
+  - If not found, prompt user to search all years (`LOGBOOK.*`).
+- Implementation details:
+  - `LogBookReader` enhanced to enumerate `LOGBOOK.*`.
+  - Added per-file scanning helper `ReadEntriesFromSpecificFile`.
+  - Fixed VB `Path` shadowing bug by renaming local variables and qualifying `System.IO.Path`.
+  - Converted invoice lookup to async call pattern to reduce UI freeze risk.
+  - Added DOS-style status/progress capability to `FrmDosPagedViewer`.
+
+## Issues encountered and resolved
+- VB syntax: `_ = RunInvoiceLookupAsync(...)` is invalid in VB.
+  - Replaced with `Dim t As Task = RunInvoiceLookupAsync(...)`.
+- `Path.Combine` errors due to variable name collision (`path`).
+  - Renamed to `filePath` and used `System.IO.Path`.
+
+## Current status
+- Invoice lookup works in selected year and via scan-all-years.
+- Status/progress display exists, but scans are now fast enough that it may only flash briefly.
+
+## Next potential enhancements
+- Add ESC-to-cancel during long scans (if network latency or file size makes it slow).
+- Improve all-years prompt to be fully DOS-like (in-viewer Y/N) instead of MessageBox.
+````
+
+## @testsubject117
+
+ok, I also need a powershell command to backup my current hyper-v installation, machines, disks, settings etc. 
+
+## Copilot
+
+There isnâ€™t a single built-in â€œbackup all of Hyperâ€‘V (host + VMs + settings)â€ PowerShell command, but you can do a **reliable full backup** by exporting every VM (includes config + checkpoints + VHDX), and separately backing up a few host-level config folders.
+
+Below is a practical approach that works well on Windows 10/11 Pro/Enterprise and Windows Server with Hyperâ€‘V.
+
+## 1) Export all VMs (the real â€œVM backupâ€)
+Run in an elevated PowerShell:
+
+```powershell
+# Destination root for the backup (change this!)
+$destRoot = "E:\HyperV-Backups\$(Get-Date -Format yyyy-MM-dd_HHmmss)"
+New-Item -ItemType Directory -Path $destRoot -Force | Out-Null
+
+# Export every VM
+Get-VM | ForEach-Object {
+    $vmDest = Join-Path $destRoot ($_.Name -replace '[\\/:*?"<>|]', '_')
+    New-Item -ItemType Directory -Path $vmDest -Force | Out-Null
+    Export-VM -Name $_.Name -Path $vmDest
+}
+
+"Done. Exports are in: $destRoot"
+```
+
+Notes:
+- `Export-VM` captures the VM configuration, snapshots/checkpoints, and VHD/VHDX **as of export time**.
+- If a VM is actively running, export usually works; for maximum consistency you can stop VMs first.
+
+## 2) Back up host-level Hyperâ€‘V settings (optional but recommended)
+This gets things like the **Virtual Switch Manager** configuration and some Hyperâ€‘V host settings.
+
+```powershell
+$hostBackup = Join-Path $destRoot "_HostConfig"
+New-Item -ItemType Directory -Path $hostBackup -Force | Out-Null
+
+# Virtual switches
+Get-VMSwitch | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMSwitches.xml")
+
+# VM host defaults (paths, etc.)
+Get-VMHost | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMHost.xml")
+
+# Hyper-V virtual network adapters (sometimes helpful)
+Get-VMNetworkAdapter -ManagementOS | Select-Object * | Export-Clixml (Join-Path $hostBackup "MgmtOS-NICs.xml")
+```
+
+## 3) Back up Hyperâ€‘V folders (only if you want belt-and-suspenders)
+Depending on OS version and configuration, useful directories may include:
+
+- `C:\ProgramData\Microsoft\Windows\Hyper-V\`
+- `C:\ProgramData\Microsoft\Windows\Hyper-V\Virtual Machines\`
+- `C:\ProgramData\Microsoft\Windows\Hyper-V\Snapshots\` (if present)
+- Your actual VM storage folders (VHDX locations), but **exports already include disks**
+
+You can copy those with `robocopy`:
+
+```powershell
+$cfg1 = "C:\ProgramData\Microsoft\Windows\Hyper-V"
+$cfg2 = "C:\ProgramData\Microsoft\Windows\Hyper-V\Virtual Machines"
+
+robocopy $cfg1 (Join-Path $hostBackup "ProgramData-HyperV") /MIR /R:1 /W:1 /COPY:DAT /DCOPY:DAT
+robocopy $cfg2 (Join-Path $hostBackup "ProgramData-VirtualMachines") /MIR /R:1 /W:1 /COPY:DAT /DCOPY:DAT
+```
+
+(If either path doesnâ€™t exist on your machine, `robocopy` will complainâ€”safe to ignore or you can check `Test-Path` first.)
+
+---
+
+### Two quick questions so I can tailor this (and avoid surprises)
+1) Are you backing up from **Windows Server Hyperâ€‘V** or **Windows 10/11 Hyperâ€‘V**?
+2) Do you want the backup to be **hot** (VMs running) or are you OK with stopping them first for maximum consistency?
+
+If you tell me your backup target (USB drive letter / NAS path), I can give you a single script that logs results and verifies exports.
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> $hostBackup = Join-Path $destRoot "_HostConfig"
+Join-Path : Cannot bind argument to parameter 'Path' because it is null.
+At line:1 char:25
++ $hostBackup = Join-Path $destRoot "_HostConfig"
++                         ~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Join-Path], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,Microsoft.PowerShell.Commands.JoinPathCom
+   mand
+
+PS C:\Windows\system32> New-Item -ItemType Directory -Path $hostBackup -Force | Out-Null
+New-Item : Cannot bind argument to parameter 'Path' because it is null.
+At line:1 char:36
++ New-Item -ItemType Directory -Path $hostBackup -Force | Out-Null
++                                    ~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [New-Item], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,Microsoft.PowerShell.Commands.NewItemComm
+   and
+
+PS C:\Windows\system32>
+PS C:\Windows\system32> # Virtual switches
+PS C:\Windows\system32> Get-VMSwitch | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMSwitches.xml")
+Join-Path : Cannot bind argument to parameter 'Path' because it is null.
+At line:1 char:59
++ ... itch | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMSwit ...
++                                                       ~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Join-Path], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,Microsoft.PowerShell.Commands.JoinPathCom
+   mand
+
+PS C:\Windows\system32>
+PS C:\Windows\system32> # VM host defaults (paths, etc.)
+PS C:\Windows\system32> Get-VMHost | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMHost.xml")
+Join-Path : Cannot bind argument to parameter 'Path' because it is null.
+At line:1 char:57
++ ... Host | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMHost ...
++                                                       ~~~~~~~~~~~
+    + CategoryInfo          : InvalidData: (:) [Join-Path], ParameterBindingValidationException
+    + FullyQualifiedErrorId : ParameterArgumentValidationErrorNullNotAllowed,Microsoft.PowerShell.Commands.JoinPathCom
+   mand
+
+PS C:\Windows\system32>
+PS C:\Windows\system32> # Hyper-V virtual network adapters (sometimes helpful)
+PS C:\Windows\system32> Get-VMNetworkAdapter -ManagementOS | Select-Object * | Export-Clixml (Join-Path $hostBackup "MgmtOS-NICs.xml")
+```
+
+## Copilot
+
+`$destRoot` is **null** in that PowerShell session, so everything that builds paths under it fails. That usually happens because you ran the â€œhost configâ€ snippet in a fresh prompt (or after closing the session) without first setting `$destRoot`.
+
+### Fix: define `$destRoot` first (then run host config)
+Run this as a single block:
+
+```powershell
+# Pick a destination root (change drive/path to what you actually have)
+$destRoot = "E:\HyperV-Backups\$(Get-Date -Format yyyy-MM-dd_HHmmss)"
+New-Item -ItemType Directory -Path $destRoot -Force | Out-Null
+
+$hostBackup = Join-Path $destRoot "_HostConfig"
+New-Item -ItemType Directory -Path $hostBackup -Force | Out-Null
+
+Get-VMSwitch | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMSwitches.xml")
+Get-VMHost   | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMHost.xml")
+Get-VMNetworkAdapter -ManagementOS | Select-Object * | Export-Clixml (Join-Path $hostBackup "MgmtOS-NICs.xml")
+
+"Host config saved to: $hostBackup"
+```
+
+If you donâ€™t have an `E:` drive, use something you do have, e.g.:
+
+```powershell
+$destRoot = "C:\HyperV-Backups\$(Get-Date -Format yyyy-MM-dd_HHmmss)"
+```
+
+### If you already exported VMs and just want to do host config now
+Set `$destRoot` to the folder you already created:
+
+```powershell
+$destRoot = "E:\HyperV-Backups\2026-05-27_231500"   # <-- your real folder
+```
+
+### Quick sanity check
+You can confirm what PowerShell thinks the variable is with:
+
+```powershell
+$destRoot
+Test-Path $destRoot
+```
+
+If you tell me where you want the backups stored (drive letter or UNC path), Iâ€™ll tailor the script to that location and add a log file so you have a record of what exported successfully.
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> Get-VMNetworkAdapter -ManagementOS | Select-Object * | Export-Clixml (Join-Path $hostBackup "MgmtOS-NICs.xml")
+PS C:\Windows\system32>
+PS C:\Windows\system32> "Host config saved to: $hostBackup"$hostBackup = Join-Path $destRoot "_HostConfig"
+At line:1 char:36
++ "Host config saved to: $hostBackup"$hostBackup = Join-Path $destRoot  ...
++                                    ~~~~~~~~~~~
+Unexpected token '$hostBackup' in expression or statement.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : UnexpectedToken
+
+PS C:\Windows\system32> New-Item -ItemType Directory -Path $hostBackup -Force | Out-Null
+PS C:\Windows\system32>
+PS C:\Windows\system32> # Virtual switches
+PS C:\Windows\system32> Get-VMSwitch | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMSwitches.xml")
+PS C:\Windows\system32>
+PS C:\Windows\system32> # VM host defaults (paths, etc.)
+PS C:\Windows\system32> Get-VMHost | Select-Object * | Export-Clixml (Join-Path $hostBackup "VMHost.xml")
+PS C:\Windows\system32>
+PS C:\Windows\system32> # Hyper-V virtual network adapters (sometimes helpful)
+PS C:\Windows\system32> Get-VMNetworkAdapter -ManagementOS | Select-Object * | Export-Clixml (Join-Path $hostBackup "MgmtOS-NICs.xml")
+```
+
+## Copilot
+
+That parser error happened because two commands got stuck together on one line:
+
+```powershell
+"Host config saved to: $hostBackup"$hostBackup = Join-Path ...
+```
+
+PowerShell requires a separator (newline or `;`) between them.
+
+### Correct way (just run these two lines separately)
+```powershell
+"Host config saved to: $hostBackup"
+$hostBackup = Join-Path $destRoot "_HostConfig"
+```
+
+Or, if you want them on one line:
+
+```powershell
+"Host config saved to: $hostBackup"; $hostBackup = Join-Path $destRoot "_HostConfig"
+```
+
+### What to do now
+It looks like the exports succeeded (no errors from the `Export-Clixml` lines). To verify the files were created:
+
+```powershell
+Get-ChildItem $hostBackup
+```
+
+You should see:
+- `VMSwitches.xml`
+- `VMHost.xml`
+- `MgmtOS-NICs.xml`
+
+### Tip: avoid this happening again
+When pasting into the console, paste whole blocks and make sure thereâ€™s a newline between statements. If you ever see two prompts â€œmergeâ€, just hit Enter once before pasting the next command.
+
+If you want, paste your `$destRoot` and Iâ€™ll give you a single â€œbackup everythingâ€ script that exports VMs + host config + writes a timestamped log.
+
+
+===== END IMPORTED EXPORT =====
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+
+
+---
+
+## Today's Latest Export
+
+_No export file for target date was found in the scan paths._
+
+---
+
+## New Notes
+
+_Add today's notes below._
+

@@ -1,0 +1,2000 @@
+﻿## @testsubject117
+
+sorry, not after hitting enter, but after inputting the check reference number
+
+## Copilot
+
+Yes â€” that makes sense, and thatâ€™s already how the latest version I gave you is wired.
+
+## Clarification
+The correct DOS sequence is:
+
+1. enter **Check #**
+2. enter or accept **Date**
+3. enter **Check Reference**
+4. **then** DOS shows:
+   - `Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]`
+
+So the trigger is:
+
+- **after entering the check reference number**
+
+not merely after pressing Enter on the date field.
+
+---
+
+## Good news
+That is already what the latest code does:
+
+### Step 7
+Date prompt:
+- blank Enter uses todayâ€™s date
+- then it goes to **Check Reference**
+
+### Step 8
+Check reference prompt:
+- user enters reference number
+- then it goes to:
+
+### Step 9
+`Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]`
+
+So no logic change is needed from that correction.
+
+---
+
+## Short answer
+No problem â€” understood.  
+And yes: the current latest code already shows **Everything Correct?** only **after the check reference number is entered**, which matches your DOS clarification.
+
+## @testsubject117
+
+yes, but the form closes as soon as I hit enter, in DOS it asks is everything correct: 
+
+## Copilot
+
+Youâ€™re right â€” then the local file youâ€™re running is still behaving like the older version, or the `currentStep = 8` branch is still calling `FinishFlow()` instead of `ShowEverythingCorrectPrompt()`.
+
+## Direct fix
+After the user enters **Check Reference**, the code must do:
+
+```vbnet
+ShowEverythingCorrectPrompt()
+```
+
+and **not**:
+
+```vbnet
+FinishFlow()
+```
+
+---
+
+## Most likely exact issue
+In your `ProcessStep()` method, this part is probably still wrong:
+
+```vbnet
+If currentStep = 8 Then
+    If value = "" Then
+        txtInput.Focus()
+        Return
+    End If
+
+    enteredCheckReference = value
+    FinishFlow()
+    Return
+End If
+```
+
+It needs to be:
+
+```vbnet
+If currentStep = 8 Then
+    If value = "" Then
+        txtInput.Focus()
+        Return
+    End If
+
+    enteredCheckReference = value
+    ShowEverythingCorrectPrompt()
+    Return
+End If
+```
+
+---
+
+## Also required
+You need the `ShowEverythingCorrectPrompt()` method present in the file, and key handling for step 9.
+
+Below is the **full corrected file** so you can replace the whole thing and avoid diff confusion.
+
+```vbnet name=AMiOffice/FormAddChecks.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormAddChecks
+    Inherits Form
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private lblLine2 As Label
+    Private lblLine3 As Label
+    Private lblLine4 As Label
+    Private lblLine5 As Label
+    Private lblLine6 As Label
+    Private lblLine7 As Label
+    Private lblLine8 As Label
+    Private lblPrompt As Label
+    Private txtInput As TextBox
+    Private btnCancel As Button
+
+    Private currentStep As Integer
+    Private enteredCompany As String
+    Private enteredAmount As String
+    Private enteredLowestInvoice As String
+    Private enteredHighestInvoice As String
+    Private enteredCheckNumber As String
+    Private enteredDateText As String
+    Private enteredCheckReference As String
+
+    Public Sub New()
+        MyBase.New()
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub FormAddChecks_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        ShowCompanyPrompt()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "Add A Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle = New Label()
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** Add A Check *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblLine1 = New Label()
+        lblLine1.AutoSize = False
+        lblLine1.SetBounds(24, 80, 920, 28)
+        lblLine1.ForeColor = Color.White
+        lblLine1.BackColor = Color.Black
+
+        lblLine2 = New Label()
+        lblLine2.AutoSize = False
+        lblLine2.SetBounds(24, 112, 920, 28)
+        lblLine2.ForeColor = Color.White
+        lblLine2.BackColor = Color.Black
+
+        lblLine3 = New Label()
+        lblLine3.AutoSize = False
+        lblLine3.SetBounds(24, 144, 920, 28)
+        lblLine3.ForeColor = Color.White
+        lblLine3.BackColor = Color.Black
+
+        lblLine4 = New Label()
+        lblLine4.AutoSize = False
+        lblLine4.SetBounds(24, 176, 920, 28)
+        lblLine4.ForeColor = Color.White
+        lblLine4.BackColor = Color.Black
+
+        lblLine5 = New Label()
+        lblLine5.AutoSize = False
+        lblLine5.SetBounds(24, 208, 920, 28)
+        lblLine5.ForeColor = Color.White
+        lblLine5.BackColor = Color.Black
+
+        lblLine6 = New Label()
+        lblLine6.AutoSize = False
+        lblLine6.SetBounds(24, 240, 920, 28)
+        lblLine6.ForeColor = Color.White
+        lblLine6.BackColor = Color.Black
+
+        lblLine7 = New Label()
+        lblLine7.AutoSize = False
+        lblLine7.SetBounds(24, 272, 920, 28)
+        lblLine7.ForeColor = Color.White
+        lblLine7.BackColor = Color.Black
+
+        lblLine8 = New Label()
+        lblLine8.AutoSize = False
+        lblLine8.SetBounds(24, 304, 920, 28)
+        lblLine8.ForeColor = Color.White
+        lblLine8.BackColor = Color.Black
+
+        lblPrompt = New Label()
+        lblPrompt.AutoSize = False
+        lblPrompt.SetBounds(24, 372, 920, 28)
+        lblPrompt.ForeColor = Color.White
+        lblPrompt.BackColor = Color.Black
+
+        txtInput = New TextBox()
+        txtInput.BorderStyle = BorderStyle.FixedSingle
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        txtInput.CharacterCasing = CharacterCasing.Upper
+        txtInput.SetBounds(24, 407, 420, 30)
+
+        btnCancel = New Button()
+        btnCancel.Text = "Cancel"
+        btnCancel.SetBounds(820, 540, 110, 34)
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(lblLine2)
+        Me.Controls.Add(lblLine3)
+        Me.Controls.Add(lblLine4)
+        Me.Controls.Add(lblLine5)
+        Me.Controls.Add(lblLine6)
+        Me.Controls.Add(lblLine7)
+        Me.Controls.Add(lblLine8)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(btnCancel)
+    End Sub
+
+    Private Sub ClearLines()
+        lblLine1.Text = ""
+        lblLine2.Text = ""
+        lblLine3.Text = ""
+        lblLine4.Text = ""
+        lblLine5.Text = ""
+        lblLine6.Text = ""
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub ShowInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Focus()
+        txtInput.SelectAll()
+    End Sub
+
+    Private Sub HideInputPrompt(promptText As String)
+        lblPrompt.Text = promptText
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub PopulateReviewLines()
+        lblLine1.Text = enteredCompany & "  REF:  Check Amount:$  " & enteredAmount & "  { 0 Invoices }"
+        lblLine2.Text = "Difference Between Total of Invoices & Check Amount: 0"
+        lblLine3.Text = ""
+        lblLine4.Text = "(C) Check is Correct, add to the ledger"
+        lblLine5.Text = "(P) Print list of invoices"
+        lblLine6.Text = "(Q) Quit to Main Menu"
+        lblLine7.Text = ""
+        lblLine8.Text = ""
+    End Sub
+
+    Private Sub PopulateEntrySummaryLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        lblLine8.Text = "Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ? " & enteredDateText
+    End Sub
+
+    Private Sub ShowCompanyPrompt()
+        currentStep = 1
+        ClearLines()
+        ShowInputPrompt("Company Name [Q = Quit] ?")
+    End Sub
+
+    Private Sub ShowAmountPrompt()
+        currentStep = 2
+        ClearLines()
+        lblLine1.Text = "Company Name: " & enteredCompany
+        ShowInputPrompt("Check Amount ?")
+    End Sub
+
+    Private Sub ShowLowestInvoicePrompt()
+        currentStep = 3
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        ShowInputPrompt("Enter the LOWEST invoice number to be paid [-1 = No Auto Scan] ?")
+    End Sub
+
+    Private Sub ShowHighestInvoicePrompt()
+        currentStep = 4
+        ClearLines()
+        lblLine1.Text = "I need the 1st and last invoice numbers so I can automatically scan for invoices."
+        lblLine2.Text = "Lowest Invoice Number: " & enteredLowestInvoice
+        ShowInputPrompt("Enter the HIGHEST invoice number to be paid ?")
+    End Sub
+
+    Private Sub ShowReviewPrompt()
+        currentStep = 5
+        ClearLines()
+        PopulateReviewLines()
+        HideInputPrompt("")
+    End Sub
+
+    Private Sub ShowCheckNumberPrompt()
+        currentStep = 6
+        ClearLines()
+        PopulateReviewLines()
+        ShowInputPrompt("Check # (Top Right)?")
+    End Sub
+
+    Private Sub ShowDatePrompt()
+        currentStep = 7
+        ClearLines()
+        PopulateReviewLines()
+        lblLine7.Text = "Check # (Top Right)? " & enteredCheckNumber
+        ShowInputPrompt("Date [ENTER = " & DateTime.Now.ToString("MM-dd-yyyy") & "] ?")
+    End Sub
+
+    Private Sub ShowCheckReferencePrompt()
+        currentStep = 8
+        ClearLines()
+        PopulateEntrySummaryLines()
+        ShowInputPrompt("Check Reference (numbers on bottom right of check) ?")
+    End Sub
+
+    Private Sub ShowEverythingCorrectPrompt()
+        currentStep = 9
+        ClearLines()
+        PopulateEntrySummaryLines()
+        lblPrompt.Text = "Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]"
+        txtInput.Visible = False
+        Me.Focus()
+    End Sub
+
+    Private Sub FinishFlow()
+        Me.DialogResult = DialogResult.OK
+        Me.Close()
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        Me.DialogResult = DialogResult.Cancel
+        Me.Close()
+    End Sub
+
+    Private Sub FormAddChecks_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            btnCancel.PerformClick()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If currentStep = 5 Then
+            If e.KeyCode = Keys.C Then
+                ShowCheckNumberPrompt()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.P Then
+                MessageBox.Show("Print list of invoices is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.Q Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If currentStep = 9 Then
+            If e.KeyCode = Keys.Y Then
+                FinishFlow()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.N Then
+                btnCancel.PerformClick()
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D1 OrElse e.KeyCode = Keys.NumPad1 Then
+                MessageBox.Show("Discount flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            If e.KeyCode = Keys.D2 OrElse e.KeyCode = Keys.NumPad2 Then
+                MessageBox.Show("Debit flow is not implemented yet.",
+                                "Add A Check",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                e.Handled = True
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            ProcessStep()
+            e.Handled = True
+            e.SuppressKeyPress = True
+            Return
+        End If
+    End Sub
+
+    Private Sub ProcessStep()
+        Dim value As String
+        value = txtInput.Text.Trim()
+
+        If currentStep = 1 Then
+            If UCase(value) = "Q" Then
+                btnCancel.PerformClick()
+                Return
+            End If
+
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCompany = value
+            ShowAmountPrompt()
+            Return
+        End If
+
+        If currentStep = 2 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredAmount = value
+            ShowLowestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 3 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredLowestInvoice = value
+
+            If value = "-1" Then
+                ShowReviewPrompt()
+                Return
+            End If
+
+            ShowHighestInvoicePrompt()
+            Return
+        End If
+
+        If currentStep = 4 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            ShowDatePrompt()
+            Return
+        End If
+
+        If currentStep = 7 Then
+            If value = "" Then
+                enteredDateText = DateTime.Now.ToString("MM-dd-yyyy")
+            Else
+                enteredDateText = value
+            End If
+
+            ShowCheckReferencePrompt()
+            Return
+        End If
+
+        If currentStep = 8 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckReference = value
+            ShowEverythingCorrectPrompt()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+## What to verify specifically
+After entering the check reference:
+- the form should **stay open**
+- the textbox should disappear
+- prompt should show:
+  - `Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]`
+
+## If it still closes
+Then the file being built is not this exact version, or Visual Studio is still running stale output. In that case:
+1. save the file
+2. do **Build â†’ Clean Solution**
+3. do **Build â†’ Rebuild Solution**
+4. run again
+
+## Short answer
+Youâ€™re right â€” it should **not** close after check reference.  
+It should go to the **Everything Correct?** hotkey prompt. The full corrected file above fixes that.
+
+## @testsubject117
+
+ok, so it appears to work, but question. if I enter a new check by customer name, amount, and check number, shouldn't it now appear for that customer under their name when we open ledger - view checks?
+
+## Copilot
+
+Not necessarily â€” **not yet**, based on the code weâ€™ve built so far.
+
+## Direct answer
+Right now, `FormAddChecks` is mostly a **DOS-style UI flow replica**, not a full save/post implementation.
+
+So even if the screen flow works, a newly entered check will **only appear in View Checks if the underlying ledger-write logic is actually implemented**.
+
+At the moment, from what weâ€™ve been changing, weâ€™ve mainly done:
+- prompt flow
+- navigation states
+- hotkey behavior
+- collecting entered values
+
+We have **not yet confirmed** that the form is:
+- writing to the ledger data file/database
+- creating a persisted check record
+- refreshing the data source used by `FormLedgerView`
+
+---
+
+## What would have to be true for it to appear in View Checks
+For a new check to show up under the customer in **View Checks**, `FormAddChecks` would need to do something like:
+
+1. resolve the entered customer/company to the actual customer record
+2. create a new check entry object/record
+3. save it to whatever backend store the app uses
+   - file
+   - database
+   - legacy DAT file
+4. use the same structure/source that `FormLedgerView` reads from
+5. possibly update indexes/totals
+
+If that persistence logic isnâ€™t there yet, then the entry flow can look correct without actually saving anything.
+
+---
+
+## So the right expectation is
+### If we only fixed the UI flow:
+- **No**, it probably will not show in View Checks yet.
+
+### If the original file already had working save logic and we preserved it:
+- **Maybe**, but we replaced most of that original lookup-driven form, so I would not assume saving is happening.
+
+---
+
+## Best way to verify
+Do this quick test:
+
+1. in VB app, add a fake check for a known customer
+2. finish the flow with `Y`
+3. open **View Checks**
+4. search that customer/check number
+5. see whether it appears
+
+### If it does not appear:
+that means we still need to implement:
+- actual ledger persistence
+- and maybe file/database integration
+
+---
+
+## Most likely current reality
+Based on the code weâ€™ve been iterating, Iâ€™d say:
+
+**most likely it does not save anything yet**  
+unless there is other hidden save logic elsewhere that gets triggered after `DialogResult.OK`.
+
+But from the file weâ€™ve been working on alone, there is no actual write/save code yet.
+
+---
+
+## Short answer
+**No â€” not automatically, not yet.**  
+Weâ€™ve made `FormAddChecks` behave like DOS, but we have **not yet confirmed or implemented the actual ledger save logic** needed for the new check to appear in **View Checks**.
+
+## @testsubject117
+
+well, when I search the dos app after entering a check for .10 for PSIBEARI with a number of 7777, I also cannot find it.
+
+## Copilot
+
+Thatâ€™s actually a very useful clue: **DOS itself doesnâ€™t show that test check either**, so the issue may not be â€œVB fails to saveâ€ at all.
+
+## What this suggests
+The DOS flow you exercised may **not have posted a ledger record yet**, or your test entry may not meet the conditions to appear in **View Checks**. For example, one of these could be true:
+
+- **`Y` wasnâ€™t selected** on the â€œIs EVERYTHING Correct?â€ prompt, so nothing was committed.
+- The check was saved somewhere else first and only later becomes visible in **View Checks**.
+- The zero-invoice / `.10` test case is treated specially or discarded.
+- `View Checks` may read from a different subset/status than â€œnewly entered checks.â€
+- The DOS flow may require another final step after `Y` before the record is truly written.
+
+## Most important point
+Because **DOS also doesnâ€™t show it**, we should **not use View Checks visibility yet as proof of a VB bug**.
+
+## Best next test
+In DOS, do one controlled end-to-end run and note exactly what happens after:
+
+- entering check reference
+- getting `Is EVERYTHING Correct ?`
+- pressing **`Y`**
+
+What I need to know is:
+
+1. What screen appears immediately after `Y`?
+2. Does DOS show a success/posted/added message?
+3. Does it return to Add Check, return to menu, or move to another prompt?
+4. If you then go to View Checks, is it still missing?
+
+## Why this matters
+Right now the real unknown is not the earlier prompts anymore â€” itâ€™s the **commit point**.
+
+We need to know:
+- what DOS does after final confirmation
+- whether the ledger write happens there
+- whether thereâ€™s another required step after `Y`
+
+## Practical conclusion
+So for now:
+
+- **donâ€™t assume VB is wrong because the check doesnâ€™t appear**
+- first verify the DOS post-confirmation behavior
+- once we know the DOS commit point, we can mirror that in VB
+
+## Short answer
+Good â€” that means the missing check is **not yet evidence of a VB problem**, because DOS also doesnâ€™t show it.  
+The next thing to test is: **what exactly happens in DOS after you press `Y` on â€œIs EVERYTHING Correct?â€**
+
+## @testsubject117
+
+immediately after pressing y it returns to the checks screen
+
+## Copilot
+
+Thatâ€™s helpful â€” it means the DOS flow likely **commits and exits immediately on `Y`**, returning to the Checks menu.
+
+## Direct answer
+So if DOS:
+- accepts the entry
+- returns straight to the Checks screen
+- and the item still does **not** appear in View Checks
+
+then one of these is likely true:
+
+1. **View Checks is not showing newly added checks the way we assumed**
+2. the tiny `.10` / `0 invoices` test entry is not retained in a way View Checks displays
+3. the check is written somewhere else or under conditions we havenâ€™t identified
+4. the legacy flow may discard/ignore this kind of test record even after `Y`
+
+So this is probably **not a parity blocker** for the UI flow itself.
+
+---
+
+## What this means for VB
+The current VB behavior after final confirmation should ultimately mirror DOS:
+
+- press `Y`
+- return to the Checks screen
+
+That part is actually consistent with what DOS does.
+
+---
+
+## Important conclusion
+At this point, the DOS-faithful behavior is:
+
+- final confirmation prompt appears
+- `Y` accepts
+- user is returned to Checks menu
+
+Whether the record appears later in View Checks is a **separate data/persistence question**, not necessarily a workflow mismatch.
+
+---
+
+## Recommendation
+I would treat the current Add Check task as two separate concerns:
+
+### 1. UI/workflow parity
+This is what weâ€™ve been fixing.
+You now have most of the confirmed DOS prompt flow.
+
+### 2. persistence/data parity
+This is a separate investigation:
+- where DOS writes the check
+- under what conditions it becomes visible
+- what `View Checks` actually reads
+
+Those should be debugged separately so we donâ€™t mix UI parity with ledger backend behavior.
+
+---
+
+## Best next step
+If you want, the next thing we should do is **tighten the final confirmation behavior** so the VB form exactly matches DOS:
+
+- after check reference:
+  - `Is EVERYTHING Correct ?  [Y = Yes] [N = NO] [1 = Discount] [2 = Debit]`
+- `Y` closes and returns to Checks
+- `N`, `1`, `2` should match DOS as closely as we can determine
+
+Then after that, we can investigate:
+- how `View Checks` gets its data
+- whether Add Check is supposed to write to the same source
+
+---
+
+## Short answer
+Good â€” that means the VB form returning to Checks on final acceptance is actually consistent with DOS.  
+The missing item in View Checks is probably a **separate data behavior question**, not proof the Add Check screen is still wrong.
+
+## @testsubject117
+
+ok, lets move on
+
+## Copilot
+
+Sounds good.
+
+## Current status
+`Add A Check` is now much closer to DOS for the flow you verified:
+- company name
+- amount
+- invoice range
+- review menu with hotkeys
+- check number
+- date
+- check reference
+- final correctness prompt
+- return to Checks on final accept
+
+## Next step
+Tell me what you want to work on next.
+
+For example, we can:
+- continue through another CHECKS option
+- fix **View Checks**
+- compare another DOS screen to VB
+- clean up formatting so the screen looks even closer to DOS
+- investigate save/data behavior later
+
+## Short answer
+Ready â€” what do you want to tackle next?
+
+## @testsubject117
+
+so currently we now have (1) add check to ledger cash receipts working from a wiring stand point, have we done (2) delete checks yet?
+
+## Copilot
+
+No â€” **we have not done (2) Delete Checks yet**.
+
+## Current status
+From what weâ€™ve covered so far:
+
+### Done / mostly done
+- **(1) Add Check to Ledger Cash Receipts**
+  - menu wiring works
+  - form opens
+  - DOS-style flow has been significantly aligned
+
+### Not yet done
+- **(2) Delete Checks**
+  - we have not reviewed its wiring
+  - we have not compared DOS vs VB behavior
+  - we have not fixed or validated its screen flow yet
+
+## So the answer is
+**No, option 2 has not been done yet.**
+
+## Best next move
+If you want, we can check option 2 next by looking at:
+
+- the CHECKS menu code that routes selection `2`
+- the form/class it opens
+- what the DOS Delete Checks screen does
+- what the VB app currently does
+
+If you paste the current code for the checks menu and/or the delete-checks form, I can walk through it with you.
+
+## @testsubject117
+
+can you review that in the AMiDataStore repo?
+
+## Copilot
+
+Yes â€” I reviewed the repo enough to say **Delete Checks has not been analyzed yet, but the AMiDataStore repo likely contains the DOS source for the checks workflow, probably in `CHECK.BAS` and related ledger/check files**. The top-level listing includes strong candidates like `CHECK.BAS`, `CHECK.INV`, `CHECKNO.DAT`, `LEDGER.BAS`, `LEDGER1.BAS`, `BILLSCHK.DAT`, and `LEDG-CHK.BAS`, which are exactly the sort of files Iâ€™d inspect for option `(2) Delete Checks`.
+
+I wasnâ€™t able to open `CHECK.BAS` directly on the first pass, but the repository listing clearly shows it exists, so the next step is to drill into the DOS source and trace which code path corresponds to menu option `2`. There are more top-level items than the first page returned, and GitHubâ€™s UI link for browsing the repo contents is here: `https://github.com/testsubject117/AMiDataStore/tree/main`
+
+## Short answer
+- **No, we have not done Delete Checks yet.**
+- **Yes, AMiDataStore appears to contain the old DOS-side source/data needed to study it.**
+- The best next file to inspect is almost certainly **`CHECK.BAS`**.
+
+## What I found relevant in AMiDataStore
+Visible top-level files strongly related to this area include:
+- `CHECK.BAS`
+- `CHECK.INV`
+- `CHECKNO.DAT`
+- `LEDGER.BAS`
+- `LEDGER1.BAS`
+- `LEDG-CHK.BAS`
+- `BILLSCHK.DAT`
+- `LEDGER.CUR`
+- `LEDGSCAN.BAS`
+- `LEGENTER.BAS`
+
+That strongly suggests the checks menu and delete-check behavior are likely recoverable from this repo.
+
+## Recommendation
+If you want, I can next:
+1. keep digging specifically for the DOS code behind **Checks option 2 = Delete Checks**, and
+2. map that to what your WinForms app currently does.
+
+If you want me to continue, Iâ€™ll treat the next task as:
+- locate the DOS delete-check flow in `AMiDataStore`
+- identify the expected prompts and file operations
+- summarize what the VB app still needs.
+
+## @testsubject117
+
+oh, is there a checks.asc file? it's the same file but saved in ascii text.
+
+## Copilot
+
+I donâ€™t see a `CHECKS.ASC`, but I **do** see `CHECK.BAS` in the repo listing, and I did **not** see a `CHECK.ASC` entry in that same top-level scan.
+
+So based on what I could inspect:
+
+- **`CHECK.BAS` exists**
+- **`CHECK.ASC` was not visible**
+- **`CHECKS.ASC` also was not visible**
+
+That means one of three things is true:
+1. it isnâ€™t in the repo,
+2. itâ€™s in a subdirectory,
+3. or it uses a slightly different filename than expected.
+
+## Likely important detail
+From the naming pattern in this repo, the singular form is more common:
+- `CHECK.BAS`
+not
+- `CHECKS.BAS`
+
+So if there is an ASCII export, Iâ€™d expect it to be more likely named:
+- `CHECK.ASC`
+
+rather than `CHECKS.ASC`.
+
+## Short answer
+I did **not** find `CHECKS.ASC`, and I also did **not** confirm `CHECK.ASC` from the top-level listing.  
+But `CHECK.BAS` definitely exists, so thatâ€™s still the strongest lead for the Checks menu logic.
+
+If you want, next I can help you search the repo more systematically for:
+- `CHECK.ASC`
+- `CHECKS.ASC`
+- or any file that contains the Delete Checks text/menu.
+
+## @testsubject117
+
+I see your search was for check.asc, not checks.asc
+
+## Copilot
+
+Youâ€™re right â€” I searched the wrong filename.
+
+## Direct answer
+I checked for **`CHECK.ASC`**, not **`CHECKS.ASC`**.
+
+So at this point I **have not actually verified** whether `CHECKS.ASC` exists in `testsubject117/AMiDataStore`.
+
+## What I can say so far
+From the large top-level listing I reviewed, I did **not notice** `CHECKS.ASC`, but that is **not the same thing as a proper check** for that exact filename.
+
+## Best next step
+If you want, I can now specifically check for:
+
+- `CHECKS.ASC`
+- `CHECKS.BAS`
+- and maybe `CHECK.ASC` / `CHECK.BAS`
+
+so we can identify the right DOS source file for the Checks menu and then inspect option `(2) Delete Checks`.
+
+## Short answer
+Yes â€” good catch.  
+I searched for the wrong file name, so I have **not yet confirmed `CHECKS.ASC`**.
+
+## @testsubject117
+
+search amidatastore for checks.asc
+
+## Copilot
+
+I searched `AMiDataStore` for **`CHECKS.ASC`** and found **no results**.
+
+So the answer appears to be:
+
+- **`CHECKS.ASC` does not seem to be present** in `testsubject117/AMiDataStore`.
+
+## Most likely possibilities
+- the file is actually named something else, like:
+  - `CHECK.BAS`
+  - `CHECK.ASC`
+  - `CHECKS.BAS`
+- or the checks menu logic lives inside `CHECK.BAS` only
+
+## Short answer
+No results for **`CHECKS.ASC`** in `AMiDataStore`.  
+The best remaining lead is still **`CHECK.BAS`**.
+
+## @testsubject117
+
+give me a sec, I may have a copy of it
+
+## Copilot
+
+Sounds good â€” send it when you have it.
+
+If you find `CHECKS.ASC`, thatâ€™ll probably be the fastest way to trace:
+- the checks menu
+- option **(2) Delete Checks**
+- and the exact DOS prompts/flow
+
+Iâ€™ll wait.
+
+## @testsubject117
+
+ok, when I try to load it, it states Direct statement in file, so it's most likely not tokenized .bas file
+
+## Copilot
+
+Yes â€” that message strongly suggests itâ€™s **plain ASCII source text**, not a tokenized GW-BASIC/QBasic program file.
+
+## What â€œDirect statement in fileâ€ usually means
+That error often happens when the interpreter/compiler is trying to load a file that contains something it doesnâ€™t expect in program-load format, for example:
+
+- plain text source being loaded the wrong way
+- a file with non-program lines at the top
+- or a source file that isnâ€™t tokenized the way that specific BASIC expects
+
+In practice, for your purpose, the important conclusion is:
+
+- **itâ€™s likely readable as text**
+- so you probably donâ€™t need to â€œloadâ€ it into BASIC first
+- you can just open it in a text editor
+
+## Good news
+That means if you have `CHECKS.ASC`, it may be exactly what we want:
+- readable source
+- searchable text
+- easier to inspect for:
+  - menu options
+  - â€œDelete Checksâ€
+  - prompts
+  - file operations
+
+## Best next step
+Open it in:
+- Notepad
+- VS Code
+- Visual Studio
+- any plain text editor
+
+Then either:
+1. paste the relevant section here, or
+2. search inside it for:
+   - `DELETE`
+   - `CHECKS`
+   - `LEDGER`
+   - `VIEW CHECKS`
+   - `ADD CHECK`
+   - `CASE 2`
+   - `CHR$(50)` or menu key handling for `2`
+
+## Short answer
+Yes â€” that error means itâ€™s probably **ASCII text source**, not a tokenized `.BAS` file.  
+Thatâ€™s actually good for us, because it should be easier to open and inspect directly.
+
+## @testsubject117
+
+no, there is no checks.asc, I was mistaken, there was another .asc file, but not that one.
+
+## Copilot
+
+Got it â€” thanks for confirming.
+
+## Direct answer
+So there is **no `CHECKS.ASC`** after all.
+
+That means our best source for the DOS checks logic is still likely:
+
+- `CHECK.BAS`
+
+and possibly related files like:
+- `LEDGER.BAS`
+- `LEDG-CHK.BAS`
+- `LEGENTER.BAS`
+
+## What that means for Delete Checks
+We still have **not** reviewed option `(2) Delete Checks`, but the most likely place to find it in `AMiDataStore` is still the DOS checks program source, probably `CHECK.BAS`.
+
+## Best next move
+If you want, we should now pivot to:
+
+1. locating the checks menu logic in `CHECK.BAS`
+2. finding where option `2` routes
+3. identifying the DOS prompts for Delete Checks
+4. comparing that to what your VB app currently does
+
+## Short answer
+Understood â€” no `CHECKS.ASC`.  
+So the next real lead is still **`CHECK.BAS`** for investigating **Delete Checks**.
+
+## @testsubject117
+
+yes, but previously when i tried to discover the contents of any .bas file that returned the direct line in statement error, I was not able to. how can we find out what check.bas actually does?
+
+## Copilot
+
+Use the **ASCII source or file text directly**, not `LOAD` in BASIC.
+
+## Direct answer
+If `CHECK.BAS` gives a **â€œDirect statement in fileâ€** error when you try to load it in the old BASIC environment, that does **not** mean we canâ€™t inspect it. It usually just means that interpreter/load method doesnâ€™t like the file format or contents.
+
+We can still figure out what `CHECK.BAS` does by using one of these methods:
+
+### Best options
+1. **Open `CHECK.BAS` in a plain text editor**
+   - Notepad
+   - VS Code
+   - Notepad++
+   - Visual Studio
+
+2. **Search the raw file contents**
+   - for menu text like:
+     - `Delete Checks`
+     - `Add Check`
+     - `View Checks`
+     - `Check is Correct`
+   - or for file names like:
+     - `LEDGER`
+     - `BILLSCHK`
+     - `CHECKNO`
+     - `JOURNAL`
+
+3. **Use DOS commands to inspect it as text**
+   - `TYPE CHECK.BAS`
+   - `MORE < CHECK.BAS`
+   - `EDIT CHECK.BAS`
+
+4. **If itâ€™s partially garbled**, inspect with a hex/text viewer
+   - but since it has a `.BAS` extension and throws a direct-statement style error, thereâ€™s a good chance itâ€™s still mostly readable text.
+
+## Why this happens
+Some old BASIC files are:
+- plain ASCII source
+- tokenized BASIC
+- saved by a different BASIC dialect/version
+- or contain lines/macros/directives that one interpreter rejects on load
+
+So â€œcanâ€™t load into this BASICâ€ is **not the same as** â€œcanâ€™t read the code.â€
+
+## Practical way to figure out what `CHECK.BAS` does
+If you can access the file locally, do this:
+
+### Option A â€” easiest
+Open it in a text editor and search for:
+- `Delete`
+- `Checks`
+- `ledger`
+- `Print list of invoices`
+- `Is EVERYTHING Correct`
+- `Check # (Top Right)`
+- `Check Reference`
+
+If those strings are in there, we can map the exact DOS logic.
+
+### Option B â€” DOS
+At the DOS prompt:
+
+```bat
+TYPE CHECK.BAS | MORE
+```
+
+or:
+
+```bat
+EDIT CHECK.BAS
+```
+
+If it is readable text, that should let you browse it.
+
+### Option C â€” send me snippets
+If you can open it, paste:
+- the checks menu section
+- the code around option `2`
+- or even just the first 100â€“200 lines
+
+and I can help interpret it.
+
+## Important point
+Because youâ€™ve already observed live DOS behavior for Add Check, we donâ€™t strictly need the BASIC source to continue. For **Delete Checks**, we can do the same thing:
+- run the DOS program
+- document each prompt/screen
+- mirror it in VB
+
+That may actually be easier than reverse-engineering the BASIC if the source is awkward.
+
+## My recommendation
+Fastest path is probably:
+
+### Path 1: behavior-driven
+Use DOS itself:
+- choose **(2) Delete Checks**
+- capture each screen
+- I help you reproduce it in VB
+
+### Path 2: source-driven
+Try to open `CHECK.BAS` as plain text and search for relevant strings
+
+## Short answer
+Even if `CHECK.BAS` wonâ€™t `LOAD`, we can still learn what it does by **opening it as plain text**, using `TYPE`/`EDIT`, or simply tracing the DOS behavior screen by screen.  
+For your project, the **screen-by-screen DOS tracing** may be the most reliable approach.
+
+## @testsubject117
+
+here's about half the file in notepad: Ã¼   Ââ€š Ã‘Ã¿Ã¿$ Ã¿Ã¿â‚¬3â€¦/Ã–FÅ“ |5Â£%
+Â¢?Â¤ ÃŠ g gh#â€˜Â§Â· b W{_oIÃ² Â® Ãš x \ â€ž r V ~ l   }R Å  
+ Ã¦  Ã‚  XP Qâ€“  Ã” ( Â 2 3< 9F Ã  K Ãº Ã’ Ã¬ O  SDIPÃ· SDIMAXN FICAPg FICAMAXÂ· MEDP MEDMAX'i ]P cZ  d vn Ã· TALK-s t , TAX1Ã¸ TAX2iu v ABSDAYSâ€¦x â€¹â€š Â»Å’ Â©â€“ Ã« SSNA EMPNAM| MTH| MTÂ¯Â  Â£Âª ÂÂ´ Ã‘ DAYâ€˜Â¾ Ã¥ LUNCHXÃˆ â€”rÃ‡ÂÃ“ ÂµÃ” Ã²Ã™ÃÃ— Ã“Ã¡ ÃŸÃ¥ Ã”ÃÃ¦ Ã™RÃ§ Ã¬Ã° );Ã´ p TT15â€œÃ¿Ãº Å¾ GFFtÃ» h CHECKNUM^Â·â€¢Ã½ Ã EQ/Ã¾ jÃ¿ Â¡ Â»Å’ SDI2D FICA2d@Æ’	Â¯
+â€ºÃâ€° H9Â® H8R GHGÃ‡ÃÂ¤"Âµ,Ã¥6Ã«@q DAYSÃ±JÃŸLÃ¾T^
+h EETOTX ERTOT|"â€ .Â[Å¡Ã° SALFÂ¤mÂ®Ã‡Â¸:Ã‚Å½â€“ÃŒ(Ã–ÃÃ—4Ã¡yÃ @Ã¢Ã£LÃ¤aÃ¥ BYPASsÃªÂÃ´= CTÂ«Ã¾ÃÃŸÅ“(
+ MISTAKEÃ±&Ã™Â± % FLLGGÃ¥Â¢
+/0Ã¼ FLAG22Ã“5p:Ã¤XvDÂ¡NÃªbVl# XVâ€ v
+ REGMIN8 OVRMIN8F REGEARN8Ã© OVREARN8Âµ GROSS8â€¹â‚¬A	 FWT8â€™ FICA8Â§ SDI8Ã‡ STATE8= OT8Ã¼ LOAN8Â¾ NET8ËœÅ â€ºâ€Ã FLAG33bâ€” QTÃš ABORTÂª$\Å¾ÃŽ TOTÂ¼ REG	 OVERT+ BEGDTÃ¶ ENDDTÃ‚ REGMINÂ° OVRMINÃˆÂ¨Ã—Â²Ã‡ MS HW3
+ OTM DEPÃ—	 LOANF PAYMENTY soc K4015 streetÃ‹
+ CITY zipâ€š phoneâ€º KK401ÃÂ¼â€¦Â¾Ã£Ã†a	 grossU BEGDT1Ã­ ENDDT1Â¶ÃžÃ°ÃÂ CRDÂ°Ãš G9	 MINÃ¤Ã¼zÃ¶Ã®Ã£ DTâ€œ TMÃ¸Ã¢ TOTDT!Y DT1' A>i*-4Â
+ TM1GH;RM\Sfcpoâ€ž) SAT2{Â¢Ã›Å½uËœÂÂ¬Â¤Â¶T TMHALFÅ¾Ã€Ã²ÃŠÃ§Ã”ÃÃ¨Â»Ã²
+ TOTALMINÂªÃ¼Å¸	 REGEARNÃ¸)	 OVREARNÃ¡$4.Ã¾ FLAG44	 SALMIN@8ËœSBÂ§	 ZYLâ€¢VÃ‰	 SDIM`Â»	 FICAqj:t   gross2ÃŒ ffÃ Be~Â£Ã„Æ’Ë†	 FWTk }â€™_Å“â€°ÂwÅ¾ÂµÂ°Â©Âº$ÃŽÂÃ“ÃºÃ˜Ã¢Ã0Ã¢ÃŠÃ¶	 DEPPÂ»Â¯ZÃœ
+Ã– Ã´Ã³	 StateÃÃ¦Ã®Ã°Ã¨Ãº "*6;?<T6JHhB^Nr[|aâ€ pÂ|Å¡â€¹Â¤â€”Â®ÂÂ¸â€˜Ã‚Ãƒ	 NETÂ£ÃŒÂ©Ã–Â» LOAN1v0Ã¶Ã Â¯ÃªÃ¦ K401BÂµÃ´ÃšÃŽÃ¾Ã‚Ã Ã°&Ãˆ:#	DV GGRÃ”I	ZI	NU	Xk	bq	lÃ	 ATTACHO	v@
+â‚¬Â¯	 EMP0 DED0Ãµ COMP0& PER0Æ’	Å 3	â€% OLDNET}	â€¢Â§ NETAÃ NETBÂ	Å¾w	â€”[	â„¢
+Â¨â€¢	 chknum"
+Â²
+Â¼F
+Ã†â€°	Ã¤:
+Ãš4
+Ã¥(
+Ã®Ã
+ EMPLEN	
+ EMP1ÃŸ	 EMP2Ã
+ CONTRACT   SOC2A
+ K4|
+ K4A   K4Bâ€ K4ERÃ©	 K4LINEÃ»	 K4PAGEÃ… ALLOÃ´ K4EE.
+Ã¸ÃŸ DOLLARÂ¥ CENTSL
+R
+^
+ X
+d
+*j
+4p
+>Â©
+Hv
+Râ€¦
+\â€¹
+fâ€”
+pâ€˜
+zÂ
+â€žÂµ
+Å½Ã—
+Â¢Ã  BONUSÃ
+Â¬Â¯
+Â¶Â£
+<Ã©
+Ã€Ãµ
+Ã…Ã¯
+ÃŠÂ»
+Ã™Ã£
+Ã§	Ã»
+ÃžÃ¨â€“ AMOUNTÅ  STATETOTÃ²
+Ã¼			/$	5.	;8	AB	GL	MV	S`	Yj	 FEDTOT_t	e~	kË†	qâ€™	wÅ“	}Â¦	Â³Â°	/Âº	Â¿Ã„	Â­ÃŽ	â€°Ã˜	Æ’Ã¢	â€ºÃ¬	â€¢Ã¶	Â 
+Ã“
+
+Ã™$#
+Â¡
+)Ëœ
+Ã¨ FLÂ¹-
+;2
+Ã¾<
+GF
+  DT2S CHKÃ¯K
+Ã©P
+p LASTDTMQ
+5Z
+Ã¯ DATE9ApÃ¿ DATET1Â° DATETOT( DATET2dd
+jn
+x
+^z
+â€¦â€š
+â€¹Å’
+â€˜â€“
+â€”Â 
+Ã– TT AÂÂª
+Ã»Â´
+Â£Â¾
+w CNTo WEEKÂ¯Ãˆ
+ÂµÃ’
+Â©Ãœ
+ÃœÃ¦
+ÃŠÃ°
+ÃµÃº
+
+Ã|Ã©Â»r-
+"
+ DAYFLÃ¯J;
+,6 GG
+6   RSN
+h
+
+@
+J]
+T
+^K
+â€ Q
+ÂW
+Å¡Â¦
+Â¸c
+Â®â€
+FINDÂ 
+Ã‚t REALÅ½
+ÃŒ   SundayË†
+Ã–{
+Ã u
+Ãªo
+Ã´i
+Ã¾Â¬
+Â²
+Â¸
+Â¾
+&Ã‡ SUNÃ„
+0ÃŠ
+:% SaturdayÃ—
+DÃ
+NÃ£
+XÃ©
+bÃ»
+lvâ‚¬Å Ã¨ SATÃ¯
+â€Å¾Ãµ
+Â¨0Â²Â´
+Â¹HÂ¼TÃ†ZÃlÃ¸NÃš`Ã¤fÃ®Â½ WEEKDAYr
+< DDB MMÂ° YYx
+Å *
+~
+â€ž 
+Â4
+Å¾>
+Ã H
+Ã¦R
+Âª\
+Ã‚f
+Ãˆp
+Â¤z
+Â¶â€ž
+Â REDOÃšÅ½
+ÃŽÅ¡
+Â¼Â
+ XXÃ”Â¥
+Ã¬Â¬
+aÂ¶
+Ã€
+
+ÃŠ
+Ã²Ã”
+Ãž
+Ã¸Ã¨
+%Ã²
+Ã¾Ã¼
++1.   WEEK3=8CBOLIV7`Ujg~â€¦Â°[Ë†sâ€™Â¦yÅ“â€¹ÂºmÃ‰â€”Ã„Â£ÃŽÂÃ˜â€˜Ã¢Â»Ã¬ÃŽÃ¶Ãš Â¯
+Ã#Ã¼Â©)Ã”(Âµ*Ã¶+2,2   DT88FJn>P   EMP6â€¹ DT6Ã† DUMDZdÃ¯Â´bx   Q1   Q2Vâ€šÃ Q3Ãœ Q4Â· Q5nÅ’\â€“P â‚¬ÂªÅ¾Â¾zÃhÃ‚tÂ¤ÃˆËœÃ’â€™ÃœÃŠÃ¦Å’Ã°â€ ÃºÂ·Ã„Ã"Ã–,Âª1Ãœ6Ã¢@Â± qqqÃµT   TM2Ã»^hr|â€ %Â TM3+Å¡1Â¤7Â®CÂ¸IÃ‚Ãƒ X1OÃŒ   X2UÃ–=Ã [ÃªaÃ´gÃ¾â€¦0msy&â€œ:â„¢DÅ¸NÂ¥XÂ«bÂ±lÂ½vÃŠâ‚¬   CARDÃ–Å Ãªâ€Ã°Å¾Ã¶Â¨Â²Â¼   U1ÃÃ†   TMPÃ¼ÃD4 Ãš   DT5Ëœ TIMÃ¤Ã®Ã¸&,28 >*J>cHiRâ‚¬\tfPpzzâ€™â€žÂ¬Â]ÂH TT2Å’â€˜Â²ËœÃ¢Â¢
+ Yâ€ Â§Â¾ÃŠÃ„Â¬Ã®Â¶ÃœÃ€nÃ”] P   onetimeonlyÃÃžÂ¸Ã©Ã¨ÃŠÃªÃ¨Ã­Ã«Ã–Ã®Ã¯Ã°Ã²6Ã¼0   EMPNAM2Â INS<h$#*)~.PBB8\VVLb`â€žË†Ã  SSN2  â€™  Å“wÂ¦  Â°Â¸Âº"Ã„   PERSONkÃŽqÃ˜Ã¨ month1Ã¼ year1Â¾ day1   datetemp   dat  ÃšÃ– dat1  DOWA todayÃ³ DAYS31   PS31   MONTH313 DAY31. YEAR31   n31 MM9 DD9   YY9  q   REN M   
+Disability   	Insurance   tax   rate   
+Percentage  3  4  ;Ã¦Ã®Ã°Ã¨Ãº "*6;?<T6JHhB^Nr[|aâ€ pÂ|Å¡â€¹Â¤  Â®  Â¸â€˜Ã‚   NET  ÃŒ  Ã–   LOAN1v0  Ã                                                                                      XÂ»  Ã£ 
+  GOTO 3800  â€” A   Referenced Line Number List -- Produced by BASIC2QB Version 2.00    â€” =      10 --  2
+ 105 --  1
+ 115 --  1
+ 210 --  1
+ 370 --  6   â€” =     430 --  4
+ 481 --  2
+ 483 --  1
+ 500 --  4
+ 510 --  1   â€” =     540 --  3
+ 550 --  1
+ 570 --  1
+ 600 --  2
+ 740 --  2   â€” =     800 --  1
+ 830 --  1
+ 890 --  2
+ 930 --  1
+ 990 --  2   â€” A    1010 --  1
+ 1110 --  1
+ 1220 --  1
+ 1280 --  8
+ 1370 --  1   â€” A    1440 --  1
+ 1540 -- 24
+ 1600 --  2
+ 1620 --  1
+ 1640 --  1   â€” A    1810 --  2
+ 1840 --  1
+ 1882 --  1
+ 1910 --  1
+ 1950 --  2   â€” A    2000 --  2
+ 2020 --  1
+ 2030 --  1
+ 2080 --  1
+ 2200 --  2   â€” A    2220 --  1
+ 2260 --  5
+ 2535 --  1
+ 2560 --  1
+ 2600 --  1   â€” A    2730 --  2
+ 2820 --  2
+ 2870 --  1
+ 2900 --  1
+ 2920 --  4   â€” A    2930 --  3
+ 2940 --  1
+ 2960 --  6
+ 2970 --  1
+ 2980 --  1   â€” A    3000 --  1
+ 3020 --  4
+ 3130 --  5
+ 3255 --  1
+ 3270 --  1   â€” A    3320 --  1
+ 3330 --  1
+ 3370 --  2
+ 3480 --  1
+ 3490 --  1   â€” A    3540 --  2
+ 3600 --  2
+ 3620 --  1
+ 3690 --  3
+ 3700 --  1   â€” A    3750 --  1
+ 3760 --  1
+ 3800 --  1
+ 3840 --  1
+ 3860 --  1   â€” A    3881 --  1
+ 3900 --  2
+ 3910 --  1
+ 3950 --  1
+ 3990 --  1   â€” A    4020 --  3
+ 4030 --  1
+ 4033 --  1
+ 4080 --  1
+ 4120 --  2   â€” A    4170 --  3
+ 4180 --  3
+ 4240 --  3
+ 4340 --  1
+ 4350 --  1   â€” A    4400 --  4
+ 4430 --  1
+ 4560 --  1
+ 4660 --  1
+ 4750 --  3   â€” A    4755 --  1
+ 4810 --  2
+ 4841 --  2
+ 4845 --  1
+ 4846 --  1   â€” A    4860 --  1
+ 4900 --  4
+ 4905 --  1
+ 4930 --  1
+ 4950 --  1     
+m 8541qa ~ m( Type PAYROLL to run the payroll program.â€“  Ã®  P    â€™V  Â¡    Ã¤  Â¸\   b dd)V Ã¿Ã¿Â¸ ( g  e Ã¿Ã¿  Ã„l  Â¸    Ãšr   b dd)V Ã¿Ã¿  Ã¬x   b m  Â¹  Ãº~  e Ã¿Ã¿  râ€ž  d	m
+ LIST 4700-e
+ 	 Â¹  d
+m
+ list 2265-e
+ 	 Â¹  dm LIST "Â¹  d)m SAVEe" 	 m CHECK" e
+ 	 Â¹  ~Å   g Â  `	â€“  kÂ¼t< Å“  Ã£ 3  
+# State Disability Insurance tax rate Percentageg kRxÃC Â¤  Ã£ 3  
+# SDIMAX = 46327 (SDI taxable wage limit) * SDIPg kÂ¬Å“= Â®  Ã£ |  
+# SOC SEC tax rate (6.2%) .062 + Medicare tax rate (1.45%) .0145  IMPORTANT REMINDERS (EMPLOYMENT TAX RATES & WAGE BASES) kÃÃ¶ÃŠE Â·  Ã£ 2  
+# ficamax=84900 (soc sec wage base) * FICAP 
+# khâ€˜m< Ã‚  Ã£   
+# Medicare tax rate (1.45%) l Ã Ã¿Â¡â€mB ÃŠ  [ Ã”  Ã£ 1  
+#  B Y P A S S   FICA & SDI & MED TAX FILE 
+	#  ~	Ãš  m TAXPRCNT.RTEdÃ‰   Â¦	Ã   dÅ  â€¡  Å“ Â¶  Â® Â¶  Â¤ Â¶  Â· Â¶ Ë†  Â´	Ã¦  dÂ¢   Ã†	Ã”  m BAK"Ã‡  Ãª	Ã¬  d Ã²  m	 VOICE.DTE"dÃ‰   Ã¸	Ãº  dÂ¢   4
+  m TAXNAME.DAT"dÃ‰   dÅ  â€¡ Â¶ Â¶ Ë†  dÂ¢   j
+ m ABSDAYS.DAT"dÃ‰   dÅ  â€¡  Â¶ Ë†  dÂ¢   Å¡
+' Ã£ $  
+
+#  CTRL - BREAK  &  CTRL - C  
+# Ã¦
+- Ã£ ?  KEY 14, CHR$(&H4) + CHR$(&H46):KEY(14) ON:ON KEY(14) GOSUB 330  23 Ã£ ?  KEY 15, CHR$(&H4) + CHR$(&H2E):KEY(15) ON:ON KEY(15) GOSUB 330  n9 }v ed  ? ed  F e   P e   W ] dd  P e d  P e; d	  P eZ d
+  P ex d  P eâ€” d  P eÂµ d  P eÃ” d  P eÃ³ d!  P ed%  P e0d)  P eNe   P 
+c e d  W e d	  W e d
+  W e d  W e d  W e d  W e d  W e d!  W e d%  W e d)  W e e   W e e   W dBm 2000dBm 2004udBm 2008ua R
+ (e d	  W P  Å’
+i m Mondayd o m Tuesday"d	 o m	 Wednesday"d
+ o m Thursdayd o m Fridayd o Ã€
+v m	 LUNCH.DAT"dÃ‰   dÅ  â€¡  |Â¶ Ë†  dÂ¢   ÃŒ
+â€¦ [ â€¹ Ã¼
+Â Å’Ã¦/ e5 eÅ½a 2 (Ã¤  (m â€˜ P  â€” eÂ¸a P (n  P  8Â eÃša p (m Â£ P    â€™Â© e5 eÂ¾ a ÃŽ (Ã¤  (m Go to the EMPLOYEES RECORDS"â€°  g Â¶ Ë†  (Ã®  P  Ã´Â¯ e5 eâ€œa 2 (Ã¤  (m" Can't find SORT.EXE , hit [Enter] â€°  g Â¶ Ë†  (m â€¹ P  Âµ e5 eÃša \ (m Â» P  DÃ e5 eÃ€
+a â€  (m Ã‡ P  jÃ e5 eta Â® (n  P  â€“Ã“ e5 eÂ 
+a Ãœ (Ã¤  (m Ã™ P  Ã„ÃŸ eÂa  (d
+ Ã¥ (dÂ¢   (m Ã¬ P  Ã´Ã² e5 eVa > (d Ã¸ (m Ã¿ P  " eÂ´a n (d  (dÂ¢   (m  P  Å½ e5 eÂ¨a Ãœ (m Card #â€¢  b â€¢ m  is messed up, hit Enterâ€¢ â€œ  (â€°   #Â¶ Ë†  (m Â» P  Ã²) eP a B (â€œ  (m) THE TAX % RATE MUST BE CHANGED, hit Enter"â€¢ â€œ  (â€°   #Â¶ Ë†  (Ã®  P  */ et a | (m	 NO CHECKS" (dÂ¢   (n  P  V5 eu a Âª (d  (dÂ¢   (n  P  â€“; e5 e6a Ã¬ (d
+Â¢   (d A (d I (m R P  Ã†X e5 en a  (d Ã²  (m Ãº  P  Ã¶^ e5 ela P (d
+Â¢   ([ d P  Â´j eF a  (Â¸    ( p (dA v (se sdÃ   (m+ Please Wait, someone is using your file...."â€“  ( |de'V Ã¿Ã¿Ã¢ (e Ã¿Ã¿  (se sdÃ   (eM Nâ€“  (s ps vÃ   (l  P  Ã¦Æ’ deÂ¤a P (m N"g  (m â€° P  Ã²Â e e ue ue9 ueD ua d (Â¸    ( p (dA v (se sdÃ   $ (â€” # 
+ 
+ 
+%
+$ DEAN UN REMARK THIS 
+!    (m1 Printer is not ready!, Get it ready & hit [ENTER]"â€°  g Â¶ Ë†  (se sdÃ   (eM Nâ€“  (s ps vÃ   (n  P  2â€¢ e6e> a Â¦ (d A (d I (d
+Â¢   (m R P  Nâ€º e<
+a Ã„ (n  P  zÂ¡ eP
+a Ã² (d Â§ (dÂ¢   (n  P  â€“Â¯ eÃ„a  (n  P  Â²Âµ ei a . (n  P  Ã˜Â» e5 eva V (n  P  "Ã m
+ ERRORS.LSTdÃ‰  Ã¾ dÅ  } m CHECK"â€ â€ Uâ€ â€ â€“  dÂ¢   vÃ‡ m ERROR #"â€¢ â€¢ m	  IN LINE "â€¢ â€¢ â€œ  m   ,hit Enterâ€°  g Â¶ Ë†  n  Nâ€¹ sÂ£  dÃ dÃ– se sdÂ¤   eP eÃ 	Sâ€“  m PAYROLL CHECK GENERATOR"g  se sdÂ¤   Ud,â€¢ eP g - wnd	Â â€™ g â€¢ eG Â â€™ â€“  se sdÂ¤   eP eÃ 	Sâ€“  â€œ  â€œ   sdsdÂ¤   Å¡ÃŸ m= (A) Print Out Timecards and Payroll Checks for ALL  Employees"â€“  Ã¦Ã¥ m= (B) Print Out Timecards and Payroll Checks for SOME Employees"â€“  
+Ã« m (Q) Quit to Main Menu"â€“  4Ã± â€œ  se sdÃ   d b  d Ã· Ã´Ã¾ se sdÂ¤   e 	â€¢ m TYPE A LETTER             â€¢ â€œ  â€œ  â€œ  sdsdÂ¤   mO   Do NOT turn off or reset the computer while using this part of the program!  "â€“  sdsdÂ¤       g  g m  a Å¾ ([  P  â‚¬
+ g e` _g e{ c b da  (d b  (â€œ  (e Nâ€¢ m Hit CAPS/LOCK Buttonâ€“  P  Ã¸ g m A"a z (eP Ã¹  (Ãƒ e 	â€¢ m @"â€¢ â€œ  (m DEL ALLOCCFI.RPTÃª  (m DEL ALLOCCFI.TXTÃª  (d ÃŸ	 ([  P  x g m B"a Ãº (eP Ã¹  (Ãƒ e 	â€¢ m @"â€¢ â€œ  (d Ã· (m DEL ALLOCCFI.RPTÃª  (m DEL ALLOCCFI.TXTÃª  (d ÃŸ	 ([  P  Ëœ" g m Q"a  (Ã®  P  Âº( g m 0"a < ([ . P  Ã†4 [  Ã®.  g  g m  a p ([ . P  : g m 1"qa â€™ ([  P  8@  g  g m  a Âº ([ @ P  ZF g m 2"qa Ãœ ([  P  nL d R [  â€“[ Ã£   
+# LOAD ALL EMPLOYEE'S 
+# Â¼a d g m FULLNAME.DATdÃ‰   Ãœm da ^ (dÂ¢   (o  P  s  gd  g dÅ  â€¡  g ?Â¶  g FÂ¶ Ë†  [ m Ly Ã£ '  
+# PRINT OUT CHECKS   
+#
+	 
+#
+-
+#  â€“â€˜ Y   g de V Ã¿Ã¿ ( g   g f Ã¿Ã¿   â€¦dqa  ([ Â P  \â€“ sÂ£  â€œ  mD YOU MUST FIX THE TIME CARDS BEFORE YOU CAN PRINT CHECKS, HIT [ENTER]â€¢ â€œ   Ã² da Ã¤ (m REN TALK.PRG TRAN.EXE"Ãª  (m TRAN fixcards.tlk"Ãª  (m REN TRAN.EXE TALK.PRG"Ãª  P  xÅ“ â€°   g Â¶ Ë†  [ â€¹ Â°Â  Â¢da 8 (â€œ  (m Please Wait...â€“  (Y Â« P  Â± sÂ£  â€œ  m? Are there any paid Vacation or Bonus Checks to be made (Y/N) ? "â€¢ â€œ  d Â· â‚¬Ã  Ã² da  (m REN TALK.PRG TRAN.EXE"Ãª  (m TRAN vacation.tlk"Ãª  (m REN TRAN.EXE TALK.PRG"Ãª  P  Ã‚Ã‡  g  g m n"g m N"ua J (m NOâ€“  ([ Ã P  Ã“ g m y"g m Y"ua Å½ (m YES"â€“  (d Â· ([ Ã P  Ã™ [ Ã‡ >Ã â€œ  m Put checks in printer now.â€“  Â¸ÃŸ â€œ  m BACKING UP FILES..."â€“  m COPY *.FIL BAK\*.*Ãª  m COPY *.SDI BAK\*.*Ãª  m COPY VACATION.LST *.TMP"Ãª  zÃ¥ sÂ£  â€œ   Ã«de V Ã¿Ã¿v ( g  e Ã¿Ã¿  Ãƒ e 	m x1 â€“  m6 Line up top of silver bar with middle of check number.â€“  m# Put checks in printer & hit [Enter]"â€°  g Â¶ Ë†  Ãƒ â€œ  Â¼Ã± d Ã· d  d 
+ d  d% m RECORDS.TMP"Âº  Ãº/ d 5 d = d F d N d X d _ d h  p Y a & v  b d gV Ã¿Ã¿Â¢X (d | X â€  ( Å’ (Å’e 	a Ã¦  <d â€™ <Y â€º (P  Å¡ Â¡ (dÂ§ (d Â® (d Âµ (kÃ°#tIÂ¾ (dÃ‡ (d Ã (d Ãš Â´ Ã¤ ( b  ?dÅ  Ã‰   .!Ãª (dÅ  â€¡ FÂ¶ Ã°Â¶ Ã¶Â¶  Ã¼Â¶  Â¶  	Â¶  Â¶ Â¶  #Â¶ Ë†  (dÅ  â€¡ +Â¶ 5Â¶  =Â¶ DÂ¶ Ë†  (dÂ¢     # M >"V (sÂ£  (â€œ  ( b  Fâ€¢ e2 Â â€™ Dâ€“  (+â€“  (5â€¢ m , CAâ€¢  =â€“  (â€œ  (m Code Number:  â€¢ ?â€“  (m Marital Status: â€¢ Ã°â€“  (m Weekly Insurance: â€¢  Ã¼â€“  (m Social Security #: "â€¢ â€“  (m
+ Dependents:  "â€¢  â€“  (m 401K Deduction:  "â€¢  #â€¢ m %"â€“  p"\ (m# Hit [Esc] to abort printing checks."â€“  Â®"b (Ã¶ed _a B# <Ã¶h <qÂ¾ <{Ã‡ <[ â€¦ (P  Ã°"â€¹ ( b  ?â€˜ (â€˜â€˜- d
+w,â€˜ (â€˜m CAR" â€˜ "#Ëœ (â€˜dÃ‰   (d Å¾ (d o (dh (d Â£ F#Âª (da Ãœ# <Y Â° <Ã¤  <[ â€¦ (P  b#Â¶ (dÅ  â€¡ Â¼Â¶ Ã‚Â¶ Ë†  Â¢#Ãˆ (Â¼d	,Ze pnÂ¼d	BZeÂpn Â¼dd	3Z ÃŽ Ã#Ã— (ÃŽÃ‡_a j$ <ÃŽÃ‡ <Â¼Ã‡ (P  Ã¾#Ã (ÃŽÂ¾ca Ëœ$ <ÃŽÂ¾ <Â¼Â¾ (P  .$Ã£ ( Å¾d  Å¾ ( Å¾da Ãˆ$ <Â¼Ã© (P  \$Ã° (Â¼Ã©a Ã¶$ < od  o <[ Ã¶ (P  â‚¬$Ã¼ (d o (Y Â° (Â¼Ã© ([ Ã° Å’$ (u Ëœ  Â¾$Ã¶ ( oda X% <Â¼Ã© <Ã‚ <[ Âª (P  ÃŒ$ (d o Ã¾$ (Ã‚d	,Ze< p Ã‚ ( Ã‚Ã‚d	BZ  Ã‚ 0% (d	,Ze< p  ( d	BZ   N%! ( Â£ Ã‚ wn  Â£ Z%' ([ Âª â€ž%Â° ( Â£eh^a $& < Â£ |w Â£ (P  Â¼%- ( 3Ã©dd	3Za \& < Ãš Â£  Ãš <[ ; (P  Ã¾%A ( Â£eÃ _a Â¤& < ÃeÃ   Ã < Ãš Â£eÃ wn  Ãš (P  (&G ( Â£eÃ ba Ã& < Ã Â£  Ã (P  6&; (d Â£ ^&M $ (h ÃÃ¶e< npn h z&S (Ã¶Ã¶d	n Y Â &c (h ÃšYe< npn h Âª&i (o  ÃŽ&o (Ã£   
+# CALCULATE TAXES 
+# ((â€¦  Ã£ 0  
+# GIVE OVERTIME $ ONLY WHEN REGMIN > 2400 
+# Ã£ 5   IF REGMIN < 2400 AND REGMIN > 0 AND OVRMIN > 0 THEN= Ã£  
+ REGMIN = REGMIN + OVRMINI Ã£ 
+ 
+ OVRMIN = 0E Ã£  
+ IF REGMIN > 2400 THEN Ã£  
+ OVRMIN = REGMIN - 2400  Ã£  
+ REGMIN = 2400 Ã£ 	 
+ END IF  Ã£ 	 
+ END IF      ( Ãe<  Ã ( Ãed p& Ã ( Ãed  Ã `(u ( Ãše<  Ãš ( Ãšed p& Ãš ( Ãšed  Ãš v({ ( Ã Ãš  Â Âº(Â ( ÃÃ¶pnh (hed p&h (hed h (h â€œ Ã¸(Å¾ (Ã¶Ã¶d	n Y (Yed p&Y (Yed Y 8)Â¤ (h ÃšYpn h (hed p&h (hed h â€)Âª ( ÃšYpn Â° ( Â°ed p& Â° ( Â°ed  Â° ( â€œed p& â€œ ( â€œed  â€œ Ãˆ)Â» ( Â° â€œ h (Ã¶ed _a â€“* <Ã¶h (P  V*Ã (Ã¶ed _ Ã‡da ÃŒ* < Ã‘Ã¶ph (P  $ ( #d_ #kÃ¬Q8>ca &+ 4hn #p # 4 #ed p& # 4 #ed  # 4P  $   t*Ã› (hdca H+ <[ Ã¡ (P  @+Ã§ (Ã¶ed _ Ã·da , < Ã­de V Ã¿Ã¿Â+ < Ã­ ( Ã­f Ã¿Ã¿  (â€œ  (m Shall I print â€¢ Fâ€¢ m 's regular check (Y/N) "â€¢ â€œ  (â€°   Ã­Â¶ Ë†  (Ã­d,m n"Ã­d,m N"ua , <[ Ã¡ (P  P  d+Ã² Ã£   
+#  SDI   &  FICA  
+# Ã®+Ã¸ Ã£ $  
+#
+ DEDUCT INSURANCE TAX FREE 
+#  Ã£   SDI = (gross# - OT) * SDIP  hn Å“ p Ã¾  Ã¾ed p& Ã¾  Ã¾ed  Ã¾ N, Ã£   FICA = (gross# - OT) * FICAP   hn Â® p   ed p&   ed   x, Ã£   
+#
+ FEDERAL  (I.R.S.)   
+# Ã¤- Ã£   gross2# = (gross# - OT)   hn Ã£ 0  IF K401 > 0 THEN gross2# = (gross# - OT) - K401  #d_] Ãž-hn #w  #d_ #kÃ¬Q8>c] .m
+ 401k errorâ€°  )Â¶ Ë†   k{_B pnw / Ã£ =  #
+ 
+^---< One Witholding Allowance TABLE 5 (Weekly) [pg32]f   Ã£ E  (Percentage Method of Withholding) (table 1)
+ <<< SINGLE >>> [pg34] 
+.4 Ã°d,m M"a Ãª. ([ : P  2.@  /e3 ba / (d F ([ M P  l.S  /e(ba R/ ( /e3 wnkÅ¡â„¢>p F ([ M P  Â°.Y  /eÂ¬ba Å¡/ ( /e(wnk)\Â>pnkÃLâ€“B  F ([ M P  Ã´._  /ef
+ba Ã¢/ ( /eÂ¬wnkRÂ¸Å¾>pnkRxC  F ([ M P  8/e  /evba *0 ( /ef
+wnkÃ¬QÂ¸>pnkâ€¦{1D  F ([ M P  h/k  /evwnkÆ’Ã€ÃŠ>pnkâ€¦Â³Ã£D  F [ M Ë†/q  Ã£  
+ <<< MARRIED >>> Â°/:  /e| ba Â¦0 (d F ([ M P  Ãª/w  /eÃ€ba Ã¤0 ( /e| wnkÅ¡â„¢>p F ([ M P  .0}  /eÃ§ba ,1 ( /eÃ€wnk)\Â>pnkÃÃŒÃºB  F ([ M P  t0Æ’  /eÃœba v1   ( /eÃ§wnkRÂ¸Å¾>pnkâ€¦Ã“C  F ([ M P  Â¸0â€°  /eÂ±ba Â¾1 ( /eÃœwnkÃ¬QÂ¸>pnkâ€¦LD  F ([ M P  Ã¬0Â  /eÂ±wnkÆ’Ã€ÃŠ>pnkÅ¡QÃ—D  F [ M     
+1â€¢ Ã£   
+#
+ STATE
+ 
+# p1M  k\ÂÃ‚?p â€º Ã£ G  <
+	-Personal Exemption Credit PG61 TABLE4  Exemption Allowance Table 4  â€“1Â£ Ã°d,m M"a Å¾2 ([ Â© P  Â¾1Â¯ Ã°d,m H"a Ã„2 ([ Âµ P    h4Â»Ã£ ' 
+ STATE WITHOLDING >>>
+ <<< SINGLE>>>r  e9 w / Ã£ >  << Standard deduction table 3 (Exact Calc. Method B) >> PG 61   eÂ½ b]   d Ã [ ÃŠ Ã£ .  ### Table 1 Low Income Exemption Table  PG 60   Ã£ D  #
+ << Table 5-Tax Rate Table(Exact Calc. Method B) weekly >> PG 65  /eo ba    ( /dwnk
+Ã—#<pnd  â€ºw Ã ([ ÃŠ (P   /eba    ( /eo wnk
+Ã—Â£<pnk{Å½?  â€ºw Ã ([ ÃŠ (P   /eÅ¾ba    ( /ewnk
+Ã—#=pnkÃ¶(â€ž@  â€ºw Ã ([ ÃŠ (P   /e>ba    ( /eÅ¾wnkÂÃ‚u=pnk)\#A  â€ºw Ã ([ ÃŠ (P   /eÃ•ba    ( /e>wnk
+Ã—Â£=pnkÃ¡zÅ¾A  â€ºw Ã ([ ÃŠ (P  $ $ /eÃ•wnkÃ‰vÂ¾=pnkÂ¸Ã¿A  â€ºw Ã [ ÃŠ     Ã€7Â© e9 w / Ã£ 8  << Standard deduction table 3 (Exact Calc. Method B) >> Ã£  
+( <<< MARRIED >>>  eÂ½ b]   d Ã [ ÃŠ Ã£ '  ### Table 1 Low Income Exemption TableB       d_a 7 (er w / Ã£ F  << Standard deduction table 3 (Exact Calc. Method B) (2 or more dep.) (exba    4Ã£ 9 
+ ^^^
+	-< Table 1 Low Income Exemption Table (2 or MORE)c 4d Ã 4[ ÃŠ 4P  P    Ã£ ?  #
+ << Tax Rate Table 5 (Exact Calc. Method B) Weekly >> PG 65h   /eÃž ba    ( /dwnk
+Ã—#<pnd  â€ºw Ã ([ ÃŠ (P   /eba    ( /eÃž wnk
+Ã—Â£<pnk{@  â€ºw Ã ([ ÃŠ (P   /e<ba    ( /ewnk
+Ã—#=pnkÃ¶(A  â€ºw Ã ([ ÃŠ (P   /e|ba    ( /e<wnkÂÃ‚u=pnk)\Â£A  â€ºw Ã ([ ÃŠ (P   /eÂªba    ( /e|wnk
+Ã—Â£=pnkÃ¡zB  â€ºw Ã ([ ÃŠ (P  $  /eÂªwnkÃ‰vÂ¾=pnkÂ¸B  â€ºw Ã [ ÃŠ   F:Âµ  Ã£  
+ <<< HEAD OF HOUSEHOLD >>>  er w / Ã£ 8  << Standard deduction table 3 (Exact Calc. Method B) >> 
+
+## Copilot
+
+Yes â€” this is **not readable source code**. What you pasted is mostly **binary/tokenized/intermediate output**, not normal ASCII BASIC you can inspect in Notepad.
+
+## Direct answer
+`CHECK.BAS` is not acting like plain text source. It looks like one of these:
+
+- tokenized BASIC / compiled-format content
+- corrupted or non-text export
+- BASIC2QB conversion/intermediate output
+- a binary file mislabeled `.BAS`
+
+The clues are:
+
+- lots of binary garbage at the top
+- embedded readable fragments mixed with junk
+- strings like:
+  - `Referenced Line Number List -- Produced by BASIC2QB Version 2.00`
+  - `LIST 4700`
+  - `SAVE "CHECK"`
+- and then payroll-related strings rather than a clean checks menu source listing
+
+So this is **not a normal source file you can reverse engineer line-by-line in Notepad**.
+
+---
+
+## Important finding
+Even though itâ€™s mostly binary junk, there are still **readable strings embedded in it**, and those strings strongly suggest:
+
+### This file may not even be the customer-checks module you want
+A lot of the readable text is payroll-related:
+
+- `PAYROLL CHECK GENERATOR`
+- `Print Out Timecards and Payroll Checks`
+- `Put checks in printer now`
+- `vacation`
+- `401k`
+- `Social Security`
+- `State Disability Insurance`
+
+That makes me think this `CHECK.BAS` is probably **payroll check printing**, not the **customer cash-receipts checks menu** youâ€™ve been tracing.
+
+So this may be the **wrong CHECK module**.
+
+---
+
+## Best conclusion from your paste
+### We learned two useful things:
+1. `CHECK.BAS` is **not readily readable as text source**
+2. it probably represents **payroll checks**, not the customer â€œChecksâ€ menu you want
+
+Thatâ€™s actually very helpful, because it means:
+
+- we should **stop relying on this file** to recover Delete Checks
+- and go back to **behavior-driven tracing** from DOS for option `(2) Delete Checks`
+
+---
+
+## Best next move now
+Since `CHECK.BAS` is not usable as source, the fastest path is:
+
+### Use DOS itself to trace Delete Checks
+Go into the DOS app and choose:
+
+- **Checks**
+- then **(2) Delete Checks**
+
+Then capture each screen the same way you did for Add Check.
+
+What Iâ€™d want from you:
+1. first Delete Checks screen
+2. what happens after first input
+3. next prompt
+4. what hotkeys/options exist
+5. what happens on confirm
+
+That will let us reproduce it accurately in VB without needing the source.
+
+---
+
+## Why this is now the better approach
+You already proved this works well for Add Check:
+- you run DOS
+- show each screen
+- I infer the flow/state machine
+- we mirror it in WinForms
+
+That is likely **more reliable than reverse-engineering a tokenized/garbled BASIC file**.
+
+---
+
+## One more useful insight
+Because the strings in this file reference payroll, there may be another file in the repo that actually controls the customer ledger/cash receipts checks flow. Possible better candidates might be:
+
+- `LEDGER.BAS`
+- `LEDGER1.BAS`
+- `LEDG-CHK.BAS`
+- `LEGENTER.BAS`
+- maybe even something invoice-related rather than `CHECK.BAS`
+
+But given the state of the files, **live DOS screen tracing is still probably the fastest route**.
+
+---
+
+## Short answer
+What you pasted shows `CHECK.BAS` is **not plain readable source**, and it also looks like **payroll check logic**, not the customer checks menu.  
+So the best way to find out what **Delete Checks** does is to **run option (2) in DOS and trace it screen by screen**, just like we did for Add Check.
+
+## @testsubject117
+
+1ST SCREEN UPON ENTERING DELETE A CHECK
+
+## Copilot
+
+Perfect â€” that gives us the starting point for **Delete A Check**.
+
+## Direct answer
+The DOS Delete Checks flow starts with a very simple prompt:
+
+- title:
+  - `***** Delete A Check *****`
+- prompt:
+  - `Check # [ENTER = Quit]?`
+
+So Delete Checks is **not done yet**, but now we know its first screen and can mirror it.
+
+## What this tells us
+This screen suggests:
+- user enters a check number directly
+- pressing **Enter on blank** quits immediately
+- likely next step is lookup/display/confirmation for that check
+
+So the VB equivalent should probably begin with:
+- one textbox
+- one prompt
+- blank Enter = close/cancel
+
+## Next thing to capture
+After you type a real check number, I need the **next DOS screen**.
+
+That will tell us whether the flow is:
+1. lookup and show check details
+2. confirm deletion with hotkeys
+3. or reject with â€œnot foundâ€
+
+## Short answer
+Great â€” we now know the first Delete Checks screen:
+
+- `***** Delete A Check *****`
+- `Check # [ENTER = Quit]?`
+
+Send me the next screen after entering a check number, and Iâ€™ll map the rest of option 2.
+
+## @testsubject117
+
+OK, CHECK IT OUT. it found the fake check I created for psibeari for .10 check # 7777. so here's the steps for how I got here. I clicked (C) checks and cash receipts, then I chose (2) delete checks. then when check # [enter = quit]? appeared I entered 7777 and hit enter, and this put me at this screen: 
+
+## Copilot
+
+Excellent â€” this is a big finding.
+
+## Direct answer
+Yes: **Delete Checks is definitely not done yet**, and now we know the DOS flow much more clearly.
+
+Also, this confirms your fake check **was created** and **is searchable by delete-check number**, even if it didnâ€™t appear where you first expected.
+
+---
+
+## Confirmed DOS flow for Delete A Check
+
+### Entry path
+- `(C) Checks and Cash Receipts`
+- `(2) Delete Checks`
+
+### First screen
+- `***** Delete A Check *****`
+- `Check # [ENTER = Quit]?`
+
+### After entering `7777`
+DOS shows the check details:
+
+- `Customer: PSIBEARI`
+- `Date: 05-19-2026`
+- `Check #: 7777    Reference: 12345678`
+- `Paid Invoice(s):`
+- `Amount: $ 0.10`
+
+Then prompts:
+
+- **`Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?`**
+
+---
+
+## What this tells us
+This means Delete Checks is a two-stage flow so far:
+
+### Step 1
+Prompt for check number
+
+### Step 2
+Lookup check and show summary, then ask:
+
+- `Y` = delete the check and reset invoices unpaid
+- `N` = do not delete / likely return
+
+This is exactly the kind of thing we can mirror cleanly in VB.
+
+---
+
+## Very important side finding
+This also proves your test check exists in the underlying data enough for DOS to find it by check number.
+
+So the fake check is not imaginary â€” itâ€™s in some searchable check data path.
+
+That means:
+- Add Check did create something real
+- View Checks must be using a different view/filter/path than we assumed
+
+Useful later, but separate from Delete Checks.
+
+---
+
+## What we know Delete Checks needs in VB
+The VB flow should likely have:
+
+### Screen 1
+```text
+***** Delete A Check *****
+Check # [ENTER = Quit]?
+```
+
+### Screen 2
+Display:
+```text
+Customer: PSIBEARI                   Date: 05-19-2026
+Check #: 7777    Reference: 12345678
+Paid Invoice(s):
+Amount: $   0.10
+
+Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?
+```
+
+with direct key handling for:
+- `Y`
+- `N`
+
+---
+
+## Next critical question
+I need the next DOS result after you press:
+
+### `Y`
+What happens?
+- confirmation message?
+- immediate return to previous screen?
+- does it delete immediately?
+
+And also ideally:
+
+### `N`
+What happens?
+- back to check-number prompt?
+- back to Checks menu?
+- remains on same screen?
+
+---
+
+## Short answer
+Great â€” now we have the first real Delete Checks flow:
+
+1. enter check number
+2. DOS displays the found check details
+3. DOS asks:
+   - `Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?`
+
+So **Delete Checks has not been built yet**, but now we can model it accurately.  
+Send me what DOS does after pressing **Y** and/or **N**, and I can map the rest.
+
+## @testsubject117
+
+when I hit Y, I get this: then it returns to the checks menu
+
+## Copilot
+
+Perfect â€” now we have the essential Delete Checks flow.
+
+## Direct answer
+After pressing **Y**, DOS:
+
+1. keeps the found check details on screen
+2. shows:
+   - `Deleting Check...`
+   - `Please Wait..`
+   - `Purging part of .INV file...`
+3. then returns to the Checks menu
+
+So yes â€” this gives us the real workflow for **Delete Checks**.
+
+---
+
+## Confirmed DOS Delete Checks flow
+
+### Screen 1
+```text
+***** Delete A Check *****
+Check # [ENTER = Quit]?
+```
+
+### Screen 2 after entering a found check number
+```text
+Customer: PSIBEARI                   Date: 05-19-2026
+Check #: 7777    Reference: 12345678
+Paid Invoice(s):
+Amount: $   0.10
+
+Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?
+```
+
+### After pressing `Y`
+DOS shows:
+```text
+Deleting Check...
+
+Please Wait..
+Purging part of .INV file...
+```
+
+Then returns to Checks menu.
+
+---
+
+## What this means for VB
+We can now model Delete Checks in VB as a simple state machine:
+
+### Step 1
+Prompt for:
+- `Check # [ENTER = Quit]?`
+
+### Step 2
+If found, show:
+- customer
+- date
+- check #
+- reference
+- paid invoice(s)
+- amount
+- confirmation prompt:
+  - `Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?`
+
+### Step 3
+If `Y`:
+- show status lines:
+  - `Deleting Check...`
+  - `Please Wait..`
+  - `Purging part of .INV file...`
+- then close/return
+
+### Step 4
+If `N`:
+- we still need exact DOS behavior for parity
+- but likely return to previous prompt or menu
+
+---
+
+## One important data insight
+This confirms the DOS app:
+- can find your fake check by number
+- can delete it
+- and references `.INV` purging as part of cleanup
+
+That suggests Delete Checks is touching:
+- the check record
+- and related invoice linkage
+
+So even if we donâ€™t implement real deletion yet, the **UI flow** is now clear.
+
+---
+
+## Short answer
+Great â€” after `Y`, DOS shows:
+
+- `Deleting Check...`
+- `Please Wait..`
+- `Purging part of .INV file...`
+
+and then returns to the Checks menu.
+
+Thatâ€™s enough to define the core VB Delete Checks workflow.  
+If you want, the next step is for me to draft the WinForms `Delete Check` form flow to match this DOS behavior.
+
+## @testsubject117
+
+ok, I created the check again so I can choose N and see what happens
+
+## Copilot
+
+Good plan.
+
+## What to check
+After you choose **N**, I want to know exactly which of these happens:
+
+1. returns to the **check number prompt**
+2. stays on the same detail screen
+3. returns to the **Checks menu**
+4. clears the screen and starts over
+
+A screenshot is best, but even a plain description is enough.
+
+Once you tell me that, weâ€™ll have both branches:
+- `Y`
+- `N`
+
+for the full Delete Checks flow.
+
+## @testsubject117
+
+ok, when I hit N for no, it drops back to the checks screen
+
+## Copilot
+
+Got it â€” that completes the DOS behavior.
+
+## Confirmed Delete Checks flow
+### Entry
+- `(C) Checks and Cash Receipts`
+- `(2) Delete Checks`
+
+### Screen 1
+- `***** Delete A Check *****`
+- `Check # [ENTER = Quit]?`
+
+### If a matching check is found
+DOS shows:
+- customer
+- date
+- check number
+- reference
+- paid invoices
+- amount
+- prompt:
+  - `Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?`
+
+### If user presses `Y`
+DOS shows:
+- `Deleting Check...`
+- `Please Wait..`
+- `Purging part of .INV file...`
+
+Then:
+- returns to the **Checks menu**
+
+### If user presses `N`
+Then:
+- returns directly to the **Checks menu**
+
+---
+

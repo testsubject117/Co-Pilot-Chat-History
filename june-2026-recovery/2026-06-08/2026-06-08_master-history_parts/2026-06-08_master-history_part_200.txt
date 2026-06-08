@@ -1,0 +1,2000 @@
+﻿### If it looks like this:
+```text
+RegionCode,RegionName,AreaCode,Location
+CA,California,213,Los Angeles.
+CN,Canada,519,London, Ont..
+```
+
+then the converter is appropriate.
+
+### If it looks like this:
+```text
+AreaCode,State,Location
+213,CA,Los Angeles
+415,CA,San Francisco
+```
+
+then the converter is the wrong fix.
+
+---
+
+## If your file does have 4 columns, hereâ€™s how to run it
+
+### Step 1: create the file
+Create a new code file named:
+
+```text
+AreaCodeFileConverter.vb
+```
+
+Paste this into it:
+
+```vb
+Imports System
+Imports System.IO
+Imports System.Text
+Imports System.Collections.Generic
+
+Module AreaCodeFileConverter
+
+    Public Sub Main()
+        Dim inputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+        Dim backupPath As String = "\\invoice\mainmenu\data\phone\areacodes_backup.csv"
+        Dim outputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+
+        If Not File.Exists(inputPath) Then
+            Console.WriteLine("Input file not found: " & inputPath)
+            Return
+        End If
+
+        File.Copy(inputPath, backupPath, True)
+
+        Dim lines = File.ReadAllLines(inputPath)
+        Dim converted As New List(Of String)
+
+        For Each line In lines
+            If String.IsNullOrWhiteSpace(line) Then
+                converted.Add(line)
+                Continue For
+            End If
+
+            Dim parts = line.Split(New Char() {","c}, 4)
+
+            If parts.Length = 4 Then
+                converted.Add(parts(0).Trim() & "|" &
+                              parts(1).Trim() & "|" &
+                              parts(2).Trim() & "|" &
+                              parts(3).Trim())
+            Else
+                converted.Add(line)
+            End If
+        Next
+
+        File.WriteAllLines(outputPath, converted, Encoding.UTF8)
+
+        Console.WriteLine("Conversion complete.")
+        Console.WriteLine("Backup created: " & backupPath)
+        Console.WriteLine("Updated file: " & outputPath)
+    End Sub
+
+End Module
+```
+
+---
+
+## Step 2: make it run
+In a WinForms app, adding a `Main()` module usually does **not** automatically run, because your startup object is probably a form.
+
+So the easiest way is **not** to rely on startup.
+
+### Easiest run method
+Temporarily call it from somewhere like `FrmRolodexMenu_Load`.
+
+Change this:
+
+```vb
+Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+```
+
+to temporarily include:
+
+```vb
+Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+    AreaCodeFileConverter.Main()
+
+    lblTitle.Text = "****** ROLODEX MENU ******"
+    lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+    lblMenu.Text =
+        "(A) Add a Person" & Environment.NewLine &
+        "(B) Delete a Person" & Environment.NewLine &
+        "(C) Look up a Person" & Environment.NewLine &
+        "(D) Modify a Person" & Environment.NewLine &
+        "(E) Print Phone Book" & Environment.NewLine &
+        "(F) Print Labels" & Environment.NewLine &
+        "(G) Look up Area Codes" & Environment.NewLine &
+        "(H) Look up Zip Codes" & Environment.NewLine &
+        "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+        "(Z) Back to Main Menu"
+End Sub
+```
+
+Then:
+
+1. build
+2. run once
+3. it converts the file
+4. then remove that line:
+   ```vb
+   AreaCodeFileConverter.Main()
+   ```
+
+---
+
+## Even easier option
+If you want, I can instead give you a **button-click-safe helper method** version that you can call manually once and then delete. That may be cleaner for your WinForms project.
+
+---
+
+## Most important caution
+If your source file is actually the old 3-column format, this converter is not the right step.
+
+## So please do this first
+Paste the first 5 lines of your current `areacodes.csv` here before running anything.
+
+That way I can tell you with certainty whether this converter is correct.
+
+## @testsubject117
+
+this is what the file currently looks like: AreaCode,State,Location
+201,NJ,Northern New Jersey
+202,DC,Washington
+203,CT,Southwestern Connecticut
+205,AL,Birmingham
+206,WA,Seattle
+207,ME,Maine
+208,ID,Idaho
+209,CA,Stockton Modesto
+210,TX,San Antonio
+212,NY,Manhattan
+213,CA,Los Angeles
+214,TX,Dallas
+215,PA,Philadelphia
+216,OH,Cleveland
+217,IL,Central Illinois
+218,MN,Northern Minnesota
+219,IN,Northwest Indiana
+224,IL,Northern Illinois
+225,LA,Baton Rouge
+228,MS,Mississippi Gulf Coast
+229,GA,Southwest Georgia
+231,MI,Northwest Michigan
+234,OH,Northeast Ohio
+239,FL,Southwest Florida
+240,MD,Western Maryland
+248,MI,Oakland County
+251,AL,Mobile
+252,NC,Eastern North Carolina
+253,WA,Tacoma
+254,TX,Waco
+256,AL,Huntsville
+260,IN,Northeast Indiana
+262,WI,Southeast Wisconsin
+267,PA,Philadelphia
+269,MI,Southwest Michigan
+270,KY,Western Kentucky
+272,PA,Northeast Pennsylvania
+274,WI,Wisconsin
+276,VA,Southwest Virginia
+281,TX,Houston
+301,MD,Western Maryland
+302,DE,Delaware
+303,CO,Denver
+304,WV,West Virginia
+305,FL,Miami
+310,CA,West Los Angeles
+312,IL,Chicago
+313,MI,Detroit
+314,MO,St Louis
+315,NY,Central New York
+316,KS,Wichita
+317,IN,Indianapolis
+318,LA,Northern Louisiana
+319,IA,Eastern Iowa
+320,MN,Central Minnesota
+321,FL,Space Coast
+323,CA,Los Angeles
+325,TX,Abilene
+330,OH,Akron Canton
+331,IL,Illinois
+334,AL,Montgomery
+336,NC,Triad
+337,LA,Southwest Louisiana
+339,MA,Massachusetts
+346,TX,Houston
+347,NY,New York City
+351,MA,Massachusetts
+352,FL,Gainesville
+360,WA,Western Washington
+361,TX,Corpus Christi
+364,KY,Kentucky
+380,OH,Ohio
+385,UT,Utah
+386,FL,Daytona Beach
+401,RI,Rhode Island
+402,NE,Nebraska
+403,AB,Southern Alberta
+404,GA,Atlanta
+405,OK,Oklahoma City
+406,MT,Montana
+407,FL,Orlando
+408,CA,San Jose
+409,TX,Beaumont
+410,MD,Baltimore
+412,PA,Pittsburgh
+413,MA,Western Massachusetts
+414,WI,Milwaukee
+415,CA,San Francisco
+416,ON,Toronto
+417,MO,Southwest Missouri
+419,OH,Northwest Ohio
+423,TN,East Tennessee
+424,CA,West Los Angeles
+425,WA,Eastside
+430,TX,Northeast Texas
+432,TX,West Texas
+434,VA,South Central Virginia
+435,UT,Utah
+440,OH,Northeast Ohio
+442,CA,California
+443,MD,Maryland
+447,IL,Illinois
+458,OR,Oregon
+463,IN,Indiana
+464,IL,Illinois
+469,TX,Dallas
+470,GA,Atlanta
+475,CT,Connecticut
+478,GA,Central Georgia
+479,AR,Northwest Arkansas
+480,AZ,East Phoenix
+484,PA,Southeast Pennsylvania
+501,AR,Little Rock
+502,KY,Louisville
+503,OR,Portland
+504,LA,New Orleans
+505,NM,New Mexico
+507,MN,Southern Minnesota
+508,MA,Central Massachusetts
+509,WA,Eastern Washington
+510,CA,East Bay
+512,TX,Austin
+513,OH,Cincinnati
+515,IA,Des Moines
+516,NY,Nassau County
+517,MI,Central Michigan
+518,NY,Capital Region
+520,AZ,Tucson
+530,CA,Northeast California
+531,NE,Nebraska
+534,WI,Wisconsin
+539,OK,Oklahoma
+540,VA,Northern Virginia
+541,OR,Oregon
+551,NJ,Northern New Jersey
+559,CA,Fresno
+561,FL,Palm Beach
+562,CA,Long Beach
+563,IA,Eastern Iowa
+567,OH,Ohio
+570,PA,Northeast Pennsylvania
+571,VA,Northern Virginia
+573,MO,Missouri
+574,IN,North Central Indiana
+575,NM,New Mexico
+580,OK,Western Oklahoma
+585,NY,Rochester
+586,MI,Macomb County
+601,MS,Mississippi
+602,AZ,Phoenix
+603,NH,New Hampshire
+604,BC,Vancouver
+605,SD,South Dakota
+606,KY,Eastern Kentucky
+607,NY,Southern Tier
+608,WI,Southwest Wisconsin
+609,NJ,South New Jersey
+610,PA,Southeast Pennsylvania
+612,MN,Minneapolis
+614,OH,Columbus
+615,TN,Nashville
+616,MI,Grand Rapids
+617,MA,Boston
+618,IL,Southern Illinois
+619,CA,San Diego
+620,KS,Kansas
+623,AZ,West Phoenix
+626,CA,Pasadena
+628,CA,San Francisco
+629,TN,Tennessee
+630,IL,West Suburban Chicago
+631,NY,Suffolk County
+636,MO,St Charles
+641,IA,Iowa
+646,NY,Manhattan
+650,CA,Peninsula
+651,MN,St Paul
+657,CA,Orange County
+660,MO,Missouri
+661,CA,Bakersfield
+662,MS,Mississippi
+667,MD,Maryland
+669,CA,San Jose
+678,GA,Atlanta
+681,WV,West Virginia
+682,TX,Fort Worth
+701,ND,North Dakota
+702,NV,Las Vegas
+703,VA,Northern Virginia
+704,NC,Charlotte
+706,GA,North Georgia
+707,CA,North Coast
+708,IL,Chicago Suburbs
+712,IA,Western Iowa
+713,TX,Houston
+714,CA,Orange County
+715,WI,Northern Wisconsin
+716,NY,Buffalo
+717,PA,South Central Pennsylvania
+718,NY,New York City
+719,CO,Colorado Springs
+720,CO,Denver
+724,PA,Western Pennsylvania
+725,NV,Las Vegas
+727,FL,Pinellas County
+730,IL,Illinois
+731,TN,West Tennessee
+732,NJ,Central New Jersey
+734,MI,Ann Arbor
+737,TX,Austin
+740,OH,Southeast Ohio
+743,NC,North Carolina
+747,CA,San Fernando Valley
+754,FL,Broward County
+757,VA,Hampton Roads
+760,CA,North San Diego
+762,GA,Georgia
+763,MN,Northwest Twin Cities
+765,IN,Indiana
+769,MS,Mississippi
+770,GA,Atlanta Suburbs
+772,FL,Treasure Coast
+773,IL,Chicago
+774,MA,Massachusetts
+775,NV,Nevada
+779,IL,Northern Illinois
+781,MA,Boston Suburbs
+785,KS,Topeka
+786,FL,Miami
+801,UT,Salt Lake City
+802,VT,Vermont
+803,SC,Columbia
+804,VA,Richmond
+805,CA,Ventura Santa Barbara
+806,TX,Texas Panhandle
+808,HI,Hawaii
+810,MI,Flint
+812,IN,Southern Indiana
+813,FL,Tampa
+814,PA,Central Pennsylvania
+815,IL,Northern Illinois
+816,MO,Kansas City
+817,TX,Fort Worth
+818,CA,San Fernando Valley
+828,NC,Western North Carolina
+830,TX,Texas Hill Country
+831,CA,Monterey Bay
+832,TX,Houston
+843,SC,Charleston
+845,NY,Hudson Valley
+847,IL,Northern Illinois
+848,NJ,Central New Jersey
+850,FL,Florida Panhandle
+854,SC,South Carolina
+856,NJ,South New Jersey
+857,MA,Boston
+858,CA,San Diego
+859,KY,Lexington
+860,CT,Hartford
+862,NJ,North New Jersey
+863,FL,Central Florida
+864,SC,Upstate South Carolina
+865,TN,Knoxville
+870,AR,Arkansas
+872,IL,Chicago
+878,PA,Western Pennsylvania
+901,TN,Memphis
+903,TX,Northeast Texas
+904,FL,Jacksonville
+906,MI,Upper Peninsula
+907,AK,Alaska
+908,NJ,Central New Jersey
+909,CA,Inland Empire
+910,NC,Fayetteville
+912,GA,Southeast Georgia
+913,KS,Kansas City
+914,NY,Westchester
+915,TX,El Paso
+916,CA,Sacramento
+917,NY,New York City
+918,OK,Tulsa
+919,NC,Raleigh
+920,WI,Northeast Wisconsin
+925,CA,East Bay
+928,AZ,Northern Arizona
+929,NY,New York City
+930,IN,Southern Indiana
+931,TN,Middle Tennessee
+934,NY,Long Island
+936,TX,East Texas
+937,OH,Dayton
+938,AL,North Alabama
+940,TX,Wichita Falls
+941,FL,Sarasota
+947,MI,Oakland County
+949,CA,Orange County
+951,CA,Riverside
+952,MN,Southwest Twin Cities
+954,FL,Broward County
+956,TX,Rio Grande Valley
+959,CT,Connecticut
+970,CO,Northern Colorado
+971,OR,Portland
+972,TX,Dallas
+973,NJ,North New Jersey
+978,MA,Northeast Massachusetts
+979,TX,Southeast Texas
+980,NC,Charlotte
+984,NC,Raleigh
+985,LA,Southeast Louisiana
+986,ID,Idaho
+989,MI,Northeast Michigan
+
+## Copilot
+
+Got it â€” **do not use the converter**.
+
+Your file is a **3-column file**:
+
+```text
+AreaCode,State,Location
+```
+
+So the real problem is that the **service code was rewritten to expect a 4-column DOS-style file**, but your actual data is still the original 3-column format.
+
+## Best fix
+Keep your current data file exactly as it is, and instead change the service so it reads:
+
+- `AreaCode`
+- `State`
+- `Location`
+
+and formats/group-results from that.
+
+That is much easier and safer than rewriting the whole data file.
+
+---
+
+## What to change
+You should replace:
+
+1. `AreaCodeEntry.vb`
+2. `RolodexAreaCodeService.vb`
+
+with versions that match your existing CSV.
+
+---
+
+# 1) Replace `AreaCodeEntry.vb` with this
+
+```vb
+Public Class AreaCodeEntry
+    Public Property AreaCode As String
+    Public Property State As String
+    Public Property Location As String
+End Class
+```
+
+---
+
+# 2) Replace `RolodexAreaCodeService.vb` with this full file
+
+```vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+
+Public Class RolodexAreaCodeService
+
+    Private Shared ReadOnly DataPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+    Private ReadOnly _entries As List(Of AreaCodeEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
+    Public Function DataFileExists() As Boolean
+        Return File.Exists(DataPath)
+    End Function
+
+    Public Function GetDataFilePath() As String
+        Return DataPath
+    End Function
+
+    Public Function Search(input As String) As List(Of AreaCodeEntry)
+        If String.IsNullOrWhiteSpace(input) Then
+            Return New List(Of AreaCodeEntry)()
+        End If
+
+        Dim trimmed = input.Trim()
+
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            Return _entries.
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList()
+        End If
+
+        If trimmed.Length = 2 AndAlso trimmed.All(Function(c) Char.IsLetter(c)) Then
+            Dim stateCode = trimmed.ToUpperInvariant()
+
+            Return _entries.
+                Where(Function(x) String.Equals(x.State, stateCode, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList()
+        End If
+
+        Dim digitsOnly = New String(trimmed.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digitsOnly.Length > 0 Then
+            Return _entries.
+                Where(Function(x) Not String.IsNullOrWhiteSpace(x.AreaCode) AndAlso
+                                  x.AreaCode.StartsWith(digitsOnly, StringComparison.OrdinalIgnoreCase)).
+                OrderBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.State).
+                ThenBy(Function(x) x.Location).
+                ToList()
+        End If
+
+        Return New List(Of AreaCodeEntry)()
+    End Function
+
+    Public Function FormatGroupedResults(entries As List(Of AreaCodeEntry)) As String
+        Dim sb As New StringBuilder()
+
+        If entries Is Nothing OrElse entries.Count = 0 Then
+            sb.AppendLine("No matches found.")
+            Return sb.ToString()
+        End If
+
+        Dim grouped = entries.
+            GroupBy(Function(x) x.State).
+            OrderBy(Function(g) g.Key)
+
+        For Each grp In grouped
+            sb.AppendLine(grp.Key & " area code(s):")
+
+            For Each item In grp.OrderBy(Function(x) x.AreaCode).ThenBy(Function(x) x.Location)
+                sb.AppendLine("   " & item.AreaCode.PadRight(4) & " " & item.Location)
+            Next
+
+            sb.AppendLine()
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+    Public Function GetAllPages(Optional linesPerPage As Integer = 35) As List(Of String)
+        Dim pages As New List(Of String)
+
+        If linesPerPage <= 0 Then
+            linesPerPage = 35
+        End If
+
+        Dim allText = FormatGroupedResults(
+            _entries.
+                OrderBy(Function(x) x.State).
+                ThenBy(Function(x) x.AreaCode).
+                ThenBy(Function(x) x.Location).
+                ToList())
+
+        If String.IsNullOrWhiteSpace(allText) Then
+            Return pages
+        End If
+
+        Dim lines = allText.Replace(vbCrLf, vbLf).Split(ControlChars.Lf)
+        Dim current As New List(Of String)
+
+        For Each line In lines
+            current.Add(line)
+
+            If current.Count >= linesPerPage Then
+                pages.Add(String.Join(Environment.NewLine, current))
+                current.Clear()
+            End If
+        Next
+
+        If current.Count > 0 Then
+            pages.Add(String.Join(Environment.NewLine, current))
+        End If
+
+        Return pages
+    End Function
+
+    Private Function LoadEntries() As List(Of AreaCodeEntry)
+        Dim results As New List(Of AreaCodeEntry)
+
+        If Not File.Exists(DataPath) Then
+            Return results
+        End If
+
+        Dim isFirstLine As Boolean = True
+
+        For Each rawLine In File.ReadAllLines(DataPath)
+            If String.IsNullOrWhiteSpace(rawLine) Then Continue For
+
+            If isFirstLine Then
+                isFirstLine = False
+                If rawLine.Trim().StartsWith("AreaCode", StringComparison.OrdinalIgnoreCase) Then
+                    Continue For
+                End If
+            End If
+
+            Dim parts = rawLine.Split(","c)
+            If parts.Length < 3 Then Continue For
+
+            Dim entry As New AreaCodeEntry With {
+                .AreaCode = parts(0).Trim(),
+                .State = parts(1).Trim().ToUpperInvariant(),
+                .Location = String.Join(",", parts.Skip(2)).Trim()
+            }
+
+            If String.IsNullOrWhiteSpace(entry.AreaCode) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.State) Then Continue For
+            If String.IsNullOrWhiteSpace(entry.Location) Then Continue For
+
+            results.Add(entry)
+        Next
+
+        Return results
+    End Function
+End Class
+```
+
+---
+
+## Why this works
+Your real file uses:
+
+```text
+AreaCode,State,Location
+```
+
+So now the service matches the actual data.
+
+It will support:
+
+- `A` â†’ all
+- `CA` â†’ California records
+- `213` â†’ area code lookup
+
+without changing the file.
+
+---
+
+## Important note
+This version will display headings like:
+
+```text
+CA area code(s):
+```
+
+not:
+
+```text
+CA California area code(s):
+```
+
+because your data file does **not** contain full state names.
+
+If you want the full DOS heading later, we can add a state-code-to-name lookup table in code.
+
+---
+
+## Recommendation
+Do this now:
+
+1. replace `AreaCodeEntry.vb`
+2. replace `RolodexAreaCodeService.vb`
+3. rebuild
+4. test:
+   - `CA`
+   - `213`
+   - `A`
+
+That should immediately stop the â€œno data foundâ€ problem.
+
+If you want, next I can give you a version that shows:
+
+```text
+CA  California area code(s):
+```
+
+even while keeping your existing 3-column CSV.
+
+## @testsubject117
+
+ok, when I type ca, it opens a new windows (paged viewer)that lists all california area code numbers next to their city, however when that window opens, all the entries are highlighted in blue.
+
+## Copilot
+
+That means the text control inside `FrmPagedTextViewer` is getting focus and auto-selecting all its text.
+
+## Direct fix
+In `FrmPagedTextViewer`, after loading the text, set the selection length to zero and move the caret to the start.
+
+If the viewer uses a `TextBox` or `RichTextBox`, add this right after assigning the text:
+
+```vb
+txtContent.SelectionStart = 0
+txtContent.SelectionLength = 0
+txtContent.ScrollToCaret()
+```
+
+If you want it to stay visually unselected even after focus, also move focus to a non-text control like a label or button.
+
+---
+
+## Most likely cause
+The paged viewer probably does something like:
+
+```vb
+txtContent.Text = pages(_currentPageIndex)
+txtContent.Focus()
+txtContent.SelectAll()
+```
+
+or just focusing a multiline textbox can leave the contents highlighted depending on earlier selection state.
+
+---
+
+## Best practical fix
+I need to see `FrmPagedTextViewer.vb` to patch it exactly, but the likely solution is:
+
+### If your viewer has a textbox named something like `txtViewer`
+update the page-rendering code to:
+
+```vb
+txtViewer.Text = _pages(_currentPageIndex)
+txtViewer.SelectionStart = 0
+txtViewer.SelectionLength = 0
+txtViewer.ScrollToCaret()
+```
+
+If itâ€™s a `RichTextBox`, same idea.
+
+---
+
+## Optional extra fix
+If blue selection still appears because the control has focus, add:
+
+```vb
+Me.ActiveControl = Nothing
+```
+
+or set focus to a button like Next/Close after text load.
+
+Example:
+
+```vb
+btnNext.Focus()
+```
+
+---
+
+## What I need from you
+Paste the code for `FrmPagedTextViewer.vb` and Iâ€™ll give you the exact full-file correction.
+
+## Short answer
+The blue highlight is just the viewer text being selected.  
+The fix is in `FrmPagedTextViewer`, not in the area code logic.
+
+## @testsubject117
+
+```
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmPagedTextViewer
+    Inherits Form
+
+    Private txtPage As TextBox
+    Private _pages As New List(Of String)
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Public Sub SetPages(pages As List(Of String))
+        _pages = If(pages, New List(Of String))
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Paged Viewer"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(800, 600)
+        Me.KeyPreview = True
+
+        txtPage = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(txtPage)
+
+        AddHandler Me.Load, AddressOf FrmPagedTextViewer_Load
+        AddHandler Me.KeyDown, AddressOf FrmPagedTextViewer_KeyDown
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs)
+        ShowPage()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            _pageIndex += 1
+
+            If _pageIndex >= _pages.Count Then
+                Me.Close()
+                Return
+            End If
+
+            ShowPage()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub ShowPage()
+        If _pages.Count = 0 Then
+            txtPage.Text = ""
+            Return
+        End If
+
+        txtPage.Text = _pages(_pageIndex)
+    End Sub
+End Class
+```
+
+## Copilot
+
+Perfect â€” the issue is in `ShowPage()`.
+
+Right now it only does:
+
+```vb
+txtPage.Text = _pages(_pageIndex)
+```
+
+and the textbox is likely keeping focus/selection, which causes the blue highlight.
+
+## Direct fix
+Replace your entire `FrmPagedTextViewer.vb` with this version:
+
+```vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmPagedTextViewer
+    Inherits Form
+
+    Private txtPage As TextBox
+    Private _pages As New List(Of String)
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Public Sub SetPages(pages As List(Of String))
+        _pages = If(pages, New List(Of String))
+        _pageIndex = 0
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Paged Viewer"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(800, 600)
+        Me.KeyPreview = True
+
+        txtPage = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtPage)
+
+        AddHandler Me.Load, AddressOf FrmPagedTextViewer_Load
+        AddHandler Me.Shown, AddressOf FrmPagedTextViewer_Shown
+        AddHandler Me.KeyDown, AddressOf FrmPagedTextViewer_KeyDown
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs)
+        ShowPage()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Shown(sender As Object, e As EventArgs)
+        Me.ActiveControl = Nothing
+        ClearTextSelection()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            _pageIndex += 1
+
+            If _pageIndex >= _pages.Count Then
+                Me.Close()
+                Return
+            End If
+
+            ShowPage()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub ShowPage()
+        If _pages.Count = 0 Then
+            txtPage.Text = ""
+            ClearTextSelection()
+            Return
+        End If
+
+        txtPage.Text = _pages(_pageIndex)
+        ClearTextSelection()
+    End Sub
+
+    Private Sub ClearTextSelection()
+        txtPage.SelectionStart = 0
+        txtPage.SelectionLength = 0
+        txtPage.HideSelection = True
+        txtPage.ScrollToCaret()
+    End Sub
+End Class
+```
+
+---
+
+## What changed
+### 1. Reset page index when pages are set
+```vb
+_pageIndex = 0
+```
+
+### 2. Prevent tab-focus behavior
+```vb
+.TabStop = False
+```
+
+### 3. Clear selection after page load
+```vb
+txtPage.SelectionStart = 0
+txtPage.SelectionLength = 0
+txtPage.HideSelection = True
+```
+
+### 4. Remove active focus from the textbox
+```vb
+Me.ActiveControl = Nothing
+```
+
+---
+
+## Expected result
+Now when the paged viewer opens:
+
+- text should no longer appear highlighted blue
+- it should look more like a passive DOS text screen
+- Enter should still advance pages
+- Esc should still close
+
+## Next polish step
+If you want, I can also make `FrmPagedTextViewer` look even more DOS-like by adding:
+
+- `-- More --`
+- page footer hints
+- no Windows title text emphasis
+- fixed DOS-style size/layout
+
+That would make the results screen match the original screenshots more closely.
+
+## @testsubject117
+
+ok, found another issue. if I hit (G) then (A) for ALL, I only get a few states, not all 50 states
+
+## Copilot
+
+That means the code is working, but the **data file itself doesnâ€™t contain all 50 states**.
+
+From the CSV you pasted earlier, I can already see it contains a lot of entries, but whether `A` shows â€œall statesâ€ depends entirely on what rows are present in `areacodes.csv`.
+
+## Most likely reason
+Your current `GetAllPages()` is showing **all loaded rows**.  
+So if only a subset of states appears, one of these is happening:
+
+1. the CSV is incomplete
+2. the page viewer is only showing the first few pages and you need to press **Enter** to continue
+3. some rows arenâ€™t loading because of parsing issues
+4. you expected old 1989 grouped data, but your modern CSV has different coverage/grouping
+
+---
+
+## Important check first
+When you press:
+
+- `G`
+- then `A`
+
+does the paged viewer:
+- show one page, and then
+- pressing **Enter** advances to more pages?
+
+Because your `FrmPagedTextViewer` is designed to show **one page at a time**.
+
+So seeing only a few states on the first page may be normal.
+
+### Current behavior:
+- page 1 opens
+- press **Enter** â†’ page 2
+- press **Enter** again â†’ page 3
+- etc.
+
+If you donâ€™t press Enter, you are only seeing the first page of the â€œallâ€ listing.
+
+---
+
+## Why this is very likely
+Your code currently does:
+
+```vb
+frm.SetPages(svc.GetAllPages())
+```
+
+and `GetAllPages()` breaks text into chunks of 35 lines.
+
+So page 1 would naturally only show a handful of states.
+
+---
+
+## Quick test
+Try this:
+
+1. press `G`
+2. type `A`
+3. when the page viewer opens, press **Enter** repeatedly
+
+Do more states appear?
+
+If yes, then there is **no bug** â€” it is just paging.
+
+---
+
+## If pressing Enter does NOT show more states
+Then we need to inspect whether all rows are loading.
+
+In that case, the likely problem is in `GetAllPages()` or `LoadEntries()`.
+
+But based on your CSV, it should load many rows.
+
+---
+
+## One strong clue
+Your DOS screenshots showed true `-- More --` paging behavior.  
+Your current viewer simulates that by requiring **Enter** to advance pages.
+
+So the â€œonly a few statesâ€ result is probably just **page 1 of many**.
+
+---
+
+## Recommended UX improvement
+Right now the viewer gives no visible clue that more pages exist.
+
+So users may think page 1 is all there is.
+
+### Better behavior
+Append something like this at the bottom of each page:
+
+```text
+-- More --   [Enter] Next Page   [Esc] Exit
+```
+
+That would make the paging obvious.
+
+---
+
+## Direct answer
+Most likely, `A` is working and youâ€™re only seeing the **first page**.  
+Press **Enter** to continue to the next page.
+
+If you want, I can update `FrmPagedTextViewer.vb` so it visibly shows:
+
+```text
+-- More --
+```
+
+just like DOS, which would make this much clearer.
+
+## @testsubject117
+
+yes pressing enter advances to more pages, can we remove that and put a scroll bar in instead. there is no text there to tell the user to hit enter to continue so it's not friendly. Scroll bars are kind of 2nd nature, if there's a scroll bar, easily seen on the side, then the user knows to use it to scroll further down
+
+## Copilot
+
+Yes â€” thatâ€™s a better UX for your WinForms version.
+
+## Direct recommendation
+Change `FrmPagedTextViewer` from a **paged Enter-to-advance viewer** into a **single scrollable viewer**:
+
+- combine all pages into one text block
+- show it in the existing multiline textbox
+- keep the vertical scrollbar
+- let `Esc` close the window
+
+That way:
+- `A = All` becomes one long scrollable list
+- `CA` becomes one shorter scrollable result
+- no hidden Enter behavior
+- much more user-friendly in Windows
+
+---
+
+## Best approach
+Instead of:
+- storing pages
+- moving `_pageIndex`
+- calling `ShowPage()` on Enter
+
+you should:
+- join all page strings together
+- display them once
+- remove page navigation logic
+
+---
+
+## Replace the entire `FrmPagedTextViewer.vb` with this
+
+```vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmPagedTextViewer
+    Inherits Form
+
+    Private txtPage As TextBox
+    Private _content As String = ""
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Public Sub SetPages(pages As List(Of String))
+        If pages Is Nothing OrElse pages.Count = 0 Then
+            _content = ""
+        Else
+            _content = String.Join(Environment.NewLine & Environment.NewLine, pages)
+        End If
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Paged Viewer"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(800, 600)
+        Me.KeyPreview = True
+
+        txtPage = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtPage)
+
+        AddHandler Me.Load, AddressOf FrmPagedTextViewer_Load
+        AddHandler Me.Shown, AddressOf FrmPagedTextViewer_Shown
+        AddHandler Me.KeyDown, AddressOf FrmPagedTextViewer_KeyDown
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs)
+        txtPage.Text = _content
+        ClearTextSelection()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Shown(sender As Object, e As EventArgs)
+        Me.ActiveControl = Nothing
+        ClearTextSelection()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub ClearTextSelection()
+        txtPage.SelectionStart = 0
+        txtPage.SelectionLength = 0
+        txtPage.HideSelection = True
+        txtPage.ScrollToCaret()
+    End Sub
+End Class
+```
+
+---
+
+## What this changes
+### Before
+- one page at a time
+- Enter advanced pages
+- easy to miss
+
+### After
+- one scrollable text view
+- visible scrollbar
+- much more natural for Windows users
+
+---
+
+## Good news
+You do **not** need to change `FrmRolodexMenu.vb` for this.
+
+It can still do:
+
+```vb
+frm.SetPages(svc.GetAllPages())
+```
+
+because the new viewer just joins those pages into one scrollable text block.
+
+So this is a drop-in replacement.
+
+---
+
+## Optional future improvement
+If you want the viewer to feel even more DOS-like while still using scrollbars, I can also help you:
+
+- hide the window title bar better
+- add a top banner like `<<< LOOK UP AREA CODES >>>`
+- use a slightly tighter fixed layout
+- add a footer like `ESC = Exit`
+
+But the scrollbar change alone is the important fix.
+
+## Recommended next step
+Replace `FrmPagedTextViewer.vb` with the version above and rebuild.
+
+## @testsubject117
+
+ok, that worked.
+
+## Copilot
+
+Great.
+
+## Where you are now
+Youâ€™ve got:
+
+- DOS-style inline prompt for `(G) Look up Area Codes`
+- working searches for:
+  - `A`
+  - state code like `CA`
+  - area code like `213`
+- scrollable results instead of hidden Enter paging
+- no blue selection highlight issue
+
+Thatâ€™s a solid improvement.
+
+## Most likely next polish items
+If you want to keep pushing it closer to the DOS app, the best next candidates are:
+
+1. **show full state names**
+   - e.g. `CA California area code(s):`
+   - instead of just `CA area code(s):`
+
+2. **make the results window look more DOS-like**
+   - banner/header
+   - less generic Windows title text
+   - maybe an `ESC = Exit` hint
+
+3. **align the ZIP code tool visually with the same style**
+
+4. **reduce obvious Windows chrome**
+   - depending on how far you want to go stylistically
+
+If you want, I can do the next one. My recommendation would be:
+
+**next: update area code results to show full state/province names while keeping your current 3-column CSV**.
+
+## @testsubject117
+
+no, I think it's fine. so it looks like we're done with all the buttons on this menu except (E) print phone book and (F) print labels. How difficult will those 2 be to get finished? is it complicated or will it only take a few minutes?
+
+## Copilot
+
+It depends on how faithful you want to be, but based on your current app, **theyâ€™re probably moderate, not huge**.
+
+## Short answer
+- **Basic working versions:** likely **pretty quick**
+- **True DOS-faithful versions with real printing behavior:** **more involved**
+
+## Realistic estimate
+### If you only want them to function in a practical WinForms way
+For both `(E)` and `(F)`, this is probably **not a massive project**.
+
+You already have some flow scaffolding in place:
+
+- `StartPrintPhoneBookFlow()`
+- `StartPrintLabelsFlow()`
+- inline prompt state handling for:
+  - customers only Y/N
+  - high quality Y/N
+  - first letter
+
+So the UI flow is already partially there.
+
+What remains is mostly the **actual printing/export behavior**.
+
+That means:
+- gathering Rolodex records
+- filtering them
+- formatting them
+- sending them either to:
+  - printer
+  - preview
+  - text output
+  - label layout
+
+Thatâ€™s doable.
+
+---
+
+## Complexity by feature
+
+### (E) Print Phone Book
+This is the easier of the two.
+
+A basic working version could:
+- ask the existing questions
+- filter the Rolodex list
+- generate a formatted text report
+- preview it in a scrollable form
+- optionally send it to a printer later
+
+### Difficulty:
+**low to moderate**
+
+If you just want â€œproduce printable phone-book-style output,â€ thatâ€™s pretty straightforward.
+
+---
+
+### (F) Print Labels
+This is usually harder.
+
+Why:
+- labels require **physical layout**
+- page dimensions matter
+- columns matter
+- margins matter
+- label sheet type matters
+- printer differences matter
+
+If you just want a simple mailing-label output preview, fine.
+
+If you want actual Avery-style correct printed label alignment, that takes more care.
+
+### Difficulty:
+- **simple preview version:** moderate
+- **real printer-accurate label printing:** moderate to fairly involved
+
+---
+
+## Biggest question
+The real scope depends on what â€œfinishedâ€ means to you.
+
+### Option A â€” â€œfinished enoughâ€
+- the prompts work
+- records filter correctly
+- output displays in a viewer
+- maybe export/print later
+
+That could be done fairly quickly.
+
+### Option B â€” â€œfully finishedâ€
+- real printer support
+- pagination
+- label sheet alignment
+- printer setup handling
+- quality modes
+- DOS-compatible behavior interpretation
+
+Thatâ€™s more work.
+
+---
+
+## Based on your project so far
+You seem to be aiming for:
+- DOS-style feel
+- WinForms practicality
+- functional modernization where appropriate
+
+If thatâ€™s true, then:
+
+### My honest estimate
+- **Print Phone Book:** probably fairly quick
+- **Print Labels:** a bit more work, but still manageable
+
+So overall:
+- **not just a few minutes**
+- but also **not an enormous rewrite**
+
+---
+
+## My recommendation
+Do them in this order:
+
+1. **(E) Print Phone Book**
+2. **(F) Print Labels**
+
+Because phone book printing will help establish:
+- record filtering
+- formatting
+- preview/print pipeline
+
+Then labels can reuse some of that data prep.
+
+---
+
+## Best next planning question
+Before implementing, we should decide:
+
+### For `(E) Print Phone Book`
+Should it:
+1. open a preview window only?
+2. actually send to printer?
+3. generate text/PDF?
+4. do all of the above?
+
+### For `(F) Print Labels`
+Should it:
+1. preview labels only?
+2. print to real label sheets?
+3. use a specific label format like Avery?
+4. just simulate the DOS flow for now?
+
+---
+
+## Bottom line
+- **(E) Print Phone Book:** likely fairly quick
+- **(F) Print Labels:** somewhat more complicated
+- **Together:** probably more than â€œa few minutes,â€ but very reasonable as the next chunk of work
+
+If you want, I can help you scope `(E)` first and tell you exactly what the fastest good implementation would be.
+
+## @testsubject117
+
+let's put those 2 items at the forefront for tomorrow. we'll pick up tomorrow by starting with getting those 2 completed.
+
+## Copilot
+
+Sounds good â€” tomorrow weâ€™ll focus on **(E) Print Phone Book** and **(F) Print Labels** first.
+
+## Plan for tomorrow
+Weâ€™ll tackle them in this order:
+
+1. **(E) Print Phone Book**
+   - finish the prompt flow
+   - decide preview vs actual printing
+   - generate formatted phone-book output
+
+2. **(F) Print Labels**
+   - finish the prompt flow
+   - decide label layout/printing approach
+   - implement preview and/or print behavior
+
+## Best place to resume
+When you come back, we should start by looking at:
+
+- the current Rolodex data source / record list
+- any existing print-related classes
+- whether you want:
+  - **preview only first**, or
+  - **real printer output immediately**
+
+## My recommendation for tomorrow
+Fastest path will probably be:
+
+- implement **previewable output first**
+- then wire in real printer support if needed
+
+That keeps progress quick and visible.
+
+## Suggested first message tomorrow
+You can just say:
+
+**â€œLetâ€™s start on E and F.â€**
+
+And if possible, paste:
+- the current Rolodex record/service code
+- anything related to printing already in the project
+
+Weâ€™ll pick it up from there.
+
+## @testsubject117
+
+wait, What I need from you today, is a way to capture the entire text of today's chat in short pieces that you can tell me how I could best get them to you tomorrow. What I mean is this. Every day I export the entire chat conversation. I have you create a master end of day file that I use to kick start the next days chat session so you will know where to pickup. I'm very picky about this. I need a way to export the entire chat for my own benefit and record, but I need some abbreviated or shorthand copies that I can easily get back to you the next day. Usually the chat export is too big to upload or paste. I then Extract it, find all the .md files, split them, then commit and push them into a chat history repo so you can review, but honestly, I spend at least an hour each day trying to get you up to speed and have all the info I need you to have. You tell me you can't read the repos, or you can't see the files, or you see the files but can't read them, please just paste them, but they are too big to paste. I need you to come up with a solution that allows me to export and keep a full text version for record, and future reference, but at the same time I need a very bullet pointed version I can easily get you to ingest the next day, instead of me spending hours getting you up to speed. Each day I also need you to scan the contents of testsubject117/AMiDataStore, testsubject117/AmiWinForms because you can't remember what you determined by scanning them the day before. I also need bullet pointed small lists I can get to you the next day that you can easily ingest of what you found in the AMiDataStore scan, the AmiWinForms scan, as well as a detailed description of how the DOS gwbasic Mainmenu app interacts so that the next day, when we start, you have a full understanding of exactly how that dos app works, where we are with the vb app etc.
+
+## Copilot
+
+Yes â€” the solution is to maintain **three layers of continuity**, not one.
+
+## Direct recommendation
+At the end of each day, create:
+
+1. **Full archive**
+   - your complete exported chat
+   - for your record only
+
+2. **Compact carry-forward brief**
+   - small enough to paste next day
+   - optimized for getting me up to speed fast
+
+3. **Repo scan snapshots**
+   - compact structured notes from:
+     - `testsubject117/AmiWinForms`
+     - `testsubject117/AMiDataStore`
+   - refreshed as needed
+
+That way, tomorrow you do **not** need to re-feed me the whole export.
+
+---
+
+# Best system going forward
+
+## A. Keep the full export for yourself
+This stays exactly as you already do it.
+
+Use it for:
+- audit trail
+- historical reference
+- recovering details if needed
+
+But **do not rely on this as the primary thing you paste to me next day**.
+
+---
+
+## B. Create one small â€œNext-Day Kickoffâ€ file
+This is the most important item.
+
+It should be:
+- short
+- structured
+- pasteable in one or a few messages
+- focused on decisions, current state, open tasks, repo context
+
+### Ideal size
+Aim for:
+- **500â€“1500 words**
+- not a giant transcript
+- no long code blocks unless absolutely necessary
+
+---
+
+## C. Create two small repo scan summaries
+One each for:
+- `AmiWinForms`
+- `AMiDataStore`
+
+These should be:
+- bullet-driven
+- stable
+- updated only when new findings matter
+
+---
+
+## D. Create one stable DOS behavior reference
+This should be a compact operational description of how the DOS app behaves.
+
+That becomes your â€œsource of truthâ€ summary for:
+- menus
+- flows
+- prompts
+- expected behavior
+- known differences vs WinForms
+
+---
+
+# The actual deliverables you should keep daily
+
+I recommend **4 small markdown files** plus your full export.
+
+---
+
+## 1. `00-next-day-kickoff.md`
+This is the file you paste first tomorrow.
+
+### Purpose
+Fastest possible context load.
+
+### Suggested structure
+```markdown
+# Next Day Kickoff
+
+## Current Objective
+- Primary focus for next session:
+  - Finish (E) Print Phone Book
+  - Finish (F) Print Labels
+
+## What Was Completed Today
+- FrmRolodexMenu area code flow changed from Windows InputBox to inline DOS-style prompt.
+- Added AreaCodes_Prompt to RolodexMenuInlineMode.
+- Area code lookup now supports:
+  - A = all
+  - state lookup like CA
+  - area code lookup like 213
+  - Esc = cancel
+- FrmPagedTextViewer changed from Enter-to-page to scrollable viewer with vertical scrollbar.
+- Removed blue text selection highlight in viewer.
+- Area code service was updated to match the real CSV format:
+  - AreaCode,State,Location
+- Did NOT convert areacodes.csv to pipe-delimited.
+- Current area code flow is considered working and acceptable.
+
+## Current App Status
+- Rolodex menu items working:
+  - A Add Person
+  - B Delete Person
+  - C Look up Person
+  - D Modify Person
+  - G Look up Area Codes
+  - H Look up Zip Codes
+  - I Test Entire Rolodex for Errors
+- Remaining unfinished menu items:
+  - E Print Phone Book
+  - F Print Labels
+
+## Important Decisions
+- Prefer DOS-style visual behavior where practical.
+- Prefer WinForms-friendly UX when DOS behavior is unclear or bad for usability.
+- For long results, scrollbar is preferred over hidden Enter-to-continue paging.
+
+## Important Data Facts
+- areacodes.csv real format is:
+  - AreaCode,State,Location
+- Do not assume DOS data file formats without verifying actual file contents.
+
+## Files Changed Today
+- FrmRolodexMenu.vb
+- RolodexMenuInlineMode.vb
+- FrmPagedTextViewer.vb
+- RolodexAreaCodeService.vb
+- AreaCodeEntry.vb
+
+## First Task Tomorrow
+- Inspect current implementation/state for:
+  - Print Phone Book
+  - Print Labels
+- Decide whether to do preview-first or real printer output first.
+```
+
+---
+
+## 2. `01-amiwinforms-scan.md`
+This is a compact repo scan result for `testsubject117/AmiWinForms`.
+
+### Purpose
+Give me codebase awareness quickly tomorrow.
+
+### Suggested structure
+```markdown
+# AmiWinForms Scan Snapshot
+
+## Repository
+- testsubject117/AmiWinForms
+
+## Relevant Project Area
+- AMiOffice WinForms recreation of DOS/GWBASIC office app.
+- Current focus area: Rolodex menu and child flows.
+
+## Confirmed Relevant Files
+- FrmRolodexMenu.vb
+- RolodexMenuInlineMode.vb
+- FrmPagedTextViewer.vb
+- RolodexAreaCodeService.vb
+- AreaCodeEntry.vb
+- FrmZipKeyPopup.vb
+- FrmRolodexPrompt.vb
+- RolodexPromptEngine.vb
+- RolodexPersonRecord.vb
+
+## Current Behavior Confirmed
+- Area code lookup prompt is inline and DOS-style.
+- Results open in scrollable viewer window.
+- Viewer uses scrollbar instead of Enter paging.
+- Zip key popup still exists and opens from H.
+- E and F prompt scaffolding exists but output not completed.
+
+## Known Design Pattern
+- Main menu opens child forms/popups for individual DOS functions.
+- Inline flows are implemented with:
+  - _inlineMode enum
+  - txtInline text rendering
+  - KeyPress / KeyDown handling
+- DOS feel achieved using:
+  - black background
+  - white monospace text
+  - manual prompt rendering
+
+## Known Open Questions
+- What data source powers phone book / labels?
+- Are there existing print helper classes?
+- Is real printer output required or is preview enough initially?
+```
+
+---
+
+## 3. `02-amidatastore-scan.md`
+This is the compact data-repo snapshot for `testsubject117/AMiDataStore`.
+
+### Purpose
+Remind me what the data repo contains without rescanning from zero conceptually.
+
+### Suggested structure
+```markdown
+# AMiDataStore Scan Snapshot
+
+## Repository
+- testsubject117/AMiDataStore
+
+## Current Relevant Data Area
+- Rolodex / phone / zip / reference data used to mimic DOS app behavior.
+
+## Confirmed Data Facts
+- areacodes.csv currently uses 3 columns:
+  - AreaCode,State,Location
+- It is not pipe-delimited.
+- Current WinForms service was adjusted to match this real format.
+
+## Important Warning
+- Do not redesign data parsing based on assumed DOS-era structure without checking the actual file first.
+
+## Possible Next Data Questions
+- Is there a labels-related source file?
+- Is there a phone-book or customer-only flag in Rolodex data?
+- Is there a print ordering rule in data or inferred by DOS behavior?
+```
+
+---
+
+## 4. `03-dos-mainmenu-behavior.md`
+This should be a compact but detailed operational summary of the DOS app behavior.
+
+### Purpose
+This becomes the persistent â€œhow the DOS app worksâ€ reference.
+
+### Suggested structure
+```markdown
+# DOS MainMenu Behavior Reference
+
+## General UX Style
+- Black screen, white monospace text.
+- Keyboard-driven.
+- Prompts typically appear inline on the same screen, not as separate dialog boxes.
+- ESC often cancels current inline action or returns to previous menu.
+- Enter is used to confirm prompts in some flows.
+- DOS behavior should be mimicked visually where practical, but WinForms usability improvements are acceptable when they remove hidden or confusing behavior.
+
+## Rolodex Menu Items
+- A Add a Person
+- B Delete a Person
+- C Look up a Person
+- D Modify a Person
+- E Print Phone Book
+- F Print Labels
+- G Look up Area Codes
+- H Look up Zip Codes
+- I Test Entire Rolodex for Errors
+- Z Back to Main Menu
+
+## Confirmed G Behavior
+- Choosing G should not use a Windows popup dialog.
+- Prompt is inline and DOS-style:
+  - <<< LOOK UP AREA CODES >>>
+  - prompt text
+  - [A = All] [Q = Quit] ? _
+- Valid inputs:
+  - A = show all area codes
+  - Q = quit
+  - 2-letter state/province code = filtered list
+  - numeric area code = location lookup
+- Results may be shown in a separate viewer in WinForms.
+- Scrollbar-based result viewing is acceptable in the WinForms version.
+
+## Confirmed H Behavior
+- Opens zip code lookup popup/form.
+- Current implementation is acceptable.
+
+## Confirmed I Behavior
+- Inline flow exists and is currently acceptable as placeholder/test behavior.
+
+## E and F Status
+- Prompt scaffolding exists in WinForms.
+- Final output/printing behavior still needs to be implemented.
+- These are the next development priority.
+```
+
+---
+
+# How to use this tomorrow
+
+## Tomorrow startup routine
+Paste these in this order:
+
+### Message 1
+Contents of:
+- `00-next-day-kickoff.md`
+
+### Message 2
+Contents of:
+- `01-amiwinforms-scan.md`
+
+### Message 3
+Contents of:
+- `02-amidatastore-scan.md`
+
+### Message 4
+Contents of:
+- `03-dos-mainmenu-behavior.md`
+
+That should be enough to get me aligned much faster.
+
+---
+
+# Very important improvement
+Do **not** make these giant prose summaries.
+
+Use:
+- bullets
+- file lists
+- â€œconfirmed factsâ€
+- â€œopen questionsâ€
+- â€œnext stepsâ€
+
+That is much more ingestible than transcript-like narrative.
+
+---
+
+# Best workflow for end of each day
+Here is the routine I recommend:
+
+## 1. Export full chat
+Keep as archive.
+
+## 2. Update the 4 compact files
+Only revise what changed that day.
+
+## 3. Optional: add a `today-changes` section
+At the top of `00-next-day-kickoff.md`, include:
+- files changed today
+- what was decided
+- what broke / what got fixed
+- next first task
+
+That keeps the daily update small.
+
+---
+
+# Even better: use a stable template every day
+If you keep the same headings every day, I can absorb it faster.
+
+Here is the ideal stable format:
+
+```markdown
+# Next Day Kickoff
+
+## Objective
+## Completed Today
+## Decisions
+## Current Working Features
+## Remaining Work
+## Files Changed
+## Known Data Facts
+## Known Risks / Gotchas
+## First Task Next Session
+```
+
+---
+
+# What you want from me today
+You said you want a way to capture all this in short pieces.
+
+## Best answer
+Yes â€” I can generate those compact end-of-day artifacts for you.
+
+## Recommended set
+At the end of each day, ask me to generate:
+
+1. **Next Day Kickoff**
+2. **AmiWinForms Scan Snapshot**
+3. **AMiDataStore Scan Snapshot**
+4. **DOS MainMenu Behavior Reference**
+5. optionally **Todayâ€™s Full Technical Summary**
+
+---
+
+# Important limitation to plan around
+You are correct that next day I may not retain prior repo scans or detailed conclusions unless you provide them again.
+
+So the fix is **not** to depend on memory.
+
+The fix is to maintain a **portable continuity pack** that is:
+- small
+- structured
+- reusable
+- pasteable
+
+Thatâ€™s the robust solution.
+
+---
+
+# My recommendation for your exact workflow
+At the end of every day, tell me:
+
+> Generate the 4 continuity files for tomorrow:
+> 1. Next Day Kickoff
+> 2. AmiWinForms Scan Snapshot
+> 3. AMiDataStore Scan Snapshot
+> 4. DOS MainMenu Behavior Reference
