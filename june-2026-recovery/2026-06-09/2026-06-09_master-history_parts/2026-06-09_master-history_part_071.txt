@@ -1,0 +1,2000 @@
+﻿
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddOtherCheck
+    Inherits Form
+
+    Private Const ScreenTitle As String = "Add A Check"
+
+    Private ReadOnly lblIntro As New Label()
+
+    Private ReadOnly lblCompany As New Label()
+    Private ReadOnly txtCompany As New TextBox()
+
+    Private ReadOnly lblCheckNumber As New Label()
+    Private ReadOnly txtCheckNumber As New TextBox()
+
+    Private ReadOnly lblReference As New Label()
+    Private ReadOnly txtReference As New TextBox()
+
+    Private ReadOnly lblDate As New Label()
+    Private ReadOnly txtDate As New TextBox()
+
+    Private ReadOnly lblAmount As New Label()
+    Private ReadOnly txtAmount As New TextBox()
+
+    Private ReadOnly lblReason As New Label()
+    Private ReadOnly txtReason As New TextBox()
+
+    Private ReadOnly btnAdd As New Button()
+    Private ReadOnly btnReEnter As New Button()
+    Private ReadOnly btnCancel As New Button()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 760
+        Height = 500
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.White
+
+        BuildUi()
+        ResetForm()
+    End Sub
+
+    Private Sub BuildUi()
+        Dim outer As New Panel() With {
+            .Dock = DockStyle.Fill,
+            .Padding = New Padding(16),
+            .BackColor = Color.Black
+        }
+
+        Dim title As New Label() With {
+            .Dock = DockStyle.Top,
+            .Height = 28,
+            .Text = "***** Add A Check *****",
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Regular, GraphicsUnit.Point),
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        lblIntro.Dock = DockStyle.Top
+        lblIntro.Height = 34
+        lblIntro.Text = "This is usually for over payments or checks that are Not paying for invoices"
+        lblIntro.ForeColor = Color.Black
+        lblIntro.BackColor = Color.Silver
+        lblIntro.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblIntro.TextAlign = ContentAlignment.MiddleLeft
+
+        Dim grid As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .AutoSize = True,
+            .ColumnCount = 2,
+            .RowCount = 6,
+            .Padding = New Padding(0, 20, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 180))
+        grid.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+
+        ConfigureLabel(lblCompany, "Company Name")
+        ConfigureLabel(lblCheckNumber, "Check #")
+        ConfigureLabel(lblReference, "Check Reference")
+        ConfigureLabel(lblDate, "Date")
+        ConfigureLabel(lblAmount, "Check Amount")
+        ConfigureLabel(lblReason, "Reason Why")
+
+        ConfigureTextBox(txtCompany, 40)
+        ConfigureTextBox(txtCheckNumber, 20)
+        ConfigureTextBox(txtReference, 40)
+        ConfigureTextBox(txtDate, 12)
+        ConfigureTextBox(txtAmount, 20)
+        ConfigureTextBox(txtReason, 80)
+
+        grid.Controls.Add(lblCompany, 0, 0)
+        grid.Controls.Add(txtCompany, 1, 0)
+        grid.Controls.Add(lblCheckNumber, 0, 1)
+        grid.Controls.Add(txtCheckNumber, 1, 1)
+        grid.Controls.Add(lblReference, 0, 2)
+        grid.Controls.Add(txtReference, 1, 2)
+        grid.Controls.Add(lblDate, 0, 3)
+        grid.Controls.Add(txtDate, 1, 3)
+        grid.Controls.Add(lblAmount, 0, 4)
+        grid.Controls.Add(txtAmount, 1, 4)
+        grid.Controls.Add(lblReason, 0, 5)
+        grid.Controls.Add(txtReason, 1, 5)
+
+        Dim buttons As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 48,
+            .Padding = New Padding(0, 22, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        ConfigureButton(btnAdd, "Add This Check")
+        ConfigureButton(btnReEnter, "Re-Enter")
+        ConfigureButton(btnCancel, "Quit")
+
+        AddHandler btnAdd.Click, Sub() SaveCheck()
+        AddHandler btnReEnter.Click, Sub() ResetForm()
+        AddHandler btnCancel.Click, Sub() Close()
+
+        buttons.Controls.Add(btnAdd)
+        buttons.Controls.Add(btnReEnter)
+        buttons.Controls.Add(btnCancel)
+
+        outer.Controls.Add(buttons)
+        outer.Controls.Add(grid)
+        outer.Controls.Add(lblIntro)
+        outer.Controls.Add(title)
+
+        Controls.Add(outer)
+    End Sub
+
+    Private Sub ConfigureLabel(lbl As Label, text As String)
+        lbl.Text = text & ":"
+        lbl.AutoSize = True
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lbl.Margin = New Padding(0, 8, 8, 8)
+        lbl.Anchor = AnchorStyles.Left
+    End Sub
+
+    Private Sub ConfigureTextBox(txt As TextBox, maxLen As Integer)
+        txt.Width = 420
+        txt.MaxLength = maxLen
+        txt.BorderStyle = BorderStyle.FixedSingle
+        txt.BackColor = Color.Black
+        txt.ForeColor = Color.White
+        txt.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txt.Margin = New Padding(0, 4, 0, 4)
+        txt.Anchor = AnchorStyles.Left
+    End Sub
+
+    Private Sub ConfigureButton(btn As Button, text As String)
+        btn.Text = text
+        btn.Width = 140
+        btn.Height = 30
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.Margin = New Padding(0, 0, 12, 0)
+    End Sub
+
+    Private Sub ResetForm()
+        txtCompany.Text = ""
+        txtCheckNumber.Text = ""
+        txtReference.Text = ""
+        txtDate.Text = Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)
+        txtAmount.Text = ""
+        txtReason.Text = ""
+        txtCompany.Focus()
+    End Sub
+
+    Private Sub SaveCheck()
+        Dim company As String = txtCompany.Text.Trim()
+        Dim checkNumber As String = txtCheckNumber.Text.Trim()
+        Dim reference As String = txtReference.Text.Trim()
+        Dim dateText As String = txtDate.Text.Trim()
+        Dim amountText As String = txtAmount.Text.Trim()
+        Dim reason As String = txtReason.Text.Trim()
+
+        If String.Equals(company, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If company = "" Then
+            MessageBox.Show(Me, "Company Name is required.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCompany.Focus()
+            Return
+        End If
+
+        If checkNumber = "" Then
+            MessageBox.Show(Me, "Check # is required.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCheckNumber.Focus()
+            Return
+        End If
+
+        If dateText = "" Then
+            dateText = Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)
+        End If
+
+        Dim parsedDate As DateTime
+        If Not DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, parsedDate) AndAlso
+           Not DateTime.TryParse(dateText, parsedDate) Then
+            MessageBox.Show(Me, "Enter a valid date.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtDate.Focus()
+            Return
+        End If
+
+        Dim amount As Decimal
+        If Not Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, amount) AndAlso
+           Not Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.CurrentCulture, amount) Then
+            MessageBox.Show(Me, "Enter a valid check amount.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtAmount.Focus()
+            Return
+        End If
+
+        Dim entry As New OtherCheckEntry() With {
+            .Company = company,
+            .DateText = parsedDate.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture),
+            .CheckNumber = checkNumber,
+            .Amount = amount,
+            .Reference = reference,
+            .ReasonWhy = reason
+        }
+
+        Dim confirmText As String =
+            "Company Name: " & entry.Company & Environment.NewLine &
+            "Check #: " & entry.CheckNumber & Environment.NewLine &
+            "Check Reference: " & entry.Reference & Environment.NewLine &
+            "Date: " & entry.DateText & Environment.NewLine &
+            "Check Amount: " & entry.Amount.ToString("0.##", CultureInfo.InvariantCulture) & Environment.NewLine &
+            "Reason Why: " & entry.ReasonWhy & Environment.NewLine & Environment.NewLine &
+            "Add this check?"
+
+        Dim result = MessageBox.Show(Me, confirmText, ScreenTitle, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+
+        If result <> DialogResult.Yes Then
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+
+        Try
+            OtherChkWriter.Append(path, entry)
+            MessageBox.Show(Me, "Check added.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            ResetForm()
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to write OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+End Class
+```
+
+---
+
+## 3. New file: `FormDeleteOtherCheck.vb`
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormDeleteOtherCheck
+    Inherits Form
+
+    Private Const ScreenTitle As String = "Delete A Check"
+
+    Private ReadOnly lblIntro As New Label()
+    Private ReadOnly lblCheckNumber As New Label()
+    Private ReadOnly txtCheckNumber As New TextBox()
+    Private ReadOnly btnFind As New Button()
+    Private ReadOnly btnClose As New Button()
+
+    Private ReadOnly txtDetails As New TextBox()
+    Private ReadOnly btnDelete As New Button()
+    Private ReadOnly btnKeep As New Button()
+
+    Private _matchedEntry As OtherCheckEntry = Nothing
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 760
+        Height = 460
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.White
+
+        BuildUi()
+    End Sub
+
+    Private Sub BuildUi()
+        Dim outer As New Panel() With {
+            .Dock = DockStyle.Fill,
+            .Padding = New Padding(16),
+            .BackColor = Color.Black
+        }
+
+        Dim title As New Label() With {
+            .Dock = DockStyle.Top,
+            .Height = 28,
+            .Text = "***** Delete A Check *****",
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Regular, GraphicsUnit.Point),
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        lblIntro.Dock = DockStyle.Top
+        lblIntro.Height = 34
+        lblIntro.Text = "This is usually for over payments or checks that are Not paying for invoices"
+        lblIntro.ForeColor = Color.Black
+        lblIntro.BackColor = Color.Silver
+        lblIntro.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblIntro.TextAlign = ContentAlignment.MiddleLeft
+
+        Dim topRow As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .Padding = New Padding(0, 18, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        lblCheckNumber.Text = "Check # to Delete:"
+        lblCheckNumber.AutoSize = True
+        lblCheckNumber.ForeColor = Color.White
+        lblCheckNumber.BackColor = Color.Black
+        lblCheckNumber.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblCheckNumber.Padding = New Padding(0, 6, 8, 0)
+
+        txtCheckNumber.Width = 180
+        txtCheckNumber.MaxLength = 20
+        txtCheckNumber.BorderStyle = BorderStyle.FixedSingle
+        txtCheckNumber.BackColor = Color.Black
+        txtCheckNumber.ForeColor = Color.White
+        txtCheckNumber.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        ConfigureButton(btnFind, "Find")
+        ConfigureButton(btnClose, "Quit")
+        AddHandler btnFind.Click, Sub() FindEntry()
+        AddHandler btnClose.Click, Sub() Close()
+
+        topRow.Controls.Add(lblCheckNumber)
+        topRow.Controls.Add(txtCheckNumber)
+        topRow.Controls.Add(btnFind)
+        topRow.Controls.Add(btnClose)
+
+        txtDetails.Dock = DockStyle.Top
+        txtDetails.Height = 160
+        txtDetails.Multiline = True
+        txtDetails.ReadOnly = True
+        txtDetails.BorderStyle = BorderStyle.FixedSingle
+        txtDetails.BackColor = Color.Black
+        txtDetails.ForeColor = Color.White
+        txtDetails.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtDetails.Visible = False
+
+        Dim bottomButtons As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .Padding = New Padding(0, 12, 0, 0),
+            .BackColor = Color.Black,
+            .Visible = False
+        }
+
+        ConfigureButton(btnDelete, "Delete This Check")
+        ConfigureButton(btnKeep, "Keep This Check")
+        AddHandler btnDelete.Click, Sub() DeleteEntry()
+        AddHandler btnKeep.Click, Sub() ClearMatch()
+
+        bottomButtons.Controls.Add(btnDelete)
+        bottomButtons.Controls.Add(btnKeep)
+
+        outer.Controls.Add(bottomButtons)
+        outer.Controls.Add(txtDetails)
+        outer.Controls.Add(topRow)
+        outer.Controls.Add(lblIntro)
+        outer.Controls.Add(title)
+
+        Controls.Add(outer)
+
+        btnDelete.Tag = bottomButtons
+        btnKeep.Tag = bottomButtons
+    End Sub
+
+    Private Sub ConfigureButton(btn As Button, text As String)
+        btn.Text = text
+        btn.Width = 150
+        btn.Height = 30
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.Margin = New Padding(0, 0, 12, 0)
+    End Sub
+
+    Private Sub FindEntry()
+        Dim checkNumber As String = txtCheckNumber.Text.Trim()
+
+        If String.Equals(checkNumber, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If checkNumber = "" Then
+            MessageBox.Show(Me, "Enter a check number.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCheckNumber.Focus()
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+        Dim allEntries As List(Of OtherCheckEntry)
+
+        Try
+            allEntries = OtherChkReader.ReadAll(path)
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to read OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+
+        _matchedEntry =
+            allEntries.FirstOrDefault(Function(x) String.Equals(If(x.CheckNumber, "").Trim(),
+                                                                checkNumber,
+                                                                StringComparison.OrdinalIgnoreCase))
+
+        If _matchedEntry Is Nothing Then
+            MessageBox.Show(Me, "Check not found.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            ClearMatch()
+            Return
+        End If
+
+        txtDetails.Text =
+            "Company Name: " & _matchedEntry.Company & Environment.NewLine &
+            "Check #: " & _matchedEntry.CheckNumber & Environment.NewLine &
+            "Check Reference: " & _matchedEntry.Reference & Environment.NewLine &
+            "Date: " & _matchedEntry.DateText & Environment.NewLine &
+            "Check Amount: " & _matchedEntry.Amount.ToString("0.##") & Environment.NewLine &
+            "Reason Why: " & _matchedEntry.ReasonWhy
+
+        txtDetails.Visible = True
+        Dim buttonPanel = TryCast(btnDelete.Tag, FlowLayoutPanel)
+        If buttonPanel IsNot Nothing Then
+            buttonPanel.Visible = True
+        End If
+    End Sub
+
+    Private Sub DeleteEntry()
+        If _matchedEntry Is Nothing Then
+            Return
+        End If
+
+        Dim confirm = MessageBox.Show(Me,
+                                      "Delete this check?",
+                                      ScreenTitle,
+                                      MessageBoxButtons.YesNo,
+                                      MessageBoxIcon.Warning,
+                                      MessageBoxDefaultButton.Button2)
+
+        If confirm <> DialogResult.Yes Then
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+
+        Try
+            Dim allEntries = OtherChkReader.ReadAll(path)
+
+            Dim removed As Boolean = False
+            Dim remaining As New List(Of OtherCheckEntry)()
+
+            For Each entry As OtherCheckEntry In allEntries
+                If Not removed AndAlso EntriesMatch(entry, _matchedEntry) Then
+                    removed = True
+                Else
+                    remaining.Add(entry)
+                End If
+            Next
+
+            OtherChkWriter.WriteAll(path, remaining)
+
+            MessageBox.Show(Me, "Check deleted.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            txtCheckNumber.Text = ""
+            ClearMatch()
+            txtCheckNumber.Focus()
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to update OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub ClearMatch()
+        _matchedEntry = Nothing
+        txtDetails.Text = ""
+        txtDetails.Visible = False
+
+        Dim buttonPanel = TryCast(btnDelete.Tag, FlowLayoutPanel)
+        If buttonPanel IsNot Nothing Then
+            buttonPanel.Visible = False
+        End If
+    End Sub
+
+    Private Shared Function EntriesMatch(a As OtherCheckEntry, b As OtherCheckEntry) As Boolean
+        If a Is Nothing OrElse b Is Nothing Then
+            Return False
+        End If
+
+        Return String.Equals(If(a.Company, "").Trim(), If(b.Company, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.DateText, "").Trim(), If(b.DateText, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.CheckNumber, "").Trim(), If(b.CheckNumber, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               a.Amount = b.Amount AndAlso
+               String.Equals(If(a.Reference, "").Trim(), If(b.Reference, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.ReasonWhy, "").Trim(), If(b.ReasonWhy, "").Trim(), StringComparison.OrdinalIgnoreCase)
+    End Function
+End Class
+```
+
+---
+
+## 4. Update `FormLedgerMenu.vb` for buttons 6 and 7
+
+Replace these two lines:
+
+```vbnet
+AddMenuButton(p, "6", "Add OTHER Checks", Sub() NotYet("Add OTHER Checks"))
+AddMenuButton(p, "7", "Delete OTHER Checks", Sub() NotYet("Delete OTHER Checks"))
+```
+
+with:
+
+```vbnet
+AddMenuButton(p, "6", "Add OTHER Checks", Sub()
+                                              Using f As New FormAddOtherCheck()
+                                                  f.ShowDialog(Me)
+                                              End Using
+                                          End Sub)
+AddMenuButton(p, "7", "Delete OTHER Checks", Sub()
+                                                 Using f As New FormDeleteOtherCheck()
+                                                     f.ShowDialog(Me)
+                                                 End Using
+                                             End Sub)
+```
+
+---
+
+
+
+## @testsubject117
+
+what types of files are each of these, class or form?
+
+## Copilot
+
+- `OtherChkWriter.vb` â†’ **Class**
+- `FormAddOtherCheck.vb` â†’ **Form**
+- `FormDeleteOtherCheck.vb` â†’ **Form**
+
+And in `FormLedgerMenu.vb`, youâ€™re just **updating an existing form**.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30456	'GetDirectoryName' is not a member of 'String'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\OtherChkWriter.vb	17	
+Error (active)	BC30456	'GetDirectoryName' is not a member of 'String'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\OtherChkWriter.vb	39	
+
+
+## Copilot
+
+That error is because VB is treating `Path` as your **parameter name** (`path As String`), not `System.IO.Path`.
+
+## Fix
+In `OtherChkWriter.vb`, change:
+
+```vbnet
+Dim directoryPath As String = Path.GetDirectoryName(path)
+```
+
+to:
+
+```vbnet
+Dim directoryPath As String = System.IO.Path.GetDirectoryName(path)
+```
+
+Do that in both places.
+
+---
+
+## Corrected `OtherChkWriter.vb`
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class OtherChkWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As OtherCheckEntry)
+        If entry Is Nothing Then
+            Throw New ArgumentNullException(NameOf(entry))
+        End If
+
+        Dim directoryPath As String = System.IO.Path.GetDirectoryName(path)
+        If directoryPath <> "" AndAlso Not Directory.Exists(directoryPath) Then
+            Directory.CreateDirectory(directoryPath)
+        End If
+
+        Dim lines As New List(Of String) From {
+            Quote(entry.Company),
+            Quote(entry.DateText),
+            Quote(entry.CheckNumber),
+            entry.Amount.ToString("0.##", CultureInfo.InvariantCulture),
+            Quote(entry.Reference),
+            Quote(entry.ReasonWhy)
+        }
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line As String In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of OtherCheckEntry))
+        Dim directoryPath As String = System.IO.Path.GetDirectoryName(path)
+        If directoryPath <> "" AndAlso Not Directory.Exists(directoryPath) Then
+            Directory.CreateDirectory(directoryPath)
+        End If
+
+        Dim safeEntries As List(Of OtherCheckEntry) =
+            If(entries IsNot Nothing, entries.ToList(), New List(Of OtherCheckEntry)())
+
+        Using sw As New StreamWriter(path, append:=False, encoding:=Encoding.ASCII)
+            For Each entry As OtherCheckEntry In safeEntries
+                sw.WriteLine(Quote(entry.Company))
+                sw.WriteLine(Quote(entry.DateText))
+                sw.WriteLine(Quote(entry.CheckNumber))
+                sw.WriteLine(entry.Amount.ToString("0.##", CultureInfo.InvariantCulture))
+                sw.WriteLine(Quote(entry.Reference))
+                sw.WriteLine(Quote(entry.ReasonWhy))
+            Next
+
+            sw.Write(ChrW(26))
+        End Using
+    End Sub
+
+    Private Shared Function Quote(value As String) As String
+        Dim s As String = If(value, "").Trim().Replace("""", """""")
+        Return """" & s & """"
+    End Function
+End Class
+```
+
+## Why it happened
+Because inside this function:
+
+```vbnet
+Public Shared Sub Append(path As String, entry As OtherCheckEntry)
+```
+
+the name `path` shadows `Path`.
+
+So VB reads:
+
+```vbnet
+Path.GetDirectoryName(path)
+```
+
+as if it were:
+
+```vbnet
+path.GetDirectoryName(path)
+```
+
+and a string doesnâ€™t have that method.
+
+If you want, after you recompile, send me the next errors if any and Iâ€™ll clean them up quickly.
+
+## @testsubject117
+
+'Public Sub New()' in designer-generated type 'FormDeleteCheck' should call InitializeComponent method.
+
+## Copilot
+
+That means one of your new forms was probably added in a way that made Visual Studio think itâ€™s a **designer form**, but the code you pasted is a **code-only form**.
+
+## Direct fix
+For the new forms:
+
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+make sure they were added as plain **Class** files, not as WinForms designer-created Forms.
+
+---
+
+## Why this happens
+A designer-created form is usually split into:
+
+- `FormX.vb`
+- `FormX.Designer.vb`
+- `FormX.resx`
+
+and the constructor expects:
+
+```vbnet
+InitializeComponent()
+```
+
+But the code I gave you builds the UI manually in `OnLoad`, so it should be a **single code file**, no designer.
+
+---
+
+# Most likely issue
+You may have accidentally created one of these as a designer form and then replaced only part of the file.
+
+The error message mentions:
+
+- **`FormDeleteCheck`**
+
+That is interesting, because that is your **existing** form, not one of the new ones.
+
+So likely one of these happened:
+
+1. `FormDeleteCheck` itself has a constructor problem
+2. Visual Studio got confused by a partial/designer mismatch
+3. a new file was created with the wrong item type and project metadata got odd
+
+---
+
+# First thing to check
+Open `FormDeleteCheck.vb`.
+
+If it is a designer-backed form, it should contain something like:
+
+```vbnet
+Public Sub New()
+    InitializeComponent()
+End Sub
+```
+
+If it doesnâ€™t, thatâ€™s the immediate problem.
+
+---
+
+# If `FormDeleteCheck` is an existing designer form
+Make sure its main file includes:
+
+```vbnet
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+End Sub
+```
+
+or at minimum:
+
+```vbnet
+Public Sub New()
+    InitializeComponent()
+End Sub
+```
+
+---
+
+# Important distinction
+## These should be code-only:
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+## This existing one may be designer-backed:
+- `FormDeleteCheck.vb`
+
+So the new forms do **not** need `InitializeComponent()` unless you created them via the designer.
+
+---
+
+# Best next step
+Please paste:
+
+- `FormDeleteCheck.vb`
+
+because the error is specifically about that form, and I can tell you exactly what line to fix.
+
+If you want a quick guess in the meantime, add this to `FormDeleteCheck.vb` if it has no constructor:
+
+```vbnet
+Public Sub New()
+    InitializeComponent()
+End Sub
+```
+
+But paste the file first if you want the safest answer.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+    Private _matchingChecks As New List(Of LedgerEntry)()
+    Private _matchIndex As Integer = -1
+    Private _hasMultipleMatches As Boolean = False
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 700, 25)
+        lblLine1 = CreateLabel(20, 60, 850, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+        _matchingChecks.Clear()
+        _matchIndex = -1
+        _hasMultipleMatches = False
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+
+        If _hasMultipleMatches Then
+            lblPrompt.Text = "Match " & (_matchIndex + 1).ToString() & " of " & _matchingChecks.Count.ToString() &
+                             "   [Y = Delete] [N = Next Match] [ESC = Cancel]"
+        Else
+            lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+        End If
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim matches As New List(Of LedgerEntry)()
+            Dim i As Integer
+
+            For i = 0 To entries.Count - 1
+                If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+                    matches.Add(entries(i))
+                End If
+            Next
+
+            If matches.Count = 0 Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            _matchingChecks = matches
+            _matchIndex = 0
+            _hasMultipleMatches = (matches.Count > 1)
+
+            ShowCheckDetails(_matchingChecks(_matchIndex))
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                If _hasMultipleMatches AndAlso _matchingChecks.Count > 1 Then
+                    _matchIndex += 1
+                    If _matchIndex >= _matchingChecks.Count Then
+                        _matchIndex = 0
+                    End If
+
+                    ShowCheckDetails(_matchingChecks(_matchIndex))
+                    Return True
+                Else
+                    Me.DialogResult = DialogResult.Cancel
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        ResetInvoicesToUnpaid(info)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim updated As New List(Of LedgerEntry)()
+        Dim i As Integer
+
+        For i = 0 To entries.Count - 1
+            If Not LedgerEntriesMatch(entries(i), info) Then
+                updated.Add(entries(i))
+            End If
+        Next
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim updated As New List(Of CheckInvBlock)()
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If Not CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                updated.Add(blocks(i))
+            End If
+        Next
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+    Private Sub ResetInvoicesToUnpaid(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                Dim j As Integer
+
+                For j = 0 To blocks(i).Invoices.Count - 1
+                    Dim invoiceText As String = blocks(i).Invoices(j)
+                    Dim invoiceNumber As Long
+
+                    If Long.TryParse(invoiceText, invoiceNumber) Then
+                        InvoiceChkWriter.SetFlag(LegacyDataPaths.InvoiceChk, invoiceNumber, "J")
+                    End If
+                Next
+
+                Exit For
+            End If
+        Next
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If x.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If block.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+End Class
+```
+
+## Copilot
+
+`FormDeleteCheck.vb` is fine. It is **not** a designer form and it does **not** need `InitializeComponent()`.
+
+So that error is almost certainly coming from a **project file / designer metadata mismatch**, not from the code you pasted.
+
+## Direct answer
+Your new code-only forms should follow the same pattern as `FormDeleteCheck`:
+
+- inherit `Form`
+- build controls in code
+- have a constructor like:
+```vbnet
+Public Sub New()
+    MyBase.New()
+End Sub
+```
+or no constructor at all
+- **do not** call `InitializeComponent()`
+
+---
+
+# Why you got that message
+Visual Studio sometimes thinks a file is designer-backed if:
+
+- it was added as a **Windows Form** item instead of a plain class
+- it has a `.Designer.vb` partner
+- or its project metadata still marks it as a form with designer support
+
+Then it expects:
+```vbnet
+InitializeComponent()
+```
+
+But your code-only forms donâ€™t use that pattern.
+
+---
+
+# What to do for the new forms
+## Best approach
+Create `FormAddOtherCheck.vb` and `FormDeleteOtherCheck.vb` as **plain class files**, not designer forms.
+
+Then use code like this at the top:
+
+```vbnet
+Public Class FormAddOtherCheck
+    Inherits Form
+```
+
+and
+
+```vbnet
+Public Class FormDeleteOtherCheck
+    Inherits Form
+```
+
+That is valid.
+
+---
+
+# If Visual Studio already created designer baggage
+Check whether either of these exists:
+
+- `FormAddOtherCheck.Designer.vb`
+- `FormAddOtherCheck.resx`
+- `FormDeleteOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.resx`
+
+## If they exist and you want code-only forms:
+remove those designer companion files from the project.
+
+Because if those exist, Visual Studio may keep expecting `InitializeComponent()`.
+
+---
+
+# Safest pattern for your new forms
+To match your existing code style, I recommend adding explicit constructors.
+
+## For `FormAddOtherCheck.vb`
+Add:
+
+```vbnet
+Public Sub New()
+    MyBase.New()
+End Sub
+```
+
+## For `FormDeleteOtherCheck.vb`
+Add:
+
+```vbnet
+Public Sub New()
+    MyBase.New()
+End Sub
+```
+
+Not strictly required, but it makes them look like your existing manual forms.
+
+---
+
+# Important conclusion
+## This file is fine:
+- `FormDeleteCheck.vb`
+
+## Likely issue:
+- one of the **new forms** was created as a designer form instead of a plain class
+
+---
+
+# What I would do right now
+1. delete the newly added form items from Solution Explorer **if they were added as Windows Forms**
+2. re-add them as:
+   - **Class**
+3. paste in the code again
+
+---
+
+# Short rule
+## Use **Class** for:
+- `OtherChkWriter.vb`
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+Even though the last two inherit `Form`, for **your project pattern** they should still be added as plain `.vb` class files if you are building the UI manually.
+
+---
+
+If you want, I can also give you a **clean constructor-added version** of both new forms to match `FormDeleteCheck` style exactly.
+
+## @testsubject117
+
+how about I paste the code for formaddothercheck, formdeleteothercheck and any other files you need, so you can review and tell me which file is the offender
+
+## Copilot
+
+Yes â€” do that.
+
+## Please paste these files:
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+And if they exist, also tell me whether you have any of these:
+- `FormAddOtherCheck.Designer.vb`
+- `FormAddOtherCheck.resx`
+- `FormDeleteOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.resx`
+
+If they do exist, paste them too, or just say:
+- â€œyes, designer/resx exists for Xâ€
+- â€œno, only the .vb file existsâ€
+
+## Why
+The offender is most likely:
+- a form added as a **designer form**
+- but implemented as a **code-only form**
+
+So once I see those files, I can tell you exactly:
+- which file is causing the mismatch
+- whether to remove designer files
+- whether to add/remove `InitializeComponent()`
+- what the correct final structure should be.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Globalization
+Imports System.Windows.Forms
+
+Public Class FormAddOtherCheck
+    Inherits Form
+
+    Private Const ScreenTitle As String = "Add A Check"
+
+    Private ReadOnly lblIntro As New Label()
+
+    Private ReadOnly lblCompany As New Label()
+    Private ReadOnly txtCompany As New TextBox()
+
+    Private ReadOnly lblCheckNumber As New Label()
+    Private ReadOnly txtCheckNumber As New TextBox()
+
+    Private ReadOnly lblReference As New Label()
+    Private ReadOnly txtReference As New TextBox()
+
+    Private ReadOnly lblDate As New Label()
+    Private ReadOnly txtDate As New TextBox()
+
+    Private ReadOnly lblAmount As New Label()
+    Private ReadOnly txtAmount As New TextBox()
+
+    Private ReadOnly lblReason As New Label()
+    Private ReadOnly txtReason As New TextBox()
+
+    Private ReadOnly btnAdd As New Button()
+    Private ReadOnly btnReEnter As New Button()
+    Private ReadOnly btnCancel As New Button()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 760
+        Height = 500
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.White
+
+        BuildUi()
+        ResetForm()
+    End Sub
+
+    Private Sub BuildUi()
+        Dim outer As New Panel() With {
+            .Dock = DockStyle.Fill,
+            .Padding = New Padding(16),
+            .BackColor = Color.Black
+        }
+
+        Dim title As New Label() With {
+            .Dock = DockStyle.Top,
+            .Height = 28,
+            .Text = "***** Add A Check *****",
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Regular, GraphicsUnit.Point),
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        lblIntro.Dock = DockStyle.Top
+        lblIntro.Height = 34
+        lblIntro.Text = "This is usually for over payments or checks that are Not paying for invoices"
+        lblIntro.ForeColor = Color.Black
+        lblIntro.BackColor = Color.Silver
+        lblIntro.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblIntro.TextAlign = ContentAlignment.MiddleLeft
+
+        Dim grid As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .AutoSize = True,
+            .ColumnCount = 2,
+            .RowCount = 6,
+            .Padding = New Padding(0, 20, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        grid.ColumnStyles.Add(New ColumnStyle(SizeType.Absolute, 180))
+        grid.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+
+        ConfigureLabel(lblCompany, "Company Name")
+        ConfigureLabel(lblCheckNumber, "Check #")
+        ConfigureLabel(lblReference, "Check Reference")
+        ConfigureLabel(lblDate, "Date")
+        ConfigureLabel(lblAmount, "Check Amount")
+        ConfigureLabel(lblReason, "Reason Why")
+
+        ConfigureTextBox(txtCompany, 40)
+        ConfigureTextBox(txtCheckNumber, 20)
+        ConfigureTextBox(txtReference, 40)
+        ConfigureTextBox(txtDate, 12)
+        ConfigureTextBox(txtAmount, 20)
+        ConfigureTextBox(txtReason, 80)
+
+        grid.Controls.Add(lblCompany, 0, 0)
+        grid.Controls.Add(txtCompany, 1, 0)
+        grid.Controls.Add(lblCheckNumber, 0, 1)
+        grid.Controls.Add(txtCheckNumber, 1, 1)
+        grid.Controls.Add(lblReference, 0, 2)
+        grid.Controls.Add(txtReference, 1, 2)
+        grid.Controls.Add(lblDate, 0, 3)
+        grid.Controls.Add(txtDate, 1, 3)
+        grid.Controls.Add(lblAmount, 0, 4)
+        grid.Controls.Add(txtAmount, 1, 4)
+        grid.Controls.Add(lblReason, 0, 5)
+        grid.Controls.Add(txtReason, 1, 5)
+
+        Dim buttons As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 48,
+            .Padding = New Padding(0, 22, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        ConfigureButton(btnAdd, "Add This Check")
+        ConfigureButton(btnReEnter, "Re-Enter")
+        ConfigureButton(btnCancel, "Quit")
+
+        AddHandler btnAdd.Click, Sub() SaveCheck()
+        AddHandler btnReEnter.Click, Sub() ResetForm()
+        AddHandler btnCancel.Click, Sub() Close()
+
+        buttons.Controls.Add(btnAdd)
+        buttons.Controls.Add(btnReEnter)
+        buttons.Controls.Add(btnCancel)
+
+        outer.Controls.Add(buttons)
+        outer.Controls.Add(grid)
+        outer.Controls.Add(lblIntro)
+        outer.Controls.Add(title)
+
+        Controls.Add(outer)
+    End Sub
+
+    Private Sub ConfigureLabel(lbl As Label, text As String)
+        lbl.Text = text & ":"
+        lbl.AutoSize = True
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lbl.Margin = New Padding(0, 8, 8, 8)
+        lbl.Anchor = AnchorStyles.Left
+    End Sub
+
+    Private Sub ConfigureTextBox(txt As TextBox, maxLen As Integer)
+        txt.Width = 420
+        txt.MaxLength = maxLen
+        txt.BorderStyle = BorderStyle.FixedSingle
+        txt.BackColor = Color.Black
+        txt.ForeColor = Color.White
+        txt.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txt.Margin = New Padding(0, 4, 0, 4)
+        txt.Anchor = AnchorStyles.Left
+    End Sub
+
+    Private Sub ConfigureButton(btn As Button, text As String)
+        btn.Text = text
+        btn.Width = 140
+        btn.Height = 30
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.Margin = New Padding(0, 0, 12, 0)
+    End Sub
+
+    Private Sub ResetForm()
+        txtCompany.Text = ""
+        txtCheckNumber.Text = ""
+        txtReference.Text = ""
+        txtDate.Text = Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)
+        txtAmount.Text = ""
+        txtReason.Text = ""
+        txtCompany.Focus()
+    End Sub
+
+    Private Sub SaveCheck()
+        Dim company As String = txtCompany.Text.Trim()
+        Dim checkNumber As String = txtCheckNumber.Text.Trim()
+        Dim reference As String = txtReference.Text.Trim()
+        Dim dateText As String = txtDate.Text.Trim()
+        Dim amountText As String = txtAmount.Text.Trim()
+        Dim reason As String = txtReason.Text.Trim()
+
+        If String.Equals(company, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If company = "" Then
+            MessageBox.Show(Me, "Company Name is required.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCompany.Focus()
+            Return
+        End If
+
+        If checkNumber = "" Then
+            MessageBox.Show(Me, "Check # is required.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCheckNumber.Focus()
+            Return
+        End If
+
+        If dateText = "" Then
+            dateText = Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)
+        End If
+
+        Dim parsedDate As DateTime
+        If Not DateTime.TryParse(dateText, CultureInfo.InvariantCulture, DateTimeStyles.None, parsedDate) AndAlso
+           Not DateTime.TryParse(dateText, parsedDate) Then
+            MessageBox.Show(Me, "Enter a valid date.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtDate.Focus()
+            Return
+        End If
+
+        Dim amount As Decimal
+        If Not Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.InvariantCulture, amount) AndAlso
+           Not Decimal.TryParse(amountText, NumberStyles.Any, CultureInfo.CurrentCulture, amount) Then
+            MessageBox.Show(Me, "Enter a valid check amount.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtAmount.Focus()
+            Return
+        End If
+
+        Dim entry As New OtherCheckEntry() With {
+            .Company = company,
+            .DateText = parsedDate.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture),
+            .CheckNumber = checkNumber,
+            .Amount = amount,
+            .Reference = reference,
+            .ReasonWhy = reason
+        }
+
+        Dim confirmText As String =
+            "Company Name: " & entry.Company & Environment.NewLine &
+            "Check #: " & entry.CheckNumber & Environment.NewLine &
+            "Check Reference: " & entry.Reference & Environment.NewLine &
+            "Date: " & entry.DateText & Environment.NewLine &
+            "Check Amount: " & entry.Amount.ToString("0.##", CultureInfo.InvariantCulture) & Environment.NewLine &
+            "Reason Why: " & entry.ReasonWhy & Environment.NewLine & Environment.NewLine &
+            "Add this check?"
+
+        Dim result = MessageBox.Show(Me, confirmText, ScreenTitle, MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question, MessageBoxDefaultButton.Button1)
+
+        If result <> DialogResult.Yes Then
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+
+        Try
+            OtherChkWriter.Append(path, entry)
+            MessageBox.Show(Me, "Check added.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            ResetForm()
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to write OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+End Class
+```
+
+## Copilot
+
+`FormAddOtherCheck.vb` is **not** the offender.
+
+## Why
+This is a valid **code-only form**:
+- no `Partial`
+- no `InitializeComponent()`
+- UI built manually in code
+- same style as your working `FormDeleteCheck`
+
+So this file is fine by itself.
+
+---
+
+## Most likely offender now
+The likely problem is one of these:
+
+1. **`FormDeleteOtherCheck.vb`**
+2. a stray designer file exists for one of the new forms:
+   - `FormAddOtherCheck.Designer.vb`
+   - `FormAddOtherCheck.resx`
+   - `FormDeleteOtherCheck.Designer.vb`
+   - `FormDeleteOtherCheck.resx`
+3. project metadata still thinks one of the new forms is designer-backed
+
+---
+
+## Next thing I need
+Please paste:
+
+- `FormDeleteOtherCheck.vb`
+
+And also tell me **yes/no** whether any of these files exist:
+
+- `FormAddOtherCheck.Designer.vb`
+- `FormAddOtherCheck.resx`
+- `FormDeleteOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.resx`
+
+## My current judgment
+From what youâ€™ve shown so far:
+- `FormAddOtherCheck.vb` looks clean
+- `FormDeleteCheck.vb` looks clean
+- therefore the mismatch is probably elsewhere, most likely `FormDeleteOtherCheck` or designer artifacts
+
+Paste that one next and I can likely identify the exact offender.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormDeleteOtherCheck
+    Inherits Form
+
+    Private Const ScreenTitle As String = "Delete A Check"
+
+    Private ReadOnly lblIntro As New Label()
+    Private ReadOnly lblCheckNumber As New Label()
+    Private ReadOnly txtCheckNumber As New TextBox()
+    Private ReadOnly btnFind As New Button()
+    Private ReadOnly btnClose As New Button()
+
+    Private ReadOnly txtDetails As New TextBox()
+    Private ReadOnly btnDelete As New Button()
+    Private ReadOnly btnKeep As New Button()
+
+    Private _matchedEntry As OtherCheckEntry = Nothing
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 760
+        Height = 460
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.White
+
+        BuildUi()
+    End Sub
+
+    Private Sub BuildUi()
+        Dim outer As New Panel() With {
+            .Dock = DockStyle.Fill,
+            .Padding = New Padding(16),
+            .BackColor = Color.Black
+        }
+
+        Dim title As New Label() With {
+            .Dock = DockStyle.Top,
+            .Height = 28,
+            .Text = "***** Delete A Check *****",
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Regular, GraphicsUnit.Point),
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        lblIntro.Dock = DockStyle.Top
+        lblIntro.Height = 34
+        lblIntro.Text = "This is usually for over payments or checks that are Not paying for invoices"
+        lblIntro.ForeColor = Color.Black
+        lblIntro.BackColor = Color.Silver
+        lblIntro.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblIntro.TextAlign = ContentAlignment.MiddleLeft
+
+        Dim topRow As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .Padding = New Padding(0, 18, 0, 0),
+            .BackColor = Color.Black
+        }
+
+        lblCheckNumber.Text = "Check # to Delete:"
+        lblCheckNumber.AutoSize = True
+        lblCheckNumber.ForeColor = Color.White
+        lblCheckNumber.BackColor = Color.Black
+        lblCheckNumber.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblCheckNumber.Padding = New Padding(0, 6, 8, 0)
+
+        txtCheckNumber.Width = 180
+        txtCheckNumber.MaxLength = 20
+        txtCheckNumber.BorderStyle = BorderStyle.FixedSingle
+        txtCheckNumber.BackColor = Color.Black
+        txtCheckNumber.ForeColor = Color.White
+        txtCheckNumber.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        ConfigureButton(btnFind, "Find")
+        ConfigureButton(btnClose, "Quit")
+        AddHandler btnFind.Click, Sub() FindEntry()
+        AddHandler btnClose.Click, Sub() Close()
+
+        topRow.Controls.Add(lblCheckNumber)
+        topRow.Controls.Add(txtCheckNumber)
+        topRow.Controls.Add(btnFind)
+        topRow.Controls.Add(btnClose)
+
+        txtDetails.Dock = DockStyle.Top
+        txtDetails.Height = 160
+        txtDetails.Multiline = True
+        txtDetails.ReadOnly = True
+        txtDetails.BorderStyle = BorderStyle.FixedSingle
+        txtDetails.BackColor = Color.Black
+        txtDetails.ForeColor = Color.White
+        txtDetails.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtDetails.Visible = False
+
+        Dim bottomButtons As New FlowLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 44,
+            .Padding = New Padding(0, 12, 0, 0),
+            .BackColor = Color.Black,
+            .Visible = False
+        }
+
+        ConfigureButton(btnDelete, "Delete This Check")
+        ConfigureButton(btnKeep, "Keep This Check")
+        AddHandler btnDelete.Click, Sub() DeleteEntry()
+        AddHandler btnKeep.Click, Sub() ClearMatch()
+
+        bottomButtons.Controls.Add(btnDelete)
+        bottomButtons.Controls.Add(btnKeep)
+
+        outer.Controls.Add(bottomButtons)
+        outer.Controls.Add(txtDetails)
+        outer.Controls.Add(topRow)
+        outer.Controls.Add(lblIntro)
+        outer.Controls.Add(title)
+
+        Controls.Add(outer)
+
+        btnDelete.Tag = bottomButtons
+        btnKeep.Tag = bottomButtons
+    End Sub
+
+    Private Sub ConfigureButton(btn As Button, text As String)
+        btn.Text = text
+        btn.Width = 150
+        btn.Height = 30
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.Font = New Font("Consolas", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.Margin = New Padding(0, 0, 12, 0)
+    End Sub
+
+    Private Sub FindEntry()
+        Dim checkNumber As String = txtCheckNumber.Text.Trim()
+
+        If String.Equals(checkNumber, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If checkNumber = "" Then
+            MessageBox.Show(Me, "Enter a check number.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtCheckNumber.Focus()
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+        Dim allEntries As List(Of OtherCheckEntry)
+
+        Try
+            allEntries = OtherChkReader.ReadAll(path)
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to read OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return
+        End Try
+
+        _matchedEntry =
+            allEntries.FirstOrDefault(Function(x) String.Equals(If(x.CheckNumber, "").Trim(),
+                                                                checkNumber,
+                                                                StringComparison.OrdinalIgnoreCase))
+
+        If _matchedEntry Is Nothing Then
+            MessageBox.Show(Me, "Check not found.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            ClearMatch()
+            Return
+        End If
+
+        txtDetails.Text =
+            "Company Name: " & _matchedEntry.Company & Environment.NewLine &
+            "Check #: " & _matchedEntry.CheckNumber & Environment.NewLine &
+            "Check Reference: " & _matchedEntry.Reference & Environment.NewLine &
+            "Date: " & _matchedEntry.DateText & Environment.NewLine &
+            "Check Amount: " & _matchedEntry.Amount.ToString("0.##") & Environment.NewLine &
+            "Reason Why: " & _matchedEntry.ReasonWhy
+
+        txtDetails.Visible = True
+        Dim buttonPanel = TryCast(btnDelete.Tag, FlowLayoutPanel)
+        If buttonPanel IsNot Nothing Then
+            buttonPanel.Visible = True
+        End If
+    End Sub
+
+    Private Sub DeleteEntry()
+        If _matchedEntry Is Nothing Then
+            Return
+        End If
+
+        Dim confirm = MessageBox.Show(Me,
+                                      "Delete this check?",
+                                      ScreenTitle,
+                                      MessageBoxButtons.YesNo,
+                                      MessageBoxIcon.Warning,
+                                      MessageBoxDefaultButton.Button2)
+
+        If confirm <> DialogResult.Yes Then
+            Return
+        End If
+
+        Dim path As String = LegacyDataPaths.OtherChk
+
+        Try
+            Dim allEntries = OtherChkReader.ReadAll(path)
+
+            Dim removed As Boolean = False
+            Dim remaining As New List(Of OtherCheckEntry)()
+
+            For Each entry As OtherCheckEntry In allEntries
+                If Not removed AndAlso EntriesMatch(entry, _matchedEntry) Then
+                    removed = True
+                Else
+                    remaining.Add(entry)
+                End If
+            Next
+
+            OtherChkWriter.WriteAll(path, remaining)
+
+            MessageBox.Show(Me, "Check deleted.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            txtCheckNumber.Text = ""
+            ClearMatch()
+            txtCheckNumber.Focus()
+        Catch ex As Exception
+            MessageBox.Show(Me, "Unable to update OTHER.CHK." & Environment.NewLine & Environment.NewLine & ex.Message,
+                            ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub ClearMatch()
+        _matchedEntry = Nothing
+        txtDetails.Text = ""
+        txtDetails.Visible = False
+
+        Dim buttonPanel = TryCast(btnDelete.Tag, FlowLayoutPanel)
+        If buttonPanel IsNot Nothing Then
+            buttonPanel.Visible = False
+        End If
+    End Sub
+
+    Private Shared Function EntriesMatch(a As OtherCheckEntry, b As OtherCheckEntry) As Boolean
+        If a Is Nothing OrElse b Is Nothing Then
+            Return False
+        End If
+
+        Return String.Equals(If(a.Company, "").Trim(), If(b.Company, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.DateText, "").Trim(), If(b.DateText, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.CheckNumber, "").Trim(), If(b.CheckNumber, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               a.Amount = b.Amount AndAlso
+               String.Equals(If(a.Reference, "").Trim(), If(b.Reference, "").Trim(), StringComparison.OrdinalIgnoreCase) AndAlso
+               String.Equals(If(a.ReasonWhy, "").Trim(), If(b.ReasonWhy, "").Trim(), StringComparison.OrdinalIgnoreCase)
+    End Function
+End Class
+```
+yes, there is a formaddothercheck.designer.vb and formdeleteothercheck.designer.vb
+
+## Copilot
+
+Thatâ€™s the offender.
+
+## Direct answer
+Your **designer files are the problem**:
+
+- `FormAddOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.Designer.vb`
+
+Because your main `.vb` files are **code-only forms**, but those `.Designer.vb` files make Visual Studio treat them as designer-backed forms, which triggers the â€œmust call `InitializeComponent`â€ expectation.
+
+---
+
+# Why this happens
+A WinForms designer form normally looks like this:
+
+- `FormX.vb` â†’ `Partial Public Class FormX`
+- `FormX.Designer.vb` â†’ `Partial Class FormX` with `InitializeComponent()`
+- optional `.resx`
+
+But your forms are written as **single-file manual UI forms** like `FormDeleteCheck.vb`.
+
+So right now you have a mismatch:
+
+## You currently have:
+- manual code form in `FormAddOtherCheck.vb`
+- manual code form in `FormDeleteOtherCheck.vb`
+- **plus** designer partial files
+
+That combination is what causes the complaint.
+
+---
+
+# Correct fix
+## Remove these from the project:
+- `FormAddOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.Designer.vb`
+
+And if they exist, also remove:
+- `FormAddOtherCheck.resx`
+- `FormDeleteOtherCheck.resx`
+
+Because you are **not** using designer-generated UI for these forms.
+
+---
+
+# Important
+Do **not** add `InitializeComponent()` to your code-only forms just to satisfy the error.  
+That would be fixing the symptom the wrong way.
+
+The real issue is that the forms should not have designer companions at all.
+
+---
+
+# What the final structure should be
+
+## Keep:
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+## Remove:
+- `FormAddOtherCheck.Designer.vb`
+- `FormDeleteOtherCheck.Designer.vb`

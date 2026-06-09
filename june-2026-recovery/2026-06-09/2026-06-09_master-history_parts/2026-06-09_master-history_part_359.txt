@@ -1,0 +1,2000 @@
+﻿            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() ShowMenu()
+
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+        AddHandler txtInput.KeyPress, AddressOf OnInputKeyPress
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    ' Consume menu keys here so they cannot "leak" into txtInput when we Focus() it.
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close()
+                    Return True
+
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt()
+                    Return True
+
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers()
+                    Return True
+
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt()
+                    Return True
+
+                Case Keys.Q
+                    Me.Close()
+                    Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    ' Only use this when you truly want to return to the menu state.
+    Private Sub ShowMenu()
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+        _ignoreNextInputKeyPress = False
+
+        RenderMenu(promptLine:=Nothing)
+    End Sub
+
+    ' IMPORTANT: RenderMenu should NOT change _mode.
+    ' It is used both for menu display and for prompt display.
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    ' Ignore the first typed character after opening the prompt (prevents leaking menu key into txtInput)
+    Private Sub OnInputKeyPress(sender As Object, e As KeyPressEventArgs)
+        If Not _ignoreNextInputKeyPress Then Return
+
+        _ignoreNextInputKeyPress = False
+        e.Handled = True
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            ShowMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                ShowMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' InvoiceNumber is Integer?
+                If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    ' -----------------------------
+    ' Paging helpers (3 entries/page, DOS-like)
+    ' -----------------------------
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+### After applying this
+- You should be able to press (3), type `726218` fully, and **nothing** opens until you press **Enter**.
+- Also set your `FrmDosPagedViewer` debug break flag back to `False` (or remove it).
+
+If anything still opens on digit `2` *after this change*, paste your updated call stack again â€” but based on the stack you provided, this fix addresses the root cause.
+
+## @testsubject117
+
+ok, only one weird thing happening now. it accepts all characters now, but when I first press 7 it doesn't appear, only the next digit appears so I have to backspace and erase back to the beginning then retype the 7 and it appears
+
+## Copilot
+
+Thatâ€™s coming from this line of behavior:
+
+- when you enter prompt mode you set `_ignoreNextInputKeyPress = True`
+- then the **first** keypress the user types gets swallowed by `OnInputKeyPress`
+
+Originally we used that to prevent the *menu selection key* (like `3`) from leaking into the prompt. But now that we fixed the real root cause (`_mode` being reset), we should make the â€œignore-first-charâ€ logic **only ignore the menu key if it actually leaked**, not the first real digit the user types.
+
+### Simplest fix (works well here)
+Stop swallowing the first character entirely, and instead **clear any leaked character** right after focusing the input.
+
+In practice: remove the `_ignoreNextInputKeyPress` machinery, and just do:
+
+- `txtInput.Clear()`
+- `BeginInvoke(Sub() txtInput.Clear())`
+
+The BeginInvoke runs after WinForms finishes processing the key that opened the prompt, so it wipes any accidental â€œ3â€ that might have landed, without eating the userâ€™s first real digit.
+
+Below is an **entire-file replacement** for `FormLogBookMenu.vb` with:
+- `_ignoreNextInputKeyPress` removed
+- `OnInputKeyPress` removed
+- in `BeginCustomerPrompt` / `BeginInvoiceLookupPrompt`, we clear `txtInput` *after* focus using `BeginInvoke`
+
+## Replace entire file: `FormLogBookMenu.vb`
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly txtScreen As TextBox
+
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() ShowMenu()
+
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close()
+                    Return True
+
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt()
+                    Return True
+
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers()
+                    Return True
+
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt()
+                    Return True
+
+                Case Keys.Q
+                    Me.Close()
+                    Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub ShowMenu()
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+
+        RenderMenu(promptLine:=Nothing)
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+
+        ' Clear any leaked initiating key after focus settles.
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+
+        ' Clear any leaked initiating key after focus settles.
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            ShowMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                ShowMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            ShowMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        ShowMenu()
+    End Sub
+
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+### After this change
+- The first digit (`7`) should appear immediately.
+- If the menu key (`3`) ever leaks into the input, the `BeginInvoke(txtInput.Clear())` will wipe it without eating your first real digit.
+
+If you still see the first digit not appear, tell me whether youâ€™re selecting option (3) via **keyboard** or **mouse click** (it affects which key message arrives first).
+
+## @testsubject117
+
+yes, it's all working now. phew. so does that wrap up (3) Look up an invoice?
+
+## Copilot
+
+Yesâ€”based on what you described, **(3) Look up an invoice is now implemented and behaving correctly**:
+
+- Selecting **(3)** shows **â€œINVOICE NUMBER TO LOOK UP?â€**
+- You can type the full invoice number (e.g., `726218`) and **nothing happens until you press Enter**
+- It no longer injects menu digits (like `3`) or triggers option (2) accidentally
+- It shows matching entries in the same paged â€œLOG BOOKâ€ viewer, and shows the â€œEND OF LOG BOOKâ€¦â€ message when there are no matches
+
+Two reminders:
+1) Make sure you turned off any debugging break you added in `FrmDosPagedViewer` (set that flag back to `False` or remove the break).
+2) Since we touched `ProcessCmdKey`/mode logic, do a quick regression: (1) View one customer, (2) View all customers, Esc behavior.
+
+If you want, tell me how you want invoice matching to behave:
+- **exact match only** (current behavior), or
+- allow leading zeros / partial matches.
+
+## @testsubject117
+
+wondering if you might shed some light on something. In the dos app, if I search for known invoice #'s such as 727400 or 726218 using (3) on the log book menu, it searches and goes to end finding nothing. The new app does the same. My question to you is, can you look at the coding in AMiDataStore and determine what it is actually searching for for (3) look up an invoice? did this ever work, if it did, what did it do, is there an explanation as to why neither dos nor the vb app are finding known invoice #'s for item (3) on the log book menu? is it something like, the invoice #'s it's looking for are not completed invoice #'s but ones that are associated with a failure that's only recorded in the logs?
+
+## Copilot
+
+I can, but I canâ€™t inspect **AMiDataStore** from here yet because I donâ€™t currently have access to that repository/code context in this chat session.
+
+If you do one of the following, I can tell you *exactly* what (3) is searching and why it returns nothing for known invoice numbers:
+
+### Option A (best): paste the relevant code
+Paste (or attach) the parts of AMiDataStore that handle log book storage/search, especially anything named like:
+- `LogBookReader`
+- `LogBookEntry`
+- `InvoiceNumber`
+- parsing of `LOGBK*.DAT` / `LOGBOOK` files
+- any lookup/index code for invoices
+
+### Option B: point me at the repo + files
+If AMiDataStore is on GitHub, share:
+- the **owner/repo** (e.g., `OrgName/AMiDataStore`)
+- and/or links to the files you suspect
+
+Then I can trace the exact lookup logic.
+
+---
+
+## In the meantime: the most likely explanation (based on your symptoms)
+If **both** the DOS app and the VB app canâ€™t find â€œknown invoice numbersâ€ via Log Book option (3), it usually means one of these is true:
+
+1) **Log book entries donâ€™t actually store invoice numbers reliably**  
+   Many log books record *customer/date/notes* but not invoice IDs, so invoice search returns nothing even though invoices exist elsewhere.
+
+2) **The â€œinvoice numberâ€ in the log book is not the same as the invoice number youâ€™re entering**  
+   Example: it may store a *short form*, an *internal sequence*, a *job/card number*, or a *yearless suffix*. (E.g., it stores `7400` but youâ€™re typing `727400`.)
+
+3) **Year mismatch / wrong file set**  
+   Your log book menu is year-scoped. If `726218` belongs to a different year than the one selected, search correctly returns none.
+
+4) **Parsing/normalization issue**  
+   If the log book stores invoice values as text with spaces, prefixes, or punctuation (e.g., `INV 726218`), and the code expects a clean integer, it will never match.
+
+5) **Option (3) was intended for a special subset**  
+   It might only find invoice numbers on entries of a certain â€œtypeâ€ (voids, corrections, boot/print records), so â€œnormalâ€ invoices never appear in log book data.
+
+---
+
+## One quick diagnostic you can do right now
+Pick a log book entry that *visibly* contains an invoice number (in the displayed text), then tell me:
+- what the entry shows (copy that one entry text)
+- what year you selected
+- what you typed into option (3)
+
+If the entry text includes `726218` but the search still returns none, itâ€™s almost certainly a parsing/normalization mismatch.
+
+Send either the repo info or the relevant AMiDataStore files, and Iâ€™ll trace it and give you a concrete answer (â€œit searches field X from file Y; it never worked because Z / it worked only for â€¦â€).
+
+## @testsubject117
+
+@testsubject117/AMiDataStore 
+
+## Copilot
+
+Option (3) is (most likely) â€œworkingâ€ exactly as designed â€” itâ€™s just searching **the log bookâ€™s invoice field**, and your â€œknown invoicesâ€ probably **arenâ€™t present in the log book data at all**, or theyâ€™re stored in a different numeric form than what youâ€™re typing.
+
+Hereâ€™s what I can tell from the AMiDataStore sources you pointed me at:
+
+## What invoice number the log book actually records
+The legacy log book entry writer in `LOGENTER.ASC` writes a record like:
+
+- date (`DT$`)
+- customer (`N2$`)
+- part number (`PN$`)
+- **invoice number (`INUM`)**
+- PO (`PO$`)
+- spec (`SPEC$`)
+- then other fields
+
+You can see it writing `INUM` directly into the `LOGBOOK.yy` file: îˆ€citeîˆ‚turn0search0îˆ
+
+So â€œinvoice lookupâ€ in the log book menu is searching for that `INUM` field â€” not the sales journal, not the ledger, not checks.
+
+## Crucial constraint: INUM is a *different number system*
+In multiple places, the legacy code treats invoice numbers as having a base offset of **75000**, and uses:
+
+```basic
+FILNUM = INT(INUM - 75000!)
+```
+
+to find the record in `INVOICE.CHK`. îˆ€citeîˆ‚turn0search0îˆ‚turn0search1îˆ
+
+And it validates invoice numbers like:
+
+```basic
+IF INUM - 75000! < 1 THEN ... (reject)
+```
+
+which effectively means log-book-entered invoices were expected to be **>= 75001**. îˆ€citeîˆ‚turn0search0îˆ
+
+That strongly suggests that the â€œinvoice numberâ€ stored in the log book historically may have been the **internal invoice index** (or a range that starts around 75,000), not necessarily the full printed invoice numbers youâ€™re entering like `726218` / `727400`.
+
+### Why your searches return nothing in DOS *and* VB
+If your printed invoice numbers are like `726218`, those are **much larger** than the 75k-based scheme, and may never have been written into `LOGBOOK.yy` as `INUM` in the first place (or only some subset were).
+
+So option (3) can be â€œcorrectâ€ and still find nothing because:
+- either the log book `INUM` field is blank/0 for most entries, or
+- the log book stores a different numeric (e.g., â€œinvoice file numberâ€ = `INUM - 75000`), or
+- entries were created by other scripts/workflows that didnâ€™t populate `INUM`.
+
+## Why it *might* have â€œnever workedâ€ for normal invoices
+The repo shows plenty of invoice operations that revolve around `INVOICE.CHK` and the `75000` offset, and other utilities search invoices in other files (like `CHECK.INV`) rather than via log book. îˆ€citeîˆ‚turn0search4îˆ‚turn0search5îˆ
+
+Itâ€™s plausible the log book invoice lookup only ever worked when the person entering the log entry typed an invoice number in the â€œ75,000+â€ scheme at entry time (or in some special workflow), and â€œregularâ€ invoices werenâ€™t logged there.
+
+## What I recommend next (quick, definitive)
+To determine which of the above is true in your data, do one of these:
+
+1) **Open a raw `LOGBOOK.yy` file** for a year where you *know* there are log entries tied to invoices, and look at the 4th field per entry (INUM).  
+   - If you see mostly `0`/blank, that explains it.
+   - If you see numbers like `78435`, then option (3) will only work with those.
+
+2) In your VB app: temporarily add a debug display (or quick one-off scan) that prints the first 50 entries where `InvoiceNumber.HasValue` and what the value is. That will show what number system is actually stored.
+
+If you tell me which year youâ€™re selecting in the log book menu when you try `726218` (e.g., 2026 vs 2027), I can also sanity-check whether you might be looking in the wrong year file.
+
+If you want, I can help you update option (3) to support both schemes (e.g., try exact match, and also try `invoiceNum Mod 1000000` or try matching `invoiceNum - 75000` depending on whatâ€™s stored), but first we should confirm whatâ€™s actually in `LOGBOOK.yy`.
+
+## @testsubject117
+
+SO ARE YOU saying that this dos app was designed to work with invoice #'s that were 75,000 or less, or 75,000 or more?
+
+## Copilot
+
+The DOS code you have in AMiDataStore is designed to work with invoice numbers **75,000 or more**.
+
+Hereâ€™s why, in plain terms:
+
+- In `LOGENTER.ASC`, when it prompts for invoice number, it rejects anything where `INUM - 75000 < 1`, which means it only accepts **INUM â‰¥ 75001**. îˆ€citeîˆ‚turn0search0îˆ
+- It then maps an invoice number to a record number in `INVOICE.CHK` using `FILNUM = INT(INUM - 75000)`, again implying invoice numbers start at ~75,001 and count upward. îˆ€citeîˆ‚turn0search0îˆ‚turn0search1îˆ
+
+So the intended scheme is:
+
+- **InvoiceNumber (what you type)**: 75,001 â€¦ 99,999 â€¦ 299,999 â€¦ etc.
+- **File record index**: `InvoiceNumber - 75,000` (so invoice 75,001 becomes record #1)
+
+If youâ€™re typing something like `726218`, that is still â€œâ‰¥ 75,001â€, so it passes the â€œmust be above 75,000â€ checkâ€”but it will only be findable in the log book if `726218` was actually written into the `INUM` field of the log book entries for that year.
+
+If you want, tell me: when you look at the original DOS `LOGBOOK.yy` file (for the year youâ€™re searching), do you ever see invoice numbers in the 700,000 range in it? That will determine whether option (3) ever had a chance to find `726218`.
+
+## @testsubject117
+
+so, it appears this is how it worked in DOS correct? so I shoudn't worry about it?
+
+## Copilot
+
+Yesâ€”based on the code in your repo, thatâ€™s how it worked in DOS: option (3) can only find an invoice if that invoice number was actually **written into the log bookâ€™s `INUM` field** when the log entry was created. If your historical log book data doesnâ€™t contain invoice numbers like `726218` in that field (or contains `0`/blank/other numbering), then **DOS would also â€œworkâ€ but return nothing**, exactly like youâ€™re seeing now. îˆ€citeîˆ‚turn0search0îˆ
+
+So you donâ€™t need to worry about it **as a regression** in the VB portâ€”the VB app is behaving consistently with the legacy behavior.
+
+That said, you *might* still want to worry about it **as a feature** if users expect invoice lookup to work. The practical question becomes: *what source of truth should â€œLook up an invoiceâ€ use?*
+
+- If the goal is â€œfind invoice in the accounting files,â€ you probably want to search `INVOICE.CHK` / sales journal / ledger rather than the log book.
+- If the goal is â€œfind log entries tied to an invoice,â€ then you either need to ensure log entry creation always writes invoice numbers, or add fallback matching (e.g., scan the formatted entry text for the invoice number as a substring).
+
+If you tell me what you want option (3) to mean in the new app (log entries only vs invoice system lookup), I can suggest the cleanest change.
+
+## @testsubject117
+
+is there a way to batch search all of the .lst files to see if any of those files contain 75,000 and up?
+
+## Copilot
+
+Yes. Here are a few good ways to batch-search all `*.lst` files for invoice-like numbers **â‰¥ 75000**.
+
+## Option 1 (fastest in Visual Studio)
+1) **Ctrl+Shift+F** (Find in Files)
+2) **Find what:** use a regex that matches 75000â€“999999 (or more)
+3) Enable **Use regular expressions**
+4) **Look in:** your folder that contains the `.lst` files
+
+Regex you can use (matches 75000+ up to 999999):
+```regex
+\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6})\b
+```
+
+That will find:
+- 75000â€“79999 (`7[5-9]\d{3}`)
+- 80000â€“99999 (`[8-9]\d{4}`)
+- any 6-digit number (`\d{6}`) which is definitely â‰¥ 100000
+
+If your invoices might be 7 digits too, use:
+```regex
+\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b
+```
+
+## Option 2 (PowerShell, best for a folder of files)
+Run this in PowerShell in the directory that contains the `.lst` files (or change the path):
+
+```powershell
+$root = "C:\path\to\lstfiles"
+Get-ChildItem $root -Recurse -Filter *.lst |
+  Select-String -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+This prints the file path + line containing the match.
+
+If you just want a list of files that contain any match:
+```powershell
+$root = "C:\path\to\lstfiles"
+Get-ChildItem $root -Recurse -Filter *.lst |
+  Where-Object { Select-String -Quiet -Path $_.FullName -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' } |
+  Select-Object FullName
+```
+
+## Option 3 (ripgrep, very fast)
+If you have `rg` installed:
+
+```bash
+rg -n --glob "*.lst" "\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b" .
+```
+
+---
+
+### Quick question (so I can tailor the pattern)
+Are your `.lst` files plain text (you can open them in Notepad), and are invoice numbers always printed as bare digits (e.g., `726218`), or do they have prefixes like `INV#726218`?
+
+## @testsubject117
+
+isn't there a powershell command I could use?
+
+## Copilot
+
+Yesâ€”`Select-String` is the PowerShell â€œgrepâ€, and itâ€™s perfect for this.
+
+### 1) Search all `.lst` files for any number **>= 75000**
+Run this in PowerShell (change `$root`):
+
+```powershell
+$root = "C:\path\to\your\lst\folder"
+
+Get-ChildItem -Path $root -Recurse -Filter *.lst |
+  Select-String -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+### 2) Only list the file names that contain such a number
+```powershell
+$root = "C:\path\to\your\lst\folder"
+
+Get-ChildItem -Path $root -Recurse -Filter *.lst |
+  Where-Object { Select-String -Quiet -Path $_.FullName -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' } |
+  Select-Object -ExpandProperty FullName
+```
+
+### 3) If you specifically want to find **6-digit invoices like 726218** (or any 6+ digits)
+```powershell
+$root = "C:\path\to\your\lst\folder"
+
+Get-ChildItem -Path $root -Recurse -Filter *.lst |
+  Select-String -Pattern '\b\d{6,}\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+If you tell me what folder the `.lst` files are in (and whether invoice numbers can be 5 digits, 6 digits, etc.), I can tighten the regex so you get fewer false matches.
+
+## @testsubject117
+
+sorry, we don't want to search .lst files do we? we want to search the logbook.1, logbook.2, etc, right?
+
+## Copilot
+
+Yesâ€”if your goal is to see what invoice numbers the **log book lookup (option 3)** could ever find, you want to search the **log book data files** (e.g., `LOGBOOK.00`, `LOGBOOK.26`, etc.), not `.lst` files.
+
+Those `LOGBOOK.yy` files are typically **line-based records** written with `WRITE#`, so theyâ€™re plain text and searchable with `Select-String`.
+
+## PowerShell: search all LOGBOOK.* files for invoice-like numbers â‰¥ 75000
+Pick the folder that contains the log book files and run:
+
+```powershell
+$root = "\\invoice\mainmenu\data"   # or wherever LOGBOOK.* lives
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  Select-String -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+## If you want to extract â€œinvoice field onlyâ€ (4th line of each record)
+In your legacy format, each entry is 12 `WRITE#` lines; invoice is the **4th line** of each block. This script reads the file and prints invoice values that are numeric and â‰¥ 75000:
+
+```powershell
+$root = "\\invoice\mainmenu\data"
+$files = Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File
+
+foreach ($f in $files) {
+  $lines = Get-Content -LiteralPath $f.FullName
+  for ($i = 3; $i -lt $lines.Count; $i += 12) {   # 0-based; 4th line is index 3
+    $inv = $lines[$i].Trim()
+    if ($inv -match '^\d+$' -and [int64]$inv -ge 75000) {
+      [pscustomobject]@{
+        File   = $f.Name
+        Index  = (($i - 3) / 12) + 1
+        Invoice = [int64]$inv
+      }
+    }
+  }
+}
+```
+
+### One important clarification
+Your VB appâ€™s `DataDir` is `\\invoice\mainmenu\data`, but the DOS code sometimes uses the current directory (or `\prc\...`). So confirm the log book files you want are actually in that share and named `LOGBOOK.xx`.
+
+If you tell me:
+- the exact directory where the `LOGBOOK.*` files live, and
+- whether theyâ€™re `LOGBOOK.00`â€¦`LOGBOOK.99` or `LOGBOOK.DAT` etc.
+
+â€¦Iâ€™ll tailor the command to match your exact naming.
+
+## @testsubject117
+
+ok, the log book files exist at: \\INVOICE\MainMenu\Data
+
+## Copilot
+
+Run this in PowerShell to search the log book files in `\\INVOICE\MainMenu\Data`.
+
+## 1) Quick scan: find any 75,000+ number anywhere in any LOGBOOK.*
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  Select-String -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+## 2) Accurate scan: pull the invoice field only (4th line of each 12-line record)
+This assumes each log entry is 12 lines (as written by the DOS `WRITE#` code), and invoice number is line 4:
+
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File | ForEach-Object {
+  $file = $_.FullName
+  $lines = Get-Content -LiteralPath $file
+
+  for ($i = 3; $i -lt $lines.Count; $i += 12) { # 0-based index; invoice is 4th line
+    $inv = $lines[$i].Trim()
+
+    if ($inv -match '^\d+$') {
+      $n = [int64]$inv
+      if ($n -ge 75000) {
+        [pscustomobject]@{
+          File    = $_.Name
+          Entry   = (($i - 3) / 12) + 1
+          Invoice = $n
+        }
+      }
+    }
+  }
+} | Sort-Object Invoice
+```
+
+### What you should look for
+- If this outputs **mostly 0 / blank / small numbers**, option (3) wonâ€™t find your 6â€‘digit invoices because they were never stored in the log book invoice field.
+- If it shows 6-digit numbers (like 726218), then option (3) *should* be able to find themâ€”meaning your VB parser/compare is likely wrong (string vs int, trimming, etc.).
+
+If you run #2 and paste **3â€“5 sample results** (just the output lines), I can tell you immediately whether the logbook invoice field ever contained the numbers youâ€™re trying to search.
+
+## @testsubject117
+
+so I want to run a powershell search of all those files looking for any invoice number of 75000 or above
+
+## Copilot
+
+Use this PowerShell command to scan **all** `LOGBOOK.*` files in `\\INVOICE\MainMenu\Data` and return matches for any **number â‰¥ 75000**.
+
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  Select-String -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' |
+  Select-Object Path, LineNumber, Line
+```
+
+- This searches the entire contents of each file and prints the **file**, **line number**, and **matching line**.
+- It matches:
+  - 75000â€“79999
+  - 80000â€“99999
+  - any 6+ digit number (100000 and up)
+
+If you want **only the filenames** that contain a match:
+
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  Where-Object { Select-String -Quiet -Path $_.FullName -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' } |
+  Select-Object -ExpandProperty FullName
+```
+
+## @testsubject117
+
+PS C:\users\capnkirk\source\repos\amiwinforms> Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+>>   Where-Object { Select-String -Quiet -Path $_.FullName -Pattern '\b(?:7[5-9]\d{3}|[8-9]\d{4}|\d{6,})\b' } |
+>>   Select-Object -ExpandProperty FullName
+\\INVOICE\MainMenu\Data\LOGBOOK.10
+\\INVOICE\MainMenu\Data\LOGBOOK.11
+\\INVOICE\MainMenu\Data\LOGBOOK.12
+\\INVOICE\MainMenu\Data\LOGBOOK.13
+\\INVOICE\MainMenu\Data\LOGBOOK.14
+\\INVOICE\MainMenu\Data\LOGBOOK.15
+\\INVOICE\MainMenu\Data\LOGBOOK.16
+\\INVOICE\MainMenu\Data\LOGBOOK.17
+\\INVOICE\MainMenu\Data\LOGBOOK.18
+\\INVOICE\MainMenu\Data\LOGBOOK.19
+\\INVOICE\MainMenu\Data\LOGBOOK.20
+\\INVOICE\MainMenu\Data\LOGBOOK.21
+\\INVOICE\MainMenu\Data\LOGBOOK.22
+\\INVOICE\MainMenu\Data\LOGBOOK.23
+\\INVOICE\MainMenu\Data\LOGBOOK.24
+\\INVOICE\MainMenu\Data\LOGBOOK.25
+\\INVOICE\MainMenu\Data\LOGBOOK.26
+
+## Copilot
+
+Good news: that output proves your `LOGBOOK.*` files **do contain** numbers that look like invoices **â‰¥ 75000** (at least in `LOGBOOK.10` through `LOGBOOK.26`). So option (3) *could* workâ€”now we need to verify **what field** those numbers appear in, and whether they match the invoice numbers youâ€™re typing (e.g., `726218`).
+
+## Next step (most useful): extract the *invoice field only*
+This will read each `LOGBOOK.xx` as 12-line records and pull the **4th line** (the legacy `INUM` field). Then it shows you the distinct invoice values â‰¥ 75000.
+
+Run:
+
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  ForEach-Object {
+    $lines = Get-Content -LiteralPath $_.FullName
+    for ($i = 3; $i -lt $lines.Count; $i += 12) {  # invoice line in each record block
+      $inv = $lines[$i].Trim()
+      if ($inv -match '^\d+$' -and [int64]$inv -ge 75000) {
+        [pscustomobject]@{ File=$_.Name; Invoice=[int64]$inv }
+      }
+    }
+  } |
+  Sort-Object Invoice |
+  Group-Object Invoice |
+  Select-Object @{n="Invoice";e={[int64]$_.Name}}, Count
+```
+
+### What this tells us
+- If you see values like **726218 / 727400** in this output, then your log book *does* store those invoices and your VB/DOS â€œlook up invoiceâ€ logic is likely mismatching due to parsing/year/file selection.
+- If you only see values like **75001â€“99999** or other ranges, then option (3) is searching a different â€œinvoice numberâ€ scheme than the one you think.
+
+## Also run this targeted check for your two invoices
+```powershell
+$root = "\\INVOICE\MainMenu\Data"
+$targets = @(726218, 727400)
+
+Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+  ForEach-Object {
+    $lines = Get-Content -LiteralPath $_.FullName
+    for ($i = 3; $i -lt $lines.Count; $i += 12) {
+      $inv = $lines[$i].Trim()
+      if ($inv -match '^\d+$') {
+        $n = [int64]$inv
+        if ($targets -contains $n) {
+          [pscustomobject]@{ File=$_.Name; Entry=(($i-3)/12)+1; Invoice=$n }
+        }
+      }
+    }
+  }
+```
+
+Paste back:
+- a few lines from the grouped output (min/max and a couple examples), and
+- whether the targeted check finds either invoice.
+
+From there I can tell you why DOS/VB isnâ€™t finding them (most commonly: the log book stores a *different* invoice value than the printed invoice #, or the app is looking at the wrong year file / wrong field).
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> Get-ChildItem -Path $root -Filter "LOGBOOK.*" -File |
+>>   ForEach-Object {
+>>     $lines = Get-Content -LiteralPath $_.FullName
+>>     for ($i = 3; $i -lt $lines.Count; $i += 12) {
+>>       $inv = $lines[$i].Trim()
+>>       if ($inv -match '^\d+$') {
+>>         $n = [int64]$inv
+>>         if ($targets -contains $n) {
+>>           [pscustomobject]@{ File=$_.Name; Entry=(($i-3)/12)+1; Invoice=$n }
+>>         }
+>>       }
+>>     }
+>>   }
+
+File       Entry Invoice
+----       ----- -------
+LOGBOOK.24 11368  726218
+LOGBOOK.25   921  727400
+LOGBOOK.25   922  727400
+```
+
+## Copilot
+
+That output answers the big question: **the log book files DO contain your â€œknownâ€ invoice numbers in the invoice field** (the 4th line of each 12-line record). So option (3) *should* be able to find them.
+
+- `726218` exists in `LOGBOOK.24` (entry #11368)
+- `727400` exists in `LOGBOOK.25` (entries #921 and #922)
+
+So when DOS and your VB app â€œfind nothingâ€, itâ€™s not because invoice lookup was only for failures or special logs. Itâ€™s because the lookup is searching the **wrong log book file/year** (or not reading the right files).
+
+## What this implies
+`LOGBOOK.24` and `LOGBOOK.25` correspond to **years 2024 and 2025** (very likely: `RIGHT$(DATE$,2)` in the DOS writer). That means:
+
+- invoice `726218` is recorded in **2024â€™s log book**
+- invoice `727400` is recorded in **2025â€™s log book**
+
+If you were running option (3) while â€œYear in useâ€ was something else (e.g., 2026), the search would correctly return nothingâ€”because it only searches the selected yearâ€™s file.
+
+This matches the DOS design and your VB design: the log book menu is **year-scoped**.
+
+## What to do
+1) In the DOS app, set â€œYear in useâ€ to **24** and search `726218`.  
+2) Set it to **25** and search `727400`.
+
+In your VB app, do the same: make sure the Log Book menu is opened for year **24** or **25** (however your â€œyear promptâ€ works).
+
+## If you *are* selecting 24/25 and it still finds nothing
+Then the bug is in the VB reader (e.g., wrong directory, wrong filename format, reading `LOGBOOK.DAT` instead of `LOGBOOK.24`, trimming/parse issues, etc.). In that case, paste your VB `LogBookReader.ReadEntries(yearTwoDigit)` code (or tell me the file name where it lives), and Iâ€™ll point out the exact mismatch.
+
+### Quick question
+When you do option (3) in DOS/VB, what does the header say for **Year in use:** (e.g., 24, 25, 26)?
+
+## @testsubject117
+
+setting to 2024 and searching for 726218:, and setting to 2025 and searching for 727400: Thanks for figuring that out for me, I was stressing out thinking we were missing something.
+
+## Copilot
+
+That wraps it upâ€”your screenshots confirm option **(3) Look up an invoice** is behaving correctly once the **Year in use** matches the `LOGBOOK.xx` file that contains the invoice:
+
+- `726218` is in **LOGBOOK.24** (12â€‘13â€‘2024) and shows up when you set **2024**.
+- `727400` is in **LOGBOOK.25** (01â€‘29â€‘2025) and shows up when you set **2025** (and you even have two matching entries, which matches the file scan).
+
+So nothing is â€œmissingâ€ in the VB portâ€”the earlier â€œfinds nothingâ€ result was simply searching the wrong year file.
+
+If you want to reduce future stress for users, a nice enhancement would be: when invoice lookup finds nothing in the selected year, offer â€œSearch all years?â€ and scan `LOGBOOK.*`. If you want, tell me and Iâ€™ll outline the simplest way to add that without slowing normal searches.
+
+## @testsubject117
+
+yes, that would be a great option. I mean, even in the DOS app, that means the user would have to know the year of the invoice they were trying to look up. 
+
+## Copilot
+
+Yesâ€”thatâ€™s a great usability improvement, and you can add it without changing your data format.
+
+### Recommended behavior
+For **(3) Look up an invoice**:
+
+1) Search the **selected year** first (fast, preserves DOS behavior).
+2) If **no matches**, prompt:
+   - â€œNot found in 20YY. Search all years? (Y/N)â€
+3) If Yes: scan **all** `LOGBOOK.*` files in `\\INVOICE\MainMenu\Data` and show matches, sorted by date.
+
+That way, users donâ€™t need to know the year, but you avoid doing a slow â€œscan everythingâ€ for every lookup.
+
+---
+
+## Implementation approach (minimal change, fast enough)
+- Keep your current `LogBookReader.ReadEntries(yearTwoDigit)` for the first pass.
+- Add a new method like `ReadEntriesAllYears()` that iterates files matching `LOGBOOK.*` and yields entries (with Year included).
+- In `RunInvoiceLookup`, if empty results from year-scan, ask the question and optionally call the all-years scan.
+
+### Performance note
+There are only ~100 possible years (`LOGBOOK.00`â€“`LOGBOOK.99`), and the files are plain text. Scanning them all is very doable, especially when itâ€™s only triggered on â€œnot foundâ€.
+
+---
+
+## I can wire this up for you, but I need the VB repo
+The code you showed earlier (FormLogBookMenu / LogBookReader) is in your **WinForms app repo**, not in `AMiDataStore` (which is DOS-era scripts).
+
+To implement this cleanly, tell me the GitHub repo for the VB app (owner/name), e.g.
+- `testsubject117/AMiOffice` or whatever itâ€™s called
+
+â€¦and I can:
+- locate `LogBookReader` + `FormLogBookMenu.RunInvoiceLookup`
+- make the change
+- and (if you want) open a PR with it.
+
+---
+
+## Quick interim snippet (what the prompt looks like)
+In WinForms VB you can do:
+
+```vbnet
+If pages.Count = 0 Then
+    Dim r = MessageBox.Show(
+        $"Invoice {invoiceNum} not found in 20{_yearTwoDigit:00}. Search all years?",
+        "LOG BOOK",
+        MessageBoxButtons.YesNo,
+        MessageBoxIcon.Question)
+
+    If r = DialogResult.Yes Then
+        ' scan all LOGBOOK.* here
+    End If
+End If
+```
+
+Reply with the **VB app repo name** (or paste `LogBookReader.vb`), and Iâ€™ll provide the exact edited code (full-file replacements, like before).
+
+## @testsubject117
+
+just send the code for each full file replacement to me and I'll make the changes by hand
+
+## Copilot
+
+Below are **full-file replacements** (copy/paste over your existing files) that add:
+
+- Invoice lookup searches the **selected year first**
+- If not found, prompts: **Search all years?**
+- If Yes, scans **all `LOGBOOK.*` files** in `\\INVOICE\MainMenu\Data`
+- Shows matches in the same DOS-style paged viewer
+- Includes which `LOGBOOK.xx` file it came from so the year context is obvious
+
+Iâ€™m assuming your logbook record format is the 12-line `WRITE#` format we discussed:
+`Date, Customer, Part#, Invoice, PO, Spec, QA, QR, Mat, HeatTreat, ReasonRejected, Status`
+
+---
+
+## 1) Full file replacement: `LogBookEntry.vb`
+
+```vbnet name=LogBookEntry.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Text
+
+Public Class LogBookEntry
+    Public Property DateText As String = ""
+    Public Property Customer As String = ""
+    Public Property PartNumber As String = ""
+    Public Property InvoiceNumber As Integer?
+    Public Property PONumber As String = ""
+    Public Property Spec As String = ""
+    Public Property QtyAccepted As String = ""
+    Public Property QtyRejected As String = ""
+    Public Property Material As String = ""
+    Public Property HeatTreat As String = ""
+    Public Property ReasonRejected As String = ""
+    Public Property Status As String = ""
+
+    ' NEW: where this entry came from (useful when scanning all years)
+    Public Property SourceFile As String = ""
+
+    Public Function FormatForDosViewer(Optional includeSource As Boolean = False) As String
+        Dim sb As New StringBuilder()
+
+        If includeSource AndAlso Not String.IsNullOrWhiteSpace(SourceFile) Then
+            sb.AppendLine($"Source: {SourceFile}")
+        End If
+
+        Dim inv As String = If(InvoiceNumber.HasValue, InvoiceNumber.Value.ToString(), "")
+
+        sb.AppendLine($"Customer: {Customer}".PadRight(30) & $"Part#: {PartNumber}".PadRight(28) & $"{DateText}")
+        sb.AppendLine($"Invoice#: {inv}".PadRight(30) & $"P.O.#: {PONumber}".PadRight(28) & $"Status: {Status}")
+        sb.AppendLine($"Qty Acc/Rec: {QtyAccepted}".PadRight(22) & $"Qty Rejected: {QtyRejected}".PadRight(22) & $"Mat: {Material}")
+        sb.AppendLine($"Heat Treat: {HeatTreat}".PadRight(22) & $"Rsn Rej: {ReasonRejected}")
+        sb.AppendLine($"Spec: {Spec}")
+
+        Return sb.ToString().TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## 2) Full file replacement: `LogBookReader.vb`
+
+```vbnet name=LogBookReader.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+
+Public Class LogBookReader
+    Private ReadOnly _dataDir As String
+
+    Public Sub New(dataDir As String)
+        _dataDir = dataDir
+    End Sub
+
+    Public Iterator Function ReadEntries(yearTwoDigit As Integer) As IEnumerable(Of LogBookEntry)
+        Dim fileName As String = $"LOGBOOK.{yearTwoDigit:00}"
+        Dim path As String = Path.Combine(_dataDir, fileName)
+
+        For Each e In ReadEntriesFromPath(path)
+            Yield e
+        Next
+    End Function
+
+    ' NEW: read from all LOGBOOK.* files in the folder.
+    Public Iterator Function ReadEntriesAllYears() As IEnumerable(Of LogBookEntry)
+        If Not Directory.Exists(_dataDir) Then
+            Return
+        End If
+
+        Dim files = Directory.EnumerateFiles(_dataDir, "LOGBOOK.*", SearchOption.TopDirectoryOnly)
+
+        ' Optional: stable ordering (LOGBOOK.00 .. LOGBOOK.99)
+        Dim ordered As New List(Of String)(files)
+        ordered.Sort(StringComparer.OrdinalIgnoreCase)
+
+        For Each path In ordered
+            For Each e In ReadEntriesFromPath(path)
+                Yield e
+            Next
+        Next
+    End Function
+
+    Private Iterator Function ReadEntriesFromPath(path As String) As IEnumerable(Of LogBookEntry)
+        If Not File.Exists(path) Then
+            Return
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Each entry is 12 lines.
+        For i As Integer = 0 To lines.Length - 12 Step 12
+            Dim e As New LogBookEntry() With {
+                .SourceFile = Path.GetFileName(path),
+                .DateText = SafeLine(lines, i + 0),
+                .Customer = SafeLine(lines, i + 1),
+                .PartNumber = SafeLine(lines, i + 2),
+                .PONumber = SafeLine(lines, i + 4),
+                .Spec = SafeLine(lines, i + 5),
+                .QtyAccepted = SafeLine(lines, i + 6),
+                .QtyRejected = SafeLine(lines, i + 7),
+                .Material = SafeLine(lines, i + 8),
+                .HeatTreat = SafeLine(lines, i + 9),
+                .ReasonRejected = SafeLine(lines, i + 10),
+                .Status = SafeLine(lines, i + 11)
+            }
+
+            Dim invText As String = SafeLine(lines, i + 3).Trim()
+            Dim inv As Integer
+            If Integer.TryParse(invText, NumberStyles.Integer, CultureInfo.InvariantCulture, inv) Then
+                e.InvoiceNumber = inv
+            Else
+                e.InvoiceNumber = Nothing
+            End If
+
+            Yield e
+        Next
+    End Function
+
+    Private Shared Function SafeLine(lines As String(), index As Integer) As String
+        If lines Is Nothing Then Return ""
+        If index < 0 OrElse index >= lines.Length Then Return ""
+        Return If(lines(index), "").TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## 3) Full file replacement: `FormLogBookMenu.vb`
+This is based on the version we already stabilized (prompt overlay + fixed mode handling), plus the new â€œsearch all years?â€ fallback for invoice lookup.
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    Private ReadOnly txtScreen As TextBox
+
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() ShowMenu()
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close()
+                    Return True
+
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt()
+                    Return True
+
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers()
+                    Return True
+
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt()
+                    Return True
+
+                Case Keys.Q
+                    Me.Close()
+                    Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub ShowMenu()
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+        RenderMenu(promptLine:=Nothing)
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+
+        ' Clear any leaked initiating key after focus settles.
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+
+        ' Clear any leaked initiating key after focus settles.
+        Me.BeginInvoke(New Action(Sub() txtInput.Clear()))
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            ShowMenu()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                ShowMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            ShowMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+        Dim pages As List(Of String) = BuildPagesFromEntries(
+            reader.ReadEntries(_yearTwoDigit),
+            Function(entry) entry.Customer IsNot Nothing AndAlso entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase),
+            includeSource:=False)
