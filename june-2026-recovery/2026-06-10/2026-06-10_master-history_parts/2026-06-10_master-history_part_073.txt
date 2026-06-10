@@ -1,0 +1,2000 @@
+﻿      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)'))</BuildNumber>
+      <BuildNumber>$([MSBuild]::Add($(BuildNumber), 1))</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+</Project>
+```
+
+After that:
+
+1. Save the project file.
+2. Add explicit `Imports` to the files above.
+3. Rebuild.
+
+If you want, next paste:
+- `FormAbout.Designer.vb`
+- `FormMainMenu.Designer.vb`
+- `UiFileErrors.vb`
+
+and Iâ€™ll give you exact corrected file headers for those three first.
+
+## @testsubject117
+
+how do I know which files are winforms and need the Imports System.Windows.Forms? how do I know which files are files that use Image, Color, Font, Point, Size, etc.?
+
+## Copilot
+
+Use the error list as your guide.
+
+## `Imports System.Windows.Forms`
+Add this to any file that has errors about WinForms types like:
+- `Form`
+- `Label`
+- `Button`
+- `TextBox`
+- `Panel`
+- `PictureBox`
+- `RichTextBox`
+- `ListBox`
+- `ComboBox`
+- `DataGridView`
+- `TableLayoutPanel`
+- `FlowLayoutPanel`
+- `Timer`
+- `IWin32Window`
+- `DataGridViewRowPrePaintEventArgs`
+
+So from your current errors, these files need:
+
+```vb
+Imports System.Windows.Forms
+```
+
+- `FormAbout.Designer.vb`
+- `FormFindByCheckNumber.vb`
+- `FormFindByInvoiceNumber.vb`
+- `FormLedgerCompanyTotals.vb`
+- `FormLedgerDoesntBalance.vb`
+- `FormMainMenu.Designer.vb`
+- `FormOtherChecksView.vb`
+- `UiFileErrors.vb`
+
+And probably also their companion form files if they inherit `Form`.
+
+---
+
+## `Imports System.Drawing`
+Add this to any file that uses drawing/UI types like:
+- `Image`
+- `Color`
+- `Font`
+- `Point`
+- `Size`
+- `ContentAlignment`
+- `Icon`
+- `Bitmap`
+- `Pen`
+- `Brush`
+
+From your current errors, this one definitely needs it:
+
+- `FormAbout.vb` because of `Image`
+
+Some of the others may also need it even if the current error list hasnâ€™t surfaced those yet.
+
+---
+
+# Fast rule of thumb
+## If the file contains things like:
+```vb
+Inherits Form
+Dim btn As New Button()
+Dim lbl As New Label()
+```
+then add:
+
+```vb
+Imports System.Windows.Forms
+```
+
+## If the file contains things like:
+```vb
+Color.Black
+New Font(...)
+New Point(...)
+New Size(...)
+Dim img As Image
+```
+then add:
+
+```vb
+Imports System.Drawing
+```
+
+## If it uses both, add both.
+
+---
+
+# Easiest practical approach
+Open each file named in the error list and look at the top.
+
+If it doesnâ€™t already have imports, add them based on what the file uses.
+
+Example header:
+
+```vb
+Option Strict On
+Option Explicit On
+
+Imports System.Windows.Forms
+Imports System.Drawing
+```
+
+---
+
+# Even easier method
+Search each file for these words.
+
+## Add `Imports System.Windows.Forms` if you see:
+- `Form`
+- `Label`
+- `Button`
+- `TextBox`
+- `Panel`
+- `PictureBox`
+- `RichTextBox`
+- `ListBox`
+- `ComboBox`
+- `DataGridView`
+- `Timer`
+- `IWin32Window`
+
+## Add `Imports System.Drawing` if you see:
+- `Image`
+- `Color`
+- `Font`
+- `Point`
+- `Size`
+- `ContentAlignment`
+
+---
+
+# Based on your current errors, start with this
+
+## Add to `FormAbout.Designer.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormAbout.vb`
+```vb
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+## Add to `FormFindByCheckNumber.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormFindByInvoiceNumber.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormLedgerCompanyTotals.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormLedgerDoesntBalance.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormMainMenu.Designer.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `FormOtherChecksView.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+## Add to `UiFileErrors.vb`
+```vb
+Imports System.Windows.Forms
+```
+
+---
+
+# Best workflow
+1. add imports to the files currently listed in the error list
+2. rebuild
+3. see what remains
+4. fix the next batch
+
+Thatâ€™s better than trying to pre-edit the whole project blindly.
+
+If you want, paste `FormAbout.Designer.vb` and `FormAbout.vb` and Iâ€™ll show you exactly where to place the imports.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30002	Type 'ComponentModel.ISupportInitialize' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	29	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	37	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	38	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	40	
+Error (active)	BC30451	'ContentAlignment' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	43	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	49	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	50	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	51	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	53	
+Error (active)	BC30451	'ContentAlignment' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	56	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	62	
+Error (active)	BC30451	'SystemColors' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	63	
+Error (active)	BC30451	'SystemColors' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	64	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	65	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	67	
+Error (active)	BC30451	'ContentAlignment' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	70	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	77	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	87	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	93	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	95	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	107	
+Error (active)	BC30002	Type 'SizeF' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	117	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	119	
+Error (active)	BC30002	Type 'ComponentModel.ISupportInitialize' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	135	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb	205	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb	206	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb	212	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLedgerDoesntBalance.vb	214	
+Error (active)	BC30193	Specifiers and attributes are not valid on this statement.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	1	
+Error (active)	BC30002	Type 'ComponentModel.Container' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	21	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	35	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	39	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	40	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	41	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	43	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	49	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	50	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	51	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	54	
+Error (active)	BC30451	'ContentAlignment' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	56	
+Error (active)	BC30002	Type 'Font' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	61	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	62	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	63	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	64	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	65	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	67	
+Error (active)	BC30451	'ContentAlignment' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	70	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	74	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	81	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	85	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	91	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	94	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	97	
+Error (active)	BC30451	'Color' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	104	
+Error (active)	BC30002	Type 'Point' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	107	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	110	
+Error (active)	BC30002	Type 'SizeF' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	121	
+Error (active)	BC30002	Type 'Size' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	123	
+
+
+## Copilot
+
+Yes â€” this confirms the pattern.
+
+## Direct answer
+You now need **more explicit imports** in the affected files:
+
+### `FormAbout.Designer.vb` needs:
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+```
+
+### `FormMainMenu.Designer.vb` needs:
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+```
+
+### `FormLedgerDoesntBalance.vb` needs at least:
+```vb
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+---
+
+# Why
+Your current errors map directly to these namespaces:
+
+## `System.Windows.Forms`
+for:
+- `Label`
+- `Button`
+- `Panel`
+- `Timer`
+
+## `System.Drawing`
+for:
+- `Font`
+- `Point`
+- `Size`
+- `SizeF`
+- `Color`
+- `ContentAlignment`
+- `SystemColors`
+
+## `System.ComponentModel`
+for:
+- `ComponentModel.ISupportInitialize`
+- `ComponentModel.Container`
+
+---
+
+# One important note about this error:
+## `BC30193 Specifiers and attributes are not valid on this statement.`
+on `FormMainMenu.Designer.vb` line 1
+
+That often means the `Imports` statement was inserted in the wrong place.
+
+In VB, `Imports` must go **after** `Option` lines and **before** attributes/class declarations.
+
+---
+
+# Correct file header structure
+For designer files, the top should look like this:
+
+```vb
+Option Strict On
+Option Explicit On
+
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Windows.Forms
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMainMenu
+```
+
+If the file does not have `Option` lines, then:
+
+```vb
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Windows.Forms
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMainMenu
+```
+
+---
+
+# So your next fixes are
+
+## `FormAbout.Designer.vb`
+Add at top:
+
+```vb
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+## `FormMainMenu.Designer.vb`
+Add at top:
+
+```vb
+Imports System.ComponentModel
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+Make sure they go **before** the `<DesignerGenerated()>` attribute and class declaration.
+
+## `FormLedgerDoesntBalance.vb`
+Add at top:
+
+```vb
+Imports System.Drawing
+Imports System.Windows.Forms
+```
+
+---
+
+# Best way to proceed
+At this point, donâ€™t guess broadly.  
+Use the error list to drive imports.
+
+### Namespace mapping:
+- `Font`, `Point`, `Size`, `SizeF`, `Color`, `ContentAlignment`, `SystemColors` â†’ `System.Drawing`
+- `Label`, `Button`, `Panel`, `Timer`, `DataGridView`, `TextBox`, etc. â†’ `System.Windows.Forms`
+- `ComponentModel.*` â†’ `System.ComponentModel`
+
+---
+
+# My recommendation
+Fix these 3 files first:
+1. `FormAbout.Designer.vb`
+2. `FormMainMenu.Designer.vb`
+3. `FormLedgerDoesntBalance.vb`
+
+Then rebuild.
+
+If you want, paste the first 15â€“20 lines of:
+- `FormAbout.Designer.vb`
+- `FormMainMenu.Designer.vb`
+
+and Iâ€™ll give you the exact corrected header text so you can paste it in safely.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30193	Specifiers and attributes are not valid on this statement.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	2	
+Error (active)	BC30002	Type 'ComponentModel.ISupportInitialize' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	32	
+Error (active)	BC30002	Type 'ComponentModel.ISupportInitialize' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAbout.Designer.vb	138	
+Error (active)	BC30193	Specifiers and attributes are not valid on this statement.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	1	
+Error (active)	BC30002	Type 'ComponentModel.Container' is not defined.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormMainMenu.Designer.vb	23	
+
+
+## Copilot
+
+This means the `Imports` were placed incorrectly in the designer files.
+
+## Direct fix
+In VB, `Imports` must be at the very top of the file, like this order:
+
+1. `Option ...` lines
+2. `Imports ...` lines
+3. attributes like `<DesignerGenerated()>`
+4. `Partial Class ...`
+
+---
+
+# What likely happened
+You probably inserted `Imports` **after** the `<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>` attribute, which causes:
+
+- `BC30193 Specifiers and attributes are not valid on this statement`
+
+---
+
+# Also important
+For these two specific remaining errors:
+
+- `ComponentModel.ISupportInitialize`
+- `ComponentModel.Container`
+
+the safest fix is **not** `Imports System.ComponentModel`
+
+Instead use:
+
+```vb
+Imports System.ComponentModel
+```
+
+**and** change any `ComponentModel.` references to either:
+- `System.ComponentModel.` fully qualified, or
+- leave them alone if the file already uses fully qualified names correctly
+
+But first we need to see the headers, because placement is the immediate problem.
+
+---
+
+# Please do this
+Paste the **top ~20 lines** of these two files:
+
+- `FormAbout.Designer.vb`
+- `FormMainMenu.Designer.vb`
+
+I want the exact header so I can tell you exactly where the imports belong.
+
+---
+
+# What the correct shape should look like
+For a designer file, it should look roughly like:
+
+```vb
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormAbout
+    Inherits Form
+```
+
+or with options/imports above it:
+
+```vb
+Option Strict On
+Option Explicit On
+
+Imports System.Drawing
+Imports System.Windows.Forms
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormAbout
+    Inherits Form
+```
+
+If `ComponentModel.ISupportInitialize` is written literally in the file, then we may need either:
+
+```vb
+Imports System.ComponentModel
+```
+
+or to replace:
+
+```vb
+ComponentModel.ISupportInitialize
+```
+
+with:
+
+```vb
+System.ComponentModel.ISupportInitialize
+```
+
+But donâ€™t edit blindly yet.
+
+Paste the first 20 lines of both files and Iâ€™ll give you the exact corrected headers.
+
+## @testsubject117
+
+```
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+```
+
+## Copilot
+
+Found it.
+
+## Direct answer
+Your `Imports` lines are in the wrong place.
+
+They must come **before** the `<DesignerGenerated()>` attribute.
+
+---
+
+# Your current header is wrong
+You have:
+
+```vb
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+Partial Class FormAbout
+```
+
+That is invalid VB syntax.
+
+---
+
+# Correct header for `FormAbout.Designer.vb`
+Replace the top of the file with this:
+
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+```
+
+---
+
+# Why the `ComponentModel` errors remain
+Because the bad placement caused the file to parse incorrectly, so the compiler never handled the imports correctly.
+
+Once the imports are moved to the top, these should be resolved:
+
+- `ComponentModel.ISupportInitialize`
+- `ComponentModel.Container`
+
+---
+
+# Do the same for `FormMainMenu.Designer.vb`
+Its header should follow the same pattern:
+
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMainMenu
+```
+
+---
+
+# Rule to remember
+In VB files:
+
+## valid order:
+```vb
+Option Strict On
+Option Explicit On
+
+Imports ...
+Imports ...
+
+<Attribute()>
+Partial Class ...
+```
+
+## invalid order:
+```vb
+<Attribute()>
+Imports ...
+Partial Class ...
+```
+
+---
+
+# Next step
+1. fix `FormAbout.Designer.vb`
+2. fix `FormMainMenu.Designer.vb`
+3. rebuild
+
+If you want, paste the first 20 lines of `FormMainMenu.Designer.vb` too and Iâ€™ll give you the exact corrected header for that file.
+
+## @testsubject117
+
+```
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+Partial Class FormMainMenu
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+```
+
+## Copilot
+
+Same exact issue.
+
+## Replace the top of `FormMainMenu.Designer.vb` with:
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormMainMenu
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+```
+
+## And `FormAbout.Designer.vb` should start like:
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+```
+
+## Why
+The only problem in both snippets is that `Imports` came after the class attribute. In VB that is invalid.
+
+After fixing both headers, rebuild.
+
+If errors remain after that, paste the new shortened error list and Iâ€™ll tell you the next exact file(s) to fix.
+
+## @testsubject117
+
+Attribute specifier is not a complete statement. Use a line continuation to apply the attribute to the following statement.
+Type 'ComponentModel.ISupportInitialize' is not defined.
+Type 'ComponentModel.ISupportInitialize' is not defined.
+Attribute specifier is not a complete statement. Use a line continuation to apply the attribute to the following statement.
+Type 'ComponentModel.Container' is not defined.
+
+## Copilot
+
+You still have malformed designer-file syntax.
+
+## Direct answer
+Two things are happening:
+
+1. the attribute line is still not being applied correctly
+2. `ComponentModel.` names are still unresolved in the file
+
+The cleanest fix is to use **fully qualified names** in the designer files and make sure the attribute sits immediately above the class declaration.
+
+---
+
+# Use this exact header for `FormAbout.Designer.vb`
+Replace the top portion with this exactly:
+
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()> _
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+```
+
+---
+
+# Use this exact header for `FormMainMenu.Designer.vb`
+Replace the top portion with this exactly:
+
+```vb
+Imports System.Windows.Forms
+Imports System.Drawing
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+Partial Class FormMainMenu
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()> _
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+```
+
+---
+
+# Why this should fix it
+
+## 1. Attribute problem
+In VB, attributes can be written directly above the declaration, but the old-style designer format commonly uses a line continuation:
+
+```vb
+<SomeAttribute()> _
+Partial Class Foo
+```
+
+Using the trailing `_` makes the association explicit and avoids parser ambiguity.
+
+## 2. `ComponentModel` problem
+Instead of relying on:
+```vb
+Imports System.ComponentModel
+```
+
+we avoid that entirely and use:
+```vb
+System.ComponentModel.IContainer
+```
+
+and similarly any `ComponentModel.ISupportInitialize` references should be changed to:
+```vb
+System.ComponentModel.ISupportInitialize
+```
+
+---
+
+# Important extra step
+Search inside both designer files for:
+
+```vb
+ComponentModel.ISupportInitialize
+```
+
+and replace with:
+
+```vb
+System.ComponentModel.ISupportInitialize
+```
+
+Search for:
+
+```vb
+ComponentModel.Container
+```
+
+and replace with:
+
+```vb
+System.ComponentModel.Container
+```
+
+if that appears anywhere.
+
+---
+
+# So do these exact edits
+## In both designer files:
+- keep:
+  - `Imports System.Windows.Forms`
+  - `Imports System.Drawing`
+- remove:
+  - `Imports System.ComponentModel`
+- use:
+  - `<...> _` form for attributes
+- fully qualify:
+  - `System.ComponentModel.ISupportInitialize`
+  - `System.ComponentModel.IContainer`
+  - `System.ComponentModel.Container`
+
+---
+
+# Why Iâ€™m suggesting full qualification
+Because we already know project/global import behavior is unstable in this project. Fully qualifying designer-only `ComponentModel` types is the safest way to stop dependency on imports.
+
+---
+
+# After editing
+Rebuild and paste the next error list.
+
+If you want, I can also generate a **find/replace checklist** for both designer files so you can do it quickly.
+
+## @testsubject117
+
+please just generate the entire code for the whole file
+
+## Copilot
+
+I can do that, but I need the **full contents** of each file first.
+
+## Direct answer
+Right now I only have the **headers**, not the whole files.  
+If I generate the â€œentire fileâ€ without seeing the rest, Iâ€™d risk deleting designer-created controls, layout code, field declarations, or event wiring.
+
+That would be dangerous.
+
+---
+
+# What I need from you
+Paste the full contents of:
+
+1. `FormAbout.Designer.vb`
+2. `FormMainMenu.Designer.vb`
+
+Then Iâ€™ll return each one as a complete corrected file.
+
+---
+
+# Why Iâ€™m not guessing
+Designer files contain a lot of generated code like:
+- control declarations
+- `InitializeComponent()`
+- resource manager lines
+- casts to `ISupportInitialize`
+- layout setup
+- field declarations at the bottom
+
+If I invent the full file, I might break the form worse.
+
+---
+
+# Fastest safe path
+Paste one full file at a time.
+
+Start with:
+- `FormAbout.Designer.vb`
+
+and Iâ€™ll send back the complete corrected version.
+
+## @testsubject117
+
+```
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        Me.lblAbout = New Label()
+        Me.lblAppName = New Label()
+        Me.lblDevelopedBy = New Label()
+        Me.picDeveloper = New PictureBox()
+        Me.rtbInfo = New RichTextBox()
+        Me.pnlBottom = New Panel()
+        Me.btnOK = New Button()
+
+        CType(Me.picDeveloper, ComponentModel.ISupportInitialize).BeginInit()
+        Me.pnlBottom.SuspendLayout()
+        Me.SuspendLayout()
+
+        ' -------------------------
+        ' lblAbout
+        ' -------------------------
+        Me.lblAbout.Dock = DockStyle.Top
+        Me.lblAbout.Font = New Font("Segoe UI", 8.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblAbout.Location = New Point(0, 0)
+        Me.lblAbout.Name = "lblAbout"
+        Me.lblAbout.Size = New Size(800, 22)
+        Me.lblAbout.TabIndex = 0
+        Me.lblAbout.Text = "About:"
+        Me.lblAbout.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' lblAppName
+        ' -------------------------
+        Me.lblAppName.Dock = DockStyle.Top
+        Me.lblAppName.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblAppName.ForeColor = Color.DarkRed
+        Me.lblAppName.Location = New Point(0, 0)
+        Me.lblAppName.Name = "lblAppName"
+        Me.lblAppName.Size = New Size(800, 30)
+        Me.lblAppName.TabIndex = 1
+        Me.lblAppName.Text = "Active Magnetic Inspection Main Menu Application"
+        Me.lblAppName.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' lblDevelopedBy
+        ' -------------------------
+        Me.lblDevelopedBy.Dock = DockStyle.Top
+        Me.lblDevelopedBy.Font = New Font("Segoe UI", 8.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblDevelopedBy.ForeColor = SystemColors.ControlText
+        Me.lblDevelopedBy.BackColor = SystemColors.Control
+        Me.lblDevelopedBy.Location = New Point(0, 0)
+        Me.lblDevelopedBy.Name = "lblDevelopedBy"
+        Me.lblDevelopedBy.Size = New Size(800, 22)
+        Me.lblDevelopedBy.TabIndex = 2
+        Me.lblDevelopedBy.Text = "Developed By:"
+        Me.lblDevelopedBy.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' picDeveloper
+        ' -------------------------
+        Me.picDeveloper.Dock = DockStyle.Top
+        Me.picDeveloper.Name = "picDeveloper"
+        Me.picDeveloper.Size = New Size(800, 60)
+        Me.picDeveloper.SizeMode = PictureBoxSizeMode.Zoom
+        Me.picDeveloper.TabIndex = 3
+        Me.picDeveloper.TabStop = False
+
+        ' -------------------------
+        ' pnlBottom
+        ' -------------------------
+        Me.pnlBottom.Dock = DockStyle.Bottom
+        Me.pnlBottom.Name = "pnlBottom"
+        Me.pnlBottom.Size = New Size(800, 45)
+        Me.pnlBottom.TabIndex = 6
+
+        ' btnOK
+        Me.btnOK.Anchor = AnchorStyles.Right Or AnchorStyles.Bottom
+        Me.btnOK.DialogResult = DialogResult.OK
+        Me.btnOK.Location = New Point(673, 11)
+        Me.btnOK.Name = "btnOK"
+        Me.btnOK.Size = New Size(75, 23)
+        Me.btnOK.TabIndex = 0
+        Me.btnOK.Text = "OK"
+        Me.btnOK.UseVisualStyleBackColor = True
+
+        Me.pnlBottom.Controls.Add(Me.btnOK)
+
+        ' -------------------------
+        ' rtbInfo
+        ' -------------------------
+        Me.rtbInfo.BorderStyle = BorderStyle.FixedSingle
+        Me.rtbInfo.Dock = DockStyle.Fill
+        Me.rtbInfo.Font = New Font("Consolas", 9.75F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        Me.rtbInfo.Name = "rtbInfo"
+        Me.rtbInfo.ReadOnly = True
+        Me.rtbInfo.TabIndex = 5
+        Me.rtbInfo.Text = ""
+
+        ' -------------------------
+        ' FormAbout
+        ' -------------------------
+        Me.AcceptButton = Me.btnOK
+        Me.AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        Me.AutoScaleMode = AutoScaleMode.Font
+        Me.ClientSize = New Size(760, 550)
+
+        Me.Controls.Add(Me.rtbInfo)
+        Me.Controls.Add(Me.pnlBottom)
+        Me.Controls.Add(Me.picDeveloper)
+        Me.Controls.Add(Me.lblDevelopedBy)
+        Me.Controls.Add(Me.lblAppName)
+        Me.Controls.Add(Me.lblAbout)
+
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.Name = "FormAbout"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Text = "About"
+
+        CType(Me.picDeveloper, ComponentModel.ISupportInitialize).EndInit()
+        Me.pnlBottom.ResumeLayout(False)
+        Me.ResumeLayout(False)
+    End Sub
+
+    Friend WithEvents lblAbout As Label
+    Friend WithEvents lblAppName As Label
+    Friend WithEvents lblDevelopedBy As Label
+    Friend WithEvents picDeveloper As PictureBox
+    Friend WithEvents rtbInfo As RichTextBox
+    Friend WithEvents pnlBottom As Panel
+    Friend WithEvents btnOK As Button
+End Class
+```
+
+## Copilot
+
+Here is the full corrected `FormAbout.Designer.vb`.
+
+```vb name=FormAbout.Designer.vb
+Imports System.Windows.Forms
+Imports System.Drawing
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+Partial Class FormAbout
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()> _
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()> _
+    Private Sub InitializeComponent()
+        Me.lblAbout = New Label()
+        Me.lblAppName = New Label()
+        Me.lblDevelopedBy = New Label()
+        Me.picDeveloper = New PictureBox()
+        Me.rtbInfo = New RichTextBox()
+        Me.pnlBottom = New Panel()
+        Me.btnOK = New Button()
+
+        CType(Me.picDeveloper, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.pnlBottom.SuspendLayout()
+        Me.SuspendLayout()
+
+        ' -------------------------
+        ' lblAbout
+        ' -------------------------
+        Me.lblAbout.Dock = DockStyle.Top
+        Me.lblAbout.Font = New Font("Segoe UI", 8.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblAbout.Location = New Point(0, 0)
+        Me.lblAbout.Name = "lblAbout"
+        Me.lblAbout.Size = New Size(800, 22)
+        Me.lblAbout.TabIndex = 0
+        Me.lblAbout.Text = "About:"
+        Me.lblAbout.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' lblAppName
+        ' -------------------------
+        Me.lblAppName.Dock = DockStyle.Top
+        Me.lblAppName.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblAppName.ForeColor = Color.DarkRed
+        Me.lblAppName.Location = New Point(0, 0)
+        Me.lblAppName.Name = "lblAppName"
+        Me.lblAppName.Size = New Size(800, 30)
+        Me.lblAppName.TabIndex = 1
+        Me.lblAppName.Text = "Active Magnetic Inspection Main Menu Application"
+        Me.lblAppName.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' lblDevelopedBy
+        ' -------------------------
+        Me.lblDevelopedBy.Dock = DockStyle.Top
+        Me.lblDevelopedBy.Font = New Font("Segoe UI", 8.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        Me.lblDevelopedBy.ForeColor = SystemColors.ControlText
+        Me.lblDevelopedBy.BackColor = SystemColors.Control
+        Me.lblDevelopedBy.Location = New Point(0, 0)
+        Me.lblDevelopedBy.Name = "lblDevelopedBy"
+        Me.lblDevelopedBy.Size = New Size(800, 22)
+        Me.lblDevelopedBy.TabIndex = 2
+        Me.lblDevelopedBy.Text = "Developed By:"
+        Me.lblDevelopedBy.TextAlign = ContentAlignment.MiddleCenter
+
+        ' -------------------------
+        ' picDeveloper
+        ' -------------------------
+        Me.picDeveloper.Dock = DockStyle.Top
+        Me.picDeveloper.Name = "picDeveloper"
+        Me.picDeveloper.Size = New Size(800, 60)
+        Me.picDeveloper.SizeMode = PictureBoxSizeMode.Zoom
+        Me.picDeveloper.TabIndex = 3
+        Me.picDeveloper.TabStop = False
+
+        ' -------------------------
+        ' pnlBottom
+        ' -------------------------
+        Me.pnlBottom.Dock = DockStyle.Bottom
+        Me.pnlBottom.Name = "pnlBottom"
+        Me.pnlBottom.Size = New Size(800, 45)
+        Me.pnlBottom.TabIndex = 6
+
+        ' btnOK
+        Me.btnOK.Anchor = AnchorStyles.Right Or AnchorStyles.Bottom
+        Me.btnOK.DialogResult = DialogResult.OK
+        Me.btnOK.Location = New Point(673, 11)
+        Me.btnOK.Name = "btnOK"
+        Me.btnOK.Size = New Size(75, 23)
+        Me.btnOK.TabIndex = 0
+        Me.btnOK.Text = "OK"
+        Me.btnOK.UseVisualStyleBackColor = True
+
+        Me.pnlBottom.Controls.Add(Me.btnOK)
+
+        ' -------------------------
+        ' rtbInfo
+        ' -------------------------
+        Me.rtbInfo.BorderStyle = BorderStyle.FixedSingle
+        Me.rtbInfo.Dock = DockStyle.Fill
+        Me.rtbInfo.Font = New Font("Consolas", 9.75F, FontStyle.Regular, GraphicsUnit.Point, CByte(0))
+        Me.rtbInfo.Name = "rtbInfo"
+        Me.rtbInfo.ReadOnly = True
+        Me.rtbInfo.TabIndex = 5
+        Me.rtbInfo.Text = ""
+
+        ' -------------------------
+        ' FormAbout
+        ' -------------------------
+        Me.AcceptButton = Me.btnOK
+        Me.AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        Me.AutoScaleMode = AutoScaleMode.Font
+        Me.ClientSize = New Size(760, 550)
+
+        Me.Controls.Add(Me.rtbInfo)
+        Me.Controls.Add(Me.pnlBottom)
+        Me.Controls.Add(Me.picDeveloper)
+        Me.Controls.Add(Me.lblDevelopedBy)
+        Me.Controls.Add(Me.lblAppName)
+        Me.Controls.Add(Me.lblAbout)
+
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.Name = "FormAbout"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Text = "About"
+
+        CType(Me.picDeveloper, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.pnlBottom.ResumeLayout(False)
+        Me.ResumeLayout(False)
+    End Sub
+
+    Friend WithEvents lblAbout As Label
+    Friend WithEvents lblAppName As Label
+    Friend WithEvents lblDevelopedBy As Label
+    Friend WithEvents picDeveloper As PictureBox
+    Friend WithEvents rtbInfo As RichTextBox
+    Friend WithEvents pnlBottom As Panel
+    Friend WithEvents btnOK As Button
+End Class
+```
+
+## What I changed
+- removed `Imports System.ComponentModel`
+- used line continuation on attributes:
+  - `<...> _`
+- fully qualified:
+  - `System.ComponentModel.ISupportInitialize`
+- left the rest of the designer code intact
+
+## Next
+Now paste the full `FormMainMenu.Designer.vb` and Iâ€™ll generate that whole corrected file too.
+
+## @testsubject117
+
+```
+Imports System.Windows.Forms
+Imports System.Drawing
+Imports System.ComponentModel
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+
+Partial Class FormMainMenu
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        components = New ComponentModel.Container()
+        pnlHeader = New Panel()
+        lblDateTime = New Label()
+        lblMainMenu = New Label()
+        tlpRoot = New TableLayoutPanel()
+        flpLeft = New FlowLayoutPanel()
+        flpRight = New FlowLayoutPanel()
+        tmrClock = New Timer(components)
+        pnlHeader.SuspendLayout()
+        tlpRoot.SuspendLayout()
+        SuspendLayout()
+        ' 
+        ' pnlHeader
+        ' 
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Controls.Add(lblDateTime)
+        pnlHeader.Controls.Add(lblMainMenu)
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Location = New Point(0, 0)
+        pnlHeader.MaximumSize = New Size(0, 48)
+        pnlHeader.MinimumSize = New Size(0, 48)
+        pnlHeader.Name = "pnlHeader"
+        pnlHeader.Size = New Size(1200, 48)
+        pnlHeader.TabIndex = 0
+        ' 
+        ' lblDateTime
+        ' 
+        lblDateTime.Dock = DockStyle.Fill
+        lblDateTime.Font = New Font("Consolas", 14.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblDateTime.ForeColor = Color.Yellow
+        lblDateTime.Location = New Point(365, 0)
+        lblDateTime.Name = "lblDateTime"
+        lblDateTime.Padding = New Padding(0, 10, 10, 0)
+        lblDateTime.Size = New Size(835, 48)
+        lblDateTime.TabIndex = 1
+        lblDateTime.TextAlign = ContentAlignment.MiddleRight
+        ' 
+        ' lblMainMenu
+        ' 
+        lblMainMenu.Dock = DockStyle.Left
+        lblMainMenu.Font = New Font("Castellar", 36F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblMainMenu.ForeColor = Color.Yellow
+        lblMainMenu.Location = New Point(0, 0)
+        lblMainMenu.MaximumSize = New Size(300, 50)
+        lblMainMenu.MinimumSize = New Size(365, 50)
+        lblMainMenu.Name = "lblMainMenu"
+        lblMainMenu.Size = New Size(365, 50)
+        lblMainMenu.TabIndex = 0
+        lblMainMenu.Text = "MAIN MENU"
+        lblMainMenu.TextAlign = ContentAlignment.MiddleLeft
+        ' 
+        ' tlpRoot
+        ' 
+        tlpRoot.BackColor = Color.Black
+        tlpRoot.ColumnCount = 2
+        tlpRoot.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpRoot.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpRoot.Controls.Add(flpLeft, 0, 0)
+        tlpRoot.Controls.Add(flpRight, 1, 0)
+        tlpRoot.Dock = DockStyle.Fill
+        tlpRoot.Location = New Point(0, 48)
+        tlpRoot.Name = "tlpRoot"
+        tlpRoot.RowCount = 1
+        tlpRoot.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlpRoot.Size = New Size(1200, 752)
+        tlpRoot.TabIndex = 1
+        ' 
+        ' flpLeft
+        ' 
+        flpLeft.AutoScroll = True
+        flpLeft.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(45))
+        flpLeft.Dock = DockStyle.Fill
+        flpLeft.FlowDirection = FlowDirection.TopDown
+        flpLeft.Location = New Point(3, 3)
+        flpLeft.Name = "flpLeft"
+        flpLeft.Padding = New Padding(10)
+        flpLeft.Size = New Size(594, 746)
+        flpLeft.TabIndex = 0
+        flpLeft.WrapContents = False
+        ' 
+        ' flpRight
+        ' 
+        flpRight.AutoScroll = True
+        flpRight.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(45))
+        flpRight.Dock = DockStyle.Fill
+        flpRight.FlowDirection = FlowDirection.TopDown
+        flpRight.Location = New Point(603, 3)
+        flpRight.Name = "flpRight"
+        flpRight.Padding = New Padding(10)
+        flpRight.Size = New Size(594, 746)
+        flpRight.TabIndex = 1
+        flpRight.WrapContents = False
+        ' 
+        ' tmrClock
+        ' 
+        tmrClock.Enabled = True
+        tmrClock.Interval = 1000
+        ' 
+        ' FormMainMenu
+        ' 
+        AutoScaleDimensions = New SizeF(7F, 15F)
+        AutoScaleMode = AutoScaleMode.Font
+        ClientSize = New Size(1200, 800)
+        Controls.Add(tlpRoot)
+        Controls.Add(pnlHeader)
+        KeyPreview = True
+        Name = "FormMainMenu"
+        StartPosition = FormStartPosition.CenterScreen
+        Text = "Main Menu"
+        pnlHeader.ResumeLayout(False)
+        tlpRoot.ResumeLayout(False)
+        ResumeLayout(False)
+    End Sub
+
+    Friend WithEvents pnlHeader As Panel
+    Friend WithEvents lblMainMenu As Label
+    Friend WithEvents lblDateTime As Label
+
+    Friend WithEvents tlpRoot As TableLayoutPanel
+    Friend WithEvents flpLeft As FlowLayoutPanel
+    Friend WithEvents flpRight As FlowLayoutPanel
+
+    Friend WithEvents tmrClock As Timer
+End Class
+```
+
+## Copilot
+
+Use this corrected full file for `FormMainMenu.Designer.vb`.
+
+```vb name=FormMainMenu.Designer.vb
+Imports System.Windows.Forms
+Imports System.Drawing
+
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+Partial Class FormMainMenu
+    Inherits System.Windows.Forms.Form
+
+    <System.Diagnostics.DebuggerNonUserCode()> _
+    Protected Overrides Sub Dispose(disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    Private components As System.ComponentModel.IContainer
+
+    <System.Diagnostics.DebuggerStepThrough()> _
+    Private Sub InitializeComponent()
+        components = New System.ComponentModel.Container()
+        pnlHeader = New Panel()
+        lblDateTime = New Label()
+        lblMainMenu = New Label()
+        tlpRoot = New TableLayoutPanel()
+        flpLeft = New FlowLayoutPanel()
+        flpRight = New FlowLayoutPanel()
+        tmrClock = New Timer(components)
+        pnlHeader.SuspendLayout()
+        tlpRoot.SuspendLayout()
+        SuspendLayout()
+        '
+        ' pnlHeader
+        '
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Controls.Add(lblDateTime)
+        pnlHeader.Controls.Add(lblMainMenu)
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Location = New Point(0, 0)
+        pnlHeader.MaximumSize = New Size(0, 48)
+        pnlHeader.MinimumSize = New Size(0, 48)
+        pnlHeader.Name = "pnlHeader"
+        pnlHeader.Size = New Size(1200, 48)
+        pnlHeader.TabIndex = 0
+        '
+        ' lblDateTime
+        '
+        lblDateTime.Dock = DockStyle.Fill
+        lblDateTime.Font = New Font("Consolas", 14.25F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblDateTime.ForeColor = Color.Yellow
+        lblDateTime.Location = New Point(365, 0)
+        lblDateTime.Name = "lblDateTime"
+        lblDateTime.Padding = New Padding(0, 10, 10, 0)
+        lblDateTime.Size = New Size(835, 48)
+        lblDateTime.TabIndex = 1
+        lblDateTime.TextAlign = ContentAlignment.MiddleRight
+        '
+        ' lblMainMenu
+        '
+        lblMainMenu.Dock = DockStyle.Left
+        lblMainMenu.Font = New Font("Castellar", 36F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        lblMainMenu.ForeColor = Color.Yellow
+        lblMainMenu.Location = New Point(0, 0)
+        lblMainMenu.MaximumSize = New Size(300, 50)
+        lblMainMenu.MinimumSize = New Size(365, 50)
+        lblMainMenu.Name = "lblMainMenu"
+        lblMainMenu.Size = New Size(365, 50)
+        lblMainMenu.TabIndex = 0
+        lblMainMenu.Text = "MAIN MENU"
+        lblMainMenu.TextAlign = ContentAlignment.MiddleLeft
+        '
+        ' tlpRoot
+        '
+        tlpRoot.BackColor = Color.Black
+        tlpRoot.ColumnCount = 2
+        tlpRoot.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpRoot.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 50F))
+        tlpRoot.Controls.Add(flpLeft, 0, 0)
+        tlpRoot.Controls.Add(flpRight, 1, 0)
+        tlpRoot.Dock = DockStyle.Fill
+        tlpRoot.Location = New Point(0, 48)
+        tlpRoot.Name = "tlpRoot"
+        tlpRoot.RowCount = 1
+        tlpRoot.RowStyles.Add(New RowStyle(SizeType.Percent, 100F))
+        tlpRoot.Size = New Size(1200, 752)
+        tlpRoot.TabIndex = 1
+        '
+        ' flpLeft
+        '
+        flpLeft.AutoScroll = True
+        flpLeft.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(45))
+        flpLeft.Dock = DockStyle.Fill
+        flpLeft.FlowDirection = FlowDirection.TopDown
+        flpLeft.Location = New Point(3, 3)
+        flpLeft.Name = "flpLeft"
+        flpLeft.Padding = New Padding(10)
+        flpLeft.Size = New Size(594, 746)
+        flpLeft.TabIndex = 0
+        flpLeft.WrapContents = False
+        '
+        ' flpRight
+        '
+        flpRight.AutoScroll = True
+        flpRight.BackColor = Color.FromArgb(CByte(45), CByte(45), CByte(45))
+        flpRight.Dock = DockStyle.Fill
+        flpRight.FlowDirection = FlowDirection.TopDown
+        flpRight.Location = New Point(603, 3)
+        flpRight.Name = "flpRight"
+        flpRight.Padding = New Padding(10)
+        flpRight.Size = New Size(594, 746)
+        flpRight.TabIndex = 1
+        flpRight.WrapContents = False
+        '
+        ' tmrClock
+        '
+        tmrClock.Enabled = True
+        tmrClock.Interval = 1000
+        '
+        ' FormMainMenu
+        '
+        AutoScaleDimensions = New SizeF(7F, 15F)
+        AutoScaleMode = AutoScaleMode.Font
+        ClientSize = New Size(1200, 800)
+        Controls.Add(tlpRoot)
+        Controls.Add(pnlHeader)
+        KeyPreview = True
+        Name = "FormMainMenu"
+        StartPosition = FormStartPosition.CenterScreen
+        Text = "Main Menu"
+        pnlHeader.ResumeLayout(False)
+        tlpRoot.ResumeLayout(False)
+        ResumeLayout(False)
+    End Sub
+
+    Friend WithEvents pnlHeader As Panel
+    Friend WithEvents lblMainMenu As Label
+    Friend WithEvents lblDateTime As Label
+
+    Friend WithEvents tlpRoot As TableLayoutPanel
+    Friend WithEvents flpLeft As FlowLayoutPanel
+    Friend WithEvents flpRight As FlowLayoutPanel
+
+    Friend WithEvents tmrClock As Timer
+End Class
+```
+
+## What changed
+- removed `Imports System.ComponentModel`
+- changed:
+  - `components = New ComponentModel.Container()`
+  to
+  - `components = New System.ComponentModel.Container()`
+- added `_` line continuation to the class and method attributes
+
+## Next
+Rebuild now.
+
+If there are still errors, paste the new error list only â€” it should be much shorter now.
+
+## @testsubject117
+
+Type 'FormAddOtherCheck' is not defined.
+Type 'FormDeleteOtherCheck' is not defined.
+'Public Sub New()' in designer-generated type 'FormDeleteCheck' should call InitializeComponent method.
+Access of shared member, constant member, enum member or nested type through an instance; qualifying expression will not be evaluated.
+
+## Copilot
+
+Good â€” this is much better. These are now ordinary project/code errors, not the Roslyn crash.
+
+## What each error means
+
+### 1. `Type 'FormAddOtherCheck' is not defined.`
+### 2. `Type 'FormDeleteOtherCheck' is not defined.`
+These are happening because those files are still removed from the project.
+
+You currently have these lines in the `.vbproj`:
+
+```xml
+<Compile Remove="FormAddOtherCheck.vb" />
+<Compile Remove="FormDeleteOtherCheck.vb" />
+<Compile Remove="OtherChkWriter.vb" />
+```
+
+So anything that references those forms will now fail.
+
+---
+
+## 3. `'Public Sub New()' in designer-generated type 'FormDeleteCheck' should call InitializeComponent method.`
+That means your `FormDeleteCheck` constructor probably looks something like:
+
+```vb
+Public Sub New()
+End Sub
+```
+
+but it needs:
+
+```vb
+Public Sub New()
+    InitializeComponent()
+End Sub
+```
+
+For WinForms, every form constructor must call `InitializeComponent()`.
+
+---
+
+## 4. `Access of shared member... through an instance; qualifying expression will not be evaluated.`
+That means somewhere youâ€™re doing something like:
+
+```vb
+someInstance.SomeSharedMember
+```
+
+instead of referring to the shared member through the type itself.
+
+Example:
+
+```vb
+Dim f As New FormAddOtherCheck()
+f.SomeSharedValue
+```
+
+when `SomeSharedValue` is actually `Shared` and should be:
+
+```vb
+FormAddOtherCheck.SomeSharedValue
+```
+
+This is a warning/error about how a shared member is referenced.
+
+---
+
+# What to do next
+
+## Step 1: add the 2 form files back
+Now that the compiler crash is gone, re-add:
+
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+
+and if it exists:
+- `FormAddOtherCheck.resx`
+- `FormDeleteOtherCheck.resx`
+
+### In the `.vbproj`
+remove these lines:
+
+```xml
+<Compile Remove="FormAddOtherCheck.vb" />
+<Compile Remove="FormDeleteOtherCheck.vb" />
+```
+
+and remove this too if present:
+
+```xml
+<EmbeddedResource Remove="FormAddOtherCheck.resx" />
+<EmbeddedResource Remove="FormDeleteOtherCheck.resx" />
+```
+
+Leave this one removed for now:
+
+```xml
+<Compile Remove="OtherChkWriter.vb" />
+```
+
+unless something also references `OtherChkWriter`.
+
+---
+
+## Step 2: fix `FormDeleteCheck`
+Open `FormDeleteCheck.vb` and make sure the constructor is:
+
+```vb
+Public Sub New()
+    InitializeComponent()
+End Sub
+```
+
+If it already has other code, keep it, just make sure `InitializeComponent()` is called first.
+
+Example:
+
+```vb
+Public Sub New()
+    InitializeComponent()
+    Me.KeyPreview = True
+End Sub
+```
+
+---
+
+## Step 3: find the shared-member error
+Search for references to:
+- `FormAddOtherCheck.`
+- `FormDeleteOtherCheck.`
+- or the line Visual Studio points to
+
+Youâ€™re looking for code that accesses a `Shared` member through an instance.
+
+Example bad:
+```vb
+Dim frm As New FormDeleteOtherCheck()
+frm.SomeSharedThing = ...
+```
+
+Example good:
+```vb
+FormDeleteOtherCheck.SomeSharedThing = ...
+```
+
+---
+
+# Recommended immediate move
+Do these in order:
+
+1. re-add `FormAddOtherCheck.vb`
+2. re-add `FormDeleteOtherCheck.vb`
+3. keep `OtherChkWriter.vb` removed for now
+4. fix `FormDeleteCheck` constructor to call `InitializeComponent()`
+5. rebuild
+6. paste the remaining error list
+
+---
+
+# Likely result
+After re-adding those files, the first two errors should disappear.  
+Then weâ€™ll be left with:
+- the `FormDeleteCheck` constructor issue
+- the shared-member access issue
+- possibly any references to `OtherChkWriter` if that file is still excluded
+
+If you want, I can generate the **next full `.vbproj`** with the right remove lines cleaned up.
+
+## @testsubject117
+
+```
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+```
+this is in formdeletecheck.vb: is that supposed to be replaced with Public Sub New()
+    InitializeComponent()
+End Sub
+
+## Copilot
+
+No â€” **donâ€™t blindly replace it**.
+
+## Direct answer
+If `FormDeleteCheck` is a designer-backed WinForms form, then its constructor should call `InitializeComponent()`.  
+Right now it calls:
+
+```vb
+InitializeDeleteCheckForm()
+```
+
+which sounds like a custom manual UI-builder method, not the designer method.
+
+So the right fix depends on whether this form is:
+
+1. **designer-based** (`FormDeleteCheck.Designer.vb` exists), or
+2. **fully hand-built** (no designer file, all controls created in code)
+
+---
+
+# What the error means
+> `'Public Sub New()' in designer-generated type 'FormDeleteCheck' should call InitializeComponent method.`
+
+That strongly suggests `FormDeleteCheck` **does have a `.Designer.vb` file**.
+
+If so, the constructor should call `InitializeComponent()`.
+
+---
+
+# Most likely correct fix
+If `FormDeleteCheck.Designer.vb` exists, change:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+to:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+## Important:
+Do **not** remove `InitializeDeleteCheckForm()` yet unless we know what it does.
+
+It may contain setup logic beyond the designer.
+
+---
+
+# Why this is safer
+- `InitializeComponent()` wires up designer-created controls
+- `InitializeDeleteCheckForm()` may do custom runtime setup
+
+So usually the safe order is:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+---
+
+# But we need to avoid double-building
+If `InitializeDeleteCheckForm()` is manually creating controls that the designer also creates, then calling both could duplicate controls.
+
+So the next question is:
+
+## Does `FormDeleteCheck.Designer.vb` exist?
+If yes, then paste:
+- the first ~30 lines of `FormDeleteCheck.vb`
+- and confirm whether `FormDeleteCheck.Designer.vb` exists
+
+---
+
+# Rule of thumb
+## If there is a `.Designer.vb` file:
+constructor should call:
+```vb
+InitializeComponent()
+```
+
+## If there is no `.Designer.vb` file:
+constructor can call custom setup like:
+```vb
+InitializeDeleteCheckForm()
+```
+
+---
+
+# Best immediate action
+Donâ€™t replace it with only `InitializeComponent()` yet.
+
+Instead, if designer file exists, try:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+But only if `InitializeDeleteCheckForm()` is not itself creating the full form UI from scratch.
+
+If you want, paste `FormDeleteCheck.vb` and Iâ€™ll tell you exactly which constructor version is right.
+
+## @testsubject117
+
+```
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()> _
+Partial Class FormDeleteCheck
+    Inherits System.Windows.Forms.Form
+
+    'Form overrides dispose to clean up the component list.
+    <System.Diagnostics.DebuggerNonUserCode()> _
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
+        Try
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
+            End If
+        Finally
+            MyBase.Dispose(disposing)
+        End Try
+    End Sub
+
+    'Required by the Windows Form Designer
+    Private components As System.ComponentModel.IContainer
+
+    'NOTE: The following procedure is required by the Windows Form Designer
+    'It can be modified using the Windows Form Designer.  
+    'Do not modify it using the code editor.
+    <System.Diagnostics.DebuggerStepThrough()> _
+    Private Sub InitializeComponent()
+        components = New System.ComponentModel.Container
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.ClientSize = New System.Drawing.Size(800, 450)
+        Me.Text = "FormDeleteCheck"
+    End Sub
+End Class
+```
+
+## Copilot
+
+Yes â€” in this case, `FormDeleteCheck` **is** designer-backed, so its constructor must call `InitializeComponent()`.
+
+## Direct fix
+Change this:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+to this:
+
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+---
+
+# Why
+Because you have a `FormDeleteCheck.Designer.vb` file containing:
+
+```vb
+Private Sub InitializeComponent()
+```
+
+So the form is definitely a designer-generated type, and the constructor is expected to call that method.
+
+---
+
+# Why not remove `InitializeDeleteCheckForm()`?
+Because it may still contain custom setup logic for this form.
+
+So the safe fix is:

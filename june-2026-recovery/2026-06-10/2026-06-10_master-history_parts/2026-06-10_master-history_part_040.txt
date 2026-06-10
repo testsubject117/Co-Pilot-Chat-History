@@ -1,0 +1,2000 @@
+﻿            ShowMatchSelection(checkNo, matches)
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        SelectHighlightedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            SelectHighlightedMatch()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub SelectHighlightedMatch()
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex < 0 Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex >= _matchingChecks.Count Then
+            Return
+        End If
+
+        ShowCheckDetails(_matchingChecks(lstMatches.SelectedIndex))
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N OrElse keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.SelectMatch Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim updated As New List(Of LedgerEntry)()
+        Dim i As Integer
+
+        For i = 0 To entries.Count - 1
+            If Not LedgerEntriesMatch(entries(i), info) Then
+                updated.Add(entries(i))
+            End If
+        Next
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim updated As New List(Of CheckInvBlock)()
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If Not CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                updated.Add(blocks(i))
+            End If
+        Next
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If x.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If block.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+End Class
+```
+
+## @testsubject117
+
+I replaced it and it still doesn't work
+
+## Copilot
+
+Then the problem is almost certainly **not** `FormDeleteCheck` anymore â€” itâ€™s that `LedgerCurReader.ReadAll()` is only returning one of the `7782` records.
+
+## Direct answer
+If the new delete form is in place **and still only finds one `7782`**, then the duplicate-matching code is doing its job over the list it receives.
+
+So the real failure is likely here:
+
+- `LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)`
+
+Itâ€™s probably parsing `LEDGER.CUR` incorrectly and only returning one of the two exact `7782` entries, or skipping your newly added one.
+
+---
+
+## Why I think that
+The new delete code does this:
+
+- read **all** ledger entries
+- loop through all of them
+- collect exact matches on check number
+
+If two exact `7782` entries were present in the parsed list, it **would** show the selection list.
+
+Since it doesnâ€™t, one of these must be true:
+
+1. only one exact `7782` is being returned by `LedgerCurReader`
+2. the new `.07` check is written in a format the reader doesnâ€™t read back correctly
+3. the app isnâ€™t reading the same `LEDGER.CUR` you inspected manually
+
+---
+
+## Fastest way to prove it
+We need to inspect `LedgerCurReader.vb`.
+
+Please paste:
+- **`LedgerCurReader.vb`**
+- and if separate, **`LedgerEntry.vb`**
+- and **`LedgerCurWriter.vb`**
+
+That will let me compare:
+- how you write the new record
+vs
+- how you parse the file back
+
+---
+
+## My strongest suspicion
+The old legacy file format may have:
+- quotes
+- blank invoice-diff fields
+- odd numeric formatting
+- EOF marker chars
+- 6-line block assumptions
+
+and your writer/reader may not be fully symmetrical.
+
+That would explain:
+- View Checks mostly works
+- Add works visibly
+- delete lookup misses one of the duplicate records
+
+---
+
+## One quick diagnostic you can do right now
+Inside `txtInput_KeyDown`, right after:
+
+```vbnet
+Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+```
+
+temporarily add:
+
+```vbnet
+MessageBox.Show("Entries read: " & entries.Count.ToString(), "Debug")
+```
+
+and then after building `matches`, add:
+
+```vbnet
+MessageBox.Show("Matches for " & checkNo & ": " & matches.Count.ToString(), "Debug")
+```
+
+If it says:
+- `Matches for 7782: 1`
+
+then that confirms the issue is in the parsed data, not the duplicate UI logic.
+
+---
+
+## Next step
+Paste these files next:
+
+1. `LedgerCurReader.vb`
+2. `LedgerCurWriter.vb`
+3. `LedgerEntry.vb`
+
+Thatâ€™s the most likely place the bug lives now.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes â€” I see the likely problem.
+
+## Direct answer
+Your `LedgerCurReader` assumes **every ledger record is exactly 6 physical lines** after blank lines are removed.
+
+That is fragile, and it likely explains why one of the `7782` records is being misread or skipped.
+
+Specifically, this part is the issue:
+
+```vbnet
+' Each entry is 6 lines
+Dim i As Integer = 0
+While i + 5 < cleaned.Count
+    ...
+    i += 6
+End While
+```
+
+If even one legacy record in `LEDGER.CUR` is not perfectly aligned as 6 cleaned lines, then everything after that can drift out of sync.
+
+---
+
+## Why this matters here
+Your add writer is likely writing clean 6-line records.
+
+But the original historical `LEDGER.CUR` may contain:
+- malformed legacy rows
+- embedded weirdness
+- extra/missing blank-ish lines
+- odd quoting
+- records that donâ€™t align perfectly once `.Trim()` and blank-line skipping happen
+
+So the parser may be grouping the file incorrectly.
+
+That would explain why:
+- one exact `7782` is visible manually in the file
+- but not both are coming back as separate parsed `LedgerEntry` objects
+
+---
+
+## Most suspicious line
+This:
+
+```vbnet
+Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+If s = "" Then
+    Continue For
+End If
+```
+
+means you are **discarding blank lines entirely**.
+
+But in `LEDGER.CUR`, the 4th field is often intentionally blank:
+
+```basic
+WRITE#1,N2$:WRITE#1,DT$:WRITE#1,CNUM$:WRITE#1,"":WRITE#1,CHKAMT:WRITE#1,RF$
+```
+
+So a valid record includes an empty field.
+
+If your reader drops that blank field line, record alignment breaks. That is huge.
+
+---
+
+# This is the bug
+The 4th field, `InvoiceDiffText`, can legitimately be blank.
+
+But your reader removes blank lines before grouping records into 6 lines.
+
+So this valid 6-field record:
+
+1. customer
+2. date
+3. check number
+4. `""` or blank
+5. amount
+6. reference
+
+can become effectively **5 cleaned lines** if the blank field is written as an empty physical line or normalizes to empty after trimming.
+
+Then every record after it can shift.
+
+---
+
+## Fix
+You should **stop removing blank lines** from `LEDGER.CUR`.
+
+Only remove the DOS EOF marker, but preserve line positions.
+
+---
+
+# Replace `LedgerCurReader.vb` with this
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+
+        Dim normalized As New List(Of String)(rawLines.Length)
+        Dim i As Integer
+
+        For i = 0 To rawLines.Length - 1
+            Dim raw As String = rawLines(i)
+
+            If raw Is Nothing Then
+                normalized.Add("")
+            Else
+                normalized.Add(raw.Replace(ChrW(26), ""))
+            End If
+        Next
+
+        i = 0
+        While i + 5 < normalized.Count
+            Dim e As New LedgerEntry()
+            e.Customer = Unquote(normalized(i))
+            e.DateText = Unquote(normalized(i + 1))
+            e.CheckNumber = Unquote(normalized(i + 2))
+            e.InvoiceDiffText = Unquote(normalized(i + 3))
+            e.Amount = ParseDecimal(normalized(i + 4))
+            e.Reference = Unquote(normalized(i + 5))
+
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+---
+
+## Why this should help
+This version:
+- preserves all physical lines
+- preserves intentionally blank field lines
+- still strips `Chr(26)`
+- still reads fixed 6-line records
+
+That makes it much more compatible with the actual legacy layout.
+
+---
+
+## What to test after replacing it
+1. rebuild
+2. open **View Checks**
+3. see whether both exact `7782` entries now appear distinctly
+4. then try **Delete Checks**
+5. enter `7782`
+
+If Iâ€™m right, you should now get multiple matches.
+
+---
+
+## Very likely outcome
+I think this is the root cause:
+- the reader was collapsing blank field lines
+- that shifted record boundaries
+- duplicate records were not being parsed correctly
+
+---
+
+## Next
+If this fixes the duplicate detection, then after that we can move on to the final missing piece:
+
+- resetting `INVOICE.CHK` on delete
+
+If you want, after you test this, tell me exactly what happened:
+- whether View Checks changed
+- and whether Delete now shows both `7782` records.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes â€” this is still the **old version**, and it still contains the bug.
+
+## Direct answer
+You have **not replaced `LedgerCurReader.vb` yet**.
+
+The proof is this section is still present:
+
+```vbnet
+If s = "" Then
+    Continue For
+End If
+```
+
+That means blank lines are still being removed, which is exactly what I think is corrupting the 6-line record alignment.
+
+---
+
+## What you need to do
+Replace the **entire file** with this exact version:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim normalized As New List(Of String)(rawLines.Length)
+
+        Dim i As Integer
+        For i = 0 To rawLines.Length - 1
+            Dim raw As String = rawLines(i)
+
+            If raw Is Nothing Then
+                normalized.Add("")
+            Else
+                normalized.Add(raw.Replace(ChrW(26), ""))
+            End If
+        Next
+
+        i = 0
+        While i + 5 < normalized.Count
+            Dim e As New LedgerEntry()
+            e.Customer = Unquote(normalized(i))
+            e.DateText = Unquote(normalized(i + 1))
+            e.CheckNumber = Unquote(normalized(i + 2))
+            e.InvoiceDiffText = Unquote(normalized(i + 3))
+            e.Amount = ParseDecimal(normalized(i + 4))
+            e.Reference = Unquote(normalized(i + 5))
+
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+---
+
+## Important difference
+### Old broken behavior:
+- strips whitespace
+- skips blank lines entirely
+
+### New intended behavior:
+- preserves every physical line
+- keeps blank field lines in place
+- only removes DOS EOF marker chars
+
+That is the key change.
+
+---
+
+## How to verify you actually replaced it
+After pasting, search the file for:
+
+```vbnet
+normalized.Add("")
+```
+
+If that text is present, you have the new version.
+
+Also make sure this text is **gone**:
+
+```vbnet
+If s = "" Then
+    Continue For
+End If
+```
+
+If that block is still there, itâ€™s still the old one.
+
+---
+
+## Then do this
+1. save file
+2. rebuild
+3. test delete on `7782` again
+
+---
+
+## Short version
+The code you just pasted proves the reader is **still skipping blank lines**.  
+That is almost certainly why duplicate ledger entries are being misparsed.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+## Copilot
+
+Good â€” `LedgerCurWriter.vb` helps confirm the format.
+
+## Direct answer
+Your writer writes the 4th field as:
+
+```vbnet
+lines.Add(Quote(entry.InvoiceDiffText))
+```
+
+So even when `InvoiceDiffText` is empty, it writes:
+
+```text
+""
+```
+
+That means the line is **not physically blank**.
+
+So my earlier â€œblank-line collapseâ€ theory may not be the main cause for newly written records.
+
+However, your `LedgerCurReader.vb` is **still definitely the old version**, and we still need to fix it because it is overly brittle.
+
+But now the stronger likely issue is this:
+
+## stronger suspicion now
+Your historical `LEDGER.CUR` may contain records that are **not perfectly clean 6-line quoted records**, and your readerâ€™s rigid 6-line grouping is causing the parsed list to drift or omit entries.
+
+So we still need to fix `LedgerCurReader.vb`.
+
+---
+
+# Important point
+You pasted `LedgerCurWriter.vb`, but I still need you to actually replace `LedgerCurReader.vb`.
+
+The code you showed earlier proves it is still the old version.
+
+---
+
+## Here is exactly what to do now
+Replace `LedgerCurReader.vb` with this exact code:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim normalized As New List(Of String)(rawLines.Length)
+
+        Dim i As Integer
+        For i = 0 To rawLines.Length - 1
+            Dim raw As String = rawLines(i)
+
+            If raw Is Nothing Then
+                normalized.Add("")
+            Else
+                normalized.Add(raw.Replace(ChrW(26), ""))
+            End If
+        Next
+
+        i = 0
+        While i + 5 < normalized.Count
+            Dim e As New LedgerEntry()
+            e.Customer = Unquote(normalized(i))
+            e.DateText = Unquote(normalized(i + 1))
+            e.CheckNumber = Unquote(normalized(i + 2))
+            e.InvoiceDiffText = Unquote(normalized(i + 3))
+            e.Amount = ParseDecimal(normalized(i + 4))
+            e.Reference = Unquote(normalized(i + 5))
+
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+---
+
+## Then verify the replacement worked
+After pasting, search the file for this line:
+
+```vbnet
+normalized.Add("")
+```
+
+If you see it, the new version is in place.
+
+Also search for:
+
+```vbnet
+If s = "" Then
+    Continue For
+End If
+```
+
+That block must be gone.
+
+---
+
+## Why Iâ€™m being repetitive here
+Because each time you pasted `LedgerCurReader.vb`, it was still the old version. So the next step is not analysis â€” itâ€™s making sure the file truly gets replaced.
+
+---
+
+## After you replace it
+Then:
+1. save
+2. rebuild
+3. test delete again with `7782`
+
+If it still only finds ASTROMAT after that, then weâ€™ll instrument the reader and inspect the actual parsed records.
+
+---
+
+## Short answer
+`LedgerCurWriter.vb` looks okay.  
+The file we still need to change is **`LedgerCurReader.vb`**, and it has not been replaced yet.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+That is **still the old file**.
+
+## Direct answer
+You keep pasting the same unchanged `LedgerCurReader.vb`. It still contains:
+
+```vbnet
+If s = "" Then
+    Continue For
+End If
+```
+
+So the reader has **not** been replaced yet.
+
+---
+
+## To move forward, do this exactly
+Open `LedgerCurReader.vb`, select all, delete it, and paste this exact full file:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim normalized As New List(Of String)(rawLines.Length)
+
+        Dim i As Integer
+        For i = 0 To rawLines.Length - 1
+            Dim raw As String = rawLines(i)
+
+            If raw Is Nothing Then
+                normalized.Add("")
+            Else
+                normalized.Add(raw.Replace(ChrW(26), ""))
+            End If
+        Next
+
+        i = 0
+        While i + 5 < normalized.Count
+            Dim e As New LedgerEntry()
+            e.Customer = Unquote(normalized(i))
+            e.DateText = Unquote(normalized(i + 1))
+            e.CheckNumber = Unquote(normalized(i + 2))
+            e.InvoiceDiffText = Unquote(normalized(i + 3))
+            e.Amount = ParseDecimal(normalized(i + 4))
+            e.Reference = Unquote(normalized(i + 5))
+
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+---
+
+## Then verify before rebuilding
+After you paste it, use Find and check:
+
+### This **must exist**
+```vbnet
+normalized.Add("")
+```
+
+### This **must not exist**
+```vbnet
+If s = "" Then
+    Continue For
+End If
+```
+
+If that old block still exists, you have not replaced the file.
+
+---
+
+## Why Iâ€™m stopping here
+Because we canâ€™t diagnose the next step until this file is actually changed. Right now, every paste confirms itâ€™s still the original buggy version.
+
+## After you replace it
+Paste just these two tiny proofs from the file:
+
+1.
+```vbnet
+normalized.Add("")
+```
+
+2. confirm that the `If s = "" Then` block is gone
+
+Then we continue.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim normalized As New List(Of String)(rawLines.Length)
+
+        Dim i As Integer
+        For i = 0 To rawLines.Length - 1
+            Dim raw As String = rawLines(i)
+
+            If raw Is Nothing Then
+                normalized.Add("")
+            Else
+                normalized.Add(raw.Replace(ChrW(26), ""))
+            End If
+        Next
+
+        i = 0
+        While i + 5 < normalized.Count
+            Dim e As New LedgerEntry()
+            e.Customer = Unquote(normalized(i))
+            e.DateText = Unquote(normalized(i + 1))
+            e.CheckNumber = Unquote(normalized(i + 2))
+            e.InvoiceDiffText = Unquote(normalized(i + 3))
+            e.Amount = ParseDecimal(normalized(i + 4))
+            e.Reference = Unquote(normalized(i + 5))
+
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "")
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Perfect â€” **that one is actually replaced now**.
+
+## Direct answer
+Now rebuild and test `7782` again.
+
+This version preserves record alignment properly, so there is a real chance the duplicate check entries will now both be parsed.
+
+---
+
+## What to test
+1. **Build**
+2. Open **Delete Checks**
+3. Enter `7782`
+
+### Expected outcome now
+You should get:
+- a **selection list** if there are multiple exact `7782` entries
+
+instead of jumping straight to ASTROMAT.
+
+---
+
+## If it still only shows one
+Then the next step is to inspect what `LedgerCurReader.ReadAll()` is actually returning for `7782`.
+
+### Add this temporary debug inside `FormDeleteCheck.vb`
+Inside `txtInput_KeyDown`, after:
+
+```vbnet
+Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+```
+
+add:
+
+```vbnet
+Dim debugMatches As New System.Text.StringBuilder()
+Dim k As Integer
+
+For k = 0 To entries.Count - 1
+    If String.Equals(entries(k).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+        debugMatches.AppendLine("Customer=" & entries(k).Customer &
+                                "  Date=" & entries(k).DateText &
+                                "  Amt=" & entries(k).Amount.ToString() &
+                                "  Ref=" & entries(k).Reference)
+    End If
+Next
+
+MessageBox.Show("Exact matches found for " & checkNo & ":" & Environment.NewLine & debugMatches.ToString(), "Debug")
+```
+
+That will tell us exactly what the reader is seeing.
+
+---
+
+## But first
+Try it **without** adding debug code, because the reader change alone may fix it.
+
+## Short answer
+Good â€” `LedgerCurReader.vb` is finally correct now.  
+Next step: rebuild and test delete on `7782` again.
+
+## @testsubject117
+
+nope, no selection list
+
+## Copilot
+
+Then we need to see exactly what the app is reading. Add a temporary debug message to the delete form and tell me what it shows.
+
+In `FormDeleteCheck.vb`, inside `txtInput_KeyDown`, replace the middle with this:
+
+```vbnet
+Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+Dim matches As New List(Of LedgerEntry)()
+Dim i As Integer
+
+For i = 0 To entries.Count - 1
+    If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+        matches.Add(entries(i))
+    End If
+Next
+
+Dim sb As New System.Text.StringBuilder()
+sb.AppendLine("Total entries read: " & entries.Count.ToString())
+sb.AppendLine("Exact matches for check # " & checkNo & ": " & matches.Count.ToString())
+sb.AppendLine("")
+
+For i = 0 To matches.Count - 1
+    sb.AppendLine("Match " & (i + 1).ToString() & ":")
+    sb.AppendLine("  Customer = " & matches(i).Customer)
+    sb.AppendLine("  Date     = " & matches(i).DateText)
+    sb.AppendLine("  Amount   = " & matches(i).Amount.ToString())
+    sb.AppendLine("  Ref      = " & matches(i).Reference)
+    sb.AppendLine("")
+Next
+
+MessageBox.Show(sb.ToString(), "Delete Check Debug")
+```
+
+Put it immediately after:
+
+```vbnet
+Dim checkNo As String = txtInput.Text.Trim()
+```
+
+and before the `If matches.Count = 0 Then` block.
+
+Then:
+1. rebuild
+2. go to Delete Checks
+3. enter `7782`
+4. paste me exactly what the debug message says
+
+That will tell us whether:
+- only one `7782` is being parsed, or
+- the delete form isnâ€™t using the new code you think it is.
+
+## @testsubject117
+
+I can't find those lines, can you just generate the entire code for the file
+
+## Copilot
+
+Yes â€” replace the entire contents of `FormDeleteCheck.vb` with this exact version. It includes the debug popup so we can see what `LedgerCurReader.ReadAll()` is actually returning for the check number.
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Text
+Imports System.Threading
+Imports System.Windows.Forms
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        SelectMatch
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+    Private _matchingChecks As New List(Of LedgerEntry)()
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lstMatches As ListBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.ClientSize = New Size(940, 560)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 700, 25)
+        lblLine1 = CreateLabel(20, 60, 860, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(220, 26)
+        txtInput.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lstMatches = New ListBox()
+        lstMatches.Location = New Point(20, 135)
+        lstMatches.Size = New Size(880, 140)
+        lstMatches.Font = New Font("Consolas", 11.0!, FontStyle.Regular)
+        lstMatches.BackColor = Color.Black
+        lstMatches.ForeColor = Color.White
+        lstMatches.BorderStyle = BorderStyle.FixedSingle
+        lstMatches.Visible = False
+        AddHandler lstMatches.KeyDown, AddressOf lstMatches_KeyDown
+        AddHandler lstMatches.DoubleClick, AddressOf lstMatches_DoubleClick
+
+        lblCustomer = CreateLabel(20, 295, 420, 25)
+        lblDate = CreateLabel(520, 295, 250, 25)
+        lblCheckInfo = CreateLabel(20, 325, 820, 25)
+        lblInvoices = CreateLabel(20, 355, 850, 25)
+        lblAmount = CreateLabel(20, 385, 300, 25)
+        lblPrompt = CreateLabel(20, 425, 880, 25)
+        lblStatus1 = CreateLabel(20, 455, 880, 25)
+        lblStatus2 = CreateLabel(20, 485, 880, 25)
+        lblStatus3 = CreateLabel(20, 515, 880, 35)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lstMatches)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+        _matchingChecks.Clear()
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lstMatches.Visible = False
+        lstMatches.Items.Clear()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowMatchSelection(checkNo As String, matches As List(Of LedgerEntry))
+        _state = DeleteCheckState.SelectMatch
+        _matchingChecks = matches
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Multiple checks found for check # " & checkNo & ". Select one and press ENTER."
+
+        txtInput.Visible = False
+        lstMatches.Visible = True
+        lstMatches.Items.Clear()
+
+        Dim i As Integer
+        For i = 0 To matches.Count - 1
+            lstMatches.Items.Add(FormatMatchText(matches(i)))
+        Next
+
+        If lstMatches.Items.Count > 0 Then
+            lstMatches.SelectedIndex = 0
+        End If
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = "ENTER = Select highlighted check   ESC = Cancel"
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        lstMatches.Focus()
+    End Sub
+
+    Private Function FormatMatchText(entry As LedgerEntry) As String
+        Dim customerText As String = SafePadRight(entry.Customer, 12)
+        Dim dateText As String = SafePadRight(entry.DateText, 12)
+        Dim refText As String = SafePadRight(entry.Reference, 12)
+        Dim amountText As String = entry.Amount.ToString("0.00").PadLeft(10)
+
+        Return customerText & "  " & dateText & "  REF " & refText & "  AMT " & amountText
+    End Function
+
+    Private Function SafePadRight(value As String, width As Integer) As String
+        Dim s As String = ""
+        If value IsNot Nothing Then
+            s = value
+        End If
+
+        If s.Length > width Then
+            s = s.Substring(0, width)
+        End If
+
+        Return s.PadRight(width)
+    End Function
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+        lstMatches.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim matches As New List(Of LedgerEntry)()
+            Dim i As Integer
+
+            For i = 0 To entries.Count - 1
+                If String.Equals(entries(i).CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase) Then
+                    matches.Add(entries(i))
+                End If
+            Next
+
+            Dim sb As New StringBuilder()
+            sb.AppendLine("Total entries read: " & entries.Count.ToString())
+            sb.AppendLine("Exact matches for check # " & checkNo & ": " & matches.Count.ToString())
+            sb.AppendLine("")
+
+            For i = 0 To matches.Count - 1
+                sb.AppendLine("Match " & (i + 1).ToString() & ":")
+                sb.AppendLine("  Customer = " & matches(i).Customer)
+                sb.AppendLine("  Date     = " & matches(i).DateText)
+                sb.AppendLine("  Amount   = " & matches(i).Amount.ToString())
+                sb.AppendLine("  Ref      = " & matches(i).Reference)
+                sb.AppendLine("")
+            Next
+
+            MessageBox.Show(sb.ToString(), "Delete Check Debug")
+
+            If matches.Count = 0 Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            If matches.Count = 1 Then
+                ShowCheckDetails(matches(0))
+                Return
+            End If
+
+            ShowMatchSelection(checkNo, matches)
+        End If
+    End Sub
+
+    Private Sub lstMatches_DoubleClick(sender As Object, e As EventArgs)
+        SelectHighlightedMatch()
+    End Sub
+
+    Private Sub lstMatches_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            SelectHighlightedMatch()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub SelectHighlightedMatch()
+        If _state <> DeleteCheckState.SelectMatch Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex < 0 Then
+            Return
+        End If
+
+        If lstMatches.SelectedIndex >= _matchingChecks.Count Then
+            Return
+        End If
+
+        ShowCheckDetails(_matchingChecks(lstMatches.SelectedIndex))
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N OrElse keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.EnterCheckNumber Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        If _state = DeleteCheckState.SelectMatch Then
+            If keyData = Keys.Escape Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        DeleteFromLedger(info)
+        DeleteFromCheckInv(info)
+        Thread.Sleep(750)
+    End Sub
+
+    Private Sub DeleteFromLedger(info As LedgerEntry)
+        Dim entries As List(Of LedgerEntry) = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+        Dim updated As New List(Of LedgerEntry)()
+        Dim i As Integer
+
+        For i = 0 To entries.Count - 1
+            If Not LedgerEntriesMatch(entries(i), info) Then
+                updated.Add(entries(i))
+            End If
+        Next
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+    End Sub
+
+    Private Sub DeleteFromCheckInv(info As LedgerEntry)
+        Dim blocks As List(Of CheckInvBlock) = CheckInvReader.ReadAll(LegacyDataPaths.CheckInv)
+        Dim updated As New List(Of CheckInvBlock)()
+        Dim i As Integer
+
+        For i = 0 To blocks.Count - 1
+            If Not CheckInvMatchesLedgerEntry(blocks(i), info) Then
+                updated.Add(blocks(i))
+            End If
+        Next
+
+        CheckInvWriter.WriteAll(LegacyDataPaths.CheckInv, updated)
+    End Sub
+
+    Private Function LedgerEntriesMatch(x As LedgerEntry, info As LedgerEntry) As Boolean
+        If x Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If x.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    Private Function CheckInvMatchesLedgerEntry(block As CheckInvBlock, info As LedgerEntry) As Boolean
+        If block Is Nothing OrElse info Is Nothing Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CustomerCode, info.Customer, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If Not String.Equals(block.SalesmanCode, info.Reference, StringComparison.OrdinalIgnoreCase) Then
+            Return False
+        End If
+
+        If block.Amount <> info.Amount Then
+            Return False
+        End If
+
+        Return True
+    End Function
+End Class
+```
+
+Then:
+1. build
+2. run delete checks
+3. type `7782`
+4. copy the text from the debug popup and paste it here
+
+That output will tell us exactly what the program sees.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+Perfect â€” that proves the duplicate logic is working and the reader is fine now.
+
+## Direct answer
+The app **is finding both exact `7782` checks**:
+
+1. `ASTROMAT` â€” amount `335.5`
+2. `PSLBARI` â€” amount `0.07`

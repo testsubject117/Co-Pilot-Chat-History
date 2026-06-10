@@ -1,0 +1,2000 @@
+﻿            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                OpenAreaCodes()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+
+        If Not svc.DataFileExists() Then
+            MessageBox.Show("Area code data file not found:" & Environment.NewLine & svc.GetDataFilePath(),
+                            "Area Code Finder",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning)
+            Return
+        End If
+
+        Dim prompt As String =
+            "Enter Area Code to find city or 2 letter abbreviation of state to find area code" & Environment.NewLine &
+            "Example: California = CA" & Environment.NewLine & Environment.NewLine &
+            "[A = All] [Q = Quit] ?"
+
+        Dim userInput As String = InputBox(prompt, "LOOK UP AREA CODES")
+
+        If String.IsNullOrWhiteSpace(userInput) Then
+            Return
+        End If
+
+        Dim trimmed = userInput.Trim()
+
+        If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Return
+        End If
+
+        Using frm As New FrmPagedTextViewer()
+            If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+                Dim pages = svc.GetAllPages()
+
+                If pages Is Nothing OrElse pages.Count = 0 Then
+                    MessageBox.Show("No area code data found.",
+                                    "Area Code Finder",
+                                    MessageBoxButtons.OK,
+                                    MessageBoxIcon.Information)
+                    Return
+                End If
+
+                frm.SetPages(pages)
+                frm.ShowDialog(Me)
+                Return
+            End If
+
+            Dim results = svc.Search(trimmed)
+
+            If results Is Nothing OrElse results.Count = 0 Then
+                MessageBox.Show("No matches found.",
+                                "Area Code Finder",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Information)
+                Return
+            End If
+
+            Dim formatted As String = svc.FormatGroupedResults(results)
+            frm.SetPages(New List(Of String) From {formatted})
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+
+## Important
+Before pasting, make sure you do **all** of this:
+
+1. open `FrmRolodexMenu.vb`
+2. **Ctrl+A**
+3. paste the full file above
+4. save
+5. rebuild
+
+Do **not** paste only the `Private Sub ...` blocks at the top of the file.
+
+If you still get the namespace error after replacing the full file, then there is probably stray text left above `Imports ...` or below `End Class`, and I can help clean that next.
+
+## @testsubject117
+
+ok, that fixed it, I built it, and ran it, it works. But it looks like windows, not the dos app:
+
+## Copilot
+
+Yes â€” thatâ€™s because `InputBox(...)` is a **standard Windows VB dialog**, so it breaks the DOS illusion.
+
+## Direct recommendation
+Replace the `InputBox` prompt with an **inline DOS-style prompt inside `txtInline`** or with a **custom black/white popup form** using the same monospace styling as the menu.
+
+Since your Rolodex menu already has this area:
+
+```vb
+txtInline
+```
+
+the best fix is to do the prompt **inside the form**, not with a Windows dialog.
+
+---
+
+## Why it looks wrong
+Your current code does this:
+
+```vb
+Dim userInput As String = InputBox(prompt, "LOOK UP AREA CODES")
+```
+
+That always gives you:
+- Windows title bar
+- OK/Cancel buttons
+- Windows textbox styling
+- non-DOS layout
+
+So functionally it works, but visually it does not match the old app.
+
+---
+
+## Best solution
+Create a **custom prompt form** styled like DOS.
+
+### It should be:
+- black background
+- white monospace text
+- centered
+- no modern message-box feel
+- single-line input
+- Enter = submit
+- Esc = cancel
+
+That will look much closer to the original app.
+
+---
+
+## Fastest practical option
+There are two ways to fix it:
+
+### Option 1 â€” inline prompt in `txtInline`
+Pros:
+- fastest
+- stays inside the menu form
+- closest to the old â€œscreen promptâ€ feel
+
+Cons:
+- youâ€™ll need to add inline input handling state for area codes
+
+### Option 2 â€” custom `FrmDosInputPrompt`
+Pros:
+- cleaner code
+- reusable later for other DOS-style prompts
+- easier to control behavior
+
+Cons:
+- one extra form file
+
+---
+
+## My recommendation
+Use **Option 2**:
+build a reusable DOS-style prompt form.
+
+Then `OpenAreaCodes()` becomes:
+
+- show DOS prompt form
+- get typed input
+- show results in your paged viewer
+
+That keeps the old visual feel without overcomplicating `FrmRolodexMenu`.
+
+---
+
+## What I can generate next
+I can give you a complete:
+
+- `FrmDosInputPrompt.vb`
+
+styled like the DOS app, and then
+- the updated `OpenAreaCodes()` code that uses it
+
+That is the cleanest next step.
+
+## Short answer
+Yes â€” it looks like Windows because `InputBox` is a Windows dialog.  
+To make it feel like DOS, we should replace it with a **custom DOS-style input form**.
+
+If you want, Iâ€™ll generate that form now.
+
+## @testsubject117
+
+this is how it should look: 
+
+## Copilot
+
+Yes â€” that should **not** be a popup dialog at all.
+
+It should be rendered **inside the black Rolodex screen itself**, like the DOS screenshot.
+
+## Direct recommendation
+Do **not** use:
+- `InputBox`
+- a MessageBox-style prompt
+- even a separate custom Windows form
+
+Instead, use the existing `txtInline` area in `FrmRolodexMenu` and turn it into the area-code prompt screen.
+
+That is the correct match for image 11.
+
+---
+
+## What the DOS behavior implies
+When the user presses `G`, the menu should switch into an **inline area-code prompt mode** and show text like:
+
+```text
+<<< LOOK UP AREA CODES >>>
+
+Enter Area Code to find city or 2 letter abreviation of state to find area code
+ Example: California = CA
+
+[A = All] [Q = Quit] ? _
+```
+
+Then typed keys should go into that prompt directly.
+
+---
+
+## Best implementation approach
+Add a new inline mode for area codes, similar to how you already handle:
+
+- print phone book
+- print labels
+- error checking
+
+So instead of a dialog box, `G` should:
+
+1. set `_inlineMode`
+2. write the DOS prompt into `txtInline`
+3. capture typed characters
+4. on Enter, run the lookup
+5. on Esc, cancel and clear
+
+---
+
+## Recommended design
+You likely need:
+
+### New inline modes
+Something like:
+- `AreaCodes_Prompt`
+- maybe `AreaCodes_ViewingResults`
+
+### New fields in the form
+Something like:
+- `_areaCodeInput As String`
+
+### New helper methods
+- `StartAreaCodeFlow()`
+- `RenderAreaCodePrompt()`
+- `ExecuteAreaCodeLookup()`
+
+---
+
+## Important note
+Your current `txtInline` is:
+
+```vb
+.ReadOnly = True
+```
+
+Thatâ€™s fine â€” you do **not** need to let the textbox edit itself directly.
+
+You can keep it read-only and update its text programmatically as keys are pressed. That actually works well for DOS simulation.
+
+---
+
+## What I recommend next
+I should generate a **full replacement of `FrmRolodexMenu.vb`** that:
+
+- removes `InputBox`
+- uses `txtInline` for the area code prompt
+- matches image 11 much more closely
+- supports:
+  - `A`
+  - `Q`
+  - area code
+  - 2-letter region
+  - Esc to exit
+  - Enter to submit
+
+Thatâ€™s the cleanest way to get the DOS look.
+
+## Short answer
+Youâ€™re right: the prompt should be **inline on the black screen**, not a Windows popup.
+
+If you want, I can now generate the full updated `FrmRolodexMenu.vb` file to make it behave like that screenshot.
+
+## @testsubject117
+
+yes, please do
+
+## Copilot
+
+Yes â€” here is the **full updated `FrmRolodexMenu.vb`** that makes area code lookup run inline in the black DOS-style screen instead of using `InputBox`.
+
+This version:
+
+- keeps the existing menu behavior
+- adds an inline **LOOK UP AREA CODES** prompt
+- lets the user type directly into the DOS-style screen
+- supports:
+  - `A` = all
+  - `Q` = quit
+  - `CA` = region lookup
+  - `213` = area code lookup
+  - `Enter` = run
+  - `Esc` = cancel and return to menu
+
+```vb
+Imports System.Diagnostics
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+    Private _areaCodeInput As String = ""
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                StartAreaCodeFlow()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If _inlineMode = RolodexMenuInlineMode.AreaCodes_Prompt Then
+            If e.KeyCode = Keys.Back Then
+                If _areaCodeInput.Length > 0 Then
+                    _areaCodeInput = _areaCodeInput.Substring(0, _areaCodeInput.Length - 1)
+                    RenderAreaCodePrompt()
+                End If
+                e.SuppressKeyPress = True
+                Return
+            ElseIf e.KeyCode = Keys.Enter Then
+                ExecuteAreaCodeLookup()
+                e.SuppressKeyPress = True
+                Return
+            ElseIf e.KeyCode = Keys.Escape Then
+                _inlineMode = RolodexMenuInlineMode.None
+                _areaCodeInput = ""
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                _areaCodeInput = ""
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        If _inlineMode = RolodexMenuInlineMode.AreaCodes_Prompt Then
+            If Char.IsControl(ch) Then
+                Return True
+            End If
+
+            If Char.IsLetterOrDigit(ch) Then
+                _areaCodeInput &= Char.ToUpperInvariant(ch)
+                RenderAreaCodePrompt()
+            End If
+
+            Return True
+        End If
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub StartAreaCodeFlow()
+        _inlineMode = RolodexMenuInlineMode.AreaCodes_Prompt
+        _areaCodeInput = ""
+        RenderAreaCodePrompt()
+    End Sub
+
+    Private Sub RenderAreaCodePrompt()
+        txtInline.Text =
+            "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+            "Enter Area Code to find city or 2 letter abreviation of state to find area code" & Environment.NewLine &
+            " Example: California = CA" & Environment.NewLine & Environment.NewLine &
+            "[A = All] [Q = Quit] ? " & _areaCodeInput & "_"
+
+        txtInline.SelectionStart = txtInline.TextLength
+        txtInline.ScrollToCaret()
+    End Sub
+
+    Private Sub ExecuteAreaCodeLookup()
+        Dim svc As New RolodexAreaCodeService()
+        Dim trimmed As String = _areaCodeInput.Trim()
+
+        If String.IsNullOrWhiteSpace(trimmed) Then
+            RenderAreaCodePrompt()
+            Return
+        End If
+
+        If String.Equals(trimmed, "Q", StringComparison.OrdinalIgnoreCase) Then
+            _inlineMode = RolodexMenuInlineMode.None
+            _areaCodeInput = ""
+            txtInline.Clear()
+            Return
+        End If
+
+        If Not svc.DataFileExists() Then
+            txtInline.Text =
+                "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+                "Area code data file not found:" & Environment.NewLine &
+                svc.GetDataFilePath() & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        If String.Equals(trimmed, "A", StringComparison.OrdinalIgnoreCase) Then
+            _inlineMode = RolodexMenuInlineMode.None
+            _areaCodeInput = ""
+
+            Using frm As New FrmPagedTextViewer()
+                frm.SetPages(svc.GetAllPages())
+                frm.ShowDialog(Me)
+            End Using
+
+            txtInline.Clear()
+            Return
+        End If
+
+        Dim results = svc.Search(trimmed)
+
+        If results Is Nothing OrElse results.Count = 0 Then
+            txtInline.Text =
+                "<<< LOOK UP AREA CODES >>>" & Environment.NewLine & Environment.NewLine &
+                "No matches found." & Environment.NewLine & Environment.NewLine &
+                "Press ESC to return."
+            Return
+        End If
+
+        _inlineMode = RolodexMenuInlineMode.None
+        _areaCodeInput = ""
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(New List(Of String) From {svc.FormatGroupedResults(results)})
+            frm.ShowDialog(Me)
+        End Using
+
+        txtInline.Clear()
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+
+---
+
+## One required extra step
+This code uses a new enum value:
+
+```vb
+RolodexMenuInlineMode.AreaCodes_Prompt
+```
+
+So you must add that value to your `RolodexMenuInlineMode` enum.
+
+If your enum currently looks something like this:
+
+```vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+End Enum
+```
+
+change it to:
+
+```vb name=RolodexMenuInlineMode.vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+    AreaCodes_Prompt
+End Enum
+```
+
+---
+
+## What you should expect after this
+When you press `G`, the lower black pane should show a DOS-style prompt much closer to your screenshot instead of a Windows popup.
+
+## Small note
+I preserved the DOS spelling:
+
+```text
+abreviation
+```
+
+because that matches the screenshot.
+
+If you want, the next step after this is to make the **results viewer** look even more DOS-like too.
+
+## @testsubject117
+
+please generate the code for the entire file for RolodexMenuInlineMode.vb
+
+## Copilot
+
+Yes â€” here is the full file for **`RolodexMenuInlineMode.vb`**.
+
+```vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+    AreaCodes_Prompt
+End Enum
+```
+
+## @testsubject117
+
+ok, I updated it, built it and ran it, now when I go to (G) Look up area codes the first screen looks just like DOS but when I enter CA for california or any other text, it opens a new window that says no data found
+
+## Copilot
+
+That means the UI is working, but the service loaded **zero rows** from the data file.
+
+## Most likely cause
+Your `RolodexAreaCodeService` is expecting this file:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+and it expects the contents in this format:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+CA|California|213|Los Angeles.
+```
+
+So if:
+- the file is missing
+- the path is wrong
+- the app canâ€™t access that network/share path
+- or the file is still comma-delimited instead of pipe-delimited
+
+then searches like `CA` will return nothing.
+
+---
+
+## First thing to verify
+Open the file you put in:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+and confirm the first few lines look like this exactly:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+AL|Alabama|205|All locations.
+AK|Alaska|907|All locations.
+AZ|Arizona|602|All locations.
+CA|California|805|Bakersfield.
+CA|California|209|Fresno.
+CA|California|213|Los Angeles.
+CA|California|916|Sacramento.
+```
+
+## If your file looks like this instead:
+```csv
+AreaCode,State,Location
+213,CA,Los Angeles
+```
+
+then it will **not** work with the current service.
+
+---
+
+## Why â€œNo data foundâ€ happens
+Your service currently parses lines using:
+
+```vb
+Dim parts = rawLine.Split("|"c)
+```
+
+So comma-separated data will not load.
+
+---
+
+## Fix options
+
+### Best fix
+Replace the data file with the pipe-delimited format the current code expects.
+
+### Alternative fix
+If you want to keep the old comma-separated file, I can rewrite the service to support that format instead.
+
+But since you want DOS-style grouped output with region name, the better format is still:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+```
+
+---
+
+## Quick test file
+Use this exact minimal file first to prove it works:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+AL|Alabama|205|All locations.
+AK|Alaska|907|All locations.
+AZ|Arizona|602|All locations.
+AR|Arkansas|501|All locations.
+CA|California|805|Bakersfield.
+CA|California|209|Fresno.
+CA|California|213|Los Angeles.
+CA|California|916|Sacramento.
+CA|California|619|San Diego.
+CA|California|415|San Francisco.
+CT|Connecticut|203|All locations.
+DC|District of Columbia|202|Washington.
+DE|Delaware|302|All locations.
+FL|Florida|813|Ft. Myers, Winter Haven.
+FL|Florida|904|Jacksonville.
+FL|Florida|305|Miami, Key West, Ft. Lauderdale.
+GA|Georgia|404|Atlanta, Rome.
+GA|Georgia|912|Waycross.
+HI|Hawaii|808|All locations.
+CN|Canada|519|London, Ont..
+CN|Canada|514|Montreal, Quebec.
+MX|Mexico|905|All locations.
+```
+
+Then test:
+- `CA`
+- `213`
+- `A`
+
+---
+
+## Important detail
+If `A` also shows nothing, that confirms `_entries` is empty and the data file is not being parsed.
+
+---
+
+## Best next step
+Check the actual contents of `\\invoice\mainmenu\data\phone\areacodes.csv`.
+
+If you want, paste the first 10â€“15 lines of that file here and Iâ€™ll tell you immediately whether the format matches the code.
+
+## @testsubject117
+
+its still comma delimited we never changed it to pipe delimited how do I do that
+
+## Copilot
+
+Yes â€” thatâ€™s the problem.
+
+Your code now expects **pipe-delimited** data, but your file is still **comma-delimited**.
+
+## Direct answer
+You need to convert lines like this:
+
+```csv
+CA,California,213,Los Angeles.
+```
+
+into this:
+
+```text
+CA|California|213|Los Angeles.
+```
+
+---
+
+## Important caution
+A simple â€œreplace all commas with pipesâ€ is **not always safe** if your location text contains commas, like:
+
+```csv
+CN,Canada,519,London, Ont..
+```
+
+If you blindly replace every comma, that becomes:
+
+```text
+CN|Canada|519|London| Ont..
+```
+
+which would break the 4-column format.
+
+So you want to replace **only the first 3 commas** on each line.
+
+---
+
+## Easiest manual method
+Open the file in Excel or Notepad++ and convert it carefully.
+
+### If your file currently looks like this:
+```csv
+RegionCode,RegionName,AreaCode,Location
+CA,California,213,Los Angeles.
+CN,Canada,519,London, Ont..
+```
+
+then the target should be:
+```text
+RegionCode|RegionName|AreaCode|Location
+CA|California|213|Los Angeles.
+CN|Canada|519|London, Ont..
+```
+
+Notice:
+- first 3 commas become `|`
+- commas inside the location stay commas
+
+---
+
+## Best quick solution in VB or code terms
+If you want to do it manually in a text editor, use this rule:
+
+- split each line into **4 parts maximum**
+- join with pipes
+
+Conceptually:
+
+```vb
+Dim parts = line.Split(New Char() {","c}, 4)
+```
+
+That means:
+- first comma splits field 1
+- second comma splits field 2
+- third comma splits field 3
+- everything after that stays inside field 4
+
+---
+
+## Fastest practical option for you
+Since you asked â€œhow do I do that,â€ here are the easiest ways:
+
+### Option 1 â€” Notepad++ regex replacement
+If you have Notepad++, this is the easiest.
+
+#### Step 1
+Open `areacodes.csv`
+
+#### Step 2
+Use **Replace** with **Regular expression** mode.
+
+You can do this in multiple passes:
+
+**Pass 1** replace the first comma on each line:
+- Find:
+```regex
+^([^,\r\n]+),
+```
+- Replace:
+```text
+\1|
+```
+
+**Pass 2** replace the second comma:
+- Find:
+```regex
+^([^|\r\n]+)\|([^,\r\n]+),
+```
+- Replace:
+```text
+\1|\2|
+```
+
+**Pass 3** replace the third comma:
+- Find:
+```regex
+^([^|\r\n]+)\|([^|\r\n]+)\|([^,\r\n]+),
+```
+- Replace:
+```text
+\1|\2|\3|
+```
+
+After that, save the file.
+
+---
+
+### Option 2 â€” easiest of all: I give you a converter utility
+I can generate a tiny VB helper that:
+- reads the comma file
+- converts only the first 3 commas
+- writes the pipe-delimited version back out
+
+That is safer than manual editing.
+
+---
+
+### Option 3 â€” do it in Excel
+If the location field is not quoted consistently, Excel may still make a mess with embedded commas, so I **donâ€™t recommend Excel** here unless the file is very clean.
+
+---
+
+## My recommendation
+The easiest and safest next step is:
+
+**donâ€™t manually edit hundreds of lines**  
+Instead, let me generate a tiny one-time converter in VB.
+
+It can convert:
+
+```text
+\\invoice\mainmenu\data\phone\areacodes.csv
+```
+
+from comma-delimited to pipe-delimited correctly.
+
+## Short answer
+You need to replace only the **first 3 commas** on each line with `|`, not every comma.
+
+If you want, I can generate a tiny VB.NET converter for you right now.
+
+## @testsubject117
+
+Option 2 â€” easiest of all: I give you a converter utility
+I can generate a tiny VB helper that:
+
+reads the comma file
+converts only the first 3 commas
+writes the pipe-delimited version back out
+That is safer than manual editing.
+
+## Copilot
+
+Yes â€” hereâ€™s a small VB helper you can run once to convert the area code file safely.
+
+## What it does
+It:
+
+- reads `\\invoice\mainmenu\data\phone\areacodes.csv`
+- converts only the **first 3 commas** on each line to `|`
+- leaves commas inside the location text alone
+- writes the converted file back out
+
+---
+
+## Simple one-time converter code
+
+You can paste this into a temporary VB file or even run it from a button click / test routine.
+
+```vb
+Imports System
+Imports System.IO
+Imports System.Text
+
+Module AreaCodeFileConverter
+
+    Sub Main()
+        Dim inputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+        Dim backupPath As String = "\\invoice\mainmenu\data\phone\areacodes_backup.csv"
+        Dim outputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+
+        If Not File.Exists(inputPath) Then
+            Console.WriteLine("Input file not found: " & inputPath)
+            Return
+        End If
+
+        File.Copy(inputPath, backupPath, True)
+
+        Dim lines = File.ReadAllLines(inputPath)
+        Dim converted As New List(Of String)
+
+        For Each line In lines
+            If String.IsNullOrWhiteSpace(line) Then
+                converted.Add(line)
+                Continue For
+            End If
+
+            Dim parts = line.Split(New Char() {","c}, 4)
+
+            If parts.Length = 4 Then
+                converted.Add(parts(0).Trim() & "|" &
+                              parts(1).Trim() & "|" &
+                              parts(2).Trim() & "|" &
+                              parts(3).Trim())
+            Else
+                converted.Add(line)
+            End If
+        Next
+
+        File.WriteAllLines(outputPath, converted, Encoding.UTF8)
+
+        Console.WriteLine("Conversion complete.")
+        Console.WriteLine("Backup created: " & backupPath)
+        Console.WriteLine("Updated file: " & outputPath)
+    End Sub
+
+End Module
+```
+
+---
+
+## What it does to a line
+For example, this:
+
+```text
+CN,Canada,519,London, Ont..
+```
+
+becomes:
+
+```text
+CN|Canada|519|London, Ont..
+```
+
+And this:
+
+```text
+CA,California,213,Los Angeles.
+```
+
+becomes:
+
+```text
+CA|California|213|Los Angeles.
+```
+
+---
+
+## Very important
+After conversion, your header should become:
+
+```text
+RegionCode|RegionName|AreaCode|Location
+```
+
+If your current header is something else, like:
+
+```text
+AreaCode,State,Location
+```
+
+then the current DOS-style service still wonâ€™t match properly, because it expects **4 fields**:
+
+1. `RegionCode`
+2. `RegionName`
+3. `AreaCode`
+4. `Location`
+
+---
+
+## So there are really 2 possible cases
+
+### Case 1: your file already has 4 columns
+Like this:
+```text
+CA,California,213,Los Angeles.
+```
+
+Then the converter above is enough.
+
+### Case 2: your file only has 3 columns
+Like this:
+```text
+213,CA,Los Angeles
+```
+
+Then this converter is **not enough**, because your service expects region code and region name separately.
+
+In that case, youâ€™d need either:
+- a new data file with 4 columns, or
+- a rewritten service that works with the old 3-column format
+
+---
+
+## Before you run it
+Open the file and check the first few lines.
+
+If they look like:
+
+```text
+RegionCode,RegionName,AreaCode,Location
+```
+
+then run this converter.
+
+If they look like:
+
+```text
+AreaCode,State,Location
+```
+
+stop â€” and tell me, because then I should generate a different fix.
+
+## Best next step
+Paste the first 5 lines of your current `areacodes.csv` if you want me to verify which case you have before you run the converter.
+
+## @testsubject117
+
+so should I paste this text into a file, if so, what should I call it? then how do I run it?
+
+## Copilot
+
+Yes â€” paste it into a **new VB file**.
+
+## Call the file
+```text
+AreaCodeFileConverter.vb
+```
+
+## Where to put it
+Put it in your project folder, for example somewhere inside:
+
+```text
+AMiOffice
+```
+
+It does not matter much where, as long as it is included in the VB project.
+
+---
+
+## But before you do that
+Thereâ€™s one very important thing:
+
+### This converter only makes sense if your current file already has 4 columns, like:
+```text
+RegionCode,RegionName,AreaCode,Location
+CA,California,213,Los Angeles.
+```
+
+### If your file instead has 3 columns like:
+```text
+AreaCode,State,Location
+213,CA,Los Angeles
+```
+
+then **do not run this converter yet**, because it wonâ€™t create the DOS-style file structure your new service expects.
+
+---
+
+## So first: check your current file
+Open `areacodes.csv` and look at the first 5 lines.
+
+### If it looks like this:
+```text
+RegionCode,RegionName,AreaCode,Location
+CA,California,213,Los Angeles.
+CN,Canada,519,London, Ont..
+```
+
+then the converter is appropriate.
+
+### If it looks like this:
+```text
+AreaCode,State,Location
+213,CA,Los Angeles
+415,CA,San Francisco
+```
+
+then the converter is the wrong fix.
+
+---
+
+## If your file does have 4 columns, hereâ€™s how to run it
+
+### Step 1: create the file
+Create a new code file named:
+
+```text
+AreaCodeFileConverter.vb
+```
+
+Paste this into it:
+
+```vb
+Imports System
+Imports System.IO
+Imports System.Text
+Imports System.Collections.Generic
+
+Module AreaCodeFileConverter
+
+    Public Sub Main()
+        Dim inputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+        Dim backupPath As String = "\\invoice\mainmenu\data\phone\areacodes_backup.csv"
+        Dim outputPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+
+        If Not File.Exists(inputPath) Then
+            Console.WriteLine("Input file not found: " & inputPath)
+            Return
+        End If
+
+        File.Copy(inputPath, backupPath, True)
+
+        Dim lines = File.ReadAllLines(inputPath)
+        Dim converted As New List(Of String)
+
+        For Each line In lines
+            If String.IsNullOrWhiteSpace(line) Then
+                converted.Add(line)
+                Continue For
+            End If
+
+            Dim parts = line.Split(New Char() {","c}, 4)
+
+            If parts.Length = 4 Then
+                converted.Add(parts(0).Trim() & "|" &
+                              parts(1).Trim() & "|" &
+                              parts(2).Trim() & "|" &
+                              parts(3).Trim())
+            Else
+                converted.Add(line)
+            End If
+        Next
+
+        File.WriteAllLines(outputPath, converted, Encoding.UTF8)
+
+        Console.WriteLine("Conversion complete.")
+        Console.WriteLine("Backup created: " & backupPath)
+        Console.WriteLine("Updated file: " & outputPath)
+    End Sub
+
+End Module
+```
+
+---
+
+## Step 2: make it run
+In a WinForms app, adding a `Main()` module usually does **not** automatically run, because your startup object is probably a form.
+
+So the easiest way is **not** to rely on startup.
+
+### Easiest run method
+Temporarily call it from somewhere like `FrmRolodexMenu_Load`.
+
+Change this:
+
+```vb
+Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+```
+
+to temporarily include:
+
+```vb
+Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+    AreaCodeFileConverter.Main()
+
+    lblTitle.Text = "****** ROLODEX MENU ******"
+    lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+    lblMenu.Text =
+        "(A) Add a Person" & Environment.NewLine &
+        "(B) Delete a Person" & Environment.NewLine &
+        "(C) Look up a Person" & Environment.NewLine &
+        "(D) Modify a Person" & Environment.NewLine &
+        "(E) Print Phone Book" & Environment.NewLine &
+        "(F) Print Labels" & Environment.NewLine &
+        "(G) Look up Area Codes" & Environment.NewLine &
+        "(H) Look up Zip Codes" & Environment.NewLine &
+        "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+        "(Z) Back to Main Menu"
+End Sub
+```
+
+Then:
+
+1. build
+2. run once
+3. it converts the file
+4. then remove that line:
+   ```vb
+   AreaCodeFileConverter.Main()
+   ```
+
+---
+
+## Even easier option
+If you want, I can instead give you a **button-click-safe helper method** version that you can call manually once and then delete. That may be cleaner for your WinForms project.
+
+---
+
+## Most important caution
+If your source file is actually the old 3-column format, this converter is not the right step.
+
+## So please do this first
+Paste the first 5 lines of your current `areacodes.csv` here before running anything.
+
+That way I can tell you with certainty whether this converter is correct.
+
+## @testsubject117
+
+this is what the file currently looks like: AreaCode,State,Location
+201,NJ,Northern New Jersey
+202,DC,Washington
+203,CT,Southwestern Connecticut
+205,AL,Birmingham
+206,WA,Seattle
+207,ME,Maine
+208,ID,Idaho
+209,CA,Stockton Modesto
+210,TX,San Antonio
+212,NY,Manhattan
+213,CA,Los Angeles
+214,TX,Dallas
+215,PA,Philadelphia
+216,OH,Cleveland
+217,IL,Central Illinois
+218,MN,Northern Minnesota
+219,IN,Northwest Indiana
+224,IL,Northern Illinois
+225,LA,Baton Rouge
+228,MS,Mississippi Gulf Coast
+229,GA,Southwest Georgia
+231,MI,Northwest Michigan
+234,OH,Northeast Ohio
+239,FL,Southwest Florida
+240,MD,Western Maryland
+248,MI,Oakland County
+251,AL,Mobile
+252,NC,Eastern North Carolina
+253,WA,Tacoma
+254,TX,Waco
+256,AL,Huntsville
+260,IN,Northeast Indiana
+262,WI,Southeast Wisconsin
+267,PA,Philadelphia
+269,MI,Southwest Michigan
+270,KY,Western Kentucky
+272,PA,Northeast Pennsylvania
+274,WI,Wisconsin
+276,VA,Southwest Virginia
+281,TX,Houston
+301,MD,Western Maryland
+302,DE,Delaware
+303,CO,Denver
+304,WV,West Virginia
+305,FL,Miami
+310,CA,West Los Angeles
+312,IL,Chicago
+313,MI,Detroit
+314,MO,St Louis
+315,NY,Central New York
+316,KS,Wichita
+317,IN,Indianapolis
+318,LA,Northern Louisiana
+319,IA,Eastern Iowa
+320,MN,Central Minnesota
+321,FL,Space Coast
+323,CA,Los Angeles
+325,TX,Abilene
+330,OH,Akron Canton
+331,IL,Illinois
+334,AL,Montgomery
+336,NC,Triad
+337,LA,Southwest Louisiana
+339,MA,Massachusetts
+346,TX,Houston
+347,NY,New York City
+351,MA,Massachusetts
+352,FL,Gainesville
+360,WA,Western Washington
+361,TX,Corpus Christi
+364,KY,Kentucky
+380,OH,Ohio
+385,UT,Utah
+386,FL,Daytona Beach
+401,RI,Rhode Island
+402,NE,Nebraska
+403,AB,Southern Alberta
+404,GA,Atlanta
+405,OK,Oklahoma City
+406,MT,Montana
+407,FL,Orlando
+408,CA,San Jose
+409,TX,Beaumont
+410,MD,Baltimore
+412,PA,Pittsburgh
+413,MA,Western Massachusetts
+414,WI,Milwaukee
+415,CA,San Francisco
+416,ON,Toronto
+417,MO,Southwest Missouri
+419,OH,Northwest Ohio
+423,TN,East Tennessee
+424,CA,West Los Angeles
+425,WA,Eastside
+430,TX,Northeast Texas
+432,TX,West Texas
+434,VA,South Central Virginia
+435,UT,Utah
+440,OH,Northeast Ohio
+442,CA,California
+443,MD,Maryland
+447,IL,Illinois
+458,OR,Oregon
+463,IN,Indiana
+464,IL,Illinois
+469,TX,Dallas
+470,GA,Atlanta
+475,CT,Connecticut
+478,GA,Central Georgia
+479,AR,Northwest Arkansas
+480,AZ,East Phoenix
+484,PA,Southeast Pennsylvania
+501,AR,Little Rock
+502,KY,Louisville
+503,OR,Portland
+504,LA,New Orleans
+505,NM,New Mexico
+507,MN,Southern Minnesota
+508,MA,Central Massachusetts
+509,WA,Eastern Washington
+510,CA,East Bay
+512,TX,Austin
+513,OH,Cincinnati
+515,IA,Des Moines
+516,NY,Nassau County
+517,MI,Central Michigan
+518,NY,Capital Region
+520,AZ,Tucson
+530,CA,Northeast California
+531,NE,Nebraska
+534,WI,Wisconsin
+539,OK,Oklahoma
+540,VA,Northern Virginia
+541,OR,Oregon
+551,NJ,Northern New Jersey
+559,CA,Fresno
+561,FL,Palm Beach
+562,CA,Long Beach
+563,IA,Eastern Iowa
+567,OH,Ohio
+570,PA,Northeast Pennsylvania
+571,VA,Northern Virginia
+573,MO,Missouri
+574,IN,North Central Indiana
+575,NM,New Mexico
+580,OK,Western Oklahoma
+585,NY,Rochester
+586,MI,Macomb County
+601,MS,Mississippi
+602,AZ,Phoenix
+603,NH,New Hampshire
+604,BC,Vancouver
+605,SD,South Dakota
+606,KY,Eastern Kentucky
+607,NY,Southern Tier
+608,WI,Southwest Wisconsin
+609,NJ,South New Jersey
+610,PA,Southeast Pennsylvania
+612,MN,Minneapolis
+614,OH,Columbus
+615,TN,Nashville
+616,MI,Grand Rapids
+617,MA,Boston
+618,IL,Southern Illinois
+619,CA,San Diego
+620,KS,Kansas
+623,AZ,West Phoenix
+626,CA,Pasadena
+628,CA,San Francisco
+629,TN,Tennessee
+630,IL,West Suburban Chicago
+631,NY,Suffolk County
+636,MO,St Charles
+641,IA,Iowa
+646,NY,Manhattan
+650,CA,Peninsula
+651,MN,St Paul
+657,CA,Orange County
+660,MO,Missouri
+661,CA,Bakersfield
+662,MS,Mississippi
+667,MD,Maryland
+669,CA,San Jose
+678,GA,Atlanta
+681,WV,West Virginia
+682,TX,Fort Worth
+701,ND,North Dakota
+702,NV,Las Vegas
+703,VA,Northern Virginia
+704,NC,Charlotte
+706,GA,North Georgia
+707,CA,North Coast
+708,IL,Chicago Suburbs
+712,IA,Western Iowa
+713,TX,Houston
+714,CA,Orange County
+715,WI,Northern Wisconsin
+716,NY,Buffalo
+717,PA,South Central Pennsylvania
+718,NY,New York City
+719,CO,Colorado Springs
+720,CO,Denver
+724,PA,Western Pennsylvania
+725,NV,Las Vegas
+727,FL,Pinellas County
+730,IL,Illinois
+731,TN,West Tennessee
+732,NJ,Central New Jersey
+734,MI,Ann Arbor
+737,TX,Austin
+740,OH,Southeast Ohio
+743,NC,North Carolina
+747,CA,San Fernando Valley
+754,FL,Broward County
+757,VA,Hampton Roads
+760,CA,North San Diego
+762,GA,Georgia
+763,MN,Northwest Twin Cities
+765,IN,Indiana
+769,MS,Mississippi
+770,GA,Atlanta Suburbs
+772,FL,Treasure Coast
+773,IL,Chicago
+774,MA,Massachusetts
+775,NV,Nevada
+779,IL,Northern Illinois
+781,MA,Boston Suburbs
+785,KS,Topeka
+786,FL,Miami
+801,UT,Salt Lake City
+802,VT,Vermont
+803,SC,Columbia
+804,VA,Richmond
+805,CA,Ventura Santa Barbara
+806,TX,Texas Panhandle
+808,HI,Hawaii
+810,MI,Flint
+812,IN,Southern Indiana
+813,FL,Tampa
+814,PA,Central Pennsylvania
+815,IL,Northern Illinois
+816,MO,Kansas City
+817,TX,Fort Worth
+818,CA,San Fernando Valley
+828,NC,Western North Carolina
+830,TX,Texas Hill Country
+831,CA,Monterey Bay
+832,TX,Houston
+843,SC,Charleston
+845,NY,Hudson Valley
+847,IL,Northern Illinois
+848,NJ,Central New Jersey
+850,FL,Florida Panhandle
+854,SC,South Carolina
+856,NJ,South New Jersey
+857,MA,Boston
+858,CA,San Diego
+859,KY,Lexington
+860,CT,Hartford
+862,NJ,North New Jersey
+863,FL,Central Florida
+864,SC,Upstate South Carolina
+865,TN,Knoxville
+870,AR,Arkansas
+872,IL,Chicago
+878,PA,Western Pennsylvania
+901,TN,Memphis
+903,TX,Northeast Texas
+904,FL,Jacksonville
+906,MI,Upper Peninsula
+907,AK,Alaska
+908,NJ,Central New Jersey
+909,CA,Inland Empire
+910,NC,Fayetteville
+912,GA,Southeast Georgia
+913,KS,Kansas City
+914,NY,Westchester
+915,TX,El Paso
+916,CA,Sacramento
+917,NY,New York City
+918,OK,Tulsa
+919,NC,Raleigh
+920,WI,Northeast Wisconsin
+925,CA,East Bay
+928,AZ,Northern Arizona
+929,NY,New York City
+930,IN,Southern Indiana
+931,TN,Middle Tennessee
+934,NY,Long Island
+936,TX,East Texas
+937,OH,Dayton
+938,AL,North Alabama
+940,TX,Wichita Falls
+941,FL,Sarasota
+947,MI,Oakland County
+949,CA,Orange County
+951,CA,Riverside
+952,MN,Southwest Twin Cities
+954,FL,Broward County
+956,TX,Rio Grande Valley
+959,CT,Connecticut
+970,CO,Northern Colorado
+971,OR,Portland
+972,TX,Dallas
+973,NJ,North New Jersey
+978,MA,Northeast Massachusetts
+979,TX,Southeast Texas
+980,NC,Charlotte
+984,NC,Raleigh
+985,LA,Southeast Louisiana
+986,ID,Idaho
+989,MI,Northeast Michigan
+
+## Copilot
+
+Got it â€” **do not use the converter**.
+
+Your file is a **3-column file**:
+
+```text
+AreaCode,State,Location
+```
+
+So the real problem is that the **service code was rewritten to expect a 4-column DOS-style file**, but your actual data is still the original 3-column format.
+
+## Best fix
+Keep your current data file exactly as it is, and instead change the service so it reads:
+
+- `AreaCode`
+- `State`
+- `Location`
+
+and formats/group-results from that.
+
+That is much easier and safer than rewriting the whole data file.
+
+---
+
+## What to change
+You should replace:
+
+1. `AreaCodeEntry.vb`
+2. `RolodexAreaCodeService.vb`
+
+with versions that match your existing CSV.
+
+---
+
+# 1) Replace `AreaCodeEntry.vb` with this
+
+```vb
+Public Class AreaCodeEntry
+    Public Property AreaCode As String
+    Public Property State As String
+    Public Property Location As String
+End Class
+```
+
+---
+
+# 2) Replace `RolodexAreaCodeService.vb` with this full file
+
+```vb
+Imports System
+Imports System.Collections.Generic
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+
+Public Class RolodexAreaCodeService
+
+    Private Shared ReadOnly DataPath As String = "\\invoice\mainmenu\data\phone\areacodes.csv"
+    Private ReadOnly _entries As List(Of AreaCodeEntry)
+
+    Public Sub New()
+        _entries = LoadEntries()
+    End Sub
+
