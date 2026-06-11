@@ -1,0 +1,2000 @@
+﻿                txtInput.Focus()
+                Return
+            End If
+
+            enteredHighestInvoice = value
+            ShowReviewPrompt()
+            Return
+        End If
+
+        If currentStep = 6 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckNumber = value
+            ShowDatePrompt()
+            Return
+        End If
+
+        If currentStep = 7 Then
+            If value = "" Then
+                enteredDateText = DateTime.Now.ToString("MM-dd-yyyy")
+            Else
+                enteredDateText = value
+            End If
+
+            ShowCheckReferencePrompt()
+            Return
+        End If
+
+        If currentStep = 8 Then
+            If value = "" Then
+                txtInput.Focus()
+                Return
+            End If
+
+            enteredCheckReference = value
+            ShowEverythingCorrectPrompt()
+            Return
+        End If
+    End Sub
+
+End Class
+```
+
+---
+
+# Test plan
+After pasting all 3 pieces:
+
+## Test 1
+1. run app
+2. go to Add Checks
+3. add check `7777`
+4. confirm with `Y`
+
+## Test 2
+1. go to Delete Checks
+2. enter `7777`
+3. confirm it is found
+4. press `Y` to delete
+
+## Test 3
+1. open Delete Checks again
+2. enter `7777`
+
+Expected result:
+- now it should say **Check not found**
+
+---
+
+## One note before publishing
+This is good for a build today if your goal is:
+- complete the Checks menu flow
+- eliminate fake hardcoded behavior
+- make Add/Delete behave consistently during a session
+
+But if you need persistence across app restarts, that is the next step after this.
+
+## Short answer
+Yes â€” paste those 3 code blocks in, rebuild, and your **Checks menu** will function correctly within the running app session so you can move forward today.
+
+## @testsubject117
+
+create a new class file named CheckRepository.vb?
+
+## Copilot
+
+Yes â€” **exactly**.
+
+## Direct answer
+Create a **new class/code file** named:
+
+```text
+CheckRepository.vb
+```
+
+It does **not** need to be a WinForm.
+
+It should be a regular VB code file that contains the shared repository class.
+
+---
+
+## In Visual Studio
+Use one of these:
+
+### Option 1
+- right-click your project
+- **Add**
+- **Class...**
+- name it:
+  - `CheckRepository.vb`
+
+### Option 2
+- right-click your project
+- **Add**
+- **New Item...**
+- choose **Class**
+- name it:
+  - `CheckRepository.vb`
+
+Either is fine.
+
+---
+
+## Important
+This file is just a normal class file, not:
+- Windows Form
+- UserControl
+- Component
+
+Just a standard VB class file.
+
+---
+
+## Then paste this into it
+
+```vbnet name=CheckRepository.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Linq
+
+Public NotInheritable Class CheckRepository
+
+    Private Sub New()
+    End Sub
+
+    Public Class CheckRecord
+        Public Property CustomerName As String = ""
+        Public Property CheckNumber As String = ""
+        Public Property Reference As String = ""
+        Public Property CheckDate As String = ""
+        Public Property PaidInvoices As New List(Of String)()
+        Public Property Amount As Decimal
+    End Class
+
+    Private Shared ReadOnly _checks As New List(Of CheckRecord)()
+
+    Public Shared Sub AddOrReplace(record As CheckRecord)
+        If record Is Nothing Then Return
+
+        Dim existing = _checks.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, record.CheckNumber, StringComparison.OrdinalIgnoreCase))
+        If existing IsNot Nothing Then
+            _checks.Remove(existing)
+        End If
+
+        _checks.Add(record)
+    End Sub
+
+    Public Shared Function FindByCheckNumber(checkNo As String) As CheckRecord
+        If String.IsNullOrWhiteSpace(checkNo) Then Return Nothing
+
+        Return _checks.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo.Trim(), StringComparison.OrdinalIgnoreCase))
+    End Function
+
+    Public Shared Function DeleteByCheckNumber(checkNo As String) As Boolean
+        Dim existing = FindByCheckNumber(checkNo)
+        If existing Is Nothing Then Return False
+
+        _checks.Remove(existing)
+        Return True
+    End Function
+
+    Public Shared Function GetAll() As List(Of CheckRecord)
+        Return _checks.Select(Function(x) New CheckRecord With {
+            .CustomerName = x.CustomerName,
+            .CheckNumber = x.CheckNumber,
+            .Reference = x.Reference,
+            .CheckDate = x.CheckDate,
+            .PaidInvoices = New List(Of String)(x.PaidInvoices),
+            .Amount = x.Amount
+        }).ToList()
+    End Function
+
+End Class
+```
+
+---
+
+## Short answer
+Yes â€” create **a normal class file** named `CheckRepository.vb`, then paste the repository code into it.
+
+## @testsubject117
+
+ok, I created the 3 files, built, tested and confirmed by entering a check for PSIBEARI of .20 and with check number 7778. it created it, then successfully deleted it.
+
+## Copilot
+
+Great â€” **that means the Checks menu is now functionally complete for this build**.
+
+## Whatâ€™s working now
+You confirmed:
+
+- **Add Checks** can create a new runtime check
+- **Delete Checks** can find that created check
+- **Delete Checks** removes it successfully
+- the same check is no longer found afterward
+
+Thatâ€™s exactly the behavior we wanted for todayâ€™s publishable milestone.
+
+---
+
+## What this means technically
+You now have a consistent in-app flow:
+
+- `FormLedgerMenu` opens Add/Delete screens correctly
+- `FormAddChecks` writes to `CheckRepository`
+- `FormDeleteCheck` reads from `CheckRepository`
+- deleting removes the record from the shared runtime store
+
+So the menu is no longer just mock UI â€” it now has working behavior.
+
+---
+
+## Important release note
+You should remember this one limitation:
+
+### Current limitation
+Checks are only stored **in memory during the current app session**.
+
+So if you:
+- close the app
+- reopen it
+
+the added checks will not still be there.
+
+That is expected with the implementation we chose today.
+
+---
+
+## Recommended wording for yourself
+If youâ€™re publishing today, think of this as:
+
+- **Checks menu ported and operational**
+- **runtime functional**
+- **persistent legacy file integration still pending**
+
+Thatâ€™s an honest and accurate status.
+
+---
+
+## What I recommend before publishing
+Do one quick sanity pass:
+
+### Quick test checklist
+- Add a check with normal values
+- Delete it
+- confirm itâ€™s gone
+- Add another different check
+- confirm it can be found
+- press **N** on delete and verify it remains
+- press **Enter** on empty check prompt and confirm it exits cleanly
+- verify menu navigation back to Checks menu works
+
+If all that passes, youâ€™re in good shape.
+
+---
+
+## Suggested next task
+Since your goal was to finish this menu and move on, the next logical step is probably one of:
+
+1. **View Checks** backed by `CheckRepository`
+2. **Find a Check #** backed by `CheckRepository`
+3. persistence to disk
+4. another menu item you want to port next
+
+If you want the rest of the Checks menu to feel consistent, Iâ€™d do:
+
+- **View Checks**
+- **Find a Check #**
+- **Find an Invoice #**
+
+using the same repository next.
+
+---
+
+## Short answer
+Excellent â€” that confirms the add/delete flow is working end-to-end for this session.  
+Youâ€™ve got a good functional milestone for todayâ€™s build.
+
+If you want, next I can help you:
+- wire **View Checks** to the same repository, or
+- help you prep a quick **publish checklist** before you ship.
+
+## @testsubject117
+
+so currently we have on the checks menu, what we have working is: (1) add checks to ledger cash reciepts, (2) Delete Checks, (3) View Checks (but I noticed this is not working correctly, ask me about it at the end of your comments after seeing this message, I think it's wired the old way and doesn't match the dos flow, and it's not finding psibeari correctly. (5) view company totals is also working but it may not be dos true as well, we will have to review, (6) add other checks is not implentmented yet, (7) Delete other checks is not implemented yet, (8) view other checks is implemented but we may want to review the DOS closeness, (9) Find a Check #, is implemented and working but we need to review to make sure it's close to DOS, (0) Find an invoice # is also implemented and working, but we may want to change the design to match dos better, and (A) find checks that don't balance is fully functional, we will also review it's functionality and compare to DOS, and lastly (S) Sales employees checks, opens correctly and both buttons are completed
+
+## Copilot
+
+Thatâ€™s a solid status update â€” the **Checks menu is mostly functional now**, with some items complete, some needing DOS-accuracy review, and two still unimplemented.
+
+## Current Checks menu status, organized
+
+### Working now
+- **(1) Add checks to ledger & cash receipts**
+  - working
+  - now connected to the runtime repository
+- **(2) Delete Checks**
+  - working
+  - finds and deletes runtime-added checks correctly
+- **(5) View Company totals**
+  - working
+  - may need DOS-behavior review
+- **(8) View OTHER checks**
+  - implemented
+  - may need DOS-closeness review
+- **(9) Find a Check #**
+  - implemented and working
+  - should be reviewed against DOS behavior
+- **(0) Find an invoice #**
+  - implemented and working
+  - may need design/layout review to better match DOS
+- **(A) Find checks that don't balance**
+  - fully functional
+  - should be reviewed against DOS behavior
+- **(S) Sales employees checks**
+  - opens correctly
+  - both buttons completed
+
+### Implemented but needs correction
+- **(3) View Checks**
+  - implemented
+  - not working correctly
+  - likely wired the old way
+  - not matching DOS flow
+  - not finding `PSIBEARI` correctly
+
+### Not implemented yet
+- **(6) Add OTHER Checks**
+- **(7) Delete OTHER Checks**
+
+---
+
+## My recommendation
+For today, youâ€™re in a pretty good state to publish **if your goal is to show broad menu coverage and functional progress**.
+
+The biggest thing Iâ€™d focus on next inside this menu is:
+
+### highest priority
+**(3) View Checks**
+
+Why:
+- you already noticed it is wrong
+- it likely overlaps with the same check data flow we just fixed
+- itâ€™s central enough that users will notice if it doesnâ€™t behave like DOS
+- fixing it now may also help with DOS-accurate behavior for related items
+
+After that, Iâ€™d review in this order:
+
+1. **(3) View Checks**
+2. **(9) Find a Check #**
+3. **(0) Find an invoice #**
+4. **(5) View Company totals**
+5. **(8) View OTHER checks**
+6. **(A) Find checks that don't balance**
+
+And later:
+- **(6)** Add OTHER Checks
+- **(7)** Delete OTHER Checks
+
+---
+
+## One important architecture note
+Now that Add/Delete are using `CheckRepository`, youâ€™ll probably want the rest of the check-related screens to eventually use the same backing source too, at least for now.
+
+Otherwise youâ€™ll get inconsistent behavior such as:
+- Add Check creates `PSIBEARI`
+- Delete Check finds it
+- View Checks doesnâ€™t show it
+- Find Check # might use a different old source
+
+That sounds like exactly the kind of mismatch youâ€™re already seeing.
+
+So the next cleanup phase is probably:
+- standardize the check screens on the same runtime data source
+- then later swap them all to real file persistence together
+
+---
+
+## Suggested â€œpublish-todayâ€ framing
+If youâ€™re publishing a build today, your honest summary could be:
+
+- Checks menu substantially ported
+- Add/Delete checks operational
+- key inquiry/reporting screens functional
+- some legacy DOS behavior and visual fidelity still under review
+- OTHER checks add/delete still pending
+
+Thatâ€™s a credible milestone.
+
+---
+
+## Next step
+Letâ€™s go straight into **View Checks**, since you already know itâ€™s off.
+
+**Question:**  
+When you open **(3) View Checks**, what exactly is it doing wrong compared to DOS?  
+Please describe:
+1. what DOS did,
+2. what your current WinForms version does instead,
+3. and what happened when you tried to find `PSIBEARI`.
+
+## @testsubject117
+
+ don't want to publish a build until we completely finish after going through the entire checks menu.
+
+## Copilot
+
+That makes sense â€” **donâ€™t publish yet**.
+
+## Direct answer
+If your standard is â€œfinish the entire Checks menu first,â€ then you should treat the current state as:
+
+- **good progress**
+- **not release-ready yet**
+
+because the menu is still missing:
+- DOS-truth review on several items
+- fixes for **View Checks**
+- implementation of **Add OTHER Checks**
+- implementation of **Delete OTHER Checks**
+- consistency across all check-related screens
+
+---
+
+## I agree with that decision
+Based on your status, publishing now would be premature if your goal is:
+
+- complete Checks menu coverage
+- DOS-faithful behavior
+- no obvious mismatches between menu options
+
+Right now, some items work, but the whole menu is not yet cohesive.
+
+---
+
+## What â€œdoneâ€ should probably mean here
+For the Checks menu to be truly complete before publishing, Iâ€™d define it as:
+
+### 1. Every menu option works
+- (1) Add Checks
+- (2) Delete Checks
+- (3) View Checks
+- (5) View Company Totals
+- (6) Add OTHER Checks
+- (7) Delete OTHER Checks
+- (8) View OTHER Checks
+- (9) Find a Check #
+- (0) Find an Invoice #
+- (A) Find checks that donâ€™t balance
+- (S) Sales employees checks
+
+### 2. Shared data behavior is consistent
+If a check is added:
+- View Checks should see it
+- Find Check # should see it
+- Delete Checks should see it
+- related summary/report screens should behave consistently
+
+### 3. DOS flow is close enough
+Not just â€œworks,â€ but:
+- same prompts
+- same navigation
+- same expectations
+- same query flow
+- reasonably similar layout and wording
+
+### 4. No obvious placeholder gaps
+Specifically:
+- **Add OTHER Checks**
+- **Delete OTHER Checks**
+
+must be done if the menu is considered complete.
+
+---
+
+## Best path from here
+Since you want to finish the entire Checks menu before publishing, Iâ€™d move in this order:
+
+### First: fix broken/inconsistent items
+1. **(3) View Checks**
+   - because itâ€™s already known-bad
+   - likely still wired to old logic
+   - likely not using the same data source
+
+### Then: fill missing items
+2. **(6) Add OTHER Checks**
+3. **(7) Delete OTHER Checks**
+
+### Then: DOS-truth review pass
+4. **(5) View Company totals**
+5. **(8) View OTHER checks**
+6. **(9) Find a Check #**
+7. **(0) Find an Invoice #**
+8. **(A) Find checks that donâ€™t balance**
+9. **(S) Sales employees checks**
+
+---
+
+## Strong recommendation
+We should now make the whole Checks menu use one coherent temporary backend while we finish porting.
+
+That means:
+- regular checks screens use one shared repository
+- OTHER checks screens use another repository if needed
+- all search/view/delete/report forms are updated against that same source
+
+That will stop the â€œsome screens see PSIBEARI, others donâ€™tâ€ problem.
+
+---
+
+## So yes â€” no publish yet
+That is the right call.
+
+## Next question
+You mentioned **(3) View Checks** is not right.
+
+Please tell me exactly:
+1. what DOS **View Checks** does,
+2. what your current version does instead,
+3. and what happens when you search for `PSIBEARI`.
+
+## @testsubject117
+
+hitting 3 in dos:
+
+## Copilot
+
+Got it â€” in DOS, pressing **3 = View Checks** does **not** jump straight to a results screen.
+
+## Direct answer
+The DOS flow starts with a prompt on the same Checks menu screen:
+
+- **Enter customer name [Enter = all customers] ?**
+
+So your WinForms version should likely behave as a **prompt-driven flow**, not a separate modern results-first screen.
+
+That matches what you hinted earlier: itâ€™s probably wired the old way and not following DOS correctly.
+
+---
+
+## What this screenshot tells us
+From the DOS screen:
+
+- user stays within the **CHECKS** menu context
+- after pressing **3**, the system asks:
+  - `Enter customer name [Enter = all customers] ?`
+- that implies this is step 1 of a multi-step filter flow
+
+And based on the existing `FormLedgerMenu.vb` code you showed earlier, your current port already has this:
+
+```vbnet
+Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+If cust Is Nothing Then Return
+
+Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+If chk Is Nothing Then Return
+
+Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+If yr Is Nothing Then Return
+
+Using f As New FormLedgerView()
+    f.ShowDialog(Me)
+End Using
+```
+
+So that means:
+
+## Important observation
+The **prompt flow is already partially there** in `FormLedgerMenu.vb`.
+
+But the likely problems are:
+1. `FormLedgerView` is not using the entered filters
+2. `FormLedgerView` may still be reading old/hardcoded data
+3. `FormLedgerView` may not be using `CheckRepository`
+4. customer matching for `PSIBEARI` is likely broken or disconnected
+
+---
+
+## So the issue is probably not button 3 itself
+Button 3 is probably doing the right first-step prompts.
+
+The real problem is probably in:
+- **`FormLedgerView.vb`**
+
+That is almost certainly where:
+- the results are shown
+- the filters should be applied
+- `PSIBEARI` should be found
+- DOS-like display behavior should be implemented
+
+---
+
+## What I need next
+Please paste the code for:
+
+- **`FormLedgerView.vb`**
+
+That is the most likely file we need to fix next.
+
+If itâ€™s long, paste the full file anyway â€” this is the right place to work now.
+
+---
+
+## One question back to you, as requested
+You asked me to ask you about this after seeing your message, so hereâ€™s the exact question:
+
+**When you use View Checks in your current WinForms build, what happens after those prompts?**  
+For example:
+- does it show no results?
+- does it show the wrong customer list?
+- does it ignore the customer filter like `PSIBEARI`?
+- does it open the wrong form/layout compared to DOS?
+
+And please paste **`FormLedgerView.vb`** next so I can line it up with the DOS flow.
+
+## @testsubject117
+
+clicking 3 in vb app: 
+
+## Copilot
+
+Yes â€” I see the mismatch.
+
+## Direct answer
+Your VB app is functionally prompting for the same input, but it is **not DOS-close in presentation**.
+
+### DOS
+- prompt appears inline at the bottom of the Checks screen
+- feels like part of the same screen
+- no popup dialog
+
+### current VB app
+- opens a **modal Windows dialog box**
+- looks modern
+- breaks the DOS flow visually
+
+So your instinct is right: **option 3 is wired in a way that gets the prompts, but not in a DOS-true way**.
+
+---
+
+## What this means
+The current code in `FormLedgerMenu.vb` uses:
+
+```vbnet
+ShowPromptDialog(...)
+```
+
+which creates this popup form:
+
+- label
+- textbox
+- OK/Cancel buttons
+
+That is why it looks like a standard Windows prompt instead of the DOS inline prompt.
+
+So there are really **two separate issues** with View Checks:
+
+### 1. UI flow problem
+The prompt style is wrong compared to DOS.
+
+### 2. Data/results problem
+You said itâ€™s not finding `PSIBEARI` correctly, which likely means the result screen logic is also wrong.
+
+---
+
+## Good news
+The prompt wording itself is already pretty close:
+- `Enter customer name [Enter = all customers] ?`
+
+So we probably do **not** need to rethink the flow completely.
+
+We need to change:
+- **how the prompts are displayed**
+- **how the collected values are passed to the view form**
+- **how the results are filtered/displayed**
+
+---
+
+## Recommendation
+To finish this correctly, I would treat **View Checks** as a two-part fix:
+
+### Part 1 â€” functional fix first
+Make sure:
+- customer filter works
+- check number filter works
+- year filter works
+- `PSIBEARI` is found if it exists in `CheckRepository`
+
+### Part 2 â€” DOS-style prompt refinement
+After it works, we can decide whether to:
+- keep the temporary modal prompts for now, or
+- replace them with a dedicated DOS-style prompt form/screen
+
+Since your goal is to completely finish the Checks menu, Iâ€™d actually lean toward doing it properly now.
+
+---
+
+## Best next step
+Please paste **`FormLedgerView.vb`**.
+
+Thatâ€™s almost certainly where we need to fix:
+- result loading
+- filter behavior
+- customer matching
+- possible old wiring
+
+---
+
+## My current read of the problem
+Based on what youâ€™ve shown, I expect one of these is happening in `FormLedgerView.vb`:
+
+- it is not receiving the prompt values at all
+- it ignores the values after receiving them
+- it is reading old/hardcoded data instead of `CheckRepository`
+- it does exact/case-sensitive matching incorrectly
+- it only searches a legacy source and never sees runtime-added checks
+
+---
+
+## Short answer
+Yes â€” the WinForms **View Checks** prompt is currently **not DOS-true** because it uses a popup dialog instead of an inline prompt on the Checks screen.
+
+Now please paste **`FormLedgerView.vb`**, and Iâ€™ll fix the actual View Checks behavior next.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Threading.Tasks
+
+Public Class FormLedgerView
+
+    Private Const ScreenTitle As String = "Ledger - View Checks"
+
+    Private ReadOnly _all As New List(Of LedgerEntry)()
+
+    ' CHECK.INV index: composite key -> invoice-number list
+    Private _invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+    Private _invIndexReady As Boolean = False
+
+    ' Main filter controls
+    Private ReadOnly txtCustomer As New TextBox()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly cmbYear As New ComboBox()
+    Private ReadOnly cmbMonth As New ComboBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    ' Invoice details panel
+    Private ReadOnly pnlInvoice As New Panel()
+    Private ReadOnly lblInvoiceTitle As New Label()
+    Private ReadOnly lblInvoiceStatus As New Label()
+    Private ReadOnly dgvInvoice As New DataGridView()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 900
+        StartPosition = FormStartPosition.CenterParent
+
+        BuildUi()
+        PopulatePicklists()
+
+        LoadData()
+        ApplyFilters()
+        StartLoadCheckInvIndex()
+    End Sub
+
+    Private Sub BuildUi()
+        ' top filter bar
+        Dim topPanel As New TableLayoutPanel() With {
+            .Dock = DockStyle.Top,
+            .Height = 70,
+            .ColumnCount = 9,
+            .RowCount = 2
+        }
+
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Customer lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 35))    ' Customer txt
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Check lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 20))    ' Check txt
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Year lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))    ' Year cmb
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Month lbl
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 15))    ' Month cmb
+        topPanel.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))       ' Refresh btn
+
+        Dim lblCustomer As New Label() With {.Text = "Customer:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblCheck As New Label() With {.Text = "Check #:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblYear As New Label() With {.Text = "Year:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+        Dim lblMonth As New Label() With {.Text = "Month:", .AutoSize = True, .Anchor = AnchorStyles.Left}
+
+        txtCustomer.Dock = DockStyle.Fill
+        txtCheck.Dock = DockStyle.Fill
+
+        cmbYear.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbMonth.DropDownStyle = ComboBoxStyle.DropDownList
+        cmbYear.Dock = DockStyle.Fill
+        cmbMonth.Dock = DockStyle.Fill
+
+        btnRefresh.Text = "Refresh"
+        btnRefresh.AutoSize = True
+        btnRefresh.Anchor = AnchorStyles.Left
+
+        lblTotal.Text = "Total: $0.00"
+        lblTotal.AutoSize = True
+        lblTotal.Dock = DockStyle.Fill
+        lblTotal.TextAlign = ContentAlignment.MiddleLeft
+
+        ' Row 0: filters
+        topPanel.Controls.Add(lblCustomer, 0, 0)
+        topPanel.Controls.Add(txtCustomer, 1, 0)
+        topPanel.Controls.Add(lblCheck, 2, 0)
+        topPanel.Controls.Add(txtCheck, 3, 0)
+        topPanel.Controls.Add(lblYear, 4, 0)
+        topPanel.Controls.Add(cmbYear, 5, 0)
+        topPanel.Controls.Add(lblMonth, 6, 0)
+        topPanel.Controls.Add(cmbMonth, 7, 0)
+        topPanel.Controls.Add(btnRefresh, 8, 0)
+
+        ' Row 1: total
+        topPanel.SetColumnSpan(lblTotal, 9)
+        topPanel.Controls.Add(lblTotal, 0, 1)
+
+        ' main check grid
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+
+        ' invoice details panel (bottom)
+        pnlInvoice.Dock = DockStyle.Bottom
+        pnlInvoice.Height = 220
+        pnlInvoice.BorderStyle = BorderStyle.Fixed3D
+
+        lblInvoiceTitle.Text = "  Invoice Details"
+        lblInvoiceTitle.Dock = DockStyle.Top
+        lblInvoiceTitle.Height = 24
+        lblInvoiceTitle.Font = New Drawing.Font(Font.FontFamily, 9.0F, Drawing.FontStyle.Bold)
+        lblInvoiceTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblInvoiceTitle.BackColor = Drawing.SystemColors.ControlDark
+        lblInvoiceTitle.ForeColor = Drawing.SystemColors.ControlLightLight
+
+        lblInvoiceStatus.Text = "Select a check row above to view invoice details."
+        lblInvoiceStatus.Dock = DockStyle.Top
+        lblInvoiceStatus.Height = 22
+        lblInvoiceStatus.Padding = New Padding(4, 0, 0, 0)
+        lblInvoiceStatus.TextAlign = ContentAlignment.MiddleLeft
+
+        dgvInvoice.Dock = DockStyle.Fill
+        dgvInvoice.ReadOnly = True
+        dgvInvoice.AllowUserToAddRows = False
+        dgvInvoice.AllowUserToDeleteRows = False
+        dgvInvoice.AutoGenerateColumns = False
+        dgvInvoice.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgvInvoice.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize
+
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "InvoiceNumber",
+            .HeaderText = "Invoice #",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Amount",
+            .HeaderText = "Amount",
+            .Width = 110
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "CompanyCode",
+            .HeaderText = "Company Code",
+            .Width = 130
+        })
+        dgvInvoice.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .DataPropertyName = "Status",
+            .HeaderText = "Status",
+            .Width = 110
+        })
+
+        pnlInvoice.Controls.Add(dgvInvoice)
+        pnlInvoice.Controls.Add(lblInvoiceStatus)
+        pnlInvoice.Controls.Add(lblInvoiceTitle)
+
+        ' Wire up events
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilters()
+            End Sub
+
+        AddHandler txtCustomer.TextChanged, Sub() ApplyFilters()
+        AddHandler txtCheck.TextChanged, Sub() ApplyFilters()
+        AddHandler cmbYear.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler cmbMonth.SelectedIndexChanged, Sub() ApplyFilters()
+        AddHandler dgv.SelectionChanged, Sub() OnMainGridSelectionChanged()
+
+        ' Add to form; order determines docking priority
+        Controls.Add(dgv)        ' Fill  (added first)
+        Controls.Add(pnlInvoice) ' Bottom
+        Controls.Add(topPanel)   ' Top   (added last)
+    End Sub
+
+    Private Sub PopulatePicklists()
+        cmbMonth.Items.Clear()
+        cmbMonth.Items.Add("") ' all
+        For m As Integer = 1 To 12
+            cmbMonth.Items.Add(m.ToString("00"))
+        Next
+        cmbMonth.SelectedIndex = 0
+
+        cmbYear.Items.Clear()
+        cmbYear.Items.Add("") ' all
+        ' We don't know min/max upfront; just provide a reasonable range + all.
+        For y As Integer = Date.Today.Year To 1986 Step -1
+            cmbYear.Items.Add(y.ToString())
+        Next
+        cmbYear.SelectedIndex = 0
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.LedgerCur
+
+        ' Clear current view so we never display stale data if the file is missing/unreadable.
+        _all.Clear()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all.AddRange(LedgerCurReader.ReadAll(path))
+        Catch ex As Exception
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilters()
+        Dim cust As String = txtCustomer.Text.Trim()
+        Dim chk As String = txtCheck.Text.Trim()
+        Dim year As String = If(TryCast(cmbYear.SelectedItem, String), "").Trim()
+        Dim month As String = If(TryCast(cmbMonth.SelectedItem, String), "").Trim()
+
+        Dim q = _all.AsEnumerable()
+
+        If cust <> "" Then
+            q = q.Where(Function(e) If(e.Customer, "").IndexOf(cust, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If chk <> "" Then
+            q = q.Where(Function(e) If(e.CheckNumber, "").IndexOf(chk, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If year <> "" Then
+            Dim yy As String = year.Substring(year.Length - 2) ' DOS compared last 2 digits
+            q = q.Where(Function(e) If(e.DateText, "").EndsWith(yy, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        If month <> "" Then
+            q = q.Where(Function(e) If(e.DateText, "").StartsWith(month, StringComparison.OrdinalIgnoreCase))
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(e) e.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+    ' Invoice details
+
+    Private Sub OnMainGridSelectionChanged()
+        If dgv.SelectedRows.Count = 0 Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        Dim entry = TryCast(dgv.SelectedRows(0).DataBoundItem, LedgerEntry)
+        If entry Is Nothing Then
+            ClearInvoiceDetails("Select a check row above to view invoice details.")
+            Return
+        End If
+
+        ShowInvoiceDetails(entry)
+    End Sub
+
+    Private Sub ClearInvoiceDetails(statusMsg As String)
+        dgvInvoice.DataSource = Nothing
+        lblInvoiceStatus.Text = statusMsg
+    End Sub
+
+    Private Sub ShowInvoiceDetails(entry As LedgerEntry)
+        If Not _invIndexReady Then
+            ClearInvoiceDetails("Loading invoice index, please wait...")
+            Return
+        End If
+
+        Dim key As String = BuildKey(entry.Customer, entry.CheckNumber)
+        Dim invoiceNumbers As List(Of Long) = Nothing
+
+        If Not _invIndex.TryGetValue(key, invoiceNumbers) OrElse
+           invoiceNumbers Is Nothing OrElse invoiceNumbers.Count = 0 Then
+            ClearInvoiceDetails("No invoice details available (check predates CHECK.INV coverage or has no invoices).")
+            Return
+        End If
+
+        Dim invChkPath As String = LegacyDataPaths.InvoiceChk
+        Dim rows As New List(Of InvoiceDetailRow)()
+
+        For Each invNo As Long In invoiceNumbers
+            Dim rec = InvoiceChkReader.ReadRecord(invChkPath, invNo)
+            rows.Add(New InvoiceDetailRow() With {
+                .InvoiceNumber = invNo,
+                .Amount = If(rec.IsFound, rec.Amount.ToString("C"), "Unavailable"),
+                .CompanyCode = If(rec.IsFound, rec.CompanyCode, ""),
+                .Status = If(rec.IsFound, rec.FlagDescription, "Unavailable")
+            })
+        Next
+
+        dgvInvoice.DataSource = rows
+        lblInvoiceStatus.Text =
+            $"Check #{entry.CheckNumber.Trim()}  |  Customer: {entry.Customer.TrimEnd()}  |  {invoiceNumbers.Count} invoice(s)"
+    End Sub
+
+    Private Sub StartLoadCheckInvIndex()
+        lblInvoiceStatus.Text = "Loading CHECK.INV index..."
+        Dim path As String = LegacyDataPaths.CheckInv
+
+        Task.Run(
+            Sub()
+                Dim idx As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+
+                Try
+                    If System.IO.File.Exists(path) Then
+                        Dim blocks = CheckInvReader.ReadAll(path)
+                        For Each b In blocks
+                            Dim key As String = BuildKey(b.CustomerCode, b.CheckNumber)
+                            Dim lst As List(Of Long) = Nothing
+                            If Not idx.TryGetValue(key, lst) Then
+                                lst = New List(Of Long)()
+                                idx(key) = lst
+                            End If
+                            If b.Invoices IsNot Nothing Then
+                                For Each invStr In b.Invoices
+                                    Dim invNo As Long
+                                    If Long.TryParse(invStr.Trim(), invNo) Then
+                                        lst.Add(invNo)
+                                    End If
+                                Next
+                            End If
+                        Next
+                    End If
+                Catch
+                    ' Best-effort; proceed with the empty index built so far.
+                End Try
+
+                ' Guard against disposal race: IsDisposed check then Invoke,
+                ' catching ObjectDisposedException should the form close between the two.
+                Try
+                    If Not Me.IsDisposed Then
+                        Me.Invoke(Sub()
+                                      _invIndex = idx
+                                      _invIndexReady = True
+                                      ' Refresh panel if a row is already selected.
+                                      OnMainGridSelectionChanged()
+                                  End Sub)
+                    End If
+                Catch __e As ObjectDisposedException
+                    ' Form was closed while the background task was running; ignore.
+                End Try
+            End Sub)
+    End Sub
+
+    Private Shared Function BuildKey(code As String, checkNum As String) As String
+        Return If(code, "").TrimEnd() & "|" & If(checkNum, "").Trim()
+    End Function
+
+End Class
+
+```
+
+## Copilot
+
+The problem is that **`FormLedgerView` is still built around legacy file data (`LEDGER.CUR`) and interactive filter controls**, not the DOS prompt-driven flow or the new runtime `CheckRepository`.
+
+## Direct answer
+To make **View Checks** behave correctly for your current Checks-menu completion pass, we should:
+
+1. **pass the DOS prompt values into `FormLedgerView`**
+2. **make `FormLedgerView` show filtered check results immediately**
+3. **use `CheckRepository` for runtime-added checks**
+4. temporarily **drop the modern top filter bar** so it feels closer to DOS
+
+Right now it is doing none of that:
+- it ignores the three prompt values from `FormLedgerMenu`
+- it reads only `LEDGER.CUR`
+- it uses a modern filter toolbar
+- it will not see checks you added through the new Add Check flow
+
+That is exactly why `PSIBEARI` is not showing correctly.
+
+---
+
+## Best next move
+Iâ€™m going to give you a **replacement `FormLedgerView.vb`** that is aligned with your current repository-based Checks flow.
+
+### This version will:
+- accept:
+  - customer
+  - check number
+  - year
+- load from `CheckRepository`
+- immediately show matching results
+- display a simple grid and total
+- be consistent with the Add/Delete work you just finished
+
+### This version will **not yet** do:
+- legacy `LEDGER.CUR` reading
+- invoice details panel
+- hybrid merge of repo + legacy data
+
+Thatâ€™s intentional â€” right now your priority is to finish the Checks menu coherently.
+
+---
+
+# Step 1: update `FormLedgerMenu.vb`
+In `OpenViewChecksPromptFlow()`, replace this:
+
+```vbnet
+Using f As New FormLedgerView()
+    f.ShowDialog(Me)
+End Using
+```
+
+with this:
+
+```vbnet
+Using f As New FormLedgerView(cust, chk, yr)
+    f.ShowDialog(Me)
+End Using
+```
+
+---
+
+# Step 2: replace entire `FormLedgerView.vb`
+Replace the whole file with this:
+
+```vbnet name=FormLedgerView.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+    Inherits Form
+
+    Private ReadOnly _customerFilter As String
+    Private ReadOnly _checkFilter As String
+    Private ReadOnly _yearFilter As String
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblFilterLine As New Label()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+        MyBase.New()
+
+        _customerFilter = If(customerFilter, "").Trim()
+        _checkFilter = If(checkFilter, "").Trim()
+        _yearFilter = If(yearFilter, "").Trim()
+
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "View Checks"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** View Checks *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblFilterLine.AutoSize = False
+        lblFilterLine.ForeColor = Color.White
+        lblFilterLine.BackColor = Color.Black
+        lblFilterLine.SetBounds(24, 70, 920, 28)
+
+        dgv.SetBounds(24, 110, 920, 420)
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.Gray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.MultiSelect = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.RowHeadersVisible = False
+        dgv.AutoGenerateColumns = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Navy
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Customer",
+            .DataPropertyName = "CustomerName",
+            .Width = 220
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Check #",
+            .DataPropertyName = "CheckNumber",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Reference",
+            .DataPropertyName = "Reference",
+            .Width = 140
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Date",
+            .DataPropertyName = "CheckDate",
+            .Width = 130
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Amount",
+            .DataPropertyName = "AmountDisplay",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Invoices",
+            .DataPropertyName = "InvoicesDisplay",
+            .Width = 170,
+            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        })
+
+        lblTotal.AutoSize = False
+        lblTotal.ForeColor = Color.White
+        lblTotal.BackColor = Color.Black
+        lblTotal.SetBounds(24, 545, 500, 28)
+
+        btnClose.Text = "Close"
+        btnClose.SetBounds(834, 545, 110, 34)
+        AddHandler btnClose.Click, Sub() Me.Close()
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblFilterLine)
+        Me.Controls.Add(dgv)
+        Me.Controls.Add(lblTotal)
+        Me.Controls.Add(btnClose)
+
+        AddHandler Me.Load, AddressOf FormLedgerView_Load
+    End Sub
+
+    Private Sub FormLedgerView_Load(sender As Object, e As EventArgs)
+        LoadFilteredChecks()
+    End Sub
+
+    Private Sub LoadFilteredChecks()
+        Dim allChecks = CheckRepository.GetAll()
+
+        Dim q = allChecks.AsEnumerable()
+
+        If _customerFilter <> "" Then
+            q = q.Where(Function(x) x.CustomerName IsNot Nothing AndAlso
+                                    x.CustomerName.IndexOf(_customerFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _checkFilter <> "" Then
+            q = q.Where(Function(x) x.CheckNumber IsNot Nothing AndAlso
+                                    x.CheckNumber.IndexOf(_checkFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _yearFilter <> "" Then
+            q = q.Where(Function(x) YearMatches(x.CheckDate, _yearFilter))
+        End If
+
+        Dim rows = q.
+            Select(Function(x) New LedgerViewRow With {
+                .CustomerName = x.CustomerName,
+                .CheckNumber = x.CheckNumber,
+                .Reference = x.Reference,
+                .CheckDate = x.CheckDate,
+                .AmountValue = x.Amount,
+                .AmountDisplay = x.Amount.ToString("0.00"),
+                .InvoicesDisplay = If(x.PaidInvoices IsNot Nothing AndAlso x.PaidInvoices.Count > 0,
+                                      String.Join(", ", x.PaidInvoices),
+                                      "")
+            }).
+            OrderBy(Function(x) x.CustomerName).
+            ThenBy(Function(x) x.CheckNumber).
+            ToList()
+
+        dgv.DataSource = rows
+
+        Dim total = rows.Sum(Function(x) x.AmountValue)
+        lblTotal.Text = "Total Amount: $" & total.ToString("0.00")
+
+        Dim custDisplay As String = If(_customerFilter = "", "ALL", _customerFilter)
+        Dim chkDisplay As String = If(_checkFilter = "", "ALL", _checkFilter)
+        Dim yearDisplay As String = If(_yearFilter = "", "ALL", _yearFilter)
+
+        lblFilterLine.Text = "Customer: " & custDisplay & "   Check #: " & chkDisplay & "   Year: " & yearDisplay
+
+        If rows.Count = 0 Then
+            MessageBox.Show("No checks found for the selected criteria.",
+                            "View Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Function YearMatches(dateText As String, requestedYear As String) As Boolean
+        If String.IsNullOrWhiteSpace(requestedYear) Then Return True
+        If String.IsNullOrWhiteSpace(dateText) Then Return False
+
+        Dim normalizedRequested = requestedYear.Trim()
+
+        If normalizedRequested.Length = 2 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase)
+        End If
+
+        If normalizedRequested.Length = 4 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase) OrElse
+                   dateText.Trim().EndsWith(normalizedRequested.Substring(2), StringComparison.OrdinalIgnoreCase)
+        End If
+
+        Return dateText.IndexOf(normalizedRequested, StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Class LedgerViewRow
+        Public Property CustomerName As String
+        Public Property CheckNumber As String
+        Public Property Reference As String
+        Public Property CheckDate As String
+        Public Property AmountValue As Decimal
+        Public Property AmountDisplay As String
+        Public Property InvoicesDisplay As String
+    End Class
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+End Class
+```
+
+---
+
+## Why this fixes your current issue
+This version fixes the exact mismatch you described:
+
+- if you added `PSIBEARI` through **Add Checks**
+- and then use **View Checks**
+- and enter `PSIBEARI`
+- it will actually search the same repository used by Add/Delete
+
+So now those features become consistent.
+
+---
+
+## Important note
+This still does **not** fully recreate the inline DOS same-screen prompt.  
+It fixes the data path and removes the old modern filter-toolbar view.
+
+If you want true DOS closeness after this, the next refinement would be:
+- replace the popup prompt sequence with a dedicated DOS-style prompt screen/form
+
+But Iâ€™d first get this working end-to-end.
+
+---
+
+## What to do now
+1. update `FormLedgerMenu.vb` constructor call
+2. replace `FormLedgerView.vb`
+3. build
+4. test:
+   - add `PSIBEARI`
+   - view checks for `PSIBEARI`
+   - confirm it appears
+   - try blank customer for all customers
+   - try check number filter
+   - try year filter
+
+---
+
+## Question for you
+After you test this, tell me:
+
+**Do you want me next to make the View Checks prompts DOS-style on the same black screen instead of popup dialogs?**
+
+## @testsubject117
+
+how should I test this
+
+## Copilot
+
+Test it in this exact order.
+
+## 1. Build first
+- save all files
+- **Build**
+- make sure there are **0 errors**
+
+---
+
+## 2. Basic View Checks test
+Run the app and go to:
+
+- **Checks**
+- press **1** to add a check
+
+Enter something like:
+- Company: `PSIBEARI`
+- Amount: `.20`
+- Lowest invoice: `-1`
+- press `C`
+- Check #: `7778`
+- Date: press **Enter** or type today
+- Reference: `12345678`
+- Final confirm: `Y`
+
+Then:
+
+- go back to **Checks**
+- press **3** for **View Checks**
+
+When prompted, enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should see:
+- one row for `PSIBEARI`
+- check `7778`
+- reference `12345678`
+- amount `.20` shown as `0.20`
+- total amount = `0.20`
+
+---
+
+## 3. All customers test
+Open **View Checks** again.
+
+Enter:
+- Customer name: press **Enter**
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should see all checks currently in the runtime repository for this session.
+
+If you only added one, then you should only see that one.
+
+---
+
+## 4. Check number filter test
+Open **View Checks** again.
+
+Enter:
+- Customer name: press **Enter**
+- Check Number: `7778`
+- Year: press **Enter**
+
+### Expected result
+You should see only check `7778`.
+
+---
+
+## 5. Year filter test
+Open **View Checks** again.
+
+Enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: `2026`
+
+### Expected result
+You should still see the row if the date ends in 2026.
+
+If you accepted todayâ€™s default date, it should match.
+
+---
+
+## 6. Not found test
+Open **View Checks** again.
+
+Enter:
+- Customer name: `NOTREAL`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+You should get:
+- a â€œNo checks foundâ€ message
+- then an empty grid or no matching rows
+
+---
+
+## 7. Delete consistency test
+Now test that View Checks matches Delete Checks.
+
+### First
+Confirm `PSIBEARI / 7778` appears in **View Checks**
+
+### Then
+Go to:
+- **Delete Checks**
+- delete `7778`
+
+### Then
+Go back to:
+- **View Checks**
+
+Enter:
+- Customer name: `PSIBEARI`
+- Check Number: press **Enter**
+- Year: press **Enter**
+
+### Expected result
+`7778` should no longer appear.
+
+---
+
+## 8. ESC/Close test
+While in the View Checks screen:
+- press **Esc**
+
+### Expected result
+It should close and return to the Checks menu.
+
+Also test the **Close** button.
+
+---
+
+## 9. What to tell me back
+After testing, tell me these exact things:
+
+1. **Did PSIBEARI appear in View Checks?**
+2. **Did blank customer show all checks?**
+3. **Did check number filtering work?**
+4. **Did year filtering work?**
+5. **After deleting 7778, did View Checks stop showing it?**
+6. **Does the screen feel closer to DOS, or still too modern?**
+
+## Short version
+Minimum test:
+1. add `PSIBEARI / 7778`
+2. view checks for `PSIBEARI`
+3. confirm it appears
+4. delete `7778`
+5. view checks again
+6. confirm itâ€™s gone
+
+After you run that, tell me what happened.
+
+## @testsubject117
+
+if I enter, enter, enter it should show all customers, all checks, all years, it doesn't, it still is showing the results of the search for the psibeari check
+
+## Copilot
+
+That means the prompt flow is probably still passing the **previous values**, or the view form is being reused with stale filter state.
+
+## Direct answer
+**Blank / Enter / Enter should absolutely mean ALL / ALL / ALL.**  
+If it still shows the old `PSIBEARI`-filtered result, thatâ€™s a bug.
+
+## Most likely cause
+One of these is happening:
+
+1. the prompt dialog is returning the old text instead of blank
+2. `FormLedgerMenu` is not passing the blank values correctly
+3. `FormLedgerView` is not being rebuilt with fresh constructor values
+4. the old `FormLedgerView.vb` code is still running instead of the replacement
+
+---
+
+## Fastest way to diagnose
+I want to verify the exact `OpenViewChecksPromptFlow()` code currently in your `FormLedgerMenu.vb`.
+
+Please paste just that method as it exists right now.
+
+It should look roughly like this:
+
+```vbnet
+Private Sub OpenViewChecksPromptFlow()
+    Dim cust As String = ShowPromptDialog("Enter customer name [Enter = all customers] ?", "")
+    If cust Is Nothing Then Return
+
+    Dim chk As String = ShowPromptDialog("Enter Check Number [Enter = All Checks] ?", "")
+    If chk Is Nothing Then Return
+
+    Dim yr As String = ShowPromptDialog("Enter Year [Enter = All Years] ?", "")
+    If yr Is Nothing Then Return
+
+    Using f As New FormLedgerView(cust, chk, yr)
+        f.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+If yours still says:
+
+```vbnet
+Using f As New FormLedgerView()
+```
+
+then thatâ€™s the problem.
+
+---
+
+## One more thing to verify
+Also make sure your new `FormLedgerView.vb` constructor is actually this:
+
+```vbnet
+Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+```
+
+If Visual Studio is still using the old no-argument version, then the old logic may still be compiled or the file replacement didnâ€™t fully stick.
+
+---
+
+## Expected behavior
+These inputs:
+
+- customer: **blank**
+- check: **blank**
+- year: **blank**
+
+should produce:
+
+- `_customerFilter = ""`
+- `_checkFilter = ""`
+- `_yearFilter = ""`
+
+and therefore **no filtering at all**.
+
+So if it still shows only `PSIBEARI`, something stale is being retained.
+
+---
+
+## Short answer
+Yes â€” **Enter, Enter, Enter should show all**.  
+Please paste your current `OpenViewChecksPromptFlow()` method from `FormLedgerMenu.vb`, because thatâ€™s the most likely place the bug is coming from.
+
+## @testsubject117
+
+but yes this looks more like dos and much better. here's a screenshot of the results after enter, enter, enter: 
+
+## Copilot
+
+That screenshot actually shows **correct behavior**, not a bug.
+
+## Direct answer
+If you pressed **Enter, Enter, Enter**, the screen should show:
+
+- **all customers**
+- **all checks**
+- **all years**
+
+And in your screenshot, it is showing:
+
+- `Customer: ALL`
+- `Check #: ALL`
+- `Year: ALL`
+
+with one row:
+
+- `PSIBEARI`
+- `7779`
+- `12345678`
+- `05-19-2026`
+- `0.30`
+
+So if that is the **only check currently in `CheckRepository` for this app run**, then this is exactly right.
+
+---
+
+## Why it may have felt wrong
+I think the confusion is this:
+
+You expected **ALL** to mean:
+- lots of historical checks from the old system
+
+But right now **ALL** only means:
+- all checks currently stored in the runtime in-memory repository
+
+And since the current repository only contains checks added during this running session, seeing just one `PSIBEARI` row is expected if thatâ€™s the only one currently added.
+
+---
+
+## So this part is working
+From the screenshot, Iâ€™d say:
+
+### View Checks now correctly:
+- accepts blank filters
+- displays `ALL / ALL / ALL`
+- shows repository-backed results
+- looks much closer to DOS
+- shows a total
+- displays the current sessionâ€™s checks
+
+Thatâ€™s a win.
+
+---
+
+## Very important distinction
+Current behavior is:
+
+### â€œAllâ€ in the current implementation
+All checks in:
+- `CheckRepository`
+
+### Not yet:
+All checks in:
+- legacy `LEDGER.CUR`
+- or any DOS-era persisted source
+
+So the result is internally correct, but the dataset is still limited by todayâ€™s temporary architecture.
+
+---
+
+## My assessment of View Checks now
+### Improved:
+- much closer visually to DOS
+- prompt-to-results flow makes more sense
+- customer search now appears consistent with Add/Delete repository behavior
+
+### Still not final-final:
+- no persistent legacy file integration
+- no inline same-screen DOS prompt yet
+- still a modern grid rather than exact DOS list layout
+- still repository-only
+
+But for menu completion, it sounds like **functional correctness is now much better**.
+
+---
+
+## Next thing Iâ€™d test
+To confirm fully:
+
+### Test A
+Add another check, for example:
+- customer: `ACME`
+- check number: `8888`
+- amount: `.50`
+
+Then View Checks with:
+- Enter
+- Enter
+- Enter
+
+### Expected
+You should now see:
+- `PSIBEARI`
+- `ACME`
+
+and total should be:
+- `$0.80`
+
+If that happens, then â€œALLâ€ is definitely working correctly.
+
+---
+
+## Short answer
+Your screenshot shows that **ALL / ALL / ALL is working correctly** for the current in-memory repository.  
+Itâ€™s only showing `PSIBEARI` because that appears to be the only current check in the repository for this app session.
+
+## My question for you
+Do you want to keep refining **View Checks** now for more DOS closeness, or move on to the next unfinished Checks menu item â€” probably **(6) Add OTHER Checks**?
+
+## @testsubject117
+
+ah, ok, so it's not using the old database like it was before. it was previously finding legitimate customer checks that were already entered
+
+## Copilot
+
+Exactly.
+
+## Direct answer
+Yes â€” **it is no longer using the old legacy data source** for View Checks.
+
+Right now, View Checks is using only:
+
+- **`CheckRepository`**
+
+which contains only checks added during the **current app session**.
+
+So it will **not** show the previously existing legitimate customer checks from the old database/files.
+
+---
+
+## What changed
+Before, `FormLedgerView.vb` was reading legacy data from:
+
+- `LEDGER.CUR`
+
+using:
+
+```vbnet
+_all.AddRange(LedgerCurReader.ReadAll(path))
+```
+
+That old version could show real historical checks already in the legacy files.
+
+But it had these problems:
+- it was disconnected from your new Add/Delete flow
+- it didnâ€™t use `CheckRepository`
+- it wasnâ€™t matching the current temporary architecture
+- it wasnâ€™t giving you consistent behavior with `PSIBEARI`
+
+So we replaced it with a repository-backed version to make the current Checks menu coherent.
+
+---
+
+## So now you have a tradeoff
+### Current version
+**Pros**
+- consistent with Add/Delete
+- `PSIBEARI` works
+- simpler
+- closer to DOS visually
+
+**Cons**
+- does not show historical legacy checks
+- only shows runtime-added checks
+
+### Old version
+**Pros**
+- showed real legacy checks from old data files
+
+**Cons**
+- inconsistent with Add/Delete
+- more modern UI
+- probably not using the DOS prompt flow correctly
+- not aligned with your current temporary repository approach
+
+---
+
+## Best next step
+The real solution is probably **not** â€œold versionâ€ or â€œnew versionâ€ alone.
+
+Itâ€™s likely this:
+
+## Hybrid View Checks
+Make View Checks show:
+1. checks from the **legacy source** (`LEDGER.CUR`)
+2. plus checks from the **runtime repository** (`CheckRepository`)
+
+That would give you:
+- historical checks still visible
+- newly added checks also visible
+- better functional continuity while you continue porting
+
+---
+
+## Recommended direction
+For finishing the Checks menu, I recommend:
+
+### Option A â€” hybrid now
+Update View Checks so it merges:
+- legacy checks
+- runtime-added checks
+
+This is probably the most practical.
+
+### Option B â€” repo only for now
+Keep current behavior and finish the rest of the menu quickly.
+
+This is simpler, but you lose visibility into old data.
+
+---
+
+## My recommendation
+Given what you just said â€” that it was previously finding legitimate already-entered customer checks â€” I think **hybrid is the right answer**.
+
+That way:
+- old real data still appears
+- new runtime-added checks also appear
+- Delete/Add behavior still makes sense for what was added this session
+
+---
+
+## Important note
+If we do hybrid, weâ€™ll want to think through duplicates:
+- if a check exists in legacy data and also in `CheckRepository`, which wins?
+
+Usually Iâ€™d say:
+- repository record wins for same check number/customer combination in the current session
+
+---
+
+## Short answer
+Correct â€” the current View Checks is no longer reading the old database/file source.  
+It is only using the new in-memory repository, which is why it no longer finds older legitimate checks.
+
+## My question
+Do you want me to make **View Checks hybrid next** so it shows:
+- old legacy checks **and**
+- newly added runtime checks?
+
+## @testsubject117
+
+is there a way to just use the ledger.cur file like we were? if we move forward with 2 files, one for old and one for new, it doesn't seem clean, and having to fight between 2 files over which one should keep duplicate data and which should not, doesn't sound like a good solution, remember, we're trying to match dos behavior, look and feel as much as possible
+
+## Copilot
+
+Yes â€” **and I think that is the right direction**.
+
+## Direct answer
+If your goal is to match DOS behavior as closely as possible, then **we should use `LEDGER.CUR` as the single source of truth** for checks, just like the old system did.
+
+I agree with you:
+- a split between **legacy file + in-memory repository** is not clean
+- duplicate reconciliation is messy
+- it moves you away from DOS truth
+
+So the better architecture is:
+
+- **Add Checks** writes to `LEDGER.CUR`
+- **Delete Checks** removes from `LEDGER.CUR`
+- **View Checks** reads from `LEDGER.CUR`
+- **Find a Check #**, **Find an Invoice #**, totals, etc. also read from the same legacy-backed source where appropriate
+
+That is much more DOS-faithful.
+
+---
+
+## What this means
+The runtime `CheckRepository` was useful as a temporary bridge to prove flow and complete UI behavior quickly.
+
+But now that youâ€™re aiming for:
+- DOS-true behavior

@@ -1,0 +1,2000 @@
+﻿## Direct fix
+Find the code that handles the main menu key/button for **`N`** and replace the â€œnot implemented yetâ€ branch with:
+
+```vb name=MainMenu_N_Handler.vb
+Using frm As New FrmRolodexMenu()
+    frm.ShowDialog(Me)
+End Using
+```
+
+---
+
+## What to look for
+Search your project for one of these:
+- `Not implemented yet`
+- `Case "N"`
+- `Case Keys.N`
+- `btnN`
+- `Rolodex`
+- main menu keypress handler
+
+You likely have something like:
+
+```vb
+Case "N"c
+    MessageBox.Show("Not implemented yet")
+```
+
+or
+
+```vb
+Case Keys.N
+    MessageBox.Show("Not implemented yet")
+```
+
+Replace that with the Rolodex form launch.
+
+---
+
+## Common examples
+
+### If your main menu uses `KeyPress`
+Use:
+
+```vb name=MainMenu_KeyPress_N.vb
+Private Sub MainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+    Select Case Char.ToUpperInvariant(e.KeyChar)
+        Case "N"c
+            Using frm As New FrmRolodexMenu()
+                frm.ShowDialog(Me)
+            End Using
+    End Select
+End Sub
+```
+
+### If your main menu uses `KeyDown`
+Use:
+
+```vb name=MainMenu_KeyDown_N.vb
+Private Sub MainMenu_KeyDown(sender As Object, e As KeyEventArgs) Handles Me.KeyDown
+    Select Case e.KeyCode
+        Case Keys.N
+            Using frm As New FrmRolodexMenu()
+                frm.ShowDialog(Me)
+            End Using
+    End Select
+End Sub
+```
+
+### If `(N)` is a button click
+Use:
+
+```vb name=btnRolodex_Click.vb
+Private Sub btnRolodex_Click(sender As Object, e As EventArgs) Handles btnRolodex.Click
+    Using frm As New FrmRolodexMenu()
+        frm.ShowDialog(Me)
+    End Using
+End Sub
+```
+
+---
+
+## If `ShowDialog(Me)` errors
+If your current context isnâ€™t a form instance, use:
+
+```vb name=RolodexLaunchFallback.vb
+Using frm As New FrmRolodexMenu()
+    frm.ShowDialog()
+End Using
+```
+
+---
+
+## After that
+Once `(N)` opens the Rolodex menu, test these keys:
+
+- `A`
+- `D`
+- `G`
+- `H`
+- `Z`
+- `Esc`
+
+Those should already do something with the scaffolding we added.
+
+---
+
+## Best next move
+Wire `(N)` now, run it, and if you want, paste the **main menu handler code** here and Iâ€™ll tell you the exact line to replace.
+
+## @testsubject117
+
+here is a copy of my formmainmenu.vb. please generate the code for the entire file with the code to wire up 
+
+## Copilot
+
+Please paste the contents of `FormMainMenu.vb`, and Iâ€™ll return the fully wired version of the entire file.
+
+I need the actual file because I shouldnâ€™t guess:
+- your form class name
+- existing controls
+- current key handlers
+- button click handlers
+- any DOS rendering logic already in place
+
+Once you paste it, Iâ€™ll generate a drop-in replacement with `(N)` launching `FrmRolodexMenu`.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        Select Case up
+            Case "A" : NotYet("Shop Card Generator")
+            Case "B" : NotYet("Invoice Generator")
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "D" : NotYet("View Sales Journal (SALES)")
+            Case "E" : NotYet("View Log Book (LOGBOOK)")
+            Case "F" : NotYet("Price List Program (plist)")
+            Case "G" : NotYet("Print/Void Invoices (BOOT)")
+            Case "H" : NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J" : NotYet("Print Out Customers Actual Names (spool real names)")
+            Case "K" : NotYet("Cash Disbursements (BILL)")
+            Case "L" : NotYet("Business Expenses Account (password)")
+            Case "M" : NotYet("Quotation Form Generator (QUOTE)")
+            Case "N" : NotYet("Rolodex (PHONE)")
+
+            Case "O" : NotYet("Copy Spec Index")
+            Case "P" : NotYet("Entire Ledger Viewing (ENTIRE)")
+            Case "Q" : NotYet("Word Processor")
+            Case "R" : NotYet("Find Word Processor Text")
+
+            Case "T" : NotYet("Change Date or Time")
+            Case "X" : NotYet("Typewriter Mode")
+            Case "Y" : NotYet("Ed Dean's Personal Backup")
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+            Case "2" : NotYet("Product Purchasing")
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+            Case "4" : NotYet("Add Entries to Log Book")
+            Case "6" : NotYet("Cadmium Cards")
+            Case "7" : NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Replace your entire `FormMainMenu.vb` with this. It keeps your existing behavior and wires **`(N)` Rolodex** to `FrmRolodexMenu`.
+
+```vb name=FormMainMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Dim V = BuildInfo.DisplayVersion
+        Dim built = BuildInfo.BuildNumber
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Function MakeHeaderLabel(text As String) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Height = 32
+        lbl.TextAlign = ContentAlignment.MiddleLeft
+        lbl.Font = New Font(Me.Font, FontStyle.Bold)
+        lbl.Text = text
+        lbl.Margin = New Padding(3, 3, 3, 8)
+        lbl.Width = 1000
+        Return lbl
+    End Function
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As String = e.KeyChar.ToString()
+        If ch = vbCr OrElse ch = vbLf Then Return
+        HandleMenuKey(ch)
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                NotYet("View Log Book (LOGBOOK)")
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                NotYet("Print Out Customers Actual Names (spool real names)")
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+End Class
+```
+
+## What changed
+Only this behavior changed:
+
+- `Case "N"` now opens:
+  - `FrmRolodexMenu`
+
+instead of:
+- `NotYet("Rolodex (PHONE)")`
+
+## After you paste it
+Run the app and test:
+- click `(N)`
+- press `N`
+
+Both should open the Rolodex menu.
+
+## Likely next issue
+Once Rolodex opens, some keys will still show placeholders:
+- `B`
+- `C`
+- maybe others
+
+Thatâ€™s fine. The shell is now wired.
+
+If you want, next I can generate the **next full-file replacement for `FrmRolodexMenu.vb`** so `E/F/I` actually accept typed responses instead of just showing the first prompt.
+
+## @testsubject117
+
+ok, it now opens the Rolodex main menu. I see (A) works, but all the other buttons say "delete person flow next" or "look up person flow next"
+
+## Copilot
+
+Good â€” that means the Rolodex shell is wired and the placeholder branches are now the next thing to replace.
+
+## Direct answer
+Those messages are coming from the temporary placeholder code in `FrmRolodexMenu.vb`.
+
+Specifically, you likely still have:
+
+```vb
+Case "B"c
+    MessageBox.Show("Delete Person flow next.")
+Case "C"c
+    MessageBox.Show("Look Up Person flow next.")
+```
+
+and similar placeholder handling.
+
+## Best next step
+Replace `FrmRolodexMenu.vb` with a version that:
+
+- keeps `A` working
+- makes `B` open the shared prompt form in **Delete** mode
+- makes `C` open the shared prompt form in **Lookup** mode
+- keeps `D`, `G`, `H`, `I`, `Z`
+- leaves print/error flows usable as stubs for now
+
+Because your current `RolodexPromptEngine` only really supports Add/Modify, we should also improve that next. But first, we can at least wire `B` and `C` to open the prompt form instead of showing message boxes.
+
+---
+
+# Replace `FrmRolodexMenu.vb` with this
+
+```vb name=FrmRolodexMenu.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 10),
+            .Size = New Size(350, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        }
+
+        lblDate = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(560, 10),
+            .Size = New Size(300, 30),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleRight
+        }
+
+        lblMenu = New Label() With {
+            .AutoSize = False,
+            .Location = New Point(10, 50),
+            .Size = New Size(420, 260),
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        }
+
+        txtInline = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .Location = New Point(10, 320),
+            .Size = New Size(860, 260),
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblMenu)
+        Me.Controls.Add(txtInline)
+
+        AddHandler Me.Load, AddressOf FrmRolodexMenu_Load
+        AddHandler Me.KeyPress, AddressOf FrmRolodexMenu_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexMenu_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        lblMenu.Text =
+            "(A) Add a Person" & Environment.NewLine &
+            "(B) Delete a Person" & Environment.NewLine &
+            "(C) Look up a Person" & Environment.NewLine &
+            "(D) Modify a Person" & Environment.NewLine &
+            "(E) Print Phone Book" & Environment.NewLine &
+            "(F) Print Labels" & Environment.NewLine &
+            "(G) Look up Area Codes" & Environment.NewLine &
+            "(H) Look up Zip Codes" & Environment.NewLine &
+            "(I) Test Entire Rolodex for Errors" & Environment.NewLine &
+            "(Z) Back to Main Menu"
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If HandleInlineInput(e.KeyChar) Then
+            Return
+        End If
+
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+
+            Case "B"c
+                OpenPrompt(RolodexPromptMode.DeletePerson)
+
+            Case "C"c
+                OpenPrompt(RolodexPromptMode.LookupPerson)
+
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+
+            Case "E"c
+                StartPrintPhoneBookFlow()
+
+            Case "F"c
+                StartPrintLabelsFlow()
+
+            Case "G"c
+                OpenAreaCodes()
+
+            Case "H"c
+                OpenZipKey()
+
+            Case "I"c
+                StartErrorCheckFlow()
+
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            If _inlineMode <> RolodexMenuInlineMode.None Then
+                _inlineMode = RolodexMenuInlineMode.None
+                txtInline.Clear()
+                e.SuppressKeyPress = True
+                Return
+            End If
+
+            Me.Close()
+        ElseIf e.KeyCode = Keys.Enter Then
+            If _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running Then
+                txtInline.Text =
+                    "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+                    "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+                    "Done. Returning to menu."
+                _inlineMode = RolodexMenuInlineMode.None
+                e.SuppressKeyPress = True
+                Return
+            End If
+        End If
+    End Sub
+
+    Private Function HandleInlineInput(ch As Char) As Boolean
+        If _inlineMode = RolodexMenuInlineMode.None Then Return False
+
+        Dim up As Char = Char.ToUpperInvariant(ch)
+
+        Select Case _inlineMode
+            Case RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ?"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_HighQuality
+                If up = "Y"c OrElse up = "N"c Then
+                    Dim firstAnswer As String = ""
+                    If txtInline.Text.Contains("customers only (Y/N) ? Yes") Then
+                        firstAnswer = "Yes"
+                    Else
+                        firstAnswer = "No"
+                    End If
+
+                    txtInline.Text =
+                        "E" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & firstAnswer &
+                        Environment.NewLine & Environment.NewLine &
+                        "Do you want High Quality but slow print (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter the 1st letter of the people you want to print (Enter = All) (Esc = Quit)"
+                    _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintPhoneBook_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+
+            Case RolodexMenuInlineMode.PrintLabels_CustomersOnly
+                If up = "Y"c OrElse up = "N"c Then
+                    txtInline.Text =
+                        "F" & Environment.NewLine & Environment.NewLine &
+                        "Do you want to print your customers only (Y/N) ? " & If(up = "Y"c, "Yes", "No") &
+                        Environment.NewLine & Environment.NewLine &
+                        "Enter 1st Letter to start with [Enter = A]"
+                    _inlineMode = RolodexMenuInlineMode.PrintLabels_FirstLetter
+                    Return True
+                End If
+
+            Case RolodexMenuInlineMode.PrintLabels_FirstLetter
+                txtInline.Text &= Environment.NewLine &
+                    "PRINTER IS NOT READY!, Get it ready and hit [ENTER]?"
+                _inlineMode = RolodexMenuInlineMode.None
+                Return True
+        End Select
+
+        Return False
+    End Function
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text =
+            "E" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text =
+            "F" & Environment.NewLine & Environment.NewLine &
+            "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text =
+            "Checking Rolodex for Errors...     [ESC] to Exit" & Environment.NewLine & Environment.NewLine &
+            "Testing the Z's" & Environment.NewLine & Environment.NewLine &
+            "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+
+---
+
+## Important note
+This removes the placeholder message boxes for:
+- `B`
+- `C`
+
+But for those to behave properly, your `RolodexPromptEngine` should also support:
+- Delete prompts
+- Lookup prompts
+
+Right now it probably doesnâ€™t fully do that yet.
+
+So after this file replacement:
+- `B` and `C` should open the prompt form
+- but the prompt contents may still be incomplete/blank unless we fix the engine next
+
+---
+
+# Next file to replace
+The next real step is to upgrade `RolodexPromptEngine.vb` so:
+- `B` = Delete prompt flow
+- `C` = Lookup prompt flow
+- `A` still works
+- `D` still works
+
+If you want, I can generate the **full replacement for `RolodexPromptEngine.vb` next** so `B` and `C` actually show usable DOS-style prompts.
+
+## @testsubject117
+
+yes please
+
+## Copilot
+
+Yes â€” replace `RolodexPromptEngine.vb` with this full version next.
+
+This version adds working prompt text and step flow for:
+
+- `A` Add Person
+- `B` Delete Person
+- `C` Look up Person
+- `D` Modify Person
+
+It is still a scaffold, but it will make `B` and `C` actually display DOS-style prompts instead of blank/incomplete behavior.
+
+```vb name=RolodexPromptEngine.vb
+Public Class RolodexPromptEngine
+    Private ReadOnly _mode As RolodexPromptMode
+    Private _stepIndex As Integer = 0
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = New RolodexPersonRecord With {
+                .PersonName = existingRecord.PersonName,
+                .Street = existingRecord.Street,
+                .City = existingRecord.City,
+                .StateCode = existingRecord.StateCode,
+                .ZipCode = existingRecord.ZipCode,
+                .AreaCode = existingRecord.AreaCode,
+                .PhoneNumber = existingRecord.PhoneNumber,
+                .Misc = existingRecord.Misc,
+                .IsCustomer = existingRecord.IsCustomer
+            }
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case RolodexPromptMode.DeletePerson
+                Return GetDeletePrompt()
+            Case RolodexPromptMode.LookupPerson
+                Return GetLookupPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case RolodexPromptMode.DeletePerson
+                Return SubmitDeleteInput(input)
+            Case RolodexPromptMode.LookupPerson
+                Return SubmitLookupInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return _stepIndex > 8
+            Case RolodexPromptMode.ModifyPerson
+                Return _stepIndex > 8
+            Case RolodexPromptMode.DeletePerson
+                Return _stepIndex > 2
+            Case RolodexPromptMode.LookupPerson
+                Return _stepIndex > 2
+            Case Else
+                Return True
+        End Select
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson, RolodexPromptMode.ModifyPerson, RolodexPromptMode.DeletePerson, RolodexPromptMode.LookupPerson
+                Return WorkingRecord.GetDisplayLines()
+            Case Else
+                Return New List(Of String)
+        End Select
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing] ?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 1 : Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 2 : Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 3 : Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 4 : Return $"Zip Code [ENTER = {WorkingRecord.ZipCode} ] ?"
+            Case 5 : Return $"Area Code [ ENTER = {WorkingRecord.AreaCode} ] ?"
+            Case 6 : Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber} ] ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 8 : Return "Is this correct (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetDeletePrompt() As String
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Delete this Person (Y/N) [Q = Quit] ?"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function GetLookupPrompt() As String
+        Select Case _stepIndex
+            Case 0
+                Return "Enter 1st Part of Whole Name" & Environment.NewLine & Environment.NewLine &
+                       "Person or Company Name [G = Global Search] ?"
+            Case 1
+                Return "Is this the Person you are looking for (Y/N) ?"
+            Case 2
+                Return "[D] to Dial Number" & Environment.NewLine & Environment.NewLine &
+                       "[Shift] and [PrtSc] to Print"
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+
+            Case 2
+                WorkingRecord.City = input.Trim()
+
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+                _stepIndex += 1
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.PersonName = input.Trim()
+
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.City = input.Trim()
+
+            Case 3
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.ZipCode = input.Trim()
+
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.AreaCode = input.Trim()
+
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+
+            Case 7
+                Dim value = input.Trim()
+                If value.ToUpperInvariant() = "A" Then
+                    WorkingRecord.Misc = WorkingRecord.Misc & " "
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+
+            Case 8
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+                _stepIndex += 1
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitDeleteInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Dim search = input.Trim()
+
+                If String.IsNullOrWhiteSpace(search) Then
+                    search = "TEST"
+                End If
+
+                WorkingRecord = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+            Case 1
+                Transcript.Add("")
+                Transcript.Add("Delete this Person (Y/N) [Q = Quit] ? " & input.Trim())
+
+            Case Else
+                Return False
+        End Select
+
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitLookupInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                Dim search = input.Trim()
+
+                If String.IsNullOrWhiteSpace(search) Then
+                    search = "TEST"
+                End If
+
+                WorkingRecord = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+
+                Transcript.Add("Enter 1st Part of Whole Name")
+                Transcript.Add("Person or Company Name [G = Global Search] ? " & input.Trim())
+                Transcript.Add("")
+                For Each line In WorkingRecord.GetDisplayLines()
+                    Transcript.Add(line)
+                Next
+
+            Case 1
+                Transcript.Add("")
+                Transcript.Add("Is this the Person you are looking for (Y/N) ? " & input.Trim())
+
+            Case 2
+                Transcript.Add("")
+                Transcript.Add("[D] to Dial Number")
+                Transcript.Add("")
+                Transcript.Add("[Shift] and [PrtSc] to Print")
+
+            Case Else
+                Return False
+        End Select
+
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts(parts.Length - 1)
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## What this improves
+### `B` Delete Person
+Now opens a DOS-style flow:
+- enter first part of name
+- show record summary
+- ask:
+  - `Delete this Person (Y/N) [Q = Quit] ?`
+
+### `C` Look up Person
+Now opens a DOS-style flow:
+- enter first part of name
+- show record summary
+- ask:
+  - `Is this the Person you are looking for (Y/N) ?`
+- then shows:
+  - `[D] to Dial Number`
+  - `[Shift] and [PrtSc] to Print`
+
+### `A` and `D`
+Still continue to work with the previous scaffold.
+
+---
+
+## Important limitation right now
+This is still using a **hardcoded sample record**:
+- `TEST`
+- `100 MAIN ST.`
+- etc.
+
+So itâ€™s useful for wiring and flow testing, but not yet connected to real Rolodex storage/search.
+
+---
+
+## Best next step after this
+Run and test:
+- `B`
+- `C`
+- `D`
+
+If those open and render reasonably, the next thing Iâ€™d fix is `FrmRolodexPrompt.vb`, because right now it still uses a Windows MessageBox for final review instead of a DOS-style review screen.
+
+If you want, I can generate the next replacement for `FrmRolodexPrompt.vb` so the review/confirm stays inside the DOS-style form instead of popping a modern message box.
+
+## @testsubject117
+
+ok, when I test the behavior here's what I see: Run the app and choose (N): the rolodex main menu appears
+
+## Copilot
+
+Thatâ€™s correct â€” `(N)` should now open the **Rolodex main menu**.
+
+## Expected at this point
+From there, these should happen:
+
+- `A` â†’ opens Add Person prompt flow
+- `B` â†’ opens Delete Person prompt flow
+- `C` â†’ opens Look Up Person prompt flow
+- `D` â†’ opens Modify Person prompt flow
+- `E` â†’ starts inline Print Phone Book prompts
+- `F` â†’ starts inline Print Labels prompts
+- `G` â†’ opens Area Codes paged viewer
+- `H` â†’ opens Zipkey-style popup
+- `I` â†’ starts inline Test Errors flow
+- `Z` or `Esc` â†’ returns to Main Menu
+
+## Go ahead
+Please continue describing **exactly** what happens for each key you test, one by one.
+
+A good format is:
+
+- `A:` what appeared, what you typed, what happened
+- `B:` ...
+- `C:` ...
+- etc.
+
+If something differs from DOS behavior, include:
+- what you expected
+- what the app did instead
+
+Once you paste that, Iâ€™ll tell you exactly what file to change next and give you the replacement code.
+
+## @testsubject117
+
+if I choose (B) Delete a Person I get this screen, but I am unable to type anything, the windows does not accept text input: 
+
+## Copilot
+
+That tells us the prompt form is showing, but the **input textbox is either hidden, too small, off-screen, or not getting focus**.
+
+## Most likely cause
+In the current `FrmRolodexPrompt`, the input box is docked at the bottom and may be visually blending into the black background, or the transcript box is taking focus and swallowing the interaction.
+
+## Direct fix
+Replace `FrmRolodexPrompt.vb` with this improved version. It:
+
+- creates a clearly visible bottom input area
+- adds an input label
+- forces focus into the input textbox
+- restores focus if the form is clicked
+- makes the textbox visibly outlined
+- keeps DOS styling
+
+```vb name=FrmRolodexPrompt.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexPrompt
+    Inherits Form
+
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Private lblTitle As Label
+    Private txtTranscript As TextBox
+    Private pnlInput As Panel
+    Private lblInput As Label
+    Private txtInput As TextBox
+
+    Public Sub New(engine As RolodexPromptEngine)
+        MyBase.New()
+        _engine = engine
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "Rolodex Prompt"
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Height = 40,
+            .Dock = DockStyle.Top,
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold),
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        pnlInput = New Panel() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 42,
+            .BackColor = Color.Black,
+            .Padding = New Padding(8, 8, 8, 8)
+        }
+
+        lblInput = New Label() With {
+            .AutoSize = False,
+            .Dock = DockStyle.Left,
+            .Width = 70,
+            .Text = "Input:",
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TextAlign = ContentAlignment.MiddleLeft
+        }
+
+        txtInput = New TextBox() With {
+            .Dock = DockStyle.Fill,
+            .BorderStyle = BorderStyle.FixedSingle,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .TabIndex = 0
+        }
+
+        pnlInput.Controls.Add(txtInput)
+        pnlInput.Controls.Add(lblInput)
+
+        txtTranscript = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtTranscript)
+        Me.Controls.Add(pnlInput)
+        Me.Controls.Add(lblTitle)
+
+        AddHandler Me.Load, AddressOf FrmRolodexPrompt_Load
+        AddHandler Me.Shown, AddressOf FrmRolodexPrompt_Shown
+        AddHandler Me.Activated, AddressOf FrmRolodexPrompt_Activated
+        AddHandler Me.Click, AddressOf FrmRolodexPrompt_Click
+        AddHandler txtTranscript.Click, AddressOf FrmRolodexPrompt_Click
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshTranscript()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Shown(sender As Object, e As EventArgs)
+        FocusInput()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Activated(sender As Object, e As EventArgs)
+        FocusInput()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Click(sender As Object, e As EventArgs)
+        FocusInput()
+    End Sub
+
+    Private Sub FocusInput()
+        txtInput.Select()
+        txtInput.Focus()
+        txtInput.SelectionStart = txtInput.TextLength
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim value = txtInput.Text
+            txtInput.Clear()
+
+            _engine.SubmitInput(value)
+
+            If _engine.IsComplete() Then
+                ShowReviewAndCloseIfAccepted()
+                Return
+            End If
+
+            RefreshTranscript()
+            FocusInput()
+
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshTranscript()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(prompt)
+        End If
+
+        txtTranscript.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtTranscript.SelectionStart = txtTranscript.TextLength
+        txtTranscript.ScrollToCaret()
+    End Sub
+
+    Private Sub ShowReviewAndCloseIfAccepted()
+        Dim reviewLines = _engine.GetReviewLines()
+        Dim reviewText = String.Join(Environment.NewLine, reviewLines)
+
+        Dim result = MessageBox.Show(
+            reviewText & Environment.NewLine & Environment.NewLine & "Accept this record?",
+            "Rolodex",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        )
+
+        If result = DialogResult.Yes Then
+            Me.DialogResult = DialogResult.OK
+        Else
+            Me.DialogResult = DialogResult.Cancel
+        End If
+
+        Me.Close()
+    End Sub
+End Class
+```
+
+---
+
+## What should change after this
+When you open `B` Delete Person:
+
+- you should now see a visible **Input:** field at the bottom
+- you should be able to type in it immediately
+- pressing Enter should advance the prompt
+
+---
+
+## Why this happened
+The earlier version was too minimal and relied on bottom docking without enough visual clarity. The textbox probably existed, but it wasnâ€™t obvious or wasnâ€™t focused.
+
+---
+
+## One important note
+This is still a temporary WinForms-friendly solution.  
+Later, if you want true DOS parity, we should replace the visible `Input:` box with inline typing behavior directly in the transcript area. But for today, this gets you unblocked.
+
+## Next step
+Replace `FrmRolodexPrompt.vb`, rerun, and test:
+
+- `B`
+- `C`
+- `D`
+
+Then tell me:
+1. whether typing now works
+2. what happens after you press Enter in Delete Person
+
+## @testsubject117
+
+ok, tried that and no, that won't work. you put the text field at the bottom. to match dos flow, the prompt and text field should be right next to the question mark at the end of:  "Person or Company Name [G = Global Search] ? 
+
+## Copilot
+
+Yes â€” youâ€™re right. That bottom input box is wrong for DOS parity.
+
+## Correct direction
+The input must appear **inline at the prompt location**, immediately after the `?`, not in a separate modern field area.
+
+So we should stop using:
+- transcript textbox + bottom textbox
+
+and instead use:
+- a **custom-rendered DOS prompt surface**
+- plus an **inline caret/input buffer**
+
+## Fastest practical fix for today
+The simplest way to get close to DOS behavior quickly is:
+
+1. use a **single multiline textbox** for the whole screen
+2. keep it focused
+3. intercept keystrokes
+4. append typed characters directly into the displayed prompt line
+5. on Enter, submit the current inline buffer and redraw
+
+That gives you:
+- typing visually right after the question mark
+- DOS-like flow
+- no detached input box
+
+---
+
+# Replace `FrmRolodexPrompt.vb` with this version
+
+This version:
+- removes the bottom input field
+- uses one full-screen monospaced textbox
+- lets the user type inline after the prompt
+- handles Backspace, Enter, Escape
+- keeps the DOS look much better
+
+```vb name=FrmRolodexPrompt.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexPrompt
+    Inherits Form
+
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Private lblTitle As Label
+    Private txtScreen As TextBox
+
+    Private _currentInput As String = ""
+
+    Public Sub New(engine As RolodexPromptEngine)
+        MyBase.New()
+        _engine = engine
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "Rolodex Prompt"
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Height = 40,
+            .Dock = DockStyle.Top,
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold),
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical,
+            .TabStop = False
+        }
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(lblTitle)
+
+        AddHandler Me.Load, AddressOf FrmRolodexPrompt_Load
+        AddHandler Me.Shown, AddressOf FrmRolodexPrompt_Shown
+        AddHandler Me.KeyPress, AddressOf FrmRolodexPrompt_KeyPress
+        AddHandler Me.KeyDown, AddressOf FrmRolodexPrompt_KeyDown
+        AddHandler txtScreen.Click, AddressOf RefocusScreen
+        AddHandler Me.Click, AddressOf RefocusScreen
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshScreen()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Shown(sender As Object, e As EventArgs)
+        RefocusScreen(Nothing, EventArgs.Empty)
+    End Sub
+
+    Private Sub RefocusScreen(sender As Object, e As EventArgs)
+        Me.Activate()
+        txtScreen.Focus()
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyPress(sender As Object, e As KeyPressEventArgs)
+        If Char.IsControl(e.KeyChar) Then Return
+
+        _currentInput &= e.KeyChar
+        RefreshScreen()
+        e.Handled = True
+    End Sub
+
+    Private Sub FrmRolodexPrompt_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Back Then
+            If _currentInput.Length > 0 Then
+                _currentInput = _currentInput.Substring(0, _currentInput.Length - 1)
+                RefreshScreen()
+            End If
+            e.SuppressKeyPress = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim submitted = _currentInput
+            _currentInput = ""
+
+            _engine.SubmitInput(submitted)
+
+            If _engine.IsComplete() Then
+                ShowReviewAndCloseIfAccepted()
+                Return
+            End If
+
+            RefreshScreen()
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshScreen()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(AppendInlineInput(prompt, _currentInput))
+        End If
+
+        txtScreen.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtScreen.SelectionStart = txtScreen.TextLength
+        txtScreen.ScrollToCaret()
+    End Sub
+
+    Private Function AppendInlineInput(prompt As String, input As String) As String
+        Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+
+        If parts.Length = 0 Then
+            Return input
+        End If
+
+        parts(parts.Length - 1) &= " " & input
+
+        Return String.Join(Environment.NewLine, parts)
+    End Function
+
+    Private Sub ShowReviewAndCloseIfAccepted()
+        Dim reviewLines = _engine.GetReviewLines()
+        Dim reviewText = String.Join(Environment.NewLine, reviewLines)
+
+        Dim result = MessageBox.Show(
+            reviewText & Environment.NewLine & Environment.NewLine & "Accept this record?",
+            "Rolodex",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        )
+
+        If result = DialogResult.Yes Then
+            Me.DialogResult = DialogResult.OK
+        Else
+            Me.DialogResult = DialogResult.Cancel
+        End If
+
+        Me.Close()
+    End Sub
+End Class
+```
+
+---
+
+## Why this is better
+Now the typed text appears like:
+
+```text
+Person or Company Name [G = Global Search] ? TEST
+```
+
+instead of in a separate field at the bottom.
+
+That matches the DOS interaction style much better.
+
+---
+
+## Important limitation
+This still uses a read-only textbox as a rendering surface, so itâ€™s not a perfect terminal emulator. But visually and behaviorally it is much closer to DOS and is the right fast move for today.
+
+---
+
+## After this change
+Test `B` again.
+
+You should be able to:
+- type directly â€œatâ€ the prompt
+- see characters appear after the question mark
+- press Backspace
+- press Enter to advance
+
+---
+
+## Next thing we should fix after that
+Once inline typing works, the next thing to improve is:
+- removing the modern MessageBox review at the end
+- keeping review/confirm inside the DOS-style screen
+
+But first we need input flow right.
+
+If you want, after you test this, Iâ€™ll generate the next update so:
+- `Delete`
+- `Lookup`
+- `Modify`
+show their confirmation/review inside the same DOS screen instead of a Windows popup.
+
+## @testsubject117
+
+OK, YES THAT IS BETTER. HOWEVER, WHEN i SEARCH FOR MY TEST ENTRY, IT FINDS IT, IF i CHOOSE "N" WHEN ASKED DELETE THIS PERSON (Y/n) [q = QUIT] IF i HIT N, IT DOES NOTHING. IF i HIT N THEN HIT ENTER, IT MOVES THE QUESTION "DELETE THIS PERSON (Y/N) [Q = QUIT] ? N DOWN A LINE BUT THEN i CANNOT HIT N OR Y OR ANYTHING ELSE IT JUST STAYS ON THE SCREEN
+
+## Copilot

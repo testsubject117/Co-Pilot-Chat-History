@@ -1,0 +1,2000 @@
+﻿```
+
+So the form is definitely a designer-generated type, and the constructor is expected to call that method.
+
+---
+
+# Why not remove `InitializeDeleteCheckForm()`?
+Because it may still contain custom setup logic for this form.
+
+So the safe fix is:
+
+1. call `InitializeComponent()`
+2. then call your custom setup method
+
+---
+
+# Important caveat
+Your designer file currently only sets:
+
+- `AutoScaleMode`
+- `ClientSize`
+- `Text`
+
+So `InitializeDeleteCheckForm()` may still be doing almost all the real work.
+
+Thatâ€™s fine. Just call both.
+
+---
+
+# Use this constructor
+```vb
+Public Sub New()
+    MyBase.New()
+    InitializeComponent()
+    InitializeDeleteCheckForm()
+End Sub
+```
+
+---
+
+# Next
+After changing that, rebuild.
+
+If the shared-member error remains, paste that exact message with file + line and Iâ€™ll pinpoint it.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30451	'OtherChkWriter' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormAddOtherCheck.vb	258	
+Error (inactive)	BC30451	'OtherChkWriter' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormDeleteOtherCheck.vb	228	
+Warning (active)	BC42025	Access of shared member, constant member, enum member or nested type through an instance; qualifying expression will not be evaluated.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\My Project\Application.Designer.vb	31	
+
+
+## Copilot
+
+Good â€” youâ€™re basically down to one real error and one harmless warning.
+
+## Direct answer
+
+### Error
+`OtherChkWriter` is not declared because **`OtherChkWriter.vb` is still removed from the project**.
+
+### Warning
+The `BC42025` warning in `My Project\Application.Designer.vb` is usually harmless generated-code noise.
+
+---
+
+# Fix the real error
+You need to re-add `OtherChkWriter.vb` to the project.
+
+## In your `.vbproj`
+remove this line:
+
+```xml
+<Compile Remove="OtherChkWriter.vb" />
+```
+
+If there are no more `<Remove>` lines for:
+- `FormAddOtherCheck.vb`
+- `FormDeleteOtherCheck.vb`
+- `OtherChkWriter.vb`
+
+then that part is done.
+
+---
+
+# Why this is happening
+You already reintroduced forms that reference `OtherChkWriter`, but the writer class itself is still excluded from compile.
+
+Thatâ€™s why these lines now fail:
+- `FormAddOtherCheck.vb` line 258
+- `FormDeleteOtherCheck.vb` line 228
+
+---
+
+# About the warning
+## `BC42025` in `My Project\Application.Designer.vb`
+This warning means generated code is accessing a `Shared` member through an instance, something like:
+
+```vb
+Me.SomeSharedMember
+```
+
+instead of:
+
+```vb
+MyApplication.SomeSharedMember
+```
+
+But since this is in generated `My Project` code, I would **not edit that file manually** unless it blocks compilation.
+
+So for now:
+
+- fix `OtherChkWriter.vb` first
+- ignore the warning unless it becomes an error or causes behavior issues
+
+---
+
+# Next step
+1. re-add `OtherChkWriter.vb`
+2. rebuild
+
+---
+
+# Expected result
+After re-adding `OtherChkWriter.vb`, the `BC30451` error should disappear.
+
+Then you may be at:
+- zero errors
+- maybe just that one warning in generated code
+
+If you want, paste your current `.vbproj` after removing the last `Compile Remove` line and Iâ€™ll verify itâ€™s clean.
+
+## @testsubject117
+
+ok, everything seems to be running now without errors
+
+## Copilot
+
+Excellent â€” that means the project is back to a healthy compile state.
+
+## What fixed it
+The core issue was **not** the 3 new files themselves. It was the old project-wide VB import setup triggering a compiler crash. Then we cleaned up the fallout by:
+
+- removing the problematic project import mechanism
+- fixing missing namespace access in affected files
+- restoring excluded files one by one
+- fixing the `FormDeleteCheck` constructor to call `InitializeComponent()`
+
+---
+
+# Where you are now
+Youâ€™re in a good state:
+- project builds
+- forms compile
+- no Roslyn fatal crash
+- `OtherChkWriter`, `FormAddOtherCheck`, and `FormDeleteOtherCheck` are back in the project
+
+---
+
+# Recommended next move
+Before changing anything else:
+
+## 1. make a backup / commit now
+This is a perfect checkpoint.
+
+If you use git:
+```bash
+git add .
+git commit -m "Fix VB WinForms project compile and restore Other Checks files"
+```
+
+If youâ€™re not using git, make a copy of the whole project folder.
+
+---
+
+## 2. test these specific workflows
+Run and test:
+
+- open main menu
+- open About form
+- open Add Other Check
+- open Delete Other Check
+- any place that calls `OtherChkWriter`
+- any form that used designer/header edits
+
+We want to confirm runtime behavior, not just compile success.
+
+---
+
+## 3. do not hand-edit more designer files unless necessary
+Now that it builds, treat `.Designer.vb` files as fragile.
+
+---
+
+# Important takeaway
+If this project ever starts throwing that Roslyn fatal error again, the first suspect is:
+
+- project-level VB import configuration
+
+not necessarily the most recently added form.
+
+---
+
+# If you want, I can help with one of these next:
+1. **clean up the `.vbproj`** now that itâ€™s stable  
+2. **review `OtherChkWriter` / Add / Delete Other Check flow**  
+3. **help make the current state safer with a minimal checklist**  
+4. **help create a git commit summary/message**
+
+## @testsubject117
+
+lets update git at end of day, push all changes, and possibly even publish for a build change. Right now, from my perspective all of checks is now working and we just need to tweak the dos look and feel. am I right or are there things I missed we need to do first
+
+## Copilot
+
+Yes â€” **youâ€™re basically at the right point** to pause feature/debug work and do a controlled end-of-day wrap-up.
+
+## Short answer
+If:
+
+- the app builds cleanly
+- the main menu opens
+- Add Other Check works
+- Delete Other Check works
+- viewing/searching/check workflows still work
+- no startup/runtime exceptions appear
+
+then you are likely ready to:
+
+1. do a final smoke test  
+2. commit/push  
+3. optionally publish a build
+
+But before publishing, Iâ€™d do a **very short checklist** so you donâ€™t freeze in a hidden regression.
+
+---
+
+# My recommendation
+## Yes, probably ready â€”
+**but do these first before push/publish:**
+
+### 1. Smoke test the exact â€œOther Checksâ€ workflow
+Since that was todayâ€™s changed area, verify:
+
+- open Add Other Check form
+- save a new Other Check
+- verify it appears where expected
+- delete an Other Check
+- verify deletion persisted
+- verify file output / writer behavior if `OtherChkWriter` writes data
+- reopen app and confirm data still looks right
+
+If all of that works, thatâ€™s the biggest proof point.
+
+---
+
+### 2. Smoke test these non-changed but high-risk forms
+Because we touched imports/designer/project config:
+
+- `FormAbout`
+- `FormMainMenu`
+- `FormDeleteCheck`
+- any form you manually edited imports in
+- any startup path using `MyApplication`
+
+This doesnâ€™t need deep testing â€” just open them and confirm they donâ€™t throw.
+
+---
+
+### 3. Confirm publish version behavior
+You mentioned â€œpossibly even publish for a build change.â€
+
+Before publishing, verify:
+- your build counter / version logic still works as expected
+- publish increments the build number the way you expect
+- the published app launches on your machine
+
+Because your project includes custom build number logic in the `.vbproj`, Iâ€™d want one publish dry run before calling it done.
+
+---
+
+# What you may still be missing
+Here are the only likely loose ends Iâ€™d check:
+
+## A. Designer files were manually edited
+That is okay for now, but it means:
+- avoid opening/re-saving forms in designer carelessly until you confirm they stay stable
+- if the designer rewrites them later, recheck behavior
+
+## B. Project config was changed to work around the compiler crash
+That solved the problem, but itâ€™s worth remembering:
+- this was an infrastructure fix, not just a feature fix
+- future form additions should be done carefully
+
+## C. Warning in generated `Application.Designer.vb`
+You had a shared-member warning earlier.  
+If itâ€™s only a warning and app runs correctly, itâ€™s probably safe to leave for now.
+
+I would **not** block todayâ€™s push on that unless itâ€™s still bothering runtime or build quality.
+
+---
+
+# My honest assessment
+## From what youâ€™ve shown:
+You are **past the emergency fix stage**.
+
+You are probably in:
+- **stabilize**
+- **smoke test**
+- **commit**
+- **push**
+- **optional publish**
+
+not in â€œmore code surgery first.â€
+
+So yes â€” your instinct is mostly right.
+
+---
+
+# Suggested end-of-day checklist
+Use this exactly:
+
+## Functional
+- [ ] app builds cleanly
+- [ ] app launches
+- [ ] main menu opens
+- [ ] About form opens
+- [ ] Add Other Check works
+- [ ] Delete Other Check works
+- [ ] Other Check data persists correctly
+- [ ] no obvious runtime exceptions
+
+## Technical
+- [ ] no excluded required files still left out of project
+- [ ] publish completes successfully
+- [ ] published app starts
+- [ ] build/version number looks correct
+
+## Source control
+- [ ] review changed files
+- [ ] commit with a clear message
+- [ ] push to remote
+
+---
+
+# Recommended commit approach
+When you do commit, Iâ€™d use something like:
+
+## Commit message
+```text
+Fix VB WinForms build issues and restore Other Checks workflow
+```
+
+## Optional longer description
+- restore FormAddOtherCheck, FormDeleteOtherCheck, and OtherChkWriter
+- fix designer/import issues causing VB compiler failure
+- fix FormDeleteCheck initialization
+- verify Other Checks flow working again
+
+---
+
+# About the DOS look and feel
+That sounds like a **good next task after this checkpoint**, not before it.
+
+Why:
+- today you fixed stability/build issues
+- styling should be done from a known-good baseline
+- if you change styling before committing, it muddies the recovery point
+
+So I would **commit/push first**, then start the DOS-theme polish work.
+
+---
+
+# My recommendation in one sentence
+**Do one final smoke test of Other Checks + startup forms, then commit/push; publish only after one quick launch test of the published build.**
+
+If you want, I can help you next with either:
+1. a **pre-push checklist**,  
+2. a **git commit/push command sequence**, or  
+3. a **safe plan for the DOS-style UI tweaks**.
+
+## @testsubject117
+
+no, I don't want to do an end of day wrap up now, maybe in an hour or so. right now, I want to finish the checks menu, specifically if you think we're good on all items actually working on the checks menu, then I want to move forward with those items on the checks menu that need to be adjusted so they look and feel more like dos
+
+## Copilot
+
+Yes â€” **based on what weâ€™ve fixed so far, itâ€™s reasonable to move on to DOS-style polish for the Checks menu now**.
+
+## My assessment
+From the evidence youâ€™ve shared:
+
+- the project compiles again
+- the removed check-related files are restored
+- `OtherChkWriter` is back
+- `FormAddOtherCheck` / `FormDeleteOtherCheck` are recognized
+- constructor/designer issues were fixed
+- you said â€œeverything seems to be running now without errorsâ€
+
+So **unless youâ€™re seeing runtime misbehavior in the Checks workflow**, I would treat the Checks menu as functionally good enough to move into UI refinement.
+
+---
+
+# What I would *not* do first
+I would **not** pause now to do git/publish.
+I agree with your instinct there.
+
+---
+
+# What I *would* do now
+Move to **Checks menu DOS-look refinement**, but do it in this order:
+
+## 1. Freeze functionality
+Before changing look/feel, donâ€™t touch logic unless a bug appears.
+
+## 2. Polish only the Checks-related UI
+Focus on:
+- Checks menu form
+- Add/Delete/View check forms
+- button appearance
+- colors
+- fonts
+- spacing
+- borders
+- keyboard feel
+
+## 3. Keep changes reversible
+Do styling in a way that avoids rewriting working logic.
+
+---
+
+# My answer to your main question
+## Yes:
+If the Checks menu items are opening, functioning, saving/deleting/viewing correctly, then it makes sense to proceed with DOS-style adjustments now.
+
+---
+
+# Best next design target
+To make it feel more DOS-like, Iâ€™d focus on these first:
+
+## Visual
+- black or very dark background
+- high-contrast text
+- yellow / white / green / cyan accent colors
+- monospaced font like:
+  - `Consolas`
+  - `Lucida Console`
+  - `Courier New`
+
+## Controls
+- flatter look
+- stronger border visibility
+- tighter layout
+- less modern rounded/soft spacing
+- larger, blocky menu buttons
+
+## Interaction
+- keyboard-first navigation
+- Enter/Esc shortcuts
+- visible focus state
+- consistent tab ordering
+- all-caps labels where appropriate
+
+## Messaging
+- DOS-style headings like:
+  - `CHECKS MENU`
+  - `ADD OTHER CHECK`
+  - `DELETE OTHER CHECK`
+- status text in a terminal-like area if useful
+
+---
+
+# Practical rule
+If you want DOS feel, donâ€™t start by micro-tweaking random controls.
+
+Start with a **theme decision** for the Checks area:
+
+### Option A: amber terminal
+- black background
+- yellow text
+- dark gold accents
+
+### Option B: green-screen
+- black background
+- green text
+- brighter green focus
+
+### Option C: classic DOS menu hybrid
+- black background
+- white text
+- cyan/yellow highlights
+
+For a business app like this, Iâ€™d guess **classic DOS menu hybrid** is best.
+
+---
+
+# Suggested immediate scope
+Iâ€™d target these first:
+1. Checks main menu screen
+2. Add Other Check form
+3. Delete Other Check form
+4. any view/search/list form related to checks
+
+---
+
+# Recommendation
+Before editing, decide whether you want the DOS effect to be:
+
+- **full theme** across checks screens, or
+- **light styling** only on buttons/headers/colors
+
+My suggestion:
+**full theme for Checks area only**, without touching the entire app yet.
+
+---
+
+# Best next step from here
+If you want, send me whichever file controls the Checks menu UI first, and Iâ€™ll help you turn it DOS-style in a controlled way.
+
+Most useful next inputs would be one of these:
+- the checks menu form code
+- a designer file for the checks menu
+- a screenshot of the checks menu
+- or just describe which menu items appear there
+
+Then I can tell you:
+- what to change
+- what colors/fonts to use
+- what exact code to adjust first
+
+## @testsubject117
+
+ok, picking up on the check menu at item (8). when I click (8) it opens a new window for (view) other checks, it appears to be functioning correctly but it looks too much like windows and not enough like dos: 
+
+## Copilot
+
+Yes â€” functionally it looks fine, but visually it still feels like a standard WinForms utility window, not a DOS screen.
+
+## Direct recommendation
+For item **(8) View Other Checks**, the biggest DOS-breakers are:
+
+- white form background
+- standard DataGridView look
+- modern textbox/button styling
+- title bar color mismatch
+- too much â€œdefault Windows control chromeâ€
+
+So the next move should be **styling this form**, not logic changes.
+
+---
+
+# What I would change first
+For this form, aim for:
+
+## Form/theme
+- black background
+- yellow text
+- monospaced font
+- darker panel backgrounds
+- minimal white anywhere
+
+## Search row
+- black/dark background behind controls
+- textbox with black background + yellow/white text
+- button styled dark with yellow/white text
+
+## Grid
+This is the biggest one.
+
+Your grid currently looks very Windows-default:
+- white cells
+- gray headers
+- standard row selection blue
+- default borders
+
+To feel DOS-like, it should be more like:
+- black/dark background
+- yellow, white, or green text
+- dark headers with bright text
+- no blue Windows selection highlight
+- monospaced font
+- strong grid lines
+
+---
+
+# Best DOS style for this form
+Given your main menu already uses:
+- black background
+- yellow text
+- bold DOS-ish heading
+
+Iâ€™d make `View Other Checks` match that.
+
+## Suggested palette
+- **Form background:** black
+- **Panel/header background:** black or very dark gray
+- **Primary text:** yellow
+- **Secondary text:** white
+- **Grid background:** black
+- **Grid header background:** dark gold / dark gray / black
+- **Selected row:** dark yellow-brown highlight with black text, or dark gray with yellow text
+- **Borders:** dim gray
+
+---
+
+# Specific UI changes Iâ€™d recommend
+
+## 1. Form chrome
+Change:
+- form background to black
+- font to `Consolas` or `Lucida Console`
+- title text maybe still â€œOther Checksâ€, but internal label/title should carry the DOS feel more than the native title bar
+
+## 2. Top filter area
+Right now:
+- white background
+- normal textbox
+- normal button
+- normal label
+
+Make it:
+- dark top panel
+- yellow label
+- black textbox with yellow or white text
+- dark button with yellow text and flat border
+
+## 3. Total amount display
+The â€œTotal: $4,202,433.03â€ line should feel like a DOS status readout:
+- yellow text
+- maybe bold monospace
+- no soft/modern spacing
+
+## 4. DataGridView
+This is the biggest transformation.
+
+Suggested styling:
+- `EnableHeadersVisualStyles = False`
+- dark headers
+- custom selection colors
+- cell background black/dark gray
+- foreground yellow/white
+- monospace font
+- no 3D-ish borders
+
+---
+
+# My practical verdict
+## Yes, this is ready for DOS look work.
+I do **not** think you need more functionality work first based on what youâ€™ve shown.
+
+---
+
+# What I need to help you change it properly
+To give you exact code, I need the code for the View Other Checks form.
+
+From your earlier errors, I believe this is probably:
+
+- `FormOtherChecksView.vb`
+
+Please paste either:
+
+1. the full `FormOtherChecksView.vb`, or  
+2. the full `FormOtherChecksView.Designer.vb` if there is one,  
+or both.
+
+Then I can give you:
+- exact DOS-style property changes
+- exact colors/fonts
+- the cleanest way to restyle the grid
+- minimal-risk edits that preserve functionality
+
+---
+
+# My design recommendation in one sentence
+Keep the function exactly as-is, but restyle the form into a **black-background, yellow-text, monospace, custom-grid DOS screen** so it visually matches the Checks menu.
+
+If you want, paste `FormOtherChecksView.vb` next and Iâ€™ll turn it into a DOS-style version.
+
+## @testsubject117
+
+IT LOOKS like whats wired up doesn't match the dos sequence at all. I'm sending you screenshots for (8) View other Checks from the DOS application. We need to review how (8) is wired up in .vb and change it to match the flow and look of dos: 
+
+## Copilot
+
+Youâ€™re right â€” **the current VB implementation of item (8) does not match the DOS flow**. The DOS screenshots show this is **not** supposed to open straight into a Windows-style browse grid. Itâ€™s supposed to be a **prompt-driven sequence** first, then a text-style result display. The screenshots show the DOS program asking for a company filter, then beginning date, then ending date, with `[Q = Quit]` and `[A = All Companys]` behavior before showing records and a total. ![image4](image4) ![image1](image1) ![image3](image3) ![image2](image2)
+
+## Direct recommendation
+For **(8) View Other Checks**, donâ€™t just restyle the current grid.  
+We should first **change the VB flow to match DOS behavior**, then style it.
+
+### DOS flow appears to be:
+1. Show **VIEW OTHER CHECKS** screen/prompt.
+2. Show note:
+   - â€œThis is usually for over payments or checks that are Not paying for invoicesâ€
+3. Prompt:
+   - `Enter All or Part of Company Name [Q = Quit] [A = All Companys]?`
+4. If user enters a company:
+   - prompt for **Beginning Date**
+   - prompt for **Ending Date**
+5. Then show output in a **text/listing style**, not a modern editable grid.
+6. Show total and exit prompt.
+
+So yes: **the wiring is wrong**, not just the look.
+
+---
+
+# What this means for the VB side
+The current VB form seems to be doing something like:
+- open form
+- show textbox
+- show refresh button
+- show DataGridView with all/filtered data immediately
+
+But DOS does:
+- guided prompt sequence
+- date range filtering
+- result listing after input sequence
+
+Thatâ€™s a different UX flow.
+
+---
+
+# What I think we should do
+## For item (8), rebuild the flow to match DOS in 2 stages:
+
+### Stage 1: behavior
+Make the form work like DOS:
+- company prompt
+- beginning date prompt
+- ending date prompt
+- quit/all-company options
+- then result output
+
+### Stage 2: look
+After behavior matches, make it look DOS:
+- black background
+- monospace font
+- white/gray/yellow text
+- text-output style layout
+- maybe a read-only multiline text area or owner-drawn list instead of a grid
+
+---
+
+# My strong recommendation
+For this screen, I would **not** use a standard DataGridView as the primary UX if your goal is DOS fidelity.
+
+A closer match would be:
+- top prompt area
+- staged input controls
+- read-only monospaced results pane
+- black background / white text
+- keyboard-driven flow
+
+You *can* still use a grid internally if needed, but visually the DOS screenshots are much closer to:
+- terminal output
+- fixed-width layout
+- record blocks
+- summary text at bottom
+
+---
+
+# Likely desired VB behavior for item (8)
+Something like:
+
+## Step A
+Form opens with:
+- title/header
+- explanatory line
+- company prompt textbox
+
+## Step B
+If user enters:
+- `Q` â†’ close form
+- `A` â†’ use all companies
+- otherwise use entered partial company
+
+## Step C
+Prompt for:
+- beginning date, default `01-01-1988`
+- ending date, default current date or old DOS default behavior
+
+## Step D
+Query records
+
+## Step E
+Render results in monospaced listing format, e.g.
+```text
+Customer: PSIBEARI           Date: 10-11-2000
+Check #: 67590  Reference: 0977624  Amount: $   26.40
+Reason Why: DEBIT FOR CHECK #66297
+****************************************************************
+...
+TOTAL from 01-01-1988 to 05-20-2026
+for PSIBEARI: $   189.30   End of List [ESC = Exit]
+```
+
+That is much closer to your DOS screenshots. ![image3](image3)
+
+---
+
+# So: are you right?
+## Yes.
+You are right that:
+- the current WinForms screen is not just â€œtoo Windowsâ€
+- it is also **wired differently from DOS**
+- we should review how item `(8)` is launched and what `FormOtherChecksView` actually does
+
+---
+
+# Best next step
+Please paste the code for whichever files control item **(8)**.
+
+Most likely these are:
+- `FormChecksMenu.vb` or wherever menu item `(8)` is handled
+- `FormOtherChecksView.vb`
+- `FormOtherChecksView.Designer.vb` if it exists
+
+If you want the fastest path, paste these two first:
+
+1. the menu click handler for `(8)`
+2. the full `FormOtherChecksView.vb`
+
+Then I can tell you exactly:
+- how itâ€™s wired now
+- what needs to change to match DOS flow
+- whether to keep the current form or split it into prompt form + results form
+- what exact code structure I recommend next
+
+If you want, send `FormOtherChecksView.vb` now and Iâ€™ll review the wiring against the DOS screenshots.
+
+## @testsubject117
+
+FormLedgerMenu.vb is the main checks window button layout, correct? that means the checks menu is not in that file but another one.
+
+## Copilot
+
+Probably yes â€” **`FormLedgerMenu.vb` sounds like the main Checks menu window**, but the code for item **(8) View Other Checks** may be split across more than one file.
+
+## Direct answer
+If `FormLedgerMenu.vb` is the window that shows the numbered Checks menu buttons, then:
+
+- **yes**, it likely contains the button layout and click handlers for the Checks menu
+- **but no**, it probably does **not** contain all the actual item-(8) logic
+
+Most likely it only does something like:
+```vb
+Dim frm As New FormOtherChecksView()
+frm.ShowDialog()
+```
+
+Then the real behavior for `(8)` lives in:
+- `FormOtherChecksView.vb`
+- maybe its designer file
+- possibly helper/data-loading code too
+
+---
+
+# So the likely split is
+
+## `FormLedgerMenu.vb`
+Contains:
+- Checks menu button layout
+- menu numbering
+- click handlers
+- routing to the forms for each option
+
+## `FormOtherChecksView.vb`
+Contains:
+- what happens when `(8)` opens
+- filtering logic
+- search input behavior
+- data loading
+- result rendering
+
+---
+
+# So your statement is basically right
+Youâ€™re saying:
+
+> that means the checks menu is not in that file but another one.
+
+More precisely:
+
+- the **menu shell** may be in `FormLedgerMenu.vb`
+- the **actual View Other Checks workflow** is probably in another file
+
+So if we want to fix how `(8)` behaves, the most important file is probably **not** `FormLedgerMenu.vb`, except for the click handler.
+
+---
+
+# What Iâ€™d inspect first
+To match DOS flow for `(8)`, I want to see:
+
+1. the click handler in the Checks menu file
+2. the form/code that opens for View Other Checks
+
+So the most useful files are probably:
+
+- `FormLedgerMenu.vb` â€” only to identify which button launches `(8)`
+- `FormOtherChecksView.vb` â€” probably where the real mismatch is
+
+---
+
+# Practical next step
+If you want the fastest path, paste:
+
+## from the menu file:
+the code for the `(8)` button click handler
+
+and
+
+## from the other file:
+the full `FormOtherChecksView.vb`
+
+That will let me tell you whether:
+- we just need to rewrite `FormOtherChecksView`
+- or whether item `(8)` is actually routed to the wrong form entirely
+
+---
+
+# Short version
+- **Yes**, `FormLedgerMenu.vb` is probably the menu shell.
+- **No**, the actual DOS mismatch for item `(8)` is probably in the form it launches, not in the menu file itself.
+
+If you want, paste the `(8)` click handler next.
+
+## @testsubject117
+
+no, other checks is defined as just that, other checks. that would not be the correct file. 
+
+## Copilot
+
+Youâ€™re right â€” if the DOS menu item is specifically **â€œView Other Checksâ€**, then we should follow the **Other Checks** naming, not assume it lives under â€œLedger.â€
+
+## Direct answer
+So no, `FormLedgerMenu.vb` is probably **not** the right file to focus on for this itemâ€™s behavior.
+
+If your naming is consistent, then the relevant code is more likely in files such as:
+
+- `FormOtherChecksView.vb`
+- some â€œOther Checksâ€ menu/launcher file
+- maybe a main menu handler that routes option `(8)` to the Other Checks view
+
+---
+
+# Why I agree with you
+â€œLedgerâ€ and â€œOther Checksâ€ are different concepts in your app.
+
+So if DOS item `(8)` is:
+- **View Other Checks**
+
+then the VB code for its behavior should likely be in:
+- an **Other Checks** form
+- not a ledger-specific one
+
+The earlier assumption was only based on your screenshot where CHECKS was visible, but your naming convention matters more than that.
+
+---
+
+# What we actually need now
+We need to identify **which file launches item (8)** and **which file renders the Other Checks flow**.
+
+Most likely:
+- one file contains the menu button
+- `FormOtherChecksView.vb` contains the current Windows-style browse view
+
+And based on your DOS screenshots, that current view is probably the thing we need to redesign.
+
+---
+
+# Best next step
+Please paste either:
+
+1. the code that opens the â€œView Other Checksâ€ screen, or  
+2. the full `FormOtherChecksView.vb`
+
+Because if â€œOther Checks is defined as just that,â€ then `FormOtherChecksView.vb` is still the strongest candidate for the current implementation that needs to be changed.
+
+---
+
+# What I suspect
+I suspect:
+- the current item `(8)` opens `FormOtherChecksView`
+- that form currently shows a filter textbox + grid
+- but DOS expects a prompt-driven sequence with date range and text-style output
+
+If thatâ€™s true, then `FormOtherChecksView.vb` is exactly the file we should change â€” even if the menu itself is launched elsewhere.
+
+---
+
+# Short version
+Youâ€™re correct:
+- donâ€™t chase `Ledger` just because itâ€™s a checks-related screen
+- follow the **Other Checks** forms/files instead
+
+So the next file I want is:
+**`FormOtherChecksView.vb`**
+
+Paste that and Iâ€™ll map it against the DOS screenshots.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormOtherChecksView
+
+    Private Const ScreenTitle As String = "Other Checks"
+
+    Private ReadOnly txtCompany As New TextBox()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+
+    Private _all As New List(Of OtherCheckEntry)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1100
+        Height = 750
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 45}
+        top.Controls.Add(New Label() With {.Text = "Company contains:", .AutoSize = True, .Padding = New Padding(0, 10, 0, 0)})
+
+        txtCompany.Width = 250
+        top.Controls.Add(txtCompany)
+
+        btnRefresh.Text = "Refresh"
+        top.Controls.Add(btnRefresh)
+
+        lblTotal.AutoSize = True
+        lblTotal.Padding = New Padding(20, 10, 0, 0)
+        top.Controls.Add(lblTotal)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AutoGenerateColumns = True
+
+        Controls.Add(dgv)
+        Controls.Add(top)
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+                ApplyFilter()
+            End Sub
+        AddHandler txtCompany.TextChanged, Sub() ApplyFilter()
+
+        LoadData()
+        ApplyFilter()
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.OtherChk
+
+        ' Clear current view so we don't show stale rows if load fails.
+        _all = New List(Of OtherCheckEntry)()
+        dgv.DataSource = Nothing
+        lblTotal.Text = "Total: $0.00"
+
+        If Not System.IO.File.Exists(path) Then
+            lblTotal.Text = "OTHER.CHK was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+            Return
+        End If
+
+        Try
+            _all = OtherChkReader.ReadAll(path)
+        Catch ex As Exception
+            _all = New List(Of OtherCheckEntry)()
+            lblTotal.Text = "Unable to read OTHER.CHK from: " & path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub ApplyFilter()
+        Dim s = txtCompany.Text.Trim()
+        Dim q = _all.AsEnumerable()
+
+        If s <> "" Then
+            q = q.Where(Function(x) If(x.Company, "").IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        Dim list = q.ToList()
+        dgv.DataSource = list
+
+        Dim total As Decimal = list.Sum(Function(x) x.Amount)
+        lblTotal.Text = $"Total: {total:C}"
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” this confirms it.  
+`FormOtherChecksView.vb` is currently wired as a **simple filter + grid browser**, and that does **not** match the DOS workflow.
+
+## Direct answer
+This file should be changed.
+
+Right now it does:
+- load all records on form load
+- show a textbox for company filter
+- refresh button
+- live filter on text change
+- show results in a `DataGridView`
+
+That is a modern browse screen, not the DOS sequence.
+
+---
+
+# What the current file is doing wrong relative to DOS
+
+## Current VB behavior
+On load:
+- builds a top panel
+- shows `Company contains:`
+- lets user type freely
+- loads all records immediately
+- filters with `TextChanged`
+- shows grid
+- shows total
+
+## DOS behavior from your screenshots
+On open:
+- show DOS header and explanatory text
+- prompt for company name or:
+  - `Q = Quit`
+  - `A = All Companys`
+- then prompt:
+  - beginning date
+  - ending date
+- then display a text-style report/listing
+- likely exit on ESC / key prompt
+
+So the mismatch is **both UI and flow**.
+
+---
+
+# Recommendation
+## We should replace this formâ€™s current behavior with a DOS-sequence form.
+
+Not just recolor it.
+
+---
+
+# What I would change in this file
+## Remove this current pattern:
+- `txtCompany`
+- `btnRefresh`
+- `dgv`
+- live filtering on `TextChanged`
+- immediate data dump on open
+
+## Replace with:
+A staged DOS-style interaction:
+
+### Input stage
+Controls for:
+- company input
+- beginning date input
+- ending date input
+- maybe buttons:
+  - View
+  - Quit
+  - All Companies
+
+### Output stage
+A read-only monospaced area, probably:
+- `RichTextBox` or multiline `TextBox`
+- black background
+- white/light text
+- fixed-width formatting
+
+This would let us mimic the DOS listing much more faithfully than a grid.
+
+---
+
+# What the DOS-equivalent WinForms structure should probably be
+
+## Top section
+- label: `***** VIEW OTHER CHECKS *****`
+- explanatory line
+- company prompt
+- beginning date prompt
+- ending date prompt
+- action buttons or Enter-driven flow
+
+## Main output area
+- multiline read-only text area showing records like:
+
+```text
+Customer: PSIBEARI               Date: 10-11-2000
+Check #: 67590   Reference: 0977624   Amount: $    26.40
+Reason Why: DEBIT FOR CHECK #66297
+****************************************************************
+Customer: PSIBEARI               Date: 09-27-2001
+Check #: 14280   Reference: 12356-05850   Amount: $   162.90
+Reason Why: INV# 3292 PAYBACK C.O.D
+****************************************************************
+TOTAL from 01-01-1988 to 05-20-2026
+for PSIBEARI: $   189.30   End of List [ESC = Exit]
+```
+
+That matches your screenshots much more closely.
+
+---
+
+# Specific code-level diagnosis of the current file
+
+## These are the DOS-breaking lines/concepts:
+```vb
+Private ReadOnly txtCompany As New TextBox()
+Private ReadOnly btnRefresh As New Button()
+Private ReadOnly dgv As New DataGridView()
+Private ReadOnly lblTotal As New Label()
+```
+
+and:
+
+```vb
+AddHandler txtCompany.TextChanged, Sub() ApplyFilter()
+```
+
+and:
+
+```vb
+dgv.DataSource = list
+```
+
+Those three choices define the whole modern Windows behavior.
+
+---
+
+# New structure I recommend
+## Keep:
+- loading from `LegacyDataPaths.OtherChk`
+- `OtherChkReader.ReadAll(path)`
+- total calculation logic
+- file error handling via `UiFileErrors`
+
+## Replace:
+- UI controls
+- filtering workflow
+- output rendering
+
+---
+
+# Suggested redesign of `FormOtherChecksView`
+I would convert it to something like this:
+
+## Fields
+- `txtCompany`
+- `txtBeginDate`
+- `txtEndDate`
+- `btnView`
+- `btnQuit`
+- `rtbOutput`
+
+## Behavior
+### On load:
+- set DOS colors/fonts
+- load all data once
+- focus company textbox
+
+### On View:
+1. read company entry
+2. handle:
+   - `Q` â†’ close
+   - `A` â†’ all companies
+3. parse dates
+4. filter by company + date range
+5. render output as monospaced text
+
+### On ESC:
+- close form
+
+---
+
+# Important question
+To filter by date correctly, I need to know what `OtherCheckEntry` looks like â€” especially the date field type.
+
+Your grid currently shows `DateText`, which suggests date handling may still be string-based.
+
+So before I generate the replacement file, I need to see:
+
+## please paste:
+- `OtherCheckEntry` class/structure
+- and if possible `OtherChkReader.ReadAll(...)`
+
+Because I need to know:
+- what property holds the date
+- whether itâ€™s already parsed as `Date`
+- or whether we need to parse `MM-dd-yyyy` ourselves
+
+---
+
+# My conclusion
+## You were exactly right:
+This isnâ€™t just a styling problem.  
+The current `FormOtherChecksView.vb` is wired for a different workflow than DOS.
+
+So the right next move is:
+1. rewrite this form to match DOS prompt flow
+2. then style it to look DOS
+
+---
+
+# Next step
+Paste:
+- `OtherCheckEntry`
+- `OtherChkReader`
+
+and Iâ€™ll generate a DOS-style replacement for `FormOtherChecksView.vb` that matches the screenshots much more closely.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class OtherChkReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of OtherCheckEntry)
+        Dim results As New List(Of OtherCheckEntry)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim lines As New List(Of String)(rawLines.Length)
+
+        For Each raw In rawLines
+            If raw Is Nothing Then Continue For
+
+            ' Remove DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+            If s = "" Then Continue For
+
+            lines.Add(s)
+        Next
+
+        Dim i As Integer = 0
+        While i + 5 < lines.Count
+            results.Add(New OtherCheckEntry With {
+                .Company = Unquote(lines(i)),
+                .DateText = Unquote(lines(i + 1)),
+                .CheckNumber = Unquote(lines(i + 2)),
+                .Amount = ParseDecimal(lines(i + 3)),
+                .Reference = Unquote(lines(i + 4)),
+                .ReasonWhy = Unquote(lines(i + 5))
+            })
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            Return s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class OtherCheckEntry
+    Public Property Company As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+    Public Property ReasonWhy As String
+End Class
+```
+
+## Copilot
+
+Yes â€” now we have enough to redesign item **(8)** properly.
+
+## Direct answer
+`FormOtherChecksView.vb` should be rewritten to match the DOS flow.
+
+Because `OtherCheckEntry` only has `DateText As String`, weâ€™ll parse the date from that text during filtering. Your data appears to be in `MM-dd-yyyy` format based on the screenshots and current grid.
+
+---
+
+# What I recommend
+Replace the current grid-based browser with a DOS-style prompt/results form that:
+
+- loads `OTHER.CHK`
+- prompts for:
+  - company name
+  - beginning date
+  - ending date
+- supports:
+  - `Q` = quit
+  - `A` = all companies
+- renders results into a monospaced read-only text area
+- looks like DOS:
+  - black background
+  - white/light gray text
+  - monospace font
+
+---
+
+# Important note
+This replacement changes behavior significantly:
+- removes the `DataGridView`
+- removes live filtering
+- changes the screen to DOS-style prompt/report output
+
+That is intentional, because your screenshots show the current implementation is conceptually wrong for item `(8)`.
+
+---
+
+# Full replacement for `FormOtherChecksView.vb`
+
+```vb name=FormOtherChecksView.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormOtherChecksView
+
+    Private Const ScreenTitle As String = "VIEW OTHER CHECKS"
+    Private Const DefaultBeginDateText As String = "01-01-1988"
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblInfo As New Label()
+    Private ReadOnly lblCompany As New Label()
+    Private ReadOnly txtCompany As New TextBox()
+    Private ReadOnly lblBeginDate As New Label()
+    Private ReadOnly txtBeginDate As New TextBox()
+    Private ReadOnly lblEndDate As New Label()
+    Private ReadOnly txtEndDate As New TextBox()
+    Private ReadOnly btnView As New Button()
+    Private ReadOnly btnQuit As New Button()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of OtherCheckEntry)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtCompany.Focus()
+        txtCompany.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Me.Text = "Other Checks"
+        Me.Width = 1100
+        Me.Height = 760
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.Gainsboro
+        Me.KeyPreview = True
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Dim topPanel As New Panel() With {
+            .Dock = DockStyle.Top,
+            .Height = 175,
+            .BackColor = Color.Black
+        }
+
+        lblTitle.AutoSize = False
+        lblTitle.Left = 12
+        lblTitle.Top = 10
+        lblTitle.Width = 700
+        lblTitle.Height = 28
+        lblTitle.ForeColor = Color.Gainsboro
+        lblTitle.BackColor = Color.Black
+        lblTitle.Font = New Font("Consolas", 14.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblTitle.Text = "***** VIEW OTHER CHECKS *****"
+
+        lblInfo.AutoSize = False
+        lblInfo.Left = 12
+        lblInfo.Top = 45
+        lblInfo.Width = 1040
+        lblInfo.Height = 22
+        lblInfo.ForeColor = Color.Black
+        lblInfo.BackColor = Color.Silver
+        lblInfo.Font = New Font("Consolas", 10.5F, FontStyle.Regular, GraphicsUnit.Point)
+        lblInfo.Text = "This is usually for over payments or checks that are Not paying for invoices"
+
+        lblCompany.AutoSize = False
+        lblCompany.Left = 12
+        lblCompany.Top = 85
+        lblCompany.Width = 520
+        lblCompany.Height = 24
+        lblCompany.ForeColor = Color.Gainsboro
+        lblCompany.BackColor = Color.Black
+        lblCompany.Text = "Enter All or Part of Company Name [Q = Quit] [A = All Companys]?"
+
+        txtCompany.Left = 540
+        txtCompany.Top = 82
+        txtCompany.Width = 250
+        txtCompany.BorderStyle = BorderStyle.FixedSingle
+        txtCompany.BackColor = Color.Black
+        txtCompany.ForeColor = Color.Gainsboro
+        txtCompany.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblBeginDate.AutoSize = False
+        lblBeginDate.Left = 12
+        lblBeginDate.Top = 118
+        lblBeginDate.Width = 300
+        lblBeginDate.Height = 24
+        lblBeginDate.ForeColor = Color.Gainsboro
+        lblBeginDate.BackColor = Color.Black
+        lblBeginDate.Text = "BEGINNING DATE [1 = 01-01-1988] ?"
+
+        txtBeginDate.Left = 320
+        txtBeginDate.Top = 115
+        txtBeginDate.Width = 120
+        txtBeginDate.BorderStyle = BorderStyle.FixedSingle
+        txtBeginDate.BackColor = Color.Black
+        txtBeginDate.ForeColor = Color.Gainsboro
+        txtBeginDate.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtBeginDate.Text = DefaultBeginDateText
+
+        lblEndDate.AutoSize = False
+        lblEndDate.Left = 470
+        lblEndDate.Top = 118
+        lblEndDate.Width = 260
+        lblEndDate.Height = 24
+        lblEndDate.ForeColor = Color.Gainsboro
+        lblEndDate.BackColor = Color.Black
+        lblEndDate.Text = "ENDING DATE ?"
+
+        txtEndDate.Left = 735
+        txtEndDate.Top = 115
+        txtEndDate.Width = 120
+        txtEndDate.BorderStyle = BorderStyle.FixedSingle
+        txtEndDate.BackColor = Color.Black
+        txtEndDate.ForeColor = Color.Gainsboro
+        txtEndDate.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtEndDate.Text = Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture)
+
+        btnView.Left = 880
+        btnView.Top = 82
+        btnView.Width = 90
+        btnView.Height = 28
+        btnView.Text = "View"
+        btnView.FlatStyle = FlatStyle.Flat
+        btnView.BackColor = Color.Black
+        btnView.ForeColor = Color.Gainsboro
+        btnView.FlatAppearance.BorderColor = Color.Gainsboro
+        btnView.FlatAppearance.BorderSize = 1
+
+        btnQuit.Left = 880
+        btnQuit.Top = 115
+        btnQuit.Width = 90
+        btnQuit.Height = 28
+        btnQuit.Text = "Quit"
+        btnQuit.FlatStyle = FlatStyle.Flat
+        btnQuit.BackColor = Color.Black
+        btnQuit.ForeColor = Color.Gainsboro
+        btnQuit.FlatAppearance.BorderColor = Color.Gainsboro
+        btnQuit.FlatAppearance.BorderSize = 1
+
+        topPanel.Controls.Add(lblTitle)
+        topPanel.Controls.Add(lblInfo)
+        topPanel.Controls.Add(lblCompany)
+        topPanel.Controls.Add(txtCompany)
+        topPanel.Controls.Add(lblBeginDate)
+        topPanel.Controls.Add(txtBeginDate)
+        topPanel.Controls.Add(lblEndDate)
+        topPanel.Controls.Add(txtEndDate)
+        topPanel.Controls.Add(btnView)
+        topPanel.Controls.Add(btnQuit)
+
+        txtOutput.Dock = DockStyle.Fill
+        txtOutput.Multiline = True
+        txtOutput.ScrollBars = ScrollBars.Vertical
+        txtOutput.ReadOnly = True
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+        txtOutput.WordWrap = False
+
+        Controls.Add(txtOutput)
+        Controls.Add(topPanel)
+
+        AddHandler btnView.Click, AddressOf ViewOtherChecks
+        AddHandler btnQuit.Click, Sub() Me.Close()
+
+        AddHandler txtCompany.KeyDown, AddressOf Input_KeyDown
+        AddHandler txtBeginDate.KeyDown, AddressOf Input_KeyDown
+        AddHandler txtEndDate.KeyDown, AddressOf Input_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        If keyData = Keys.F5 Then
+            ViewOtherChecks(Me, EventArgs.Empty)
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub Input_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            ViewOtherChecks(Me, EventArgs.Empty)
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.OtherChk
+
+        _all = New List(Of OtherCheckEntry)()
+        txtOutput.Clear()
+
+        If Not System.IO.File.Exists(path) Then
+            txtOutput.Text = "OTHER.CHK was not found at: " & path
+            UiFileErrors.ShowMissingRequiredFile(Me, "Other Checks", path)
+            Return
+        End If
+
+        Try
+            _all = OtherChkReader.ReadAll(path)
+        Catch ex As Exception
+            _all = New List(Of OtherCheckEntry)()
+            txtOutput.Text = "Unable to read OTHER.CHK from: " & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, "Other Checks", path, ex)
+        End Try
+    End Sub
+
+    Private Sub ViewOtherChecks(sender As Object, e As EventArgs)
+        Dim companyInput As String = txtCompany.Text.Trim()
+
+        If String.Equals(companyInput, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Me.Close()
+            Return
+        End If
+
+        Dim includeAllCompanies As Boolean = String.Equals(companyInput, "A", StringComparison.OrdinalIgnoreCase)
+        Dim companyCaption As String = If(includeAllCompanies OrElse companyInput = "", "ALL COMPANYS", companyInput.ToUpperInvariant())
+
+        Dim beginDate As Date
+        If Not TryParseDosDateInput(txtBeginDate.Text.Trim(), DefaultBeginDateText, beginDate) Then
+            MessageBox.Show(Me, "Beginning date must be in MM-dd-yyyy format, or enter 1 for 01-01-1988.", "Invalid Beginning Date", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtBeginDate.Focus()
+            txtBeginDate.SelectAll()
+            Return
+        End If
+
+        Dim endDate As Date
+        If Not TryParseDosDateInput(txtEndDate.Text.Trim(), Date.Today.ToString("MM-dd-yyyy", CultureInfo.InvariantCulture), endDate) Then
+            MessageBox.Show(Me, "Ending date must be in MM-dd-yyyy format.", "Invalid Ending Date", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            txtEndDate.Focus()
+            txtEndDate.SelectAll()
+            Return
+        End If
+
+        Dim filtered = _all.
+            Where(Function(x) MatchesCompany(x, companyInput, includeAllCompanies)).
+            Select(Function(x) New With {
+                .Entry = x,
+                .ParsedDate = ParseEntryDate(x.DateText)
+            }).
+            Where(Function(x) x.ParsedDate.HasValue AndAlso x.ParsedDate.Value.Date >= beginDate.Date AndAlso x.ParsedDate.Value.Date <= endDate.Date).
+            OrderBy(Function(x) x.ParsedDate.Value).
+            ThenBy(Function(x) If(x.Entry.Company, "")).
+            ThenBy(Function(x) If(x.Entry.CheckNumber, "")).
+            ToList()
+
+        Dim sb As New StringBuilder()
+
+        If filtered.Count = 0 Then
+            sb.AppendLine("***** VIEW OTHER CHECKS *****")
+            sb.AppendLine()
+            sb.AppendLine("No records matched the requested criteria.")
+            sb.AppendLine()
+            sb.AppendLine($"TOTAL from {beginDate:MM-dd-yyyy} to {endDate:MM-dd-yyyy}")
+            sb.AppendLine($"for {companyCaption}: $      0.00   End of List [ESC = Exit]")
+            txtOutput.Text = sb.ToString()
+            Return
+        End If
+
+        For Each item In filtered
+            Dim x = item.Entry
+
+            sb.AppendLine($"Customer: {PadRightSafe(x.Company, 28)}Date: {item.ParsedDate.Value:MM-dd-yyyy}")
+            sb.AppendLine($"Check #: {PadRightSafe(x.CheckNumber, 10)}  Reference: {PadRightSafe(x.Reference, 12)}  Amount: $ {x.Amount,8:N2}")
+            sb.AppendLine($"Reason Why: {If(x.ReasonWhy, "")}")
+            sb.AppendLine(New String("*"c, 88))
+        Next
+
+        Dim total As Decimal = filtered.Sum(Function(x) x.Entry.Amount)
+
+        sb.AppendLine($"TOTAL from {beginDate:MM-dd-yyyy} to {endDate:MM-dd-yyyy}")
+        sb.AppendLine($"for {companyCaption}: $ {total,8:N2}   End of List [ESC = Exit]")
+
+        txtOutput.Text = sb.ToString()
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function MatchesCompany(entry As OtherCheckEntry, companyInput As String, includeAllCompanies As Boolean) As Boolean
+        If includeAllCompanies Then Return True
+
+        Dim s As String = companyInput.Trim()
+        If s = "" Then Return True
+
+        Return If(entry.Company, "").IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Function TryParseDosDateInput(value As String, defaultValue As String, ByRef result As Date) As Boolean
+        Dim textToParse As String = value
+
+        If textToParse = "" Then
+            textToParse = defaultValue
+        ElseIf textToParse = "1" Then
+            textToParse = DefaultBeginDateText
+        End If
+
+        Return Date.TryParseExact(
+            textToParse,
+            "MM-dd-yyyy",
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            result)
+    End Function
+
+    Private Function ParseEntryDate(value As String) As Date?
+        Dim d As Date
+
+        If Date.TryParseExact(value,
+                              "MM-dd-yyyy",
+                              CultureInfo.InvariantCulture,
+                              DateTimeStyles.None,
+                              d) Then
+            Return d
+        End If
+
+        Return Nothing
+    End Function
+
+    Private Function PadRightSafe(value As String, width As Integer) As String
+        Dim s As String = If(value, "")
+        If s.Length >= width Then
+            Return s.Substring(0, width)
+        End If
+
+        Return s.PadRight(width)
+    End Function
+
+End Class
+```
+
+---
+
+# What this does
+## Behavior
+- no immediate grid dump
+- user enters company / `Q` / `A`
+- user enters date range
+- click **View** or press **Enter**
+- output appears in DOS-style text block
+- `Esc` exits
+
+## Look
+- black background
+- monospace font
+- DOS-like labels and output
+- no Windows-style `DataGridView`
+
+---
+
+# What may still need slight adjustment
+## 1. â€œAll Companysâ€ spelling
+I kept `Companys` in the prompt/output because the DOS screenshot shows that exact spelling. If you want historical fidelity, keep it.
+
+## 2. Date default
+I used:
+- beginning default = `01-01-1988`
+- ending default = `today`
+
+If DOS strictly uses another default ending date, we can change it.
+
+## 3. Output spacing
+Once you test with real data, we may want to tweak:
+- column widths
+- number spacing
+- separator line length
+
+Thatâ€™s normal.
+
+---
+
+# Important next step
+Before replacing the file, make a copy of the current version.
+
+Then test:
+- company exact/partial search
+- `A`
+- `Q`
+- blank company
+- begin/end dates
+- ESC to close
+
+---
+
+# My view
+This is much closer to the DOS screenshots than the current grid browser.
+
+If you want, next I can help you:
+1. refine this further to match the screenshots even more closely, or  
+2. wire the menu text/title so item `(8)` launches this in a DOS-consistent way.
+
+## @testsubject117
+
+that's beautiful.
+
+## Copilot
+
+Thanks â€” and yes, this is the right direction.
+
+## Direct recommendation
+The next thing to do is **drop that replacement in and test the actual flow**, because this is no longer just a cosmetic tweak â€” it changes item `(8)` to behave much closer to DOS.
+
+---
+
+# What to test right away
+After you paste it in, test these exact cases:
+
+### company prompt
+- partial company name
+- exact company name
+- blank company
+- `A`
+- `Q`
+
+### dates
+- blank beginning date
+- `1` for beginning date
+- valid ending date
+- invalid date entry
+
+### results
+- records appear in date order
+- totals match expected
+- no matches case looks clean
+- `Esc` exits
+
+---
+
+# What I expect may need minor tuning
+Probably just formatting polish:
+- spacing between `Customer:` and `Date:`
+- width of `Reference`
+- amount alignment
+- separator length
+- maybe whether blank company should mean all companies or require explicit `A`
+
+Those are easy follow-up tweaks.
+
+---
+
+# Best workflow now
+1. replace `FormOtherChecksView.vb`
+2. compile
+3. run item `(8)`
+4. compare to DOS screenshots
+5. tell me what feels off
+
+---
+
+# Likely next refinement after test
+Once it runs, I can help you tighten it further to match DOS exactly, for example:
+- make the output area start empty until search
+- hide buttons and make it more keyboard-only
+- mimic DOS prompt spacing more precisely
+- use brighter white/gray text
+- make title/header align closer to the screenshots
+
+---
+
+# Short version
+Yes â€” this is the correct direction.  
+Now the job is to **test and tune**.
+
+When you run it, send me:
+- what works
+- what looks off
+- any compile/runtime errors
+
+and Iâ€™ll help you refine it quickly.
+
+## @testsubject117
+
+blank should mean all companys
+
+## Copilot
+
+Yes â€” that makes sense, and itâ€™s also closer to classic DOS behavior.
+
+## Direct answer
+With the code I gave you, **blank already behaves as all companies**.
+
+That happens here:
+
+```vb
+Dim companyCaption As String = If(includeAllCompanies OrElse companyInput = "", "ALL COMPANYS", companyInput.ToUpperInvariant())
+```
+
+and here:
+
+```vb
+If s = "" Then Return True
+```
+
+So:
+
+- blank input = all companies
+- `A` = all companies
+- `Q` = quit
+
+---
+
+# So behavior is currently:
+- `Q` â†’ close form
+- `A` â†’ all companies
+- blank â†’ all companies
+- anything else â†’ partial company match
+
+---
+
+# If you want DOS wording to reflect that more clearly
+You could leave the prompt as-is for strict DOS fidelity:
+
+```vb
+"Enter All or Part of Company Name [Q = Quit] [A = All Companys]?"
+```
+
+or slightly adjust it to hint that blank is also acceptable, like:
+
+```vb
+"Enter All or Part of Company Name [Blank/A = All Companys] [Q = Quit]?"
+```
+
+But if your goal is matching DOS exactly, Iâ€™d keep the original wording and just preserve the behavior silently.
+
+---
+
+# My recommendation
+Keep it exactly this way:
+
+- blank = all companies
+- `A` = all companies
+- `Q` = quit
+

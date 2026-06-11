@@ -1,0 +1,2000 @@
+﻿
+    Write-Info "Copied extracted reviewable files to repo folder"
+}
+
+$summaryPath = Build-ExecutiveSummaryFile -Date $TargetDate -TargetFolder $repoTargetFolder -MasterHistoryPath $masterHistory -ImportSource $importSource
+Write-Info "Built executive summary: $summaryPath"
+
+$markdownFiles = Get-ChildItem -Path $repoTargetFolder -ErrorAction SilentlyContinue |
+    Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".md" }
+
+foreach ($mdFile in $markdownFiles) {
+    $partsFolder = Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $repoTargetFolder -LinesPerPart $ChunkLineCount
+    if ($partsFolder) {
+        Write-Info "Split markdown file into parts: $partsFolder"
+    }
+}
+
+if (-not $Silent) {
+    Start-Process notepad.exe $masterHistory
+}
+
+if (-not $SkipGit) {
+    Push-Location $RepoPath
+    try {
+        git checkout $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $BranchName" }
+
+        git pull origin $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Failed to pull branch $BranchName" }
+
+        git add -- $repoSubfolder
+
+        $status = git status --porcelain
+        if (-not $status) {
+            Write-Info "No changes to commit."
+            exit 0
+        }
+
+        $commitMessage = "Add chat history files for $targetDateString"
+        git commit -m $commitMessage
+        if ($LASTEXITCODE -ne 0) { throw "Git commit failed." }
+
+        git push origin $BranchName
+        if ($LASTEXITCODE -ne 0) { throw "Git push failed." }
+
+        Write-Info "Synced chat history to repo: $repoSubfolder"
+    }
+    finally {
+        Pop-Location
+    }
+}
+else {
+    Write-Info "SkipGit specified; files prepared but not committed/pushed."
+}
+```
+
+## Important
+Your script requires `-RepoPath`, so run it like this:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -Silent
+```
+
+## Example with SkipGit first
+To test safely before push:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit -Silent
+```
+
+Thatâ€™s the best first test.
+
+If you want, next I can give you:
+1. a **safer version that auto-creates the branch if missing**, or  
+2. a **more robust version that recursively scans Downloads subfolders too**.
+
+## @testsubject117
+
+how can I test this to see whats happening. right now it opens then closes right away and I can't see what happens
+
+## Copilot
+
+Donâ€™t double-click it. Run it from a PowerShell window and add output pauses/logging.
+
+## Easiest way
+Open PowerShell and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit
+```
+
+That way the console stays visible because you launched it from an already-open shell.
+
+## Best safe test
+Use this first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit
+```
+
+or if you want less UI popping:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit -Silent
+```
+
+## If you want to capture everything to a log
+Run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit *>&1 | Tee-Object "H:\AM\Scripts\Sync-CoPilotChatHistory.log"
+```
+
+That will:
+- show output on screen
+- also save it to a log file
+
+## If errors are still disappearing
+Wrap the bottom of the script in a top-level `try/catch` so errors print clearly and pause.
+
+Replace the **main flow section** with this pattern:
+
+```powershell
+try {
+    # Main flow
+    $targetDateString = $TargetDate.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $targetDateString
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    Assert-GitRepo -Path $RepoPath
+
+    Write-Info "Scanning export files for $targetDateString"
+    $exports = Get-ExportFilesForDate -Paths $ScanPaths -Date $TargetDate
+    $latestGroup = Get-LatestExportGroup -Files $exports
+    $importSource = Get-BestImportSourceFromGroup -GroupFiles $latestGroup -TodayFolder $todayFolder
+
+    if ($importSource) {
+        Write-Info "Selected import source: $($importSource.ImportFile.FullName)"
+        Write-Info "Import type: $($importSource.SourceType)"
+    }
+    else {
+        Write-Info "No import source found for $targetDateString"
+    }
+
+    $masterHistory = Build-MasterHistoryFile -Date $TargetDate -DailyBasePath $DailyBasePath -ImportSource $importSource
+    Write-Info "Built master history: $masterHistory"
+
+    $monthRecoveryFolder = Get-MonthRecoveryFolderName -Date $TargetDate
+    $repoSubfolder = Join-Path ("${monthRecoveryFolder}-recovery") $targetDateString
+    $repoTargetFolder = Join-Path $RepoPath $repoSubfolder
+    New-Item -ItemType Directory -Path $repoTargetFolder -Force | Out-Null
+
+    Copy-Item -Path $masterHistory -Destination $repoTargetFolder -Force
+    Write-Info "Copied master history to repo folder"
+
+    if ($importSource -and $importSource.ExtractPath -and (Test-Path $importSource.ExtractPath)) {
+        $filesToCopy = Get-ChildItem -Path $importSource.ExtractPath -Recurse -ErrorAction SilentlyContinue |
+            Where-Object {
+                -not $_.PSIsContainer -and $_.Extension.ToLower() -in ".md", ".json", ".txt"
+            }
+
+        foreach ($file in $filesToCopy) {
+            Copy-Item -Path $file.FullName -Destination $repoTargetFolder -Force
+        }
+
+        Write-Info "Copied extracted reviewable files to repo folder"
+    }
+
+    $summaryPath = Build-ExecutiveSummaryFile -Date $TargetDate -TargetFolder $repoTargetFolder -MasterHistoryPath $masterHistory -ImportSource $importSource
+    Write-Info "Built executive summary: $summaryPath"
+
+    $markdownFiles = Get-ChildItem -Path $repoTargetFolder -ErrorAction SilentlyContinue |
+        Where-Object { -not $_.PSIsContainer -and $_.Extension.ToLower() -eq ".md" }
+
+    foreach ($mdFile in $markdownFiles) {
+        $partsFolder = Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $repoTargetFolder -LinesPerPart $ChunkLineCount
+        if ($partsFolder) {
+            Write-Info "Split markdown file into parts: $partsFolder"
+        }
+    }
+
+    if (-not $Silent) {
+        Start-Process notepad.exe $masterHistory
+    }
+
+    if (-not $SkipGit) {
+        Push-Location $RepoPath
+        try {
+            git checkout $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $BranchName" }
+
+            git pull origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to pull branch $BranchName" }
+
+            git add -- $repoSubfolder
+
+            $status = git status --porcelain
+            if (-not $status) {
+                Write-Info "No changes to commit."
+                exit 0
+            }
+
+            $commitMessage = "Add chat history files for $targetDateString"
+            git commit -m $commitMessage
+            if ($LASTEXITCODE -ne 0) { throw "Git commit failed." }
+
+            git push origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Git push failed." }
+
+            Write-Info "Synced chat history to repo: $repoSubfolder"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    else {
+        Write-Info "SkipGit specified; files prepared but not committed/pushed."
+    }
+}
+catch {
+    Write-Host ""
+    Write-Host "========== SCRIPT FAILED ==========" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Full error:" -ForegroundColor Yellow
+    Write-Host ($_ | Format-List * -Force | Out-String)
+    Write-Host "===================================" -ForegroundColor Red
+    Read-Host "Press Enter to close"
+}
+```
+
+## Quickest no-edit debugging option
+Just run this from an existing PowerShell window:
+
+```powershell
+& "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit
+```
+
+That is the simplest way to stop the â€œopens then closesâ€ problem.
+
+## Recommended exact first test
+Use this:
+
+```powershell
+& "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit
+```
+
+Then if it errors, copy the output.
+
+If you want, I can also give you a **debug version of the full script** with:
+- step numbers
+- explicit file counts
+- selected file names
+- pause at the end.
+
+## @testsubject117
+
+```
+PS C:\Windows\system32> powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\YourRepoPathHere" -SkipGit
+H:\AM\Scripts\Sync-CoPilotChatHistory.ps1 : Cannot validate argument on parameter 'RepoPath'. The " Test-Path $_ "
+validation script for the argument with value "H:\AM\YourRepoPathHere" did not return a result of True. Determine why
+the validation script failed, and then try the command again.
+    + CategoryInfo          : InvalidData: (:) [Sync-CoPilotChatHistory.ps1], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : ParameterArgumentValidationError,Sync-CoPilotChatHistory.ps1
+
+```
+
+## Copilot
+
+That error just means the path you passed is a placeholder and doesnâ€™t exist.
+
+## Direct fix
+Replace:
+
+```powershell
+-RepoPath "H:\AM\YourRepoPathHere"
+```
+
+with the **actual full path to your Git repo**.
+
+For example, if your repo is here:
+
+```powershell
+H:\AM\Repos\copilot-chat-history
+```
+
+then run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\Repos\copilot-chat-history" -SkipGit
+```
+
+## How to find the right repo path
+In PowerShell, navigate to the repo and run:
+
+```powershell
+Get-Location
+```
+
+or check whether a folder is a git repo:
+
+```powershell
+Test-Path "H:\AM\Repos\copilot-chat-history\.git"
+```
+
+If that returns `True`, thatâ€™s a valid `RepoPath`.
+
+## Best way to test candidate paths
+Try:
+
+```powershell
+Test-Path "H:\AM\Repos\copilot-chat-history"
+Test-Path "H:\AM\Repos\copilot-chat-history\.git"
+```
+
+You want both to be true, especially the second one for this script.
+
+## Recommended test flow
+### 1. Find the real repo path
+Example:
+
+```powershell
+Test-Path "H:\AM\Git\ChatHistoryRepo"
+Test-Path "H:\AM\Git\ChatHistoryRepo\.git"
+```
+
+### 2. Run script with SkipGit
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\Git\ChatHistoryRepo" -SkipGit
+```
+
+## If you donâ€™t remember where the repo is
+Search for `.git` folders:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName ".git") } | Select-Object FullName
+```
+
+That will list folders under `H:\AM` that are Git repos.
+
+## Short answer
+The script itself got past parsing.  
+Now itâ€™s just failing because `"H:\AM\YourRepoPathHere"` is not a real path.
+
+Use the actual repo folder path and rerun.
+
+If you want, I can also help you identify which exact folder should be the repo if you paste the result of:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName ".git") } | Select-Object FullName
+```
+
+## @testsubject117
+
+PS C:\Windows\system32> Get-Location
+
+Path
+----
+C:\Windows\system32
+
+
+PS C:\Windows\system32>
+
+
+## Copilot
+
+`Get-Location` only shows your **current shell folder**, not your repo.
+
+## Do this instead
+Search under `H:\AM` for Git repositories:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue |
+Where-Object { Test-Path (Join-Path $_.FullName ".git") } |
+Select-Object FullName
+```
+
+That will list candidate repo folders.
+
+## Then test one
+For a candidate path, run:
+
+```powershell
+Test-Path "H:\AM\some-repo"
+Test-Path "H:\AM\some-repo\.git"
+```
+
+If both are `True`, use that as `RepoPath`.
+
+## Then run the script
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\some-repo" -SkipGit
+```
+
+## If you want the fastest path
+If you already know the repo name, you can search just for that:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "*chat*" }
+```
+
+But the `.git` search is more reliable.
+
+## Next step
+Run this exactly and paste the output:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue |
+Where-Object { Test-Path (Join-Path $_.FullName ".git") } |
+Select-Object FullName
+```
+
+## @testsubject117
+
+PS C:\Windows\system32> Test-Path "H:\AM\Repos\copilot-chat-history\.git"
+False
+
+## Copilot
+
+That means `H:\AM\Repos\copilot-chat-history` is **not** your repo path.
+
+## Next step
+Find the actual Git repo under `H:\AM` by running:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue |
+Where-Object { Test-Path (Join-Path $_.FullName ".git") } |
+Select-Object FullName
+```
+
+## What youâ€™re looking for
+The output should be one or more folders like:
+
+```powershell
+FullName
+--------
+H:\AM\SomeActualRepo
+H:\AM\OtherRepo
+```
+
+Any folder listed there is a valid Git repo candidate.
+
+## After that
+Pick the correct one and test it:
+
+```powershell
+Test-Path "H:\AM\SomeActualRepo\.git"
+```
+
+If `True`, run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -RepoPath "H:\AM\SomeActualRepo" -SkipGit
+```
+
+## If the search is too broad
+You can narrow it to likely repo roots:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory
+```
+
+and then inspect likely folders manually.
+
+## Short answer
+Youâ€™ve confirmed the parser problem is fixed.  
+Now the only issue is finding the **real repo folder**.
+
+Please run this and paste the output:
+
+```powershell
+Get-ChildItem "H:\AM" -Directory -Recurse -ErrorAction SilentlyContinue |
+Where-Object { Test-Path (Join-Path $_.FullName ".git") } |
+Select-Object FullName
+```
+
+## @testsubject117
+
+ok, hold on. the point of this is to upload local exported chat files that are in a folder by exporting them, if they are zipped, unzip them, then find the .md files, split them into more ingestible chunks for chat, then save them to my local repo, then push them to testsubject117/co-pilot-chat-history. it seems like we're fishing around trying to figure out repos. Can you just update the code for the file so it includes the correct local repo and correct online repo?
+
+## Copilot
+
+Yes â€” the right fix is to **bake your actual defaults into the script** so you donâ€™t have to keep passing them every time.
+
+But I only know the **remote repo name** from what you just told me:
+
+- **GitHub remote target:** `testsubject117/co-pilot-chat-history`
+
+I **do not know your actual local clone path yet**, and I should not invent one. If I hardcode the wrong local path, the script will still fail.
+
+## Best practical fix
+Iâ€™ll give you a version of the script that:
+
+1. defaults the remote expectation to `testsubject117/co-pilot-chat-history`
+2. can **auto-detect the local repo path** by searching under likely folders
+3. verifies that the detected repoâ€™s `origin` points to `testsubject117/co-pilot-chat-history`
+4. uses that repo automatically if `-RepoPath` is omitted
+
+That way you do **not** need to fish around manually.
+
+---
+
+# Full replacement script
+
+```powershell
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$RepoPath = "",
+
+    [Parameter(Mandatory = $false)]
+    [datetime]$TargetDate = (Get-Date),
+
+    [Parameter(Mandatory = $false)]
+    [string]$DailyBasePath = "H:\AM\DailyConversations",
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$ScanPaths = @(
+        "$env:USERPROFILE\Downloads",
+        "H:\AM\Backed up CoPilot Sessions"
+    ),
+
+    [Parameter(Mandatory = $false)]
+    [string]$BranchName = "upload-chat-history",
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(100, 10000)]
+    [int]$ChunkLineCount = 2000,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ExpectedGitHubRepo = "testsubject117/co-pilot-chat-history",
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$RepoSearchRoots = @(
+        "H:\AM",
+        "$env:USERPROFILE\source\repos",
+        "$env:USERPROFILE\Documents\GitHub",
+        "$env:USERPROFILE\GitHub",
+        "$env:USERPROFILE\Repos"
+    ),
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipGit,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Silent
+)
+
+$ErrorActionPreference = "Stop"
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor Cyan
+}
+
+function Write-WarnMsg {
+    param([string]$Message)
+    Write-Host "[WARN] $Message" -ForegroundColor Yellow
+}
+
+function Write-ErrMsg {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+}
+
+function Get-VersionNumber {
+    param([string]$FileName)
+
+    if ($FileName -match '\((\d+)\)(?=\.[^.]+$)') {
+        return [int]$matches[1]
+    }
+
+    return 0
+}
+
+function Get-NormalizedBaseName {
+    param([string]$FileName)
+
+    $nameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $normalized = $nameWithoutExtension -replace '\s*\(\d+\)$', ''
+    return $normalized.ToLower().Replace("-", "_").Replace(" ", "_")
+}
+
+function Get-DatePatterns {
+    param([datetime]$Date)
+
+    return @(
+        $Date.ToString("ddd_MMM_d_yyyy"),
+        $Date.ToString("ddd_MMMM_d_yyyy"),
+        $Date.ToString("yyyy-MM-dd"),
+        $Date.ToString("MM-dd-yyyy"),
+        $Date.ToString("M-d-yyyy")
+    ) | ForEach-Object {
+        $_.ToLower().Replace("-", "_").Replace(" ", "_")
+    }
+}
+
+function Get-ExportFilesForDate {
+    param(
+        [string[]]$Paths,
+        [datetime]$Date
+    )
+
+    $datePatterns = Get-DatePatterns -Date $Date
+    $results = @()
+
+    foreach ($path in $Paths) {
+        if (-not (Test-Path $path)) {
+            Write-WarnMsg "Scan path not found: $path"
+            continue
+        }
+
+        Write-Info "Scanning path: $path"
+
+        $files = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".zip" } |
+            Where-Object {
+                $baseName = $_.BaseName.ToLower().Replace("-", "_").Replace(" ", "_")
+                ($datePatterns | Where-Object { $baseName -like "*$_*" }).Count -gt 0
+            }
+
+        if ($files) {
+            Write-Info "Found $($files.Count) matching export file(s) in $path"
+            $results += $files
+        }
+    }
+
+    return $results
+}
+
+function Get-LatestExportGroup {
+    param([object[]]$Files)
+
+    if (-not $Files -or $Files.Count -eq 0) {
+        return $null
+    }
+
+    $ranked = $Files |
+        Sort-Object `
+            @{ Expression = { Get-VersionNumber $_.Name }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    $best = $ranked | Select-Object -First 1
+    $bestNormalized = Get-NormalizedBaseName $best.Name
+    $bestVersion = Get-VersionNumber $best.Name
+
+    Write-Info "Best export candidate: $($best.FullName)"
+    Write-Info "Best normalized group: $bestNormalized"
+    Write-Info "Best detected version: $bestVersion"
+
+    return $Files | Where-Object {
+        (Get-NormalizedBaseName $_.Name) -eq $bestNormalized -and
+        (Get-VersionNumber $_.Name) -eq $bestVersion
+    }
+}
+
+function Expand-ZipFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ZipFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $extractFolderName = [System.IO.Path]::GetFileNameWithoutExtension($ZipFile.Name)
+    $extractPath = Join-Path $DestinationRoot $extractFolderName
+
+    if (Test-Path $extractPath) {
+        Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+    Expand-Archive -Path $ZipFile.FullName -DestinationPath $extractPath -Force
+
+    Write-Info "Expanded zip: $($ZipFile.FullName)"
+    Write-Info "Extracted to: $extractPath"
+
+    return $extractPath
+}
+
+function Get-MainMarkdownCandidate {
+    param(
+        [object[]]$MarkdownFiles,
+        [string]$ExpectedBaseName
+    )
+
+    if (-not $MarkdownFiles -or $MarkdownFiles.Count -eq 0) {
+        return $null
+    }
+
+    $expected = $ExpectedBaseName.ToLower()
+
+    $ranked = $MarkdownFiles |
+        Sort-Object `
+            @{ Expression = {
+                $name = $_.BaseName.ToLower()
+                if ($name -eq $expected) { 100 }
+                elseif ($name -like "$expected*") { 90 }
+                elseif ($name -match 'checklist|readme|guide|instruction|instructions') { 10 }
+                else { 50 }
+            }; Descending = $true },
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    return $ranked | Select-Object -First 1
+}
+
+function Get-BestImportSourceFromGroup {
+    param(
+        [object[]]$GroupFiles,
+        [string]$TodayFolder
+    )
+
+    if (-not $GroupFiles -or $GroupFiles.Count -eq 0) {
+        return $null
+    }
+
+    $zipFile = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".zip" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($zipFile) {
+        $extractRoot = Join-Path $TodayFolder "extracted"
+        New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+        $extractPath = Expand-ZipFile -ZipFile $zipFile -DestinationRoot $extractRoot
+        $expectedBaseName = Get-NormalizedBaseName $zipFile.Name
+
+        $mdFiles = Get-ChildItem -Path $extractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+        $mdInside = Get-MainMarkdownCandidate -MarkdownFiles $mdFiles -ExpectedBaseName $expectedBaseName
+        if ($mdInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedMarkdown"
+                ImportFile    = $mdInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+
+        $jsonInside = Get-ChildItem -Path $extractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -eq ".json" } |
+            Sort-Object `
+                @{ Expression = { $_.Length }; Descending = $true },
+                @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+            Select-Object -First 1
+
+        if ($jsonInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedJson"
+                ImportFile    = $jsonInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+    }
+
+    $standaloneMdFiles = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    $expectedStandaloneBase = Get-NormalizedBaseName (($GroupFiles | Select-Object -First 1).Name)
+    $standaloneMd = Get-MainMarkdownCandidate -MarkdownFiles $standaloneMdFiles -ExpectedBaseName $expectedStandaloneBase
+
+    if ($standaloneMd) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneMarkdown"
+            ImportFile    = $standaloneMd
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    $standaloneJson = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".json" } |
+        Sort-Object `
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+        Select-Object -First 1
+
+    if ($standaloneJson) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneJson"
+            ImportFile    = $standaloneJson
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    return $null
+}
+
+function Get-LatestPreviousHistoryFile {
+    param(
+        [string]$BasePath,
+        [string]$Today
+    )
+
+    $previousFolder = Get-ChildItem -Path $BasePath -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -lt $Today } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+
+    if (-not $previousFolder) {
+        return $null
+    }
+
+    return Get-ChildItem -Path $previousFolder.FullName -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "*_master-history.md" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+function Build-MasterHistoryFile {
+    param(
+        [datetime]$Date,
+        [string]$DailyBasePath,
+        [object]$ImportSource
+    )
+
+    $today = $Date.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $today
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    $historyFile = Join-Path $todayFolder "${today}_master-history.md"
+    $previousHistory = Get-LatestPreviousHistoryFile -BasePath $DailyBasePath -Today $today
+    $latestImportSource = if ($ImportSource) { $ImportSource.ImportFile.FullName } else { "None" }
+
+    $content = @()
+    $content += "# Daily Copilot Running History"
+    $content += ""
+    $content += "- Date: $today"
+    $content += "- Last Updated: $((Get-Date).ToString('HH:mm:ss'))"
+    $content += "- Latest Import Source: $latestImportSource"
+    $content += ""
+
+    if ($ImportSource) {
+        $content += "- Import Source Type: $($ImportSource.SourceType)"
+        if ($ImportSource.ContainerFile) {
+            $content += "- Source Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $content += "- Extracted To: $($ImportSource.ExtractPath)"
+        }
+        $content += ""
+    }
+
+    $content += "---"
+    $content += ""
+    $content += "## Previous Running History"
+    $content += ""
+
+    if ($previousHistory) {
+        $content += Get-Content -Path $previousHistory.FullName
+    }
+    else {
+        $content += "_No previous running history file was found._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## Today's Latest Export"
+    $content += ""
+
+    if ($ImportSource) {
+        $detectedVersionSource = if ($ImportSource.ContainerFile) { $ImportSource.ContainerFile.Name } else { $ImportSource.ImportFile.Name }
+
+        $content += "- Source File: $($ImportSource.ImportFile.FullName)"
+        $content += "- Last Write Time: $($ImportSource.ImportFile.LastWriteTime)"
+        $content += "- File Type: $($ImportSource.ImportFile.Extension)"
+        $content += "- Detected Version: $(Get-VersionNumber $detectedVersionSource)"
+        $content += ""
+        $content += "===== BEGIN IMPORTED EXPORT ====="
+        $content += ""
+
+        try {
+            $raw = Get-Content -Path $ImportSource.ImportFile.FullName -Raw
+            $content += $raw
+        }
+        catch {
+            $content += "[ERROR] Failed to read import file: $($ImportSource.ImportFile.FullName)"
+            $content += $_.Exception.Message
+        }
+
+        $content += ""
+        $content += "===== END IMPORTED EXPORT ====="
+    }
+    else {
+        $content += "_No export file for target date was found in the scan paths._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## New Notes"
+    $content += ""
+    $content += "_Add today's notes below._"
+    $content += ""
+
+    Set-Content -Path $historyFile -Value $content -Encoding UTF8
+    return $historyFile
+}
+
+function Build-ExecutiveSummaryFile {
+    param(
+        [datetime]$Date,
+        [string]$TargetFolder,
+        [string]$MasterHistoryPath,
+        [object]$ImportSource
+    )
+
+    $dateString = $Date.ToString("yyyy-MM-dd")
+    $summaryPath = Join-Path $TargetFolder "${dateString}_executive-summary.md"
+
+    $summary = @()
+    $summary += "# Executive Summary - $dateString"
+    $summary += ""
+    $summary += "## Source Overview"
+    $summary += ""
+    $summary += "- Master History: $MasterHistoryPath"
+
+    if ($ImportSource) {
+        $summary += "- Import Source Type: $($ImportSource.SourceType)"
+        $summary += "- Import File: $($ImportSource.ImportFile.FullName)"
+        if ($ImportSource.ContainerFile) {
+            $summary += "- Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $summary += "- Extracted Folder: $($ImportSource.ExtractPath)"
+        }
+    }
+    else {
+        $summary += "- No import source detected for the target date."
+    }
+
+    $summary += ""
+    $summary += "## Notes"
+    $summary += ""
+    $summary += "- This file is an operator-facing summary placeholder."
+    $summary += "- Replace or expand this with a handoff summary after review."
+    $summary += "- Recommended follow-up: ask Copilot to summarize the imported history into a project handoff."
+    $summary += ""
+
+    Set-Content -Path $summaryPath -Value $summary -Encoding UTF8
+    return $summaryPath
+}
+
+function Split-TextFileIntoParts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputRoot,
+
+        [int]$LinesPerPart = 2000
+    )
+
+    if (-not (Test-Path $SourceFile)) {
+        return $null
+    }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($SourceFile)
+    $partsFolder = Join-Path $OutputRoot ($baseName + "_parts")
+
+    New-Item -ItemType Directory -Path $partsFolder -Force | Out-Null
+
+    Get-ChildItem -Path $partsFolder -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "${baseName}_part_*.txt" } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    $chunk = New-Object System.Collections.Generic.List[string]
+    $partNumber = 1
+
+    Get-Content -Path $SourceFile | ForEach-Object {
+        $chunk.Add($_)
+
+        if ($chunk.Count -ge $LinesPerPart) {
+            $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+            $chunk | Set-Content -Path $partPath -Encoding UTF8
+            $chunk = New-Object System.Collections.Generic.List[string]
+            $partNumber++
+        }
+    }
+
+    if ($chunk.Count -gt 0) {
+        $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+        $chunk | Set-Content -Path $partPath -Encoding UTF8
+    }
+
+    return $partsFolder
+}
+
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    $monthMap = @{
+        'jan' = 'january'
+        'feb' = 'february'
+        'mar' = 'march'
+        'apr' = 'april'
+        'may' = 'may'
+        'jun' = 'june'
+        'jul' = 'july'
+        'aug' = 'august'
+        'sep' = 'september'
+        'oct' = 'october'
+        'nov' = 'november'
+        'dec' = 'december'
+    }
+
+    if ($monthFolder -match '^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-') {
+        $abbr = $matches[1].ToLower()
+        return ($monthFolder -replace "^(?i)$abbr", $monthMap[$abbr])
+    }
+
+    return $monthFolder
+}
+
+function Get-GitOriginUrl {
+    param([string]$Path)
+
+    if (-not (Test-Path (Join-Path $Path ".git"))) {
+        return $null
+    }
+
+    Push-Location $Path
+    try {
+        $origin = git remote get-url origin 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            return $null
+        }
+        return ($origin | Select-Object -First 1)
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Test-RepoMatchesExpectedRemote {
+    param(
+        [string]$Path,
+        [string]$ExpectedRepo
+    )
+
+    $origin = Get-GitOriginUrl -Path $Path
+    if (-not $origin) {
+        return $false
+    }
+
+    return $origin -match [regex]::Escape($ExpectedRepo)
+}
+
+function Find-LocalRepoPath {
+    param(
+        [string[]]$SearchRoots,
+        [string]$ExpectedRepo
+    )
+
+    foreach ($root in $SearchRoots) {
+        if (-not (Test-Path $root)) {
+            continue
+        }
+
+        Write-Info "Searching for local repo under: $root"
+
+        $repos = Get-ChildItem -Path $root -Directory -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName ".git") }
+
+        foreach ($repo in $repos) {
+            if (Test-RepoMatchesExpectedRemote -Path $repo.FullName -ExpectedRepo $ExpectedRepo) {
+                Write-Info "Matched local repo: $($repo.FullName)"
+                return $repo.FullName
+            }
+        }
+    }
+
+    return $null
+}
+
+function Resolve-RepoPath {
+    param(
+        [string]$RepoPath,
+        [string[]]$SearchRoots,
+        [string]$ExpectedRepo
+    )
+
+    if ($RepoPath) {
+        if (-not (Test-Path $RepoPath)) {
+            throw "RepoPath does not exist: $RepoPath"
+        }
+
+        if (-not (Test-Path (Join-Path $RepoPath ".git"))) {
+            throw "RepoPath is not a Git repository: $RepoPath"
+        }
+
+        if (-not (Test-RepoMatchesExpectedRemote -Path $RepoPath -ExpectedRepo $ExpectedRepo)) {
+            $origin = Get-GitOriginUrl -Path $RepoPath
+            throw "RepoPath does not point to expected remote '$ExpectedRepo'. Origin is: $origin"
+        }
+
+        return $RepoPath
+    }
+
+    $detected = Find-LocalRepoPath -SearchRoots $SearchRoots -ExpectedRepo $ExpectedRepo
+    if ($detected) {
+        return $detected
+    }
+
+    throw "Could not auto-detect a local clone for GitHub repo '$ExpectedRepo'. Please pass -RepoPath explicitly."
+}
+
+try {
+    $RepoPath = Resolve-RepoPath -RepoPath $RepoPath -SearchRoots $RepoSearchRoots -ExpectedRepo $ExpectedGitHubRepo
+    Write-Info "Using local repo path: $RepoPath"
+    Write-Info "Expected GitHub repo: $ExpectedGitHubRepo"
+
+    $targetDateString = $TargetDate.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $targetDateString
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    Write-Info "Scanning export files for $targetDateString"
+    $exports = Get-ExportFilesForDate -Paths $ScanPaths -Date $TargetDate
+    $latestGroup = Get-LatestExportGroup -Files $exports
+    $importSource = Get-BestImportSourceFromGroup -GroupFiles $latestGroup -TodayFolder $todayFolder
+
+    if ($importSource) {
+        Write-Info "Selected import source: $($importSource.ImportFile.FullName)"
+        Write-Info "Import type: $($importSource.SourceType)"
+    }
+    else {
+        Write-WarnMsg "No import source found for $targetDateString"
+    }
+
+    $masterHistory = Build-MasterHistoryFile -Date $TargetDate -DailyBasePath $DailyBasePath -ImportSource $importSource
+    Write-Info "Built master history: $masterHistory"
+
+    $monthRecoveryFolder = Get-MonthRecoveryFolderName -Date $TargetDate
+    $repoSubfolder = Join-Path ("${monthRecoveryFolder}-recovery") $targetDateString
+    $repoTargetFolder = Join-Path $RepoPath $repoSubfolder
+    New-Item -ItemType Directory -Path $repoTargetFolder -Force | Out-Null
+
+    Copy-Item -Path $masterHistory -Destination $repoTargetFolder -Force
+    Write-Info "Copied master history to repo folder: $repoTargetFolder"
+
+    if ($importSource -and $importSource.ExtractPath -and (Test-Path $importSource.ExtractPath)) {
+        $filesToCopy = Get-ChildItem -Path $importSource.ExtractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".txt" }
+
+        foreach ($file in $filesToCopy) {
+            Copy-Item -Path $file.FullName -Destination $repoTargetFolder -Force
+        }
+
+        Write-Info "Copied extracted reviewable files to repo folder"
+    }
+
+    $summaryPath = Build-ExecutiveSummaryFile -Date $TargetDate -TargetFolder $repoTargetFolder -MasterHistoryPath $masterHistory -ImportSource $importSource
+    Write-Info "Built executive summary: $summaryPath"
+
+    $markdownFiles = Get-ChildItem -Path $repoTargetFolder -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    foreach ($mdFile in $markdownFiles) {
+        $partsFolder = Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $repoTargetFolder -LinesPerPart $ChunkLineCount
+        if ($partsFolder) {
+            Write-Info "Split markdown file into parts: $partsFolder"
+        }
+    }
+
+    if (-not $Silent) {
+        Start-Process notepad.exe $masterHistory
+    }
+
+    if (-not $SkipGit) {
+        Push-Location $RepoPath
+        try {
+            git checkout $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $BranchName" }
+
+            git pull origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to pull branch $BranchName" }
+
+            git add -- $repoSubfolder
+
+            $status = git status --porcelain
+            if (-not $status) {
+                Write-Info "No changes to commit."
+                exit 0
+            }
+
+            $commitMessage = "Add chat history files for $targetDateString"
+            git commit -m $commitMessage
+            if ($LASTEXITCODE -ne 0) { throw "Git commit failed." }
+
+            git push origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Git push failed." }
+
+            Write-Info "Synced chat history to repo: $repoSubfolder"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    else {
+        Write-Info "SkipGit specified; files prepared but not committed/pushed."
+    }
+}
+catch {
+    Write-Host ""
+    Write-ErrMsg "========== SCRIPT FAILED =========="
+    Write-ErrMsg $_.Exception.Message
+    Write-Host ""
+    Write-Host "Full error details:" -ForegroundColor Yellow
+    Write-Host ($_ | Format-List * -Force | Out-String)
+    Write-Host ""
+    Read-Host "Press Enter to close"
+}
+```
+
+---
+
+## What this changes
+
+### 1. Remote repo expectation is now built in
+It now expects the GitHub repo to be:
+
+```text
+testsubject117/co-pilot-chat-history
+```
+
+### 2. Local repo path can be omitted
+If you donâ€™t pass `-RepoPath`, it will search likely roots and find the local clone whose `origin` matches that GitHub repo.
+
+### 3. It verifies the correct repo
+So it wonâ€™t accidentally write into some unrelated local repo.
+
+### 4. It wonâ€™t close instantly on failure
+It now has a top-level `try/catch` with a pause.
+
+---
+
+## How to test it now
+
+### Safest test first
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -SkipGit
+```
+
+### Quiet version
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -SkipGit -Silent
+```
+
+### Full run with git
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1"
+```
+
+---
+
+## Important note
+This only works **if you already have a local clone** of `testsubject117/co-pilot-chat-history` somewhere under one of these search roots:
+
+- `H:\AM`
+- `%USERPROFILE%\source\repos`
+- `%USERPROFILE%\Documents\GitHub`
+- `%USERPROFILE%\GitHub`
+- `%USERPROFILE%\Repos`
+
+If you **do not** already have a local clone, the script will now tell you clearly.
+
+If you want, next I can give you a second version that will also:
+- **create the branch if it doesnâ€™t exist**, and/or
+- **clone the repo automatically if no local clone is found**.
+
+## @testsubject117
+
+this is the local path to where we were keeping these files: C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History
+
+## Copilot
+
+Perfect. Then hardcode that local repo path and the GitHub repo target.
+
+Use this full file:
+
+```powershell
+[CmdletBinding()]
+param(
+    [Parameter(Mandatory = $false)]
+    [datetime]$TargetDate = (Get-Date),
+
+    [Parameter(Mandatory = $false)]
+    [string]$DailyBasePath = "H:\AM\DailyConversations",
+
+    [Parameter(Mandatory = $false)]
+    [string[]]$ScanPaths = @(
+        "$env:USERPROFILE\Downloads",
+        "H:\AM\Backed up CoPilot Sessions"
+    ),
+
+    [Parameter(Mandatory = $false)]
+    [string]$BranchName = "upload-chat-history",
+
+    [Parameter(Mandatory = $false)]
+    [ValidateRange(100, 10000)]
+    [int]$ChunkLineCount = 2000,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipGit,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Silent
+)
+
+$ErrorActionPreference = "Stop"
+
+$RepoPath = "C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History"
+$ExpectedGitHubRepo = "testsubject117/co-pilot-chat-history"
+
+function Write-Info {
+    param([string]$Message)
+    Write-Host "[INFO] $Message" -ForegroundColor Cyan
+}
+
+function Write-WarnMsg {
+    param([string]$Message)
+    Write-Host "[WARN] $Message" -ForegroundColor Yellow
+}
+
+function Write-ErrMsg {
+    param([string]$Message)
+    Write-Host "[ERROR] $Message" -ForegroundColor Red
+}
+
+function Get-VersionNumber {
+    param([string]$FileName)
+
+    if ($FileName -match '\((\d+)\)(?=\.[^.]+$)') {
+        return [int]$matches[1]
+    }
+
+    return 0
+}
+
+function Get-NormalizedBaseName {
+    param([string]$FileName)
+
+    $nameWithoutExtension = [System.IO.Path]::GetFileNameWithoutExtension($FileName)
+    $normalized = $nameWithoutExtension -replace '\s*\(\d+\)$', ''
+    return $normalized.ToLower().Replace("-", "_").Replace(" ", "_")
+}
+
+function Get-DatePatterns {
+    param([datetime]$Date)
+
+    return @(
+        $Date.ToString("ddd_MMM_d_yyyy"),
+        $Date.ToString("ddd_MMMM_d_yyyy"),
+        $Date.ToString("yyyy-MM-dd"),
+        $Date.ToString("MM-dd-yyyy"),
+        $Date.ToString("M-d-yyyy")
+    ) | ForEach-Object {
+        $_.ToLower().Replace("-", "_").Replace(" ", "_")
+    }
+}
+
+function Get-ExportFilesForDate {
+    param(
+        [string[]]$Paths,
+        [datetime]$Date
+    )
+
+    $datePatterns = Get-DatePatterns -Date $Date
+    $results = @()
+
+    foreach ($path in $Paths) {
+        if (-not (Test-Path $path)) {
+            Write-WarnMsg "Scan path not found: $path"
+            continue
+        }
+
+        Write-Info "Scanning path: $path"
+
+        $files = Get-ChildItem -Path $path -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".zip" } |
+            Where-Object {
+                $baseName = $_.BaseName.ToLower().Replace("-", "_").Replace(" ", "_")
+                ($datePatterns | Where-Object { $baseName -like "*$_*" }).Count -gt 0
+            }
+
+        if ($files) {
+            Write-Info "Found $($files.Count) matching export file(s) in $path"
+            $results += $files
+        }
+    }
+
+    return $results
+}
+
+function Get-LatestExportGroup {
+    param([object[]]$Files)
+
+    if (-not $Files -or $Files.Count -eq 0) {
+        return $null
+    }
+
+    $ranked = $Files |
+        Sort-Object `
+            @{ Expression = { Get-VersionNumber $_.Name }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    $best = $ranked | Select-Object -First 1
+    $bestNormalized = Get-NormalizedBaseName $best.Name
+    $bestVersion = Get-VersionNumber $best.Name
+
+    Write-Info "Best export candidate: $($best.FullName)"
+    Write-Info "Best normalized group: $bestNormalized"
+    Write-Info "Best detected version: $bestVersion"
+
+    return $Files | Where-Object {
+        (Get-NormalizedBaseName $_.Name) -eq $bestNormalized -and
+        (Get-VersionNumber $_.Name) -eq $bestVersion
+    }
+}
+
+function Expand-ZipFile {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$ZipFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationRoot
+    )
+
+    $extractFolderName = [System.IO.Path]::GetFileNameWithoutExtension($ZipFile.Name)
+    $extractPath = Join-Path $DestinationRoot $extractFolderName
+
+    if (Test-Path $extractPath) {
+        Remove-Item -Path $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+    New-Item -ItemType Directory -Path $extractPath -Force | Out-Null
+    Expand-Archive -Path $ZipFile.FullName -DestinationPath $extractPath -Force
+
+    Write-Info "Expanded zip: $($ZipFile.FullName)"
+    Write-Info "Extracted to: $extractPath"
+
+    return $extractPath
+}
+
+function Get-MainMarkdownCandidate {
+    param(
+        [object[]]$MarkdownFiles,
+        [string]$ExpectedBaseName
+    )
+
+    if (-not $MarkdownFiles -or $MarkdownFiles.Count -eq 0) {
+        return $null
+    }
+
+    $expected = $ExpectedBaseName.ToLower()
+
+    $ranked = $MarkdownFiles |
+        Sort-Object `
+            @{ Expression = {
+                $name = $_.BaseName.ToLower()
+                if ($name -eq $expected) { 100 }
+                elseif ($name -like "$expected*") { 90 }
+                elseif ($name -match 'checklist|readme|guide|instruction|instructions') { 10 }
+                else { 50 }
+            }; Descending = $true },
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true }
+
+    return $ranked | Select-Object -First 1
+}
+
+function Get-BestImportSourceFromGroup {
+    param(
+        [object[]]$GroupFiles,
+        [string]$TodayFolder
+    )
+
+    if (-not $GroupFiles -or $GroupFiles.Count -eq 0) {
+        return $null
+    }
+
+    $zipFile = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".zip" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($zipFile) {
+        $extractRoot = Join-Path $TodayFolder "extracted"
+        New-Item -ItemType Directory -Path $extractRoot -Force | Out-Null
+
+        $extractPath = Expand-ZipFile -ZipFile $zipFile -DestinationRoot $extractRoot
+        $expectedBaseName = Get-NormalizedBaseName $zipFile.Name
+
+        $mdFiles = Get-ChildItem -Path $extractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+        $mdInside = Get-MainMarkdownCandidate -MarkdownFiles $mdFiles -ExpectedBaseName $expectedBaseName
+        if ($mdInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedMarkdown"
+                ImportFile    = $mdInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+
+        $jsonInside = Get-ChildItem -Path $extractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -eq ".json" } |
+            Sort-Object `
+                @{ Expression = { $_.Length }; Descending = $true },
+                @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+            Select-Object -First 1
+
+        if ($jsonInside) {
+            return [PSCustomObject]@{
+                SourceType    = "ExtractedJson"
+                ImportFile    = $jsonInside
+                ContainerFile = $zipFile
+                ExtractPath   = $extractPath
+            }
+        }
+    }
+
+    $standaloneMdFiles = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    $expectedStandaloneBase = Get-NormalizedBaseName (($GroupFiles | Select-Object -First 1).Name)
+    $standaloneMd = Get-MainMarkdownCandidate -MarkdownFiles $standaloneMdFiles -ExpectedBaseName $expectedStandaloneBase
+
+    if ($standaloneMd) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneMarkdown"
+            ImportFile    = $standaloneMd
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    $standaloneJson = $GroupFiles |
+        Where-Object { $_.Extension.ToLower() -eq ".json" } |
+        Sort-Object `
+            @{ Expression = { $_.Length }; Descending = $true },
+            @{ Expression = { $_.LastWriteTime }; Descending = $true } |
+        Select-Object -First 1
+
+    if ($standaloneJson) {
+        return [PSCustomObject]@{
+            SourceType    = "StandaloneJson"
+            ImportFile    = $standaloneJson
+            ContainerFile = $null
+            ExtractPath   = $null
+        }
+    }
+
+    return $null
+}
+
+function Get-LatestPreviousHistoryFile {
+    param(
+        [string]$BasePath,
+        [string]$Today
+    )
+
+    $previousFolder = Get-ChildItem -Path $BasePath -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -lt $Today } |
+        Sort-Object Name -Descending |
+        Select-Object -First 1
+
+    if (-not $previousFolder) {
+        return $null
+    }
+
+    return Get-ChildItem -Path $previousFolder.FullName -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "*_master-history.md" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
+function Build-MasterHistoryFile {
+    param(
+        [datetime]$Date,
+        [string]$DailyBasePath,
+        [object]$ImportSource
+    )
+
+    $today = $Date.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $today
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    $historyFile = Join-Path $todayFolder "${today}_master-history.md"
+    $previousHistory = Get-LatestPreviousHistoryFile -BasePath $DailyBasePath -Today $today
+    $latestImportSource = if ($ImportSource) { $ImportSource.ImportFile.FullName } else { "None" }
+
+    $content = @()
+    $content += "# Daily Copilot Running History"
+    $content += ""
+    $content += "- Date: $today"
+    $content += "- Last Updated: $((Get-Date).ToString('HH:mm:ss'))"
+    $content += "- Latest Import Source: $latestImportSource"
+    $content += ""
+
+    if ($ImportSource) {
+        $content += "- Import Source Type: $($ImportSource.SourceType)"
+        if ($ImportSource.ContainerFile) {
+            $content += "- Source Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $content += "- Extracted To: $($ImportSource.ExtractPath)"
+        }
+        $content += ""
+    }
+
+    $content += "---"
+    $content += ""
+    $content += "## Previous Running History"
+    $content += ""
+
+    if ($previousHistory) {
+        $content += Get-Content -Path $previousHistory.FullName
+    }
+    else {
+        $content += "_No previous running history file was found._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## Today's Latest Export"
+    $content += ""
+
+    if ($ImportSource) {
+        $detectedVersionSource = if ($ImportSource.ContainerFile) { $ImportSource.ContainerFile.Name } else { $ImportSource.ImportFile.Name }
+
+        $content += "- Source File: $($ImportSource.ImportFile.FullName)"
+        $content += "- Last Write Time: $($ImportSource.ImportFile.LastWriteTime)"
+        $content += "- File Type: $($ImportSource.ImportFile.Extension)"
+        $content += "- Detected Version: $(Get-VersionNumber $detectedVersionSource)"
+        $content += ""
+        $content += "===== BEGIN IMPORTED EXPORT ====="
+        $content += ""
+
+        try {
+            $raw = Get-Content -Path $ImportSource.ImportFile.FullName -Raw
+            $content += $raw
+        }
+        catch {
+            $content += "[ERROR] Failed to read import file: $($ImportSource.ImportFile.FullName)"
+            $content += $_.Exception.Message
+        }
+
+        $content += ""
+        $content += "===== END IMPORTED EXPORT ====="
+    }
+    else {
+        $content += "_No export file for target date was found in the scan paths._"
+    }
+
+    $content += ""
+    $content += "---"
+    $content += ""
+    $content += "## New Notes"
+    $content += ""
+    $content += "_Add today's notes below._"
+    $content += ""
+
+    Set-Content -Path $historyFile -Value $content -Encoding UTF8
+    return $historyFile
+}
+
+function Build-ExecutiveSummaryFile {
+    param(
+        [datetime]$Date,
+        [string]$TargetFolder,
+        [string]$MasterHistoryPath,
+        [object]$ImportSource
+    )
+
+    $dateString = $Date.ToString("yyyy-MM-dd")
+    $summaryPath = Join-Path $TargetFolder "${dateString}_executive-summary.md"
+
+    $summary = @()
+    $summary += "# Executive Summary - $dateString"
+    $summary += ""
+    $summary += "## Source Overview"
+    $summary += ""
+    $summary += "- Master History: $MasterHistoryPath"
+
+    if ($ImportSource) {
+        $summary += "- Import Source Type: $($ImportSource.SourceType)"
+        $summary += "- Import File: $($ImportSource.ImportFile.FullName)"
+        if ($ImportSource.ContainerFile) {
+            $summary += "- Archive: $($ImportSource.ContainerFile.FullName)"
+        }
+        if ($ImportSource.ExtractPath) {
+            $summary += "- Extracted Folder: $($ImportSource.ExtractPath)"
+        }
+    }
+    else {
+        $summary += "- No import source detected for the target date."
+    }
+
+    $summary += ""
+    $summary += "## Notes"
+    $summary += ""
+    $summary += "- This file is an operator-facing summary placeholder."
+    $summary += "- Replace or expand this with a handoff summary after review."
+    $summary += "- Recommended follow-up: ask Copilot to summarize the imported history into a project handoff."
+    $summary += ""
+
+    Set-Content -Path $summaryPath -Value $summary -Encoding UTF8
+    return $summaryPath
+}
+
+function Split-TextFileIntoParts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$SourceFile,
+
+        [Parameter(Mandatory = $true)]
+        [string]$OutputRoot,
+
+        [int]$LinesPerPart = 2000
+    )
+
+    if (-not (Test-Path $SourceFile)) {
+        return $null
+    }
+
+    $baseName = [System.IO.Path]::GetFileNameWithoutExtension($SourceFile)
+    $partsFolder = Join-Path $OutputRoot ($baseName + "_parts")
+
+    New-Item -ItemType Directory -Path $partsFolder -Force | Out-Null
+
+    Get-ChildItem -Path $partsFolder -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "${baseName}_part_*.txt" } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
+    $chunk = New-Object System.Collections.Generic.List[string]
+    $partNumber = 1
+
+    Get-Content -Path $SourceFile | ForEach-Object {
+        $chunk.Add($_)
+
+        if ($chunk.Count -ge $LinesPerPart) {
+            $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+            $chunk | Set-Content -Path $partPath -Encoding UTF8
+            $chunk = New-Object System.Collections.Generic.List[string]
+            $partNumber++
+        }
+    }
+
+    if ($chunk.Count -gt 0) {
+        $partPath = Join-Path $partsFolder ("{0}_part_{1:D3}.txt" -f $baseName, $partNumber)
+        $chunk | Set-Content -Path $partPath -Encoding UTF8
+    }
+
+    return $partsFolder
+}
+
+function Get-MonthRecoveryFolderName {
+    param([datetime]$Date)
+
+    $monthFolder = $Date.ToString("MMM-yyyy").ToLower()
+
+    $monthMap = @{
+        'jan' = 'january'
+        'feb' = 'february'
+        'mar' = 'march'
+        'apr' = 'april'
+        'may' = 'may'
+        'jun' = 'june'
+        'jul' = 'july'
+        'aug' = 'august'
+        'sep' = 'september'
+        'oct' = 'october'
+        'nov' = 'november'
+        'dec' = 'december'
+    }
+
+    if ($monthFolder -match '^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-') {
+        $abbr = $matches[1].ToLower()
+        return ($monthFolder -replace "^(?i)$abbr", $monthMap[$abbr])
+    }
+
+    return $monthFolder
+}
+
+function Get-GitOriginUrl {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) {
+        return $null
+    }
+
+    if (-not (Test-Path (Join-Path $Path ".git"))) {
+        return $null
+    }
+
+    Push-Location $Path
+    try {
+        $origin = git remote get-url origin 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            return $null
+        }
+
+        return ($origin | Select-Object -First 1)
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Assert-RepoIsCorrect {
+    param(
+        [string]$Path,
+        [string]$ExpectedRepo
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Local repo path does not exist: $Path"
+    }
+
+    if (-not (Test-Path (Join-Path $Path ".git"))) {
+        throw "Local repo path is not a Git repository: $Path"
+    }
+
+    $origin = Get-GitOriginUrl -Path $Path
+    if (-not $origin) {
+        throw "Could not read git origin from repo: $Path"
+    }
+
+    if ($origin -notmatch [regex]::Escape($ExpectedRepo)) {
+        throw "Repo origin does not match expected GitHub repo '$ExpectedGitHubRepo'. Actual origin: $origin"
+    }
+}
+
+try {
+    Write-Info "Using local repo path: $RepoPath"
+    Write-Info "Expected GitHub repo: $ExpectedGitHubRepo"
+
+    Assert-RepoIsCorrect -Path $RepoPath -ExpectedRepo $ExpectedGitHubRepo
+
+    $targetDateString = $TargetDate.ToString("yyyy-MM-dd")
+    $todayFolder = Join-Path $DailyBasePath $targetDateString
+    New-Item -ItemType Directory -Path $todayFolder -Force | Out-Null
+
+    Write-Info "Scanning export files for $targetDateString"
+    $exports = Get-ExportFilesForDate -Paths $ScanPaths -Date $TargetDate
+    $latestGroup = Get-LatestExportGroup -Files $exports
+    $importSource = Get-BestImportSourceFromGroup -GroupFiles $latestGroup -TodayFolder $todayFolder
+
+    if ($importSource) {
+        Write-Info "Selected import source: $($importSource.ImportFile.FullName)"
+        Write-Info "Import type: $($importSource.SourceType)"
+    }
+    else {
+        Write-WarnMsg "No import source found for $targetDateString"
+    }
+
+    $masterHistory = Build-MasterHistoryFile -Date $TargetDate -DailyBasePath $DailyBasePath -ImportSource $importSource
+    Write-Info "Built master history: $masterHistory"
+
+    $monthRecoveryFolder = Get-MonthRecoveryFolderName -Date $TargetDate
+    $repoSubfolder = Join-Path ("${monthRecoveryFolder}-recovery") $targetDateString
+    $repoTargetFolder = Join-Path $RepoPath $repoSubfolder
+    New-Item -ItemType Directory -Path $repoTargetFolder -Force | Out-Null
+
+    Copy-Item -Path $masterHistory -Destination $repoTargetFolder -Force
+    Write-Info "Copied master history to repo folder: $repoTargetFolder"
+
+    if ($importSource -and $importSource.ExtractPath -and (Test-Path $importSource.ExtractPath)) {
+        $filesToCopy = Get-ChildItem -Path $importSource.ExtractPath -Recurse -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension.ToLower() -in ".md", ".json", ".txt" }
+
+        foreach ($file in $filesToCopy) {
+            Copy-Item -Path $file.FullName -Destination $repoTargetFolder -Force
+        }
+
+        Write-Info "Copied extracted reviewable files to repo folder"
+    }
+
+    $summaryPath = Build-ExecutiveSummaryFile -Date $TargetDate -TargetFolder $repoTargetFolder -MasterHistoryPath $masterHistory -ImportSource $importSource
+    Write-Info "Built executive summary: $summaryPath"
+
+    $markdownFiles = Get-ChildItem -Path $repoTargetFolder -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Extension.ToLower() -eq ".md" }
+
+    foreach ($mdFile in $markdownFiles) {
+        $partsFolder = Split-TextFileIntoParts -SourceFile $mdFile.FullName -OutputRoot $repoTargetFolder -LinesPerPart $ChunkLineCount
+        if ($partsFolder) {
+            Write-Info "Split markdown file into parts: $partsFolder"
+        }
+    }
+
+    if (-not $Silent) {
+        Start-Process notepad.exe $masterHistory
+    }
+
+    if (-not $SkipGit) {
+        Push-Location $RepoPath
+        try {
+            git checkout $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to checkout branch $BranchName" }
+
+            git pull origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Failed to pull branch $BranchName" }
+
+            git add -- $repoSubfolder
+
+            $status = git status --porcelain
+            if (-not $status) {
+                Write-Info "No changes to commit."
+                exit 0
+            }
+
+            $commitMessage = "Add chat history files for $targetDateString"
+            git commit -m $commitMessage
+            if ($LASTEXITCODE -ne 0) { throw "Git commit failed." }
+
+            git push origin $BranchName
+            if ($LASTEXITCODE -ne 0) { throw "Git push failed." }
+
+            Write-Info "Synced chat history to repo: $repoSubfolder"
+        }
+        finally {
+            Pop-Location
+        }
+    }
+    else {
+        Write-Info "SkipGit specified; files prepared but not committed/pushed."
+    }
+}
+catch {
+    Write-Host ""
+    Write-ErrMsg "========== SCRIPT FAILED =========="
+    Write-ErrMsg $_.Exception.Message
+    Write-Host ""
+    Write-Host "Full error details:" -ForegroundColor Yellow
+    Write-Host ($_ | Format-List * -Force | Out-String)
+    Write-Host ""
+    Read-Host "Press Enter to close"
+}
+```
+
+## What is now hardcoded
+### Local repo:
+```powershell
+C:\Users\CapnKirk\source\repos\Co-Pilot-Chat-History
+```
+
+### Expected remote repo:
+```powershell
+testsubject117/co-pilot-chat-history
+```
+
+## How to test safely first
+Run this:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1" -SkipGit
+```
+
+That will:
+- scan the export folders
+- build the daily files
+- copy into your local repo
+- split markdown files
+- **not** commit or push
+
+## Then full run
+```powershell
+powershell -ExecutionPolicy Bypass -File "H:\AM\Scripts\Sync-CoPilotChatHistory.ps1"
+```
+
+## Important possible next issue
+If the branch `upload-chat-history` does not already exist locally/remotely, the script may fail at:
+
+```powershell
+git checkout $BranchName
+```
+
+If that happens, paste the output and Iâ€™ll give you a version that auto-creates the branch.
+
+## @testsubject117
+
+ok, I was able to run that and it seemed successful. only thing is, it opens a notepad file and leaves it open. is this the full .md file? does it open it so it can parse and split? why doesn't it close the notepad window?
+
