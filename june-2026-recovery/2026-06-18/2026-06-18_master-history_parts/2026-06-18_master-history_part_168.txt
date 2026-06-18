@@ -1,0 +1,2000 @@
+﻿            Dim target As Integer = header.InvoiceCount
+            If target < 0 Then target = 0
+            If target > 5000 Then target = 5000 ' safety cap
+
+            While i < rawLines.Length AndAlso invoices.Count < target
+                Dim invLine As String = CleanLine(rawLines(i))
+
+                If invLine.Length = 0 Then
+                    i += 1
+                    Continue While
+                End If
+
+                ' If we hit the next header early, stop this block.
+                If invLine.StartsWith("""", StringComparison.Ordinal) Then
+                    Exit While
+                End If
+
+                ' A single line may contain one invoice or many invoices.
+                ' Try to parse as WRITE#-style CSV first. If it yields multiple parts, use them.
+                Dim parts As List(Of String) = SplitBasicWriteLine(invLine)
+
+                If parts.Count > 1 Then
+                    For Each p In parts
+                        Dim v = NormalizeInvoiceToken(p)
+                        If v.Length > 0 Then invoices.Add(v)
+                        If invoices.Count >= target Then Exit For
+                    Next
+                Else
+                    ' Not a CSV-ish line; treat as a single invoice token
+                    Dim v = NormalizeInvoiceToken(invLine)
+                    If v.Length > 0 Then invoices.Add(v)
+                End If
+
+                i += 1
+            End While
+
+            header.Invoices = invoices
+            results.Add(header)
+        End While
+
+        Return results
+    End Function
+    Public Shared Function DiagnoseFormat(path As String) As String
+        If Not File.Exists(path) Then Return "File not found: " & path
+
+        Dim rawLines = File.ReadAllLines(path)
+        Dim headers As Integer = 0
+        Dim invLines As Integer = 0
+        Dim invLinesWithCommas As Integer = 0
+        Dim invLinesThatLookQuoted As Integer = 0
+
+        Dim seen As Integer = 0
+        For Each raw In rawLines
+            Dim line = If(raw, "").Replace(ChrW(26), "").Trim()
+            If line = "" Then Continue For
+
+            seen += 1
+            If line.StartsWith("""", StringComparison.Ordinal) Then
+                headers += 1
+            Else
+                invLines += 1
+                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+                If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
+            End If
+
+            If seen >= 200 Then Exit For
+        Next
+
+        Return $"Lines scanned: {seen}" & Environment.NewLine &
+           $"Header lines (start with quote): {headers}" & Environment.NewLine &
+           $"Non-header lines: {invLines}" & Environment.NewLine &
+           $"Non-header lines containing commas: {invLinesWithCommas}" & Environment.NewLine &
+           $"Non-header lines containing quotes: {invLinesThatLookQuoted}"
+    End Function
+    Private Shared Function ParseHeader(line As String) As CheckInvBlock
+        ' Example:
+        ' "NATAIRCR","8508","4","01-03-1995",196.75,4
+        Dim parts As List(Of String) = SplitBasicWriteLine(line)
+
+        Dim b As New CheckInvBlock() With {
+            .CustomerCode = GetPart(parts, 0),
+            .CheckNumber = GetPart(parts, 1),
+            .SalesmanCode = GetPart(parts, 2),
+            .DateText = GetPart(parts, 3),
+            .Amount = ParseDecimal(GetPart(parts, 4)),
+            .InvoiceCount = ParseInt(GetPart(parts, 5)),
+            .Invoices = New List(Of String)()
+        }
+
+        Return b
+    End Function
+
+    Private Shared Function CleanLine(s As String) As String
+        If s Is Nothing Then Return ""
+        Return s.Replace(ChrW(26), "").Trim()
+    End Function
+
+    Private Shared Function NormalizeInvoiceToken(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t = s.Replace(ChrW(26), "").Trim()
+
+        ' Some legacy files may quote invoice numbers even on "invoice lines"
+        ' SplitBasicWriteLine already unquotes, but for safety:
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2).Trim()
+        End If
+
+        ' Optional normalization that often matches legacy: collapse internal spaces
+        ' (keep it conservative to avoid changing real invoice formats)
+        t = t.Replace(vbTab, " ")
+        While t.Contains("  ", StringComparison.Ordinal)
+            t = t.Replace("  ", " ")
+        End While
+
+        Return t
+    End Function
+
+    Private Shared Function GetPart(parts As List(Of String), idx As Integer) As String
+        If parts Is Nothing OrElse idx < 0 OrElse idx >= parts.Count Then Return ""
+        Return If(parts(idx), "").Trim()
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+
+    Private Shared Function ParseInt(s As String) As Integer
+        If s Is Nothing Then Return 0
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim n As Integer
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, n) Then Return n
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then Return n
+        Return 0
+    End Function
+
+    ' Robust parser for GW-BASIC WRITE# "CSV-ish" lines:
+    ' - quoted strings allowed
+    ' - embedded quotes written as "" inside quoted strings
+    ' - numeric fields unquoted
+    Private Shared Function SplitBasicWriteLine(line As String) As List(Of String)
+        Dim result As New List(Of String)()
+        If line Is Nothing Then Return result
+
+        Dim sb As New StringBuilder()
+        Dim inQuotes As Boolean = False
+        Dim i As Integer = 0
+
+        While i < line.Length
+            Dim ch As Char = line(i)
+
+            If inQuotes Then
+                If ch = """"c Then
+                    ' Doubled quote => literal quote
+                    If i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 2
+                        Continue While
+                    Else
+                        inQuotes = False
+                        i += 1
+                        Continue While
+                    End If
+                Else
+                    sb.Append(ch)
+                    i += 1
+                    Continue While
+                End If
+            Else
+                If ch = """"c Then
+                    inQuotes = True
+                    i += 1
+                    Continue While
+                End If
+
+                If ch = ","c Then
+                    result.Add(sb.ToString().Trim())
+                    sb.Clear()
+                    i += 1
+                    Continue While
+                End If
+
+                sb.Append(ch)
+                i += 1
+            End If
+        End While
+
+        result.Add(sb.ToString().Trim())
+        Return result
+    End Function
+End Class
+
+Public Class CheckInvBlock
+    Public Property CustomerCode As String
+    Public Property CheckNumber As String
+    Public Property SalesmanCode As String
+    Public Property DateText As String
+    Public Property Amount As Decimal
+    Public Property InvoiceCount As Integer
+    Public Property Invoices As List(Of String)
+End Class
+```
+
+## Copilot
+
+Yes â€” now we have enough to rewrite `(9)` properly.
+
+## Direct answer
+`FormFindByCheckNumber.vb` should be replaced with a DOS-style sequential search/results form.
+
+Because `CheckInvBlock` contains exactly what we need:
+
+- `CustomerCode`
+- `CheckNumber`
+- `DateText`
+- `Amount`
+- `InvoiceCount`
+- `Invoices`
+
+There is **no Reference field** in `CHECK.INV`, so if DOS shows a reference-like value on that line, either:
+- it comes from another source in DOS, or
+- your current screenshot is from a related merged display path
+
+So for the VB rewrite based strictly on `CHECK.INV`, we should show the fields we actually have and avoid inventing reference data.
+
+---
+
+# Important note before code
+Your DOS screenshots for `(9)` show `Reference:` on the result line, but `CheckInvBlock` has no such property.
+
+So Iâ€™m going to make the replacement:
+- faithful to the DOS flow
+- faithful to the actual available VB data
+
+## That means:
+- customer
+- date
+- check #
+- amount
+- invoices
+- no fake reference field unless you later show me where that data exists
+
+---
+
+# Full replacement for `FormFindByCheckNumber.vb`
+
+```vb name=FormFindByCheckNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByCheckNumber
+
+    Private Const ScreenTitle As String = "Find by Check #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As List(Of CheckInvBlock) = New List(Of CheckInvBlock)()
+    Private _matches As List(Of CheckInvBlock) = New List(Of CheckInvBlock)()
+    Private _currentIndex As Integer = -1
+    Private _showingResults As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtCheck.Focus()
+        txtCheck.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Check # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 700
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Invoices that a Check Payed for  >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 760
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?"
+
+        txtCheck.Left = 780
+        txtCheck.Top = 55
+        txtCheck.Width = 120
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.Gainsboro
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtCheck)
+        Controls.Add(txtOutput)
+
+        AddHandler txtCheck.KeyDown, AddressOf TxtCheck_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If keyData = Keys.Enter AndAlso _showingResults Then
+            ShowNextMatch()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtCheck_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        Dim checkText As String = txtCheck.Text.Trim()
+
+        If String.Equals(checkText, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        If checkText = "" Then
+            _matches = _all.ToList()
+        Else
+            _matches =
+                _all.
+                Where(Function(b) If(b.CheckNumber, "").IndexOf(checkText, StringComparison.OrdinalIgnoreCase) >= 0).
+                ToList()
+        End If
+
+        _currentIndex = -1
+        _showingResults = True
+
+        If _matches.Count = 0 Then
+            _showingResults = False
+            txtOutput.Text = "No checks matched that search." & Environment.NewLine &
+                             Environment.NewLine &
+                             "Press ESC to quit."
+            Return
+        End If
+
+        ShowNextMatch()
+    End Sub
+
+    Private Sub ShowNextMatch()
+        If _matches Is Nothing OrElse _matches.Count = 0 Then
+            Close()
+            Return
+        End If
+
+        _currentIndex += 1
+
+        If _currentIndex >= _matches.Count Then
+            Close()
+            Return
+        End If
+
+        Dim hit As CheckInvBlock = _matches(_currentIndex)
+        txtOutput.Text = BuildMatchText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildMatchText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine($"{customer}{Space(Math.Max(1, 55 - customer.Length))}Date: {dateText}")
+        sb.AppendLine($"Check # {checkNo}   Amount $ {hit.Amount,10:N2}")
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 9))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [ESC = Quit]")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+
+        For i As Integer = 0 To invoices.Count - 1
+            Dim token As String = If(invoices(i), "").Trim()
+
+            If token <> "" Then
+                If (i Mod itemsPerLine) <> 0 Then
+                    sb.Append(" ")
+                End If
+
+                sb.Append(token)
+            End If
+
+            If (i Mod itemsPerLine) = itemsPerLine - 1 AndAlso i < invoices.Count - 1 Then
+                sb.AppendLine()
+            End If
+        Next
+
+        Return sb.ToString()
+    End Function
+
+End Class
+```
+
+---
+
+# What this now matches
+## Behavior
+- black DOS-style screen
+- prompt for partial/full check number
+- blank = all checks
+- `Q` = quit
+- `Please wait...`
+- sequential matching records
+- Enter shows next match
+- Esc exits
+- closes when last result is exhausted
+
+## Output
+- customer on first line
+- date on first line right side
+- check number and amount on next line
+- invoice header
+- wrapped invoice list
+- Enter prompt at bottom
+
+---
+
+# One difference from DOS
+## No `Reference:` field
+Because your `CHECK.INV` structure does not contain one.
+
+If you later show me where DOS got that value from, I can add it.
+
+---
+
+# Also important
+Your DOS screenshot with PSIBEARI shows:
+
+```text
+Check # Check # (Top Right)? 7777
+```
+
+That odd wording suggests the original DOS data or display code may occasionally include malformed check labels or reused prompt text. Since your VB data model only has plain `CheckNumber`, this version will display:
+
+```text
+Check # 7777
+```
+
+which is cleaner and safer unless you specifically want to mimic the glitch.
+
+---
+
+# Recommendation
+Use this replacement and test these cases:
+
+- `7777`
+- blank Enter
+- `Q`
+- no-match value
+- Enter through all matches
+- Esc from a result page
+
+---
+
+# If you want the next refinement
+After you test, I can help you tune:
+- exact spacing
+- invoice wrapping width
+- whether to preserve weird DOS label quirks
+- whether to keep the prompt visible during result mode or hide it
+
+But structurally, this is the correct DOS-style rewrite for `(9)`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvBlock)
+        Dim results As New List(Of CheckInvBlock)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim i As Integer = 0
+
+        While i < rawLines.Length
+            Dim line As String = CleanLine(rawLines(i))
+
+            If line.Length = 0 Then
+                i += 1
+                Continue While
+            End If
+
+            ' Header lines are GW-BASIC WRITE# output and start with a quote.
+            If Not line.StartsWith("""", StringComparison.Ordinal) Then
+                i += 1
+                Continue While
+            End If
+
+            Dim header As CheckInvBlock = ParseHeader(line)
+            i += 1
+
+            ' Collect invoice numbers until we reach the invoice count or the next header.
+            Dim invoices As New List(Of String)()
+
+            ' Defensive: bad/blank counts happen
+            Dim target As Integer = header.InvoiceCount
+            If target < 0 Then target = 0
+            If target > 5000 Then target = 5000 ' safety cap
+
+            While i < rawLines.Length AndAlso invoices.Count < target
+                Dim invLine As String = CleanLine(rawLines(i))
+
+                If invLine.Length = 0 Then
+                    i += 1
+                    Continue While
+                End If
+
+                ' If we hit the next header early, stop this block.
+                If invLine.StartsWith("""", StringComparison.Ordinal) Then
+                    Exit While
+                End If
+
+                ' A single line may contain one invoice or many invoices.
+                ' Try to parse as WRITE#-style CSV first. If it yields multiple parts, use them.
+                Dim parts As List(Of String) = SplitBasicWriteLine(invLine)
+
+                If parts.Count > 1 Then
+                    For Each p In parts
+                        Dim v = NormalizeInvoiceToken(p)
+                        If v.Length > 0 Then invoices.Add(v)
+                        If invoices.Count >= target Then Exit For
+                    Next
+                Else
+                    ' Not a CSV-ish line; treat as a single invoice token
+                    Dim v = NormalizeInvoiceToken(invLine)
+                    If v.Length > 0 Then invoices.Add(v)
+                End If
+
+                i += 1
+            End While
+
+            header.Invoices = invoices
+            results.Add(header)
+        End While
+
+        Return results
+    End Function
+    Public Shared Function DiagnoseFormat(path As String) As String
+        If Not File.Exists(path) Then Return "File not found: " & path
+
+        Dim rawLines = File.ReadAllLines(path)
+        Dim headers As Integer = 0
+        Dim invLines As Integer = 0
+        Dim invLinesWithCommas As Integer = 0
+        Dim invLinesThatLookQuoted As Integer = 0
+
+        Dim seen As Integer = 0
+        For Each raw In rawLines
+            Dim line = If(raw, "").Replace(ChrW(26), "").Trim()
+            If line = "" Then Continue For
+
+            seen += 1
+            If line.StartsWith("""", StringComparison.Ordinal) Then
+                headers += 1
+            Else
+                invLines += 1
+                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+                If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
+            End If
+
+            If seen >= 200 Then Exit For
+        Next
+
+        Return $"Lines scanned: {seen}" & Environment.NewLine &
+           $"Header lines (start with quote): {headers}" & Environment.NewLine &
+           $"Non-header lines: {invLines}" & Environment.NewLine &
+           $"Non-header lines containing commas: {invLinesWithCommas}" & Environment.NewLine &
+           $"Non-header lines containing quotes: {invLinesThatLookQuoted}"
+    End Function
+    Private Shared Function ParseHeader(line As String) As CheckInvBlock
+        ' Example:
+        ' "NATAIRCR","8508","4","01-03-1995",196.75,4
+        Dim parts As List(Of String) = SplitBasicWriteLine(line)
+
+        Dim b As New CheckInvBlock() With {
+            .CustomerCode = GetPart(parts, 0),
+            .CheckNumber = GetPart(parts, 1),
+            .SalesmanCode = GetPart(parts, 2),
+            .DateText = GetPart(parts, 3),
+            .Amount = ParseDecimal(GetPart(parts, 4)),
+            .InvoiceCount = ParseInt(GetPart(parts, 5)),
+            .Invoices = New List(Of String)()
+        }
+
+        Return b
+    End Function
+
+    Private Shared Function CleanLine(s As String) As String
+        If s Is Nothing Then Return ""
+        Return s.Replace(ChrW(26), "").Trim()
+    End Function
+
+    Private Shared Function NormalizeInvoiceToken(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t = s.Replace(ChrW(26), "").Trim()
+
+        ' Some legacy files may quote invoice numbers even on "invoice lines"
+        ' SplitBasicWriteLine already unquotes, but for safety:
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2).Trim()
+        End If
+
+        ' Optional normalization that often matches legacy: collapse internal spaces
+        ' (keep it conservative to avoid changing real invoice formats)
+        t = t.Replace(vbTab, " ")
+        While t.Contains("  ", StringComparison.Ordinal)
+            t = t.Replace("  ", " ")
+        End While
+
+        Return t
+    End Function
+
+    Private Shared Function GetPart(parts As List(Of String), idx As Integer) As String
+        If parts Is Nothing OrElse idx < 0 OrElse idx >= parts.Count Then Return ""
+        Return If(parts(idx), "").Trim()
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+
+    Private Shared Function ParseInt(s As String) As Integer
+        If s Is Nothing Then Return 0
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim n As Integer
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, n) Then Return n
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then Return n
+        Return 0
+    End Function
+
+    ' Robust parser for GW-BASIC WRITE# "CSV-ish" lines:
+    ' - quoted strings allowed
+    ' - embedded quotes written as "" inside quoted strings
+    ' - numeric fields unquoted
+    Private Shared Function SplitBasicWriteLine(line As String) As List(Of String)
+        Dim result As New List(Of String)()
+        If line Is Nothing Then Return result
+
+        Dim sb As New StringBuilder()
+        Dim inQuotes As Boolean = False
+        Dim i As Integer = 0
+
+        While i < line.Length
+            Dim ch As Char = line(i)
+
+            If inQuotes Then
+                If ch = """"c Then
+                    ' Doubled quote => literal quote
+                    If i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 2
+                        Continue While
+                    Else
+                        inQuotes = False
+                        i += 1
+                        Continue While
+                    End If
+                Else
+                    sb.Append(ch)
+                    i += 1
+                    Continue While
+                End If
+            Else
+                If ch = """"c Then
+                    inQuotes = True
+                    i += 1
+                    Continue While
+                End If
+
+                If ch = ","c Then
+                    result.Add(sb.ToString().Trim())
+                    sb.Clear()
+                    i += 1
+                    Continue While
+                End If
+
+                sb.Append(ch)
+                i += 1
+            End If
+        End While
+
+        result.Add(sb.ToString().Trim())
+        Return result
+    End Function
+End Class
+
+Public Class CheckInvBlock
+    Public Property CustomerCode As String
+    Public Property CheckNumber As String
+    Public Property SalesmanCode As String
+    Public Property DateText As String
+    Public Property Amount As Decimal
+    Public Property InvoiceCount As Integer
+    Public Property Invoices As List(Of String)
+End Class
+```
+
+## Copilot
+
+That `CheckInvReader` / `CheckInvBlock` code is good â€” and it confirms the same thing:
+
+## Direct answer
+There is still **no `Reference` field** in the `CHECK.INV` model, so the DOS-match rewrite for `(9)` should use the data you actually have:
+
+- customer
+- date
+- check number
+- amount
+- invoice list
+
+That means the replacement form I gave is still the right direction.
+
+---
+
+# Important clarification
+You just pasted the reader/model again, not a new file â€” which is fine, but it doesnâ€™t change the conclusion:
+
+## `CHECK.INV` contains:
+- `CustomerCode`
+- `CheckNumber`
+- `SalesmanCode`
+- `DateText`
+- `Amount`
+- `InvoiceCount`
+- `Invoices`
+
+## it does **not** contain:
+- `Reference`
+
+So if we want DOS-like behavior now, the VB screen should still be rewritten around these actual fields.
+
+---
+
+# What to do next
+## Replace `FormFindByCheckNumber.vb` with the DOS-style version I gave.
+
+That is the correct next move.
+
+---
+
+# One improvement I want to make before you paste it
+I want to tighten the formatting a little so it behaves more like the other successful DOS conversions.
+
+Here is the **cleaned-up version** I recommend you use instead.
+
+```vb name=FormFindByCheckNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByCheckNumber
+
+    Private Const ScreenTitle As String = "Find by Check #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _matches As New List(Of CheckInvBlock)()
+    Private _currentIndex As Integer = -1
+    Private _showingResults As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtCheck.Focus()
+        txtCheck.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Check # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 720
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Invoices that a Check Payed for  >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 770
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?"
+
+        txtCheck.Left = 790
+        txtCheck.Top = 55
+        txtCheck.Width = 120
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.Gainsboro
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtCheck)
+        Controls.Add(txtOutput)
+
+        AddHandler txtCheck.KeyDown, AddressOf TxtCheck_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If keyData = Keys.Enter AndAlso _showingResults Then
+            ShowNextMatch()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtCheck_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        Dim checkText As String = txtCheck.Text.Trim()
+
+        If String.Equals(checkText, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        If checkText = "" Then
+            _matches = _all.ToList()
+        Else
+            _matches =
+                _all.
+                Where(Function(b) If(b.CheckNumber, "").IndexOf(checkText, StringComparison.OrdinalIgnoreCase) >= 0).
+                ToList()
+        End If
+
+        _currentIndex = -1
+        _showingResults = True
+
+        If _matches.Count = 0 Then
+            _showingResults = False
+            txtOutput.Text =
+                "No checks matched that search." & Environment.NewLine &
+                Environment.NewLine &
+                "Press ESC to quit."
+            Return
+        End If
+
+        ShowNextMatch()
+    End Sub
+
+    Private Sub ShowNextMatch()
+        If _matches Is Nothing OrElse _matches.Count = 0 Then
+            Close()
+            Return
+        End If
+
+        _currentIndex += 1
+
+        If _currentIndex >= _matches.Count Then
+            Close()
+            Return
+        End If
+
+        Dim hit As CheckInvBlock = _matches(_currentIndex)
+        txtOutput.Text = BuildMatchText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildMatchText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [ESC = Quit]")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# Why this version is better
+It keeps the same DOS-style behavior, but improves:
+
+- cleaner alignment
+- more stable invoice wrapping
+- simpler output formatting
+- no invented fields
+
+---
+
+# Expected behavior
+## Search input
+- blank + Enter = all checks
+- partial number = contains match
+- `Q` = quit
+
+## Results
+- one result at a time
+- Enter = next
+- Esc = exit
+- closes after last result
+
+---
+
+# Only caveat
+If you want to reproduce the DOS **reference field**, Iâ€™ll need to know where that value comes from in your modern codebase. It is not in `CHECK.INV`.
+
+---
+
+# Next step
+Paste in this replacement and run item `(9)`.
+
+Then tell me:
+- whether it compiles
+- whether it visually matches
+- whether your fake `7777` test behaves like DOS
+
+and Iâ€™ll help you fine-tune any spacing if needed.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class CheckInvReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of CheckInvBlock)
+        Dim results As New List(Of CheckInvBlock)()
+        If Not File.Exists(path) Then Return results
+
+        Dim rawLines As String() = File.ReadAllLines(path)
+        Dim i As Integer = 0
+
+        While i < rawLines.Length
+            Dim line As String = CleanLine(rawLines(i))
+
+            If line.Length = 0 Then
+                i += 1
+                Continue While
+            End If
+
+            ' Header lines are GW-BASIC WRITE# output and start with a quote.
+            If Not line.StartsWith("""", StringComparison.Ordinal) Then
+                i += 1
+                Continue While
+            End If
+
+            Dim header As CheckInvBlock = ParseHeader(line)
+            i += 1
+
+            ' Collect invoice numbers until we reach the invoice count or the next header.
+            Dim invoices As New List(Of String)()
+
+            ' Defensive: bad/blank counts happen
+            Dim target As Integer = header.InvoiceCount
+            If target < 0 Then target = 0
+            If target > 5000 Then target = 5000 ' safety cap
+
+            While i < rawLines.Length AndAlso invoices.Count < target
+                Dim invLine As String = CleanLine(rawLines(i))
+
+                If invLine.Length = 0 Then
+                    i += 1
+                    Continue While
+                End If
+
+                ' If we hit the next header early, stop this block.
+                If invLine.StartsWith("""", StringComparison.Ordinal) Then
+                    Exit While
+                End If
+
+                ' A single line may contain one invoice or many invoices.
+                ' Try to parse as WRITE#-style CSV first. If it yields multiple parts, use them.
+                Dim parts As List(Of String) = SplitBasicWriteLine(invLine)
+
+                If parts.Count > 1 Then
+                    For Each p In parts
+                        Dim v = NormalizeInvoiceToken(p)
+                        If v.Length > 0 Then invoices.Add(v)
+                        If invoices.Count >= target Then Exit For
+                    Next
+                Else
+                    ' Not a CSV-ish line; treat as a single invoice token
+                    Dim v = NormalizeInvoiceToken(invLine)
+                    If v.Length > 0 Then invoices.Add(v)
+                End If
+
+                i += 1
+            End While
+
+            header.Invoices = invoices
+            results.Add(header)
+        End While
+
+        Return results
+    End Function
+    Public Shared Function DiagnoseFormat(path As String) As String
+        If Not File.Exists(path) Then Return "File not found: " & path
+
+        Dim rawLines = File.ReadAllLines(path)
+        Dim headers As Integer = 0
+        Dim invLines As Integer = 0
+        Dim invLinesWithCommas As Integer = 0
+        Dim invLinesThatLookQuoted As Integer = 0
+
+        Dim seen As Integer = 0
+        For Each raw In rawLines
+            Dim line = If(raw, "").Replace(ChrW(26), "").Trim()
+            If line = "" Then Continue For
+
+            seen += 1
+            If line.StartsWith("""", StringComparison.Ordinal) Then
+                headers += 1
+            Else
+                invLines += 1
+                If line.Contains(",", StringComparison.Ordinal) Then invLinesWithCommas += 1
+                If line.StartsWith("""", StringComparison.Ordinal) OrElse line.Contains("""", StringComparison.Ordinal) Then invLinesThatLookQuoted += 1
+            End If
+
+            If seen >= 200 Then Exit For
+        Next
+
+        Return $"Lines scanned: {seen}" & Environment.NewLine &
+           $"Header lines (start with quote): {headers}" & Environment.NewLine &
+           $"Non-header lines: {invLines}" & Environment.NewLine &
+           $"Non-header lines containing commas: {invLinesWithCommas}" & Environment.NewLine &
+           $"Non-header lines containing quotes: {invLinesThatLookQuoted}"
+    End Function
+    Private Shared Function ParseHeader(line As String) As CheckInvBlock
+        ' Example:
+        ' "NATAIRCR","8508","4","01-03-1995",196.75,4
+        Dim parts As List(Of String) = SplitBasicWriteLine(line)
+
+        Dim b As New CheckInvBlock() With {
+            .CustomerCode = GetPart(parts, 0),
+            .CheckNumber = GetPart(parts, 1),
+            .SalesmanCode = GetPart(parts, 2),
+            .DateText = GetPart(parts, 3),
+            .Amount = ParseDecimal(GetPart(parts, 4)),
+            .InvoiceCount = ParseInt(GetPart(parts, 5)),
+            .Invoices = New List(Of String)()
+        }
+
+        Return b
+    End Function
+
+    Private Shared Function CleanLine(s As String) As String
+        If s Is Nothing Then Return ""
+        Return s.Replace(ChrW(26), "").Trim()
+    End Function
+
+    Private Shared Function NormalizeInvoiceToken(s As String) As String
+        If s Is Nothing Then Return ""
+        Dim t = s.Replace(ChrW(26), "").Trim()
+
+        ' Some legacy files may quote invoice numbers even on "invoice lines"
+        ' SplitBasicWriteLine already unquotes, but for safety:
+        If t.Length >= 2 AndAlso t.StartsWith("""", StringComparison.Ordinal) AndAlso t.EndsWith("""", StringComparison.Ordinal) Then
+            t = t.Substring(1, t.Length - 2).Trim()
+        End If
+
+        ' Optional normalization that often matches legacy: collapse internal spaces
+        ' (keep it conservative to avoid changing real invoice formats)
+        t = t.Replace(vbTab, " ")
+        While t.Contains("  ", StringComparison.Ordinal)
+            t = t.Replace("  ", " ")
+        End While
+
+        Return t
+    End Function
+
+    Private Shared Function GetPart(parts As List(Of String), idx As Integer) As String
+        If parts Is Nothing OrElse idx < 0 OrElse idx >= parts.Count Then Return ""
+        Return If(parts(idx), "").Trim()
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+
+    Private Shared Function ParseInt(s As String) As Integer
+        If s Is Nothing Then Return 0
+        s = s.Replace(ChrW(26), "").Trim()
+
+        Dim n As Integer
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, n) Then Return n
+        If Integer.TryParse(s, NumberStyles.Integer, CultureInfo.CurrentCulture, n) Then Return n
+        Return 0
+    End Function
+
+    ' Robust parser for GW-BASIC WRITE# "CSV-ish" lines:
+    ' - quoted strings allowed
+    ' - embedded quotes written as "" inside quoted strings
+    ' - numeric fields unquoted
+    Private Shared Function SplitBasicWriteLine(line As String) As List(Of String)
+        Dim result As New List(Of String)()
+        If line Is Nothing Then Return result
+
+        Dim sb As New StringBuilder()
+        Dim inQuotes As Boolean = False
+        Dim i As Integer = 0
+
+        While i < line.Length
+            Dim ch As Char = line(i)
+
+            If inQuotes Then
+                If ch = """"c Then
+                    ' Doubled quote => literal quote
+                    If i + 1 < line.Length AndAlso line(i + 1) = """"c Then
+                        sb.Append(""""c)
+                        i += 2
+                        Continue While
+                    Else
+                        inQuotes = False
+                        i += 1
+                        Continue While
+                    End If
+                Else
+                    sb.Append(ch)
+                    i += 1
+                    Continue While
+                End If
+            Else
+                If ch = """"c Then
+                    inQuotes = True
+                    i += 1
+                    Continue While
+                End If
+
+                If ch = ","c Then
+                    result.Add(sb.ToString().Trim())
+                    sb.Clear()
+                    i += 1
+                    Continue While
+                End If
+
+                sb.Append(ch)
+                i += 1
+            End If
+        End While
+
+        result.Add(sb.ToString().Trim())
+        Return result
+    End Function
+End Class
+
+Public Class CheckInvBlock
+    Public Property CustomerCode As String
+    Public Property CheckNumber As String
+    Public Property SalesmanCode As String
+    Public Property DateText As String
+    Public Property Amount As Decimal
+    Public Property InvoiceCount As Integer
+    Public Property Invoices As List(Of String)
+End Class
+```
+
+## Copilot
+
+Yes â€” same conclusion as before.
+
+## Direct answer
+Youâ€™ve reposted the same `CheckInvReader` / `CheckInvBlock` code, and it still confirms:
+
+- we have enough data to implement `(9)`
+- there is still **no Reference field**
+- the DOS-style rewrite should proceed using:
+  - `CustomerCode`
+  - `CheckNumber`
+  - `DateText`
+  - `Amount`
+  - `Invoices`
+
+So the next actual step is **replace `FormFindByCheckNumber.vb`**, not keep revisiting the reader.
+
+---
+
+# What to do now
+Use this replacement for `FormFindByCheckNumber.vb`.
+
+```vb name=FormFindByCheckNumber.vb
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Text
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormFindByCheckNumber
+
+    Private Const ScreenTitle As String = "Find by Check #"
+
+    Private ReadOnly lblPromptTitle As New Label()
+    Private ReadOnly lblPrompt As New Label()
+    Private ReadOnly txtCheck As New TextBox()
+    Private ReadOnly txtOutput As New TextBox()
+
+    Private _all As New List(Of CheckInvBlock)()
+    Private _matches As New List(Of CheckInvBlock)()
+    Private _currentIndex As Integer = -1
+    Private _showingResults As Boolean = False
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        BuildScreen()
+        LoadData()
+
+        txtCheck.Focus()
+        txtCheck.SelectAll()
+    End Sub
+
+    Private Sub BuildScreen()
+        Text = "Find by Check # (CHECK.INV)"
+        Width = 950
+        Height = 650
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.Black
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+        Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        lblPromptTitle.AutoSize = False
+        lblPromptTitle.Left = 12
+        lblPromptTitle.Top = 18
+        lblPromptTitle.Width = 720
+        lblPromptTitle.Height = 28
+        lblPromptTitle.BackColor = Color.Black
+        lblPromptTitle.ForeColor = Color.Gainsboro
+        lblPromptTitle.Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblPromptTitle.Text = "<<<  Find the Invoices that a Check Payed for  >>>"
+
+        lblPrompt.AutoSize = False
+        lblPrompt.Left = 12
+        lblPrompt.Top = 58
+        lblPrompt.Width = 770
+        lblPrompt.Height = 24
+        lblPrompt.BackColor = Color.Black
+        lblPrompt.ForeColor = Color.Gainsboro
+        lblPrompt.Text = "Enter Part or All of Check Number [ENTER = All Checks] [Q = Quit] ?"
+
+        txtCheck.Left = 790
+        txtCheck.Top = 55
+        txtCheck.Width = 120
+        txtCheck.BorderStyle = BorderStyle.FixedSingle
+        txtCheck.BackColor = Color.Black
+        txtCheck.ForeColor = Color.Gainsboro
+        txtCheck.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        txtOutput.Left = 12
+        txtOutput.Top = 100
+        txtOutput.Width = 900
+        txtOutput.Height = 500
+        txtOutput.Anchor = AnchorStyles.Top Or AnchorStyles.Bottom Or AnchorStyles.Left Or AnchorStyles.Right
+        txtOutput.Multiline = True
+        txtOutput.ReadOnly = True
+        txtOutput.ScrollBars = ScrollBars.None
+        txtOutput.BorderStyle = BorderStyle.None
+        txtOutput.BackColor = Color.Black
+        txtOutput.ForeColor = Color.Gainsboro
+        txtOutput.WordWrap = False
+        txtOutput.Font = New Font("Consolas", 11.0F, FontStyle.Regular, GraphicsUnit.Point)
+
+        Controls.Add(lblPromptTitle)
+        Controls.Add(lblPrompt)
+        Controls.Add(txtCheck)
+        Controls.Add(txtOutput)
+
+        AddHandler txtCheck.KeyDown, AddressOf TxtCheck_KeyDown
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        If keyData = Keys.Enter AndAlso _showingResults Then
+            ShowNextMatch()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub TxtCheck_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            StartSearch()
+        ElseIf e.KeyCode = Keys.Escape Then
+            e.SuppressKeyPress = True
+            Close()
+        End If
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                txtOutput.Text = "CHECK.INV was not found at:" & Environment.NewLine & path
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            txtOutput.Clear()
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            txtOutput.Text = "Unable to read CHECK.INV from:" & Environment.NewLine & path
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub StartSearch()
+        Dim checkText As String = txtCheck.Text.Trim()
+
+        If String.Equals(checkText, "Q", StringComparison.OrdinalIgnoreCase) Then
+            Close()
+            Return
+        End If
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        txtOutput.Text = "Please wait..."
+        txtOutput.Refresh()
+        Application.DoEvents()
+
+        If checkText = "" Then
+            _matches = _all.ToList()
+        Else
+            _matches =
+                _all.
+                Where(Function(b) If(b.CheckNumber, "").IndexOf(checkText, StringComparison.OrdinalIgnoreCase) >= 0).
+                ToList()
+        End If
+
+        _currentIndex = -1
+        _showingResults = True
+
+        If _matches.Count = 0 Then
+            _showingResults = False
+            txtOutput.Text =
+                "No checks matched that search." & Environment.NewLine &
+                Environment.NewLine &
+                "Press ESC to quit."
+            Return
+        End If
+
+        ShowNextMatch()
+    End Sub
+
+    Private Sub ShowNextMatch()
+        If _matches Is Nothing OrElse _matches.Count = 0 Then
+            Close()
+            Return
+        End If
+
+        _currentIndex += 1
+
+        If _currentIndex >= _matches.Count Then
+            Close()
+            Return
+        End If
+
+        Dim hit As CheckInvBlock = _matches(_currentIndex)
+        txtOutput.Text = BuildMatchText(hit)
+        txtOutput.SelectionStart = 0
+        txtOutput.SelectionLength = 0
+    End Sub
+
+    Private Function BuildMatchText(hit As CheckInvBlock) As String
+        Dim sb As New StringBuilder()
+
+        Dim customer As String = If(hit.CustomerCode, "").Trim().ToUpperInvariant()
+        Dim dateText As String = If(hit.DateText, "").Trim()
+        Dim checkNo As String = If(hit.CheckNumber, "").Trim()
+
+        sb.AppendLine(customer.PadRight(52) & "Date: " & dateText)
+        sb.AppendLine("Check # " & checkNo & "   Amount $ " & hit.Amount.ToString("###,##0.00").PadLeft(10))
+        sb.AppendLine("==================== Invoices =====================")
+
+        If hit.Invoices IsNot Nothing AndAlso hit.Invoices.Count > 0 Then
+            sb.AppendLine(WrapInvoices(hit.Invoices, 10))
+        End If
+
+        sb.AppendLine()
+        sb.Append("Hit ENTER to look for another check [ESC = Quit]")
+
+        Return sb.ToString()
+    End Function
+
+    Private Function WrapInvoices(invoices As List(Of String), itemsPerLine As Integer) As String
+        Dim sb As New StringBuilder()
+        Dim columnCount As Integer = 0
+
+        For Each inv In invoices
+            Dim token As String = If(inv, "").Trim()
+            If token = "" Then Continue For
+
+            If columnCount > 0 Then
+                sb.Append(" ")
+            End If
+
+            sb.Append(token)
+            columnCount += 1
+
+            If columnCount >= itemsPerLine Then
+                sb.AppendLine()
+                columnCount = 0
+            End If
+        Next
+
+        Return sb.ToString().TrimEnd()
+    End Function
+
+End Class
+```
+
+---
+
+# Why this matches DOS better
+It changes the behavior from:
+- exact-match lookup
+- one static result
+- button-based UI
+
+to:
+- partial search
+- blank = all checks
+- one result at a time
+- Enter advances
+- Esc quits
+- DOS-like text screen
+
+---
+
+# One more note
+If you want this to match DOS even more closely later, we can:
+- keep the Checks menu visible behind it
+- adjust line spacing
+- tweak the invoice wrapping width
+- add a more DOS-like â€œplease waitâ€ placement
+
+But structurally, this is the right conversion.
+
+---
+
+# Next step
+Paste this into `FormFindByCheckNumber.vb`, rebuild, and test with:
+- `7777`
+- blank input
+- `Q`
+- no-match input
+
+Then tell me whatâ€™s off, if anything.
+
+## @testsubject117
+
+beautiful, it works perfect!
+
+## Copilot
+
+Excellent â€” then **(9) is done**.
+
+## Direct answer
+If it:
+- matches the DOS prompt flow
+- supports partial check-number search
+- pages one result at a time
+- shows invoices correctly
+- uses Enter / Esc correctly
+
+then yes, that item is complete.
+
+---
+
+# Status
+Youâ€™ve now successfully brought these Checks items into DOS alignment:
+
+- **(5) View Company Totals**
+- **(8) View OTHER Checks**
+- **(9) Find a Check #**
+
+And importantly, these now match DOS in:
+- flow
+- pacing
+- keyboard behavior
+- appearance
+
+Thatâ€™s exactly the right kind of progress.
+
+---
+
+# My recommendation
+Move straight to the next Checks menu item that still doesnâ€™t match DOS.
+
+Send it the same way:
+1. what DOS does
+2. what VB does
+3. screenshots if useful
+4. current `.vb` file
+
+and weâ€™ll keep going.
+
+## @testsubject117
+
+next is find an invoice #. here are the dos screenshots. One thing I noticed is that it says at the bottom of one of the screens "Hit enter to search for another check" but if I hit enter, it just drops me back to the checks menu. Notice that at the top it shows the check # and all the invoices that are associated with it at the bottom?: 
+
+## Copilot
+
+Yes â€” this one is clear enough from the DOS screenshots.
+
+## Direct answer
+For **(0) Find an Invoice #**, DOS behavior appears to be:
+
+1. prompt from within the Checks screen:
+   - `<<<  Find the Check that Payed for an Invoice >>>`
+   - `Enter the Invoice Number [-1 = Quit] ?`
+2. user enters an invoice number
+3. DOS shows:
+   - `Please Wait...`
+4. then it displays the **check that paid that invoice**
+5. the result screen includes:
+   - customer
+   - date
+   - check #
+   - reference
+   - amount
+   - full invoice list for that check
+6. bottom prompt says:
+   - `Hit ENTER to look for another check [Q = Quit] ?`
+7. but based on your test, Enter may simply return to the Checks menu after the result
+
+So the wording may imply â€œsearch again,â€ but the actual behavior seems to be:
+## result shown once, then Enter exits back to menu
+
+---
+
+# Important difference from item (9)
+Item `(9)` was:
+- search by check number
+- possibly many matching checks
+- Enter cycles through matches
+
+Item `(0)` looks like:
+- search by invoice number
+- likely find the **first matching check block containing that invoice**
+- show that single check/result
+- Enter returns to menu
+
+Thatâ€™s a different flow.
+
+---
+
+# Also important
+The result screen still shows:
+- the **check**
+- and the **full list of invoices attached to that check**
+
+So this is not â€œshow one invoice.â€  
+It is â€œfind the check that paid for this invoice, then show the check record.â€
+
+---
+
+# What I need next
+Please send the current VB form/code for **Find an Invoice #**.
+
+Likely something like:
+- `FormFindByInvoiceNumber.vb`
+- `FormFindInvoiceNumber.vb`
+
+If thereâ€™s already a form for it, I want to see whether it:
+- searches `CHECK.INV`
+- scans all invoice lists
+- uses a button/grid/listbox
+- returns one result or many
+
+---
+
+# Likely implementation plan
+Assuming it also uses `CHECK.INV`, the DOS-style VB version will probably:
+
+## prompt phase
+```text
+<<<  Find the Check that Payed for an Invoice >>>
+
+Enter the Invoice Number [-1 = Quit] ?
+```
+
+## search phase
+```text
+Please Wait...
+```
+
+## result phase
+show the matching `CheckInvBlock`:
+- customer
+- date
+- check #
+- amount
+- invoice list
+
+## exit/search-again behavior
+Based on your observation, I would probably make:
+- `Enter` close and return to menu
+- `Q` close
+- maybe `Esc` close too, for convenience
+
+unless the current DOS behavior proves there can be multiple hits.
+
+---
+
+# One more note
+Again, DOS shows a `Reference:` value, but your current `CHECK.INV` model doesnâ€™t include one. So unless the VB code pulls that from somewhere else, the same limitation applies here.
+
+---
+
+# Short version
+Yes â€” `(0) Find an Invoice #` looks like a **single-result DOS search screen**:
+- prompt
+- please wait
+- show the matching check record
+- Enter returns
+
+Paste the current VB file for this item and Iâ€™ll convert it to match DOS.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormFindByInvoiceNumber
+
+    Private Const ScreenTitle As String = "Find by Invoice #"
+
+    Private ReadOnly txtInvoice As New TextBox()
+    Private ReadOnly btnFind As New Button()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly lblResult As New Label()
+
+    Private _all As List(Of CheckInvBlock) = New List(Of CheckInvBlock)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = "Find by Invoice # (CHECK.INV)"
+        Width = 750
+        Height = 320
+        StartPosition = FormStartPosition.CenterParent
+
+        Dim top As New FlowLayoutPanel() With {.Dock = DockStyle.Top, .Height = 45, .Padding = New Padding(10)}
+        top.Controls.Add(New Label() With {.Text = "Invoice #:", .AutoSize = True, .Padding = New Padding(0, 10, 0, 0)})
+
+        txtInvoice.Width = 170
+        top.Controls.Add(txtInvoice)
+
+        btnFind.Text = "Find"
+        top.Controls.Add(btnFind)
+
+        btnRefresh.Text = "Refresh"
+        top.Controls.Add(btnRefresh)
+
+        lblResult.Dock = DockStyle.Fill
+        lblResult.Padding = New Padding(10)
+        lblResult.Text = "Loading CHECK.INV..."
+
+        Controls.Add(lblResult)
+        Controls.Add(top)
+
+        AddHandler btnFind.Click, Sub() DoFind()
+
+        AddHandler btnRefresh.Click,
+            Sub()
+                LoadData()
+            End Sub
+
+        AddHandler txtInvoice.KeyDown,
+            Sub(sender, args)
+                If args.KeyCode = Keys.Enter Then
+                    args.SuppressKeyPress = True
+                    DoFind()
+                End If
+            End Sub
+
+        LoadData()
+    End Sub
+
+    Private Sub LoadData()
+        Dim path = LegacyDataPaths.CheckInv
+
+        Try
+            If Not File.Exists(path) Then
+                _all = New List(Of CheckInvBlock)()
+                lblResult.Text =
+                    "CHECK.INV was not found at:" & Environment.NewLine &
+                    path
+
+                UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, path)
+                Return
+            End If
+
+            _all = CheckInvReader.ReadAll(path)
+            lblResult.Text = $"Loaded {_all.Count:N0} check records from CHECK.INV."
+        Catch ex As Exception
+            _all = New List(Of CheckInvBlock)()
+            lblResult.Text =
+                "Unable to read CHECK.INV from:" & Environment.NewLine &
+                path
+
+            UiFileErrors.ShowUnableToReadRequiredFile(Me, ScreenTitle, path, ex)
+        End Try
+    End Sub
+
+    Private Sub DoFind()
+        Dim invNo = txtInvoice.Text.Trim()
+        If invNo = "" Then Return
+
+        If _all Is Nothing OrElse _all.Count = 0 Then
+            LoadData()
+            If _all Is Nothing OrElse _all.Count = 0 Then Return
+        End If
+
+        Dim hit = _all.FirstOrDefault(
+            Function(b) b.Invoices IsNot Nothing AndAlso
+                        b.Invoices.Any(Function(x) String.Equals(x.Trim(), invNo, StringComparison.OrdinalIgnoreCase))
+        )
+
+        If hit Is Nothing Then
+            lblResult.Text = $"No match for invoice #{invNo}."
+            Return
+        End If
+
+        lblResult.Text =
+            $"Invoice {invNo} was paid by:" & Environment.NewLine &
+            $"Customer: {hit.CustomerCode}" & Environment.NewLine &
+            $"Check #:  {hit.CheckNumber}" & Environment.NewLine &
+            $"Date:     {hit.DateText}" & Environment.NewLine &
+            $"Amount:   {hit.Amount:C}" & Environment.NewLine &
+            $"Invoices on that check: {hit.InvoiceCount}"
+    End Sub
+
+End Class
+```
+
+## Copilot

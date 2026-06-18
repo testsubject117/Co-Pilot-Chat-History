@@ -1,0 +1,2000 @@
+﻿
+So the DOS app is clearly pausing output a page at a time.
+
+### 3. Geographic scope goes beyond U.S. states
+The listing includes:
+- Canada
+- Mexico
+
+So the area-code database is broader than just U.S. states.
+
+## WinForms parity implication
+For parity, the VB version of **Look up Area Codes** should not be reduced to a tiny one-result dialog only. It should support:
+- long-form report viewing
+- paging or at least a scrollable monospaced viewer
+- all-listing mode across multiple pages of results
+
+## Most important takeaway
+These screenshots reinforce that **Look up Area Codes** is a **paged textual reference report**, not just a simple one-off lookup prompt.
+
+## @testsubject117
+
+Describe this image
+
+## Copilot
+
+These screenshots show two different DOS Rolodex features:
+
+- **Image 35:** `(I) Test Entire Rolodex for Errors`
+- **Images 36â€“37:** `(H) Look up Zip Codes`
+
+---
+
+# Image 35 â€” `(I) Test Entire Rolodex for Errors`
+
+## Whatâ€™s shown
+The Rolodex menu remains visible, and below it DOS displays:
+
+- `Checking Rolodex for Errors...     [ESC] to Exit`
+- `Testing the Zâ€™s`
+- `Hit [ENTER] to continue?`
+
+## Behavioral meaning
+### 1. Runs inline from the menu
+Like some print operations, this feature appears to execute directly on the Rolodex menu screen rather than switching to a separate form.
+
+### 2. Iterative/stepwise validation
+The message:
+- `Testing the Zâ€™s`
+
+suggests DOS checks records in alphabetical groups or batches.
+
+### 3. User-controlled progression
+The prompt:
+- `Hit [ENTER] to continue?`
+
+suggests the test may pause between steps or sections, rather than running silently straight through.
+
+### 4. ESC cancels
+- `[ESC] to Exit`
+
+So the user can abort the error-check process.
+
+## WinForms parity implication
+For DOS parity, `(I)` should likely:
+- run as a menu-inline or DOS-style progress workflow
+- show status text as it checks sections
+- allow cancellation with Esc
+- optionally pause or acknowledge between phases
+
+---
+
+# Images 36â€“37 â€” `(H) Look up Zip Codes`
+
+These show the DOS **Zip Code lookup utility**, and it behaves differently from Area Codes.
+
+## Key visual difference
+Instead of switching away from the menu, it opens a **red popup/overlay box** on top of the Rolodex menu.
+
+That is a very important DOS UI behavior.
+
+---
+
+## Image 36 â€” Zipkey intro/search popup
+
+### Background
+The Rolodex menu remains visible behind the popup.
+
+### Foreground red box
+The popup shows:
+
+- `ZIPKEY, V1.07e current to 06/89`
+- `Copyright 1989 Eric Isaacson`
+
+Registration/shareware text:
+- `EVALUATION COPY -- register by sending $30 to:`
+- `Eric Isaacson Software`
+- address and phone details
+
+Instructions:
+- `Type a zip code, a two-letter state code, or ? for a city-only search:`
+- `Type the Esc key to exit.`
+
+### Meaning
+This appears to be an embedded external utility or licensed/shareware module integrated into the Rolodex menu.
+
+It supports searching by:
+- zip code
+- two-letter state code
+- `?` for city-only search
+
+---
+
+## Image 37 â€” zip lookup result popup
+
+The same red popup now shows a result:
+
+- `State: CA California`
+- `City: SANTA CLARITA`
+- `Zip: 91380`
+
+Also:
+- `The city is:`
+- `Santa Clarita`
+
+And instructions:
+- `Type the Enter key to confirm.`
+- `Up/Down-arrow for new state.`
+- `Type the Esc key to exit.`
+
+## Behavioral meaning
+### 1. Interactive popup utility
+Unlike Area Codesâ€™ plain text report, Zip Codes uses a dedicated overlay tool/window.
+
+### 2. State cycling
+- `Up/Down-arrow for new state`
+
+This suggests that for a city search with multiple possible states, the user can cycle between matching states.
+
+### 3. Confirmation/exit controls
+- Enter confirms
+- Esc exits
+
+---
+
+# WinForms parity implications
+
+## For `(H) Look up Zip Codes`
+To match DOS behavior, the VB version should ideally:
+- keep the Rolodex menu visible in the background
+- show a centered DOS-style popup/overlay for zip lookup
+- use a visually distinct box/panel, likely preserving the red dialog feel if that matches the appâ€™s chosen DOS emulation style
+- support:
+  - zip lookup
+  - 2-letter state lookup
+  - `?` city-only lookup
+  - Up/Down state cycling
+  - Enter confirm
+  - Esc exit
+
+## For `(I) Test Entire Rolodex for Errors`
+Should behave more like:
+- status/progress text appended on the menu
+- Esc to stop
+- Enter to continue through phases
+
+---
+
+## Most important takeaway
+These screenshots show that Rolodex uses **more than one DOS interaction style**:
+
+- dedicated full-screen prompt workflows for Add/Delete/Modify
+- inline menu-appended workflows for printing and error testing
+- a popup overlay utility for Zip Code lookup
+
+That means the WinForms Rolodex implementation should likely preserve those distinct interaction patterns rather than forcing everything into one generic form style.
+
+## @testsubject117
+
+ok, some things to consider: 1) I do not have a printer hooked up to the dos virtual machine, so I am unable to print or get past any pages that mention the printer as it looks for the printer to be attached, up and running and detectable. There may be screens beyond these screenshots that I cannot get to. 2) in the (G) Look up area codes button, clicked to view all area codes, then hit enter when it said -- More -- a few times and took screenshots. after the last screenshot I sent to you of the look up area codes, I hit enter 8 more times to get through the entire list, then it returned to the main rolodex menu. 3) for Look up zip codes, it looks like the author of the DOS GW Basic Main Menu app chose a freeware app called zipkey, which I have a copy of. We will need to reimplement this to work in the rolodex just the way it worked in DOS, so we keep the flow, look and feel the way the users are used to.
+
+## Copilot
+
+Understood. Those are the right constraints to carry forward.
+
+## Direct conclusions
+
+1. **Printer flows are partially unknown**
+   Because the DOS VM has no working printer attached, we should treat the print workflows as:
+   - **known up to the printer-ready checkpoint**
+   - **possibly incomplete beyond that point**
+
+2. **Area Codes full-list behavior is now clearer**
+   For `(G) Look up Area Codes` with `A = All`:
+   - the app shows repeated `-- More --` pages
+   - pressing **Enter** advances page by page
+   - after the final page, it **returns to the Rolodex menu**
+
+3. **Zip Codes should be reimplemented, not replaced with something modern**
+   For `(H) Look up Zip Codes`:
+   - DOS embedded **Zipkey**
+   - we should recreate its **workflow, appearance, and interaction model**
+   - not just substitute a generic modern zip search dialog
+
+---
+
+## What this means for the WinForms plan
+
+### Printer-related items
+For:
+- `(E) Print Phone Book`
+- `(F) Print Labels`
+
+we should implement the **known DOS prompt flow first**:
+- customers only? `Y/N`
+- quality prompt where applicable
+- first-letter prompt
+- printer readiness handling
+
+And we should mark anything after printer detection as:
+- **behavior to infer**
+- or **to verify later if more DOS evidence appears**
+
+So we should not invent extra post-printer screens unless necessary.
+
+---
+
+### Area Codes behavior
+For `(G) Look up Area Codes`, we now know the `All` flow should behave like:
+
+1. prompt:
+   - area code / state abbreviation / `A` / `Q`
+2. if `A`:
+   - show paged monospaced results
+   - display `-- More --`
+   - **Enter** advances pages
+3. after the final page:
+   - automatically return to the Rolodex menu
+
+Thatâ€™s specific enough to replicate.
+
+---
+
+### Zip Codes behavior
+I agree completely: we should **reimplement Zipkey-style behavior inside Rolodex**.
+
+That means preserving:
+- popup overlay presentation
+- the red-box dialog feel
+- menu visible behind it
+- search modes:
+  - zip
+  - 2-letter state
+  - `?` city-only
+- result interaction:
+  - Up/Down for alternate states
+  - Enter to confirm
+  - Esc to exit
+
+The implementation can be native VB/WinForms under the hood, but the **user experience should feel like DOS Zipkey inside Rolodex**.
+
+---
+
+## Best practical interpretation for parity
+We should aim for:
+
+- **behavioral parity first**
+- **visual parity second**
+- implementation details can differ internally as long as users experience the same flow
+
+So for Zipkey especially:
+- do **not** launch an external app
+- do **not** use a Windows-standard search dialog
+- do **not** modernize into a grid/search panel if avoidable
+
+Instead:
+- build an in-app DOS-style popup utility
+
+---
+
+## Updated confidence map
+
+### Well-understood now
+- Rolodex main menu
+- Add Person
+- Delete Person
+- Modify Person
+- Area Codes
+- Zip Codes high-level interaction
+- Test Entire Rolodex for Errors
+- early print prompts
+
+### Partially unknown
+- deeper printer-dependent branches after readiness succeeds
+- exact behavior of `(C) Look up a Person` if you havenâ€™t shown it yet
+- exact save/cancel aftermath screens in some flows
+- the special `~` word-processor path in Modify
+
+---
+
+## Recommended implementation order
+Given what youâ€™ve shown, the most sensible build order is probably:
+
+1. **Rolodex main menu**
+2. **(A) Add a Person**
+3. **(D) Modify a Person**
+4. **(B) Delete a Person**
+5. **(H) Look up Zip Codes**
+6. **(G) Look up Area Codes**
+7. **(I) Test Entire Rolodex for Errors**
+8. **(E)/(F) printing flows** with printer behavior stubbed/adapted as needed
+9. **(C) Look up a Person**
+10. special `~` word-processor path if still needed
+
+---
+
+## Most important takeaway
+Yes â€” we should treat Zipkey as a **DOS behavior to faithfully reproduce inside the WinForms Rolodex**, not as a place to modernize.
+
+If you want, the next best step is for me to turn everything weâ€™ve learned so far into a **single structured Rolodex implementation spec** you can use as the working blueprint.
+
+## @testsubject117
+
+ok, let's start wiring this up
+
+## Copilot
+
+Yes â€” letâ€™s wire it up.
+
+## Best first step
+Start with the **Rolodex main menu shell** and route `(N)` from the Main Menu into it.
+
+Then wire each Rolodex option as menu actions, even if some initially open placeholder DOS-style forms.
+
+## Recommended wiring order
+### Phase 1: entry and menu shell
+Implement:
+
+- Main Menu `(N)` â†’ **Rolodex menu form**
+- Rolodex menu options:
+  - `(A)` Add a Person
+  - `(B)` Delete a Person
+  - `(C)` Look up a Person
+  - `(D)` Modify a Person
+  - `(E)` Print Phone Book
+  - `(F)` Print Labels
+  - `(G)` Look up Area Codes
+  - `(H)` Look up Zip Codes
+  - `(I)` Test Entire Rolodex for Errors
+  - `(Z)` Back to Main Menu
+
+### Phase 2: working flows first
+Prioritize:
+1. Add a Person
+2. Modify a Person
+3. Delete a Person
+4. Zip Codes
+5. Area Codes
+
+## Architecture recommendation
+To match DOS behavior cleanly, donâ€™t build Rolodex as random standalone Windows forms.
+
+Instead, use a small set of reusable DOS-style patterns:
+
+### 1. `RolodexMenuForm`
+For the main Rolodex menu.
+
+### 2. `PromptFlowForm`
+Reusable for:
+- Add Person
+- Modify Person
+- Delete Person lookup/confirm
+- Look up Person likely too
+
+This should support:
+- monospaced DOS-style display
+- progressive prompt transcript
+- one active input at a time
+- Enter-default semantics
+- single-key command semantics where needed
+
+### 3. `PagedTextViewerForm`
+Reusable for:
+- Area Codes All listing
+- maybe long search results later
+
+Should support:
+- monospaced text pages
+- `-- More --`
+- Enter to continue
+- return when done
+
+### 4. `OverlayPopupForm`
+Reusable for:
+- Zip Codes / Zipkey-style overlay
+
+Should support:
+- DOS popup look
+- centered panel
+- background menu visible behind it
+- Enter/Esc/Up/Down handling
+
+### 5. Inline menu workflow support
+For:
+- Print Phone Book
+- Print Labels
+- Test Entire Rolodex for Errors
+
+These may be easiest as:
+- temporary status/prompt area at bottom of Rolodex menu form
+- not a whole separate form unless needed
+
+## Concrete wiring targets
+At minimum, wire these handlers now:
+
+- `OpenRolodexMenu()`
+- `HandleRolodexCommand(key As Char)`
+
+And route:
+- `A` â†’ open Add Person flow
+- `B` â†’ open Delete Person flow
+- `C` â†’ open Lookup Person flow placeholder
+- `D` â†’ open Modify Person flow
+- `E` â†’ start inline print-phone-book prompts
+- `F` â†’ start inline print-labels prompts
+- `G` â†’ open Area Codes prompt/viewer
+- `H` â†’ open Zipkey-style popup
+- `I` â†’ start inline test-errors flow
+- `Z` / `Esc` â†’ close Rolodex and return
+
+## Implementation rule to follow
+Even if some actions are placeholders at first, the **navigation and DOS interaction style** should be right from the beginning.
+
+That means:
+- hotkeys work
+- title/date layout matches
+- back behavior works
+- prompts appear in DOS-like order
+
+## What I can do next
+If you want, I can help in either of these two ways:
+
+### Option 1 â€” implementation blueprint
+I write a **step-by-step coding plan** for the Rolodex wiring in VB WinForms.
+
+### Option 2 â€” repo-specific coding help
+If you give me the repo and the relevant form/file names, I can help map:
+- where `(N)` should be wired
+- what files to add/update
+- what classes/forms to create first
+
+## Short answer
+Start by wiring **Main Menu `(N)` â†’ Rolodex menu form**, then connect every Rolodex hotkey to a DOS-style workflow shell.  
+If you want, I can now help you design the exact **VB form/class structure** for that wiring.
+
+## @testsubject117
+
+yes please. I want to get the rolodex completed today.
+
+## Copilot
+
+Letâ€™s do the **VB WinForms form/class structure** now so you can move fast today.
+
+## Goal
+Build Rolodex using a few reusable DOS-style UI pieces, not ten unrelated forms.
+
+---
+
+# Recommended structure
+
+## 1. `FrmRolodexMenu`
+Purpose:
+- the main Rolodex menu screen
+- entered from Main Menu via `(N)`
+- handles inline workflows for:
+  - Print Phone Book
+  - Print Labels
+  - Test Entire Rolodex for Errors
+- launches child forms/popups for:
+  - Add
+  - Delete
+  - Look Up
+  - Modify
+  - Area Codes
+  - Zip Codes
+
+### Responsibilities
+- render:
+  - `****** ROLODEX MENU ******`
+  - top-right date
+  - menu items Aâ€“I, Z
+- capture single-key commands
+- maintain bottom prompt/status area for inline menu workflows
+- return to main menu on `Z` or `Esc`
+
+---
+
+## 2. `FrmRolodexPersonPrompt`
+Purpose:
+- reusable prompt-flow screen for person record workflows
+
+Use modes like:
+- Add
+- Modify
+- DeleteLookup
+- LookupPerson
+- ConfirmRecord
+- ReviewRecord
+
+You can do this either with:
+- one form + mode enum
+or
+- multiple small forms
+
+### My recommendation
+Use **one reusable form** with a mode enum and workflow engine.
+
+### Why
+Because these screens all share:
+- black DOS background
+- monospaced text
+- progressive transcript-style prompts
+- one active input
+- summary display
+- Y/N style confirmation
+
+---
+
+## 3. `RolodexPromptEngine`
+Purpose:
+- non-UI workflow logic for prompt sequences
+
+This is the most important class if you want speed without chaos.
+
+### Handles
+- current step
+- prompt text
+- default value logic
+- validation
+- transcript lines
+- transitions between steps
+- review/confirm stage
+
+### Should support
+#### Add Person
+Steps:
+- Name
+- Street
+- City
+- State
+- Zip
+- Area Code
+- Phone
+- Misc
+- Review
+- Confirm
+
+#### Modify Person
+Same steps, but with:
+- Enter = existing value
+- `A = Append` for Misc
+- pre-confirm selected person
+- final review
+
+#### Delete Person
+Steps:
+- name lookup / global search trigger
+- candidate record display
+- delete confirm
+
+#### Lookup Person
+Likely similar to Delete/Modify search path once you show remaining screenshots
+
+---
+
+## 4. `RolodexPersonRecord`
+Purpose:
+- data model for a rolodex record
+
+Suggested properties:
+- `Name`
+- `Street`
+- `City`
+- `State`
+- `ZipCode`
+- `AreaCode`
+- `PhoneNumber`
+- `Misc`
+
+Optional:
+- `IsCustomer`
+- `RawPhone`
+- `RawMisc`
+- `SourceIndex`
+
+### Also add helper methods
+- `ToDisplayLines()`
+- `FormattedPhone()`
+- `CityStateZipLine()`
+
+This helps reuse exact DOS-style summary rendering.
+
+---
+
+## 5. `FrmRolodexAreaCodes`
+Purpose:
+- initial area code prompt screen
+
+Supports:
+- area code input
+- 2-letter state input
+- `A = All`
+- `Q = Quit`
+
+If `A = All`, open paged viewer.
+
+---
+
+## 6. `FrmPagedTextViewer`
+Purpose:
+- DOS-style paged text output
+
+Use for:
+- Area Codes full listing
+- maybe future reports
+
+### Behavior
+- show monospaced text page
+- display `-- More --`
+- Enter advances
+- Esc closes
+- final page returns automatically
+
+### Good design
+Accept:
+- `List(Of String)` or `List(Of String())` pages
+
+---
+
+## 7. `FrmZipKeyPopup`
+Purpose:
+- DOS-style popup overlay for Zip Code lookup
+
+### Must preserve
+- menu visible behind
+- centered red popup/panel
+- Zipkey intro/result flow
+- Enter confirm
+- Esc exit
+- Up/Down state cycling
+- `?` city-only search
+- zip/state lookup modes
+
+### Internal structure
+Could use:
+- one popup form with internal states:
+  - Intro/Input
+  - ResultView
+
+---
+
+## 8. `RolodexAreaCodeService`
+Purpose:
+- data/service layer for area code lookups
+
+### Handles
+- load area code data
+- find by state
+- find by area code
+- produce full report pages
+
+---
+
+## 9. `RolodexZipCodeService`
+Purpose:
+- Zipkey replacement data/service layer
+
+### Handles
+- search by zip
+- search by state
+- search by city-only
+- cycle alternate states/results
+
+This should reproduce Zipkey behavior while keeping the UI DOS-like.
+
+---
+
+## 10. `FrmRolodexLookupResults` or reuse prompt form
+You may not need a separate form if your prompt form can display:
+
+- record summary
+- `Is this the Person you are looking for (Y/N) ?`
+- `[D] to Dial Number`
+- `[Shift] and [PrtSc] to Print`
+
+If your current DOS-style form can do that, reuse it.
+
+---
+
+# Fastest implementation shape for today
+
+If speed matters most, use this reduced structure:
+
+## Forms
+- `FrmRolodexMenu`
+- `FrmRolodexPrompt`
+- `FrmPagedTextViewer`
+- `FrmZipKeyPopup`
+
+## Classes
+- `RolodexPromptEngine`
+- `RolodexPersonRecord`
+- `RolodexAreaCodeService`
+- `RolodexZipCodeService`
+
+That is enough to finish most of Rolodex without overengineering.
+
+---
+
+# Mode enum suggestion
+
+```vb name=RolodexPromptMode.vb
+Public Enum RolodexPromptMode
+    AddPerson
+    ModifyPersonSearch
+    ModifyPersonEdit
+    DeletePersonSearch
+    DeletePersonConfirm
+    LookupPersonSearch
+    LookupPersonConfirm
+    ReviewRecord
+    ConfirmYesNo
+End Enum
+```
+
+You may simplify further if needed.
+
+---
+
+# Suggested `FrmRolodexMenu` behavior map
+
+## Hotkeys
+- `A` â†’ `OpenAddPerson()`
+- `B` â†’ `OpenDeletePerson()`
+- `C` â†’ `OpenLookupPerson()`
+- `D` â†’ `OpenModifyPerson()`
+- `E` â†’ `StartPrintPhoneBookFlow()`
+- `F` â†’ `StartPrintLabelsFlow()`
+- `G` â†’ `OpenAreaCodes()`
+- `H` â†’ `OpenZipCodes()`
+- `I` â†’ `StartErrorCheckFlow()`
+- `Z` or `Esc` â†’ close/return
+
+## Inline state machine for menu-inline actions
+Add enum:
+
+```vb name=RolodexMenuInlineMode.vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+End Enum
+```
+
+This will let the menu behave like DOS without opening extra forms.
+
+---
+
+# Suggested `RolodexPromptEngine` flow definitions
+
+## Add Person
+```text
+Title: <<<< ADD A PERSON >>>>
+
+1. Person or Company Name: ?
+2. Address Number & Street: [N = Nothing] ?
+3. City: ?
+4. State [ENTER = CA] ?
+5. Zip Code: ?
+6. Area Code [ENTER = 818] ?
+7. Phone Number ?
+8. show fax instruction
+9. Misc: ?
+10. summary review
+11. IS THIS CORRECT (Y/N) ?
+12. save or return
+```
+
+## Modify Person
+```text
+1. search/select record
+2. Modify this Person (Y/N) [Q = Quit] ?
+3. Person or Company Name: [ENTER = existing] ?
+4. Address Number & Street: [N = Nothing] [ENTER = existing] ?
+5. City: [ENTER = existing] ?
+6. State [ENTER = existing/default] ?
+7. Zip Code [ENTER = existing] ?
+8. Area Code [ENTER = existing] ?
+9. Phone Number [ENTER = existing raw] ?
+10. show fax instruction
+11. Misc: [A = Append] [ENTER = existing] ?
+12. summary review
+13. Is this correct (Y/N) ?
+14. save or discard
+```
+
+## Delete Person
+```text
+1. <<<< DELETE A PERSON >>>>
+2. Enter 1st Part of Whole Name
+3. Person or Company Name [G = Global Search] ?
+4. if match found, show record summary
+5. Delete this Person (Y/N) [Q = Quit] ?
+6. delete or cancel
+```
+
+---
+
+# UI composition suggestion for DOS-style prompt forms
+
+## `FrmRolodexPrompt`
+Use:
+- one large read-only monospaced transcript surface
+- one active input line or textbox at the bottom/current row
+
+### Controls
+- `lblTitle`
+- `txtTranscript` or custom rendered text panel
+- `txtInput`
+
+### Better than many textboxes
+Do **not** create one textbox per field if you want DOS parity.
+
+Instead:
+- transcript area shows prior prompts and answers
+- single active input handles current step
+
+This will make Add/Modify feel much more like DOS.
+
+---
+
+# Data formatting helpers you should implement immediately
+
+## Summary lines
+```vb name=RolodexPersonRecordHelpers.vb
+Public Function GetDisplayLines(record As RolodexPersonRecord) As List(Of String)
+    Return New List(Of String) From {
+        record.Name,
+        record.Street,
+        $"{record.City} , {record.State}   {record.ZipCode}",
+        $"({record.AreaCode}) {FormatPhone(record.PhoneNumber)}",
+        record.Misc
+    }
+End Function
+```
+
+## Phone formatting
+Store raw if needed, display formatted.
+
+This matches the screenshots where:
+- edit prompt uses raw `4780990`
+- summary uses `(661) 478-0990`
+
+---
+
+# What to stub vs fully implement today
+
+## Fully implement today
+- Rolodex menu
+- Add Person
+- Modify Person
+- Delete Person
+- Area Codes prompt + paged all listing
+- Zipkey popup shell
+- inline menu state machine for E/F/I
+
+## Stub if necessary today
+- actual dial-number behavior
+- actual printer integration
+- word-processor `~` mode
+- deeper printer-ready postflows
+- full lookup person details if screenshots are incomplete
+
+---
+
+# Best â€œtodayâ€ milestone
+If you want Rolodex mostly complete today, aim for this deliverable:
+
+- `(N)` opens Rolodex menu
+- all Rolodex hotkeys work
+- Add works end-to-end
+- Modify works end-to-end
+- Delete works end-to-end
+- Area Codes works with prompt + paged list
+- Zip Codes opens DOS-style popup and returns properly
+- Print flows and Error Check flows are wired with known DOS prompts
+
+That gets you very close to â€œcompleteâ€ from a user perspective.
+
+---
+
+# My recommendation for the very next coding step
+Create these first:
+
+1. `FrmRolodexMenu`
+2. `FrmRolodexPrompt`
+3. `RolodexPersonRecord`
+4. `RolodexPromptEngine`
+
+Once those exist, most of the rest becomes much easier.
+
+## If you want, next I can give you:
+- a **concrete file-by-file implementation checklist**, or
+- a **starter VB class/form skeleton** for these Rolodex pieces.
+
+## @testsubject117
+
+ok, I created the class and form files, but have not copied in the contents yet
+
+## Copilot
+
+Perfect â€” next paste in the **starter skeletons** so you can compile and begin wiring immediately.
+
+Below is a **minimal but structured VB WinForms scaffold** for the Rolodex pieces.
+
+---
+
+## 1) `RolodexPersonRecord.vb`
+
+```vb name=RolodexPersonRecord.vb
+Public Class RolodexPersonRecord
+    Public Property PersonName As String = ""
+    Public Property Street As String = ""
+    Public Property City As String = ""
+    Public Property StateCode As String = ""
+    Public Property ZipCode As String = ""
+    Public Property AreaCode As String = ""
+    Public Property PhoneNumber As String = ""
+    Public Property Misc As String = ""
+    Public Property IsCustomer As Boolean = False
+
+    Public Function GetDisplayLines() As List(Of String)
+        Return New List(Of String) From {
+            PersonName,
+            Street,
+            $"{City} , {StateCode}   {ZipCode}",
+            $"({AreaCode}) {FormatPhone(PhoneNumber)}",
+            Misc
+        }
+    End Function
+
+    Public Shared Function FormatPhone(raw As String) As String
+        Dim digits = New String((If(raw, "")).Where(Function(c) Char.IsDigit(c)).ToArray())
+
+        If digits.Length = 7 Then
+            Return $"{digits.Substring(0, 3)}-{digits.Substring(3, 4)}"
+        End If
+
+        Return raw
+    End Function
+End Class
+```
+
+---
+
+## 2) `RolodexPromptMode.vb`
+
+```vb name=RolodexPromptMode.vb
+Public Enum RolodexPromptMode
+    AddPerson
+    ModifyPerson
+    DeletePerson
+    LookupPerson
+End Enum
+```
+
+---
+
+## 3) `RolodexMenuInlineMode.vb`
+
+```vb name=RolodexMenuInlineMode.vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+End Enum
+```
+
+---
+
+## 4) `RolodexPromptEngine.vb`
+
+This is intentionally simple so you can get moving today.
+
+```vb name=RolodexPromptEngine.vb
+Public Class RolodexPromptEngine
+    Private ReadOnly _mode As RolodexPromptMode
+    Private _stepIndex As Integer = 0
+
+    Public Property WorkingRecord As RolodexPersonRecord
+    Public Property Transcript As New List(Of String)
+
+    Public Sub New(mode As RolodexPromptMode, Optional existingRecord As RolodexPersonRecord = Nothing)
+        _mode = mode
+
+        If existingRecord IsNot Nothing Then
+            WorkingRecord = New RolodexPersonRecord With {
+                .PersonName = existingRecord.PersonName,
+                .Street = existingRecord.Street,
+                .City = existingRecord.City,
+                .StateCode = existingRecord.StateCode,
+                .ZipCode = existingRecord.ZipCode,
+                .AreaCode = existingRecord.AreaCode,
+                .PhoneNumber = existingRecord.PhoneNumber,
+                .Misc = existingRecord.Misc,
+                .IsCustomer = existingRecord.IsCustomer
+            }
+        Else
+            WorkingRecord = New RolodexPersonRecord()
+        End If
+    End Sub
+
+    Public ReadOnly Property Title As String
+        Get
+            Select Case _mode
+                Case RolodexPromptMode.AddPerson
+                    Return "<<<< ADD A PERSON >>>>"
+                Case RolodexPromptMode.ModifyPerson
+                    Return "<<<< MODIFY A PERSON >>>>"
+                Case RolodexPromptMode.DeletePerson
+                    Return "<<<< DELETE A PERSON >>>>"
+                Case RolodexPromptMode.LookupPerson
+                    Return "<<<< LOOK UP A PERSON >>>>"
+                Case Else
+                    Return "<<<< ROLODEX >>>>"
+            End Select
+        End Get
+    End Property
+
+    Public Function GetCurrentPrompt() As String
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return GetAddPrompt()
+            Case RolodexPromptMode.ModifyPerson
+                Return GetModifyPrompt()
+            Case Else
+                Return ""
+        End Select
+    End Function
+
+    Public Function SubmitInput(input As String) As Boolean
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return SubmitAddInput(input)
+            Case RolodexPromptMode.ModifyPerson
+                Return SubmitModifyInput(input)
+            Case Else
+                Return False
+        End Select
+    End Function
+
+    Public Function IsComplete() As Boolean
+        Select Case _mode
+            Case RolodexPromptMode.AddPerson
+                Return _stepIndex > 9
+            Case RolodexPromptMode.ModifyPerson
+                Return _stepIndex > 9
+            Case Else
+                Return True
+        End Select
+    End Function
+
+    Public Function GetReviewLines() As List(Of String)
+        Return WorkingRecord.GetDisplayLines()
+    End Function
+
+    Private Function GetAddPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return "Person or Company Name: ?"
+            Case 1 : Return "Address Number & Street: [N = Nothing]?"
+            Case 2 : Return "City: ?"
+            Case 3 : Return "State [ENTER = CA] ?"
+            Case 4 : Return "Zip Code: ?"
+            Case 5 : Return "Area Code [ENTER = 818] ?"
+            Case 6 : Return "Phone Number ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       "Misc: ?"
+            Case 8 : Return "IS THIS CORRECT (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function GetModifyPrompt() As String
+        Select Case _stepIndex
+            Case 0 : Return $"Person or Company Name: [ENTER = {WorkingRecord.PersonName}] ?"
+            Case 1 : Return $"Address Number & Street: [N = Nothing] [ENTER = {WorkingRecord.Street}] ?"
+            Case 2 : Return $"City: [ENTER = {WorkingRecord.City}] ?"
+            Case 3 : Return $"State [ENTER = {If(String.IsNullOrWhiteSpace(WorkingRecord.StateCode), "CA", WorkingRecord.StateCode)}] ?"
+            Case 4 : Return $"Zip Code [ENTER = {WorkingRecord.ZipCode} ] ?"
+            Case 5 : Return $"Area Code [ ENTER = {WorkingRecord.AreaCode} ] ?"
+            Case 6 : Return $"Phone Number [ENTER = {WorkingRecord.PhoneNumber} ] ?"
+            Case 7
+                Return "When entering in a Fax #, put a 1 in front of it if it is not 818." & Environment.NewLine &
+                       "Make sure there is a space after the #.      Example:  FAX:1805-222-3333" & Environment.NewLine &
+                       Environment.NewLine &
+                       $"Misc: [A = Append] [ENTER = {WorkingRecord.Misc}] ?"
+            Case 8 : Return "Is this correct (Y/N) ?"
+            Case Else : Return ""
+        End Select
+    End Function
+
+    Private Function SubmitAddInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                Else
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                WorkingRecord.City = input.Trim()
+            Case 3
+                WorkingRecord.StateCode = If(String.IsNullOrWhiteSpace(input), "CA", input.Trim().ToUpperInvariant())
+            Case 4
+                WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                WorkingRecord.AreaCode = If(String.IsNullOrWhiteSpace(input), "818", input.Trim())
+            Case 6
+                WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+            Case 7
+                WorkingRecord.Misc = input.Trim()
+            Case 8
+                Transcript.Add("IS THIS CORRECT (Y/N) ? " & input.Trim())
+                _stepIndex += 1
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function SubmitModifyInput(input As String) As Boolean
+        Select Case _stepIndex
+            Case 0
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.PersonName = input.Trim()
+            Case 1
+                If input.Trim().ToUpperInvariant() = "N" Then
+                    WorkingRecord.Street = ""
+                ElseIf Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.Street = input.Trim()
+                End If
+            Case 2
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.City = input.Trim()
+            Case 3
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.StateCode = input.Trim().ToUpperInvariant()
+                ElseIf String.IsNullOrWhiteSpace(WorkingRecord.StateCode) Then
+                    WorkingRecord.StateCode = "CA"
+                End If
+            Case 4
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.ZipCode = input.Trim()
+            Case 5
+                If Not String.IsNullOrWhiteSpace(input) Then WorkingRecord.AreaCode = input.Trim()
+            Case 6
+                If Not String.IsNullOrWhiteSpace(input) Then
+                    WorkingRecord.PhoneNumber = New String(input.Where(Function(c) Char.IsDigit(c)).ToArray())
+                End If
+            Case 7
+                Dim value = input.Trim()
+                If value.ToUpperInvariant() = "A" Then
+                    ' placeholder for append mode trigger
+                ElseIf Not String.IsNullOrWhiteSpace(value) Then
+                    WorkingRecord.Misc = value
+                End If
+            Case 8
+                Transcript.Add("Is this correct (Y/N) ? " & input.Trim())
+                _stepIndex += 1
+                Return True
+        End Select
+
+        Transcript.Add(GetPromptSummaryLine(input))
+        _stepIndex += 1
+        Return True
+    End Function
+
+    Private Function GetPromptSummaryLine(input As String) As String
+        Dim prompt = GetCurrentPrompt()
+
+        If prompt.Contains(Environment.NewLine) Then
+            Dim parts = prompt.Split({Environment.NewLine}, StringSplitOptions.None)
+            prompt = parts.Last()
+        End If
+
+        Return $"{prompt} {input}".TrimEnd()
+    End Function
+End Class
+```
+
+---
+
+## 5) `FrmRolodexPrompt.vb`
+
+This is your reusable DOS-style prompt form for Add/Modify first.
+
+```vb name=FrmRolodexPrompt.vb
+Public Class FrmRolodexPrompt
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Public Sub New(engine As RolodexPromptEngine)
+        InitializeComponent()
+        _engine = engine
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.KeyPreview = True
+
+        lblTitle.Text = _engine.Title
+        txtTranscript.BackColor = Color.Black
+        txtTranscript.ForeColor = Color.White
+        txtTranscript.BorderStyle = BorderStyle.None
+        txtTranscript.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        txtTranscript.ReadOnly = True
+
+        txtInput.BackColor = Color.Black
+        txtInput.ForeColor = Color.White
+        txtInput.BorderStyle = BorderStyle.None
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+
+        RefreshTranscript()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs) Handles txtInput.KeyDown
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim value = txtInput.Text
+            txtInput.Clear()
+
+            _engine.SubmitInput(value)
+
+            If _engine.IsComplete() Then
+                ShowReviewAndCloseIfAccepted()
+                Return
+            End If
+
+            RefreshTranscript()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshTranscript()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(prompt)
+        End If
+
+        txtTranscript.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtTranscript.SelectionStart = txtTranscript.TextLength
+        txtTranscript.ScrollToCaret()
+    End Sub
+
+    Private Sub ShowReviewAndCloseIfAccepted()
+        Dim reviewLines = _engine.GetReviewLines()
+        Dim reviewText = String.Join(Environment.NewLine, reviewLines)
+
+        Dim result = MessageBox.Show(reviewText & Environment.NewLine & Environment.NewLine & "Accept this record?", "Rolodex", MessageBoxButtons.YesNo, MessageBoxIcon.Question)
+
+        If result = DialogResult.Yes Then
+            Me.DialogResult = DialogResult.OK
+        Else
+            Me.DialogResult = DialogResult.Cancel
+        End If
+
+        Me.Close()
+    End Sub
+End Class
+```
+
+### `FrmRolodexPrompt` expected controls
+Add these to the form designer:
+- `lblTitle` (Label)
+- `txtTranscript` (TextBox, multiline = True, scrollbars vertical)
+- `txtInput` (TextBox)
+
+Simple layout:
+- `lblTitle` top
+- `txtTranscript` fills most of form
+- `txtInput` bottom
+
+---
+
+## 6) `FrmPagedTextViewer.vb`
+
+```vb name=FrmPagedTextViewer.vb
+Public Class FrmPagedTextViewer
+    Private _pages As New List(Of String)
+    Private _pageIndex As Integer = 0
+
+    Public Sub SetPages(pages As List(Of String))
+        _pages = pages
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.KeyPreview = True
+
+        txtPage.BackColor = Color.Black
+        txtPage.ForeColor = Color.White
+        txtPage.BorderStyle = BorderStyle.None
+        txtPage.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        txtPage.ReadOnly = True
+
+        ShowPage()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            _pageIndex += 1
+
+            If _pageIndex >= _pages.Count Then
+                Me.Close()
+                Return
+            End If
+
+            ShowPage()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub ShowPage()
+        If _pages.Count = 0 Then
+            txtPage.Text = ""
+            Return
+        End If
+
+        txtPage.Text = _pages(_pageIndex)
+    End Sub
+End Class
+```
+
+### Control expected
+- `txtPage` multiline textbox docked fill
+
+---
+
+## 7) `FrmZipKeyPopup.vb`
+
+This is just a starter shell.
+
+```vb name=FrmZipKeyPopup.vb
+Public Class FrmZipKeyPopup
+    Private Sub FrmZipKeyPopup_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.KeyPreview = True
+
+        pnlPopup.BackColor = Color.DarkRed
+        pnlPopup.BorderStyle = BorderStyle.FixedSingle
+
+        lblZipContent.ForeColor = Color.White
+        lblZipContent.Font = New Font("Consolas", 11.0F, FontStyle.Regular)
+
+        lblZipContent.Text =
+            "ZIPKEY, V1.07e current to 06/89" & Environment.NewLine &
+            "Copyright 1989 Eric Isaacson" & Environment.NewLine & Environment.NewLine &
+            "EVALUATION COPY -- register" & Environment.NewLine &
+            "by sending $30 to:" & Environment.NewLine & Environment.NewLine &
+            "Eric Isaacson Software" & Environment.NewLine & Environment.NewLine &
+            "Type a zip code, a two-letter" & Environment.NewLine &
+            "state code, or ? for a city-" & Environment.NewLine &
+            "only search:" & Environment.NewLine & Environment.NewLine &
+            "Type the Esc key to exit."
+    End Sub
+
+    Private Sub FrmZipKeyPopup_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+End Class
+```
+
+### Controls expected
+- `pnlPopup` panel centered on form
+- `lblZipContent` label inside panel
+
+---
+
+## 8) `RolodexAreaCodeService.vb`
+
+```vb name=RolodexAreaCodeService.vb
+Public Class RolodexAreaCodeService
+    Public Function GetAllPages() As List(Of String)
+        Return New List(Of String) From {
+"** Area Code Finder **" & Environment.NewLine &
+"(C) Dean Beimer 1989" & Environment.NewLine & Environment.NewLine &
+"AL  Alabama area code(s):" & Environment.NewLine &
+"    205 All locations." & Environment.NewLine & Environment.NewLine &
+"AK  Alaska area code(s):" & Environment.NewLine &
+"    907 All locations." & Environment.NewLine & Environment.NewLine &
+"-- More --",
+
+"CA  California area code(s):" & Environment.NewLine &
+"    805 Bakersfield." & Environment.NewLine &
+"    209 Fresno." & Environment.NewLine &
+"    213 Los Angeles." & Environment.NewLine &
+"    916 Sacramento." & Environment.NewLine &
+"    619 San Diego." & Environment.NewLine &
+"    415 San Francisco." & Environment.NewLine & Environment.NewLine &
+"-- More --"
+        }
+    End Function
+End Class
+```
+
+Stub first; replace with full data later.
+
+---
+
+## 9) `FrmRolodexMenu.vb`
+
+This gets you wiring fast.
+
+```vb name=FrmRolodexMenu.vb
+Public Class FrmRolodexMenu
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private Sub FrmRolodexMenu_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.KeyPreview = True
+
+        lblTitle.Text = "****** ROLODEX MENU ******"
+        lblDate.Text = "Todays Date: " & DateTime.Now.ToString("MM-dd-yyyy")
+
+        txtInline.BackColor = Color.Black
+        txtInline.ForeColor = Color.White
+        txtInline.BorderStyle = BorderStyle.None
+        txtInline.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        txtInline.ReadOnly = True
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles MyBase.KeyPress
+        Dim ch = Char.ToUpperInvariant(e.KeyChar)
+
+        Select Case ch
+            Case "A"c
+                OpenPrompt(RolodexPromptMode.AddPerson)
+            Case "B"c
+                MessageBox.Show("Delete Person flow next.")
+            Case "C"c
+                MessageBox.Show("Look Up Person flow next.")
+            Case "D"c
+                Dim sample = New RolodexPersonRecord With {
+                    .PersonName = "TEST",
+                    .Street = "100 MAIN ST.",
+                    .City = "BURMA",
+                    .StateCode = "CA",
+                    .ZipCode = "91304",
+                    .AreaCode = "661",
+                    .PhoneNumber = "4780990",
+                    .Misc = "TESTING"
+                }
+                OpenPrompt(RolodexPromptMode.ModifyPerson, sample)
+            Case "E"c
+                StartPrintPhoneBookFlow()
+            Case "F"c
+                StartPrintLabelsFlow()
+            Case "G"c
+                OpenAreaCodes()
+            Case "H"c
+                OpenZipKey()
+            Case "I"c
+                StartErrorCheckFlow()
+            Case "Z"c
+                Me.Close()
+        End Select
+    End Sub
+
+    Private Sub FrmRolodexMenu_KeyDown(sender As Object, e As KeyEventArgs) Handles MyBase.KeyDown
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub OpenPrompt(mode As RolodexPromptMode, Optional record As RolodexPersonRecord = Nothing)
+        Using frm As New FrmRolodexPrompt(New RolodexPromptEngine(mode, record))
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub StartPrintPhoneBookFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintPhoneBook_CustomersOnly
+        txtInline.Text = "E" & Environment.NewLine & Environment.NewLine &
+                         "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartPrintLabelsFlow()
+        _inlineMode = RolodexMenuInlineMode.PrintLabels_CustomersOnly
+        txtInline.Text = "F" & Environment.NewLine & Environment.NewLine &
+                         "Do you want to print your customers only (Y/N) ?"
+    End Sub
+
+    Private Sub StartErrorCheckFlow()
+        _inlineMode = RolodexMenuInlineMode.ErrorCheck_Running
+        txtInline.Text = "Checking Rolodex for Errors...     [ESC] to Exit" &
+                         Environment.NewLine & Environment.NewLine &
+                         "Testing the Z's" &
+                         Environment.NewLine & Environment.NewLine &
+                         "Hit [ENTER] to continue?"
+    End Sub
+
+    Private Sub OpenAreaCodes()
+        Dim svc As New RolodexAreaCodeService()
+        Using frm As New FrmPagedTextViewer()
+            frm.SetPages(svc.GetAllPages())
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+
+    Private Sub OpenZipKey()
+        Using frm As New FrmZipKeyPopup()
+            frm.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+
+### Controls expected
+- `lblTitle`
+- `lblDate`
+- a label for static menu text, or hardcode a multiline label
+- `txtInline` multiline textbox for inline prompt output
+
+---
+
+## 10) Main menu wiring
+Wherever your main menu handles the `(N)` key, call:
+
+```vb name=MainMenuRolodexLaunch.vb
+Using frm As New FrmRolodexMenu()
+    frm.ShowDialog(Me)
+End Using
+```
+
+---
+
+## Best next move
+Paste these in, get it compiling, then do this in order:
+
+1. make `FrmRolodexMenu` open
+2. make `A` Add Person run
+3. make `D` Modify Person run
+4. make `G` Area Codes open paged viewer
+5. make `H` Zip popup appear
+6. then fill in `B`, `C`, `E`, `F`, `I`
+
+## If you want
+Next, I can give you the **designer/control layout checklist** for each form so you can set them up quickly without guessing.
+
+## @testsubject117
+
+what type of file is RolodexPromptMode.vb?
+
+## Copilot
+
+A **standard VB code file** containing an **Enum**.
+
+Use:
+- **Class file** / regular `.vb` file
+- not a Form
+- not a Designer
+- not a Module unless you specifically want it inside one
+
+## Example contents
+```vb name=RolodexPromptMode.vb
+Public Enum RolodexPromptMode
+    AddPerson
+    ModifyPerson
+    DeletePerson
+    LookupPerson
+End Enum
+```
+
+## In Visual Studio
+You can create it as:
+- **Add > Class...**
+- name it `RolodexPromptMode.vb`
+
+Then replace the default generated class contents with the enum above.
+
+## Same applies to
+- `RolodexMenuInlineMode.vb`
+
+Those are just simple supporting code files.
+
+If you want, I can also tell you **which of the Rolodex files should be Forms vs plain class files**.
+
+## @testsubject117
+
+what type of file is RolodexMenuInlineMode.vb
+
+## Copilot
+
+Also a **plain VB code file** with an **Enum** inside it.
+
+## Use
+- **Class file** / standard `.vb` file
+- not a form
+- not a designer file
+
+## Contents
+```vb name=RolodexMenuInlineMode.vb
+Public Enum RolodexMenuInlineMode
+    None
+    PrintPhoneBook_CustomersOnly
+    PrintPhoneBook_HighQuality
+    PrintPhoneBook_FirstLetter
+    PrintLabels_CustomersOnly
+    PrintLabels_FirstLetter
+    ErrorCheck_Running
+End Enum
+```
+
+## In Visual Studio
+Create it as:
+- **Add > Class...**
+- name: `RolodexMenuInlineMode.vb`
+
+Then replace the default class code with the enum.
+
+If you want, I can give you a **full file-type map** for every Rolodex file now:
+- which ones are **Windows Forms**
+- which ones are **plain class files**
+- which ones are **service/helper files**.
+
+## @testsubject117
+
+ok, I pasted in the content of all files, but did not perform some of the additional steps you listed. now that I pasted all the code for all the files, lets go back and fix all the issues: Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	17	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	18	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	19	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	20	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	21	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	44	
+Error (active)	BC30451	'txtPage' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmPagedTextViewer.vb	48	
+Error (active)	BC30451	'lblTitle' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	12	
+Error (active)	BC30451	'lblDate' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	13	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	15	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	16	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	17	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	18	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	19	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	73	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	79	
+Error (active)	BC30451	'txtInline' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexMenu.vb	85	
+Error (active)	BC30451	'lblTitle' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	17	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	18	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	19	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	20	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	21	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	22	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	24	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	25	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	26	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	27	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	30	
+Error (active)	BC30506	Handles clause requires a WithEvents variable defined in the containing type or one of its base types.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	33	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	37	
+Error (active)	BC30451	'txtInput' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	38	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	63	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	64	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	64	
+Error (active)	BC30451	'txtTranscript' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmRolodexPrompt.vb	65	
+Error (active)	BC30451	'pnlPopup' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	10	
+Error (active)	BC30451	'pnlPopup' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	11	
+Error (active)	BC30451	'lblZipContent' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	13	
+Error (active)	BC30451	'lblZipContent' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	14	
+Error (active)	BC30451	'lblZipContent' is not declared. It may be inaccessible due to its protection level.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FrmZipKeyPopup.vb	16	
+Error (active)	BC30201	Expression expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	10	
+Error (active)	BC30370	'}' expected.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	10	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	12	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	13	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	14	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	15	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	16	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	17	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	18	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	19	
+Error (active)	BC30035	Syntax error.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\RolodexAreaCodeService.vb	20	
+
+
+## Copilot
+
+Yes â€” these are fixable, and the root cause is simple:
+
+## Direct cause
+Most of your errors are because the code I gave references **designer-created controls** that do not exist yet on the forms.
+
+Examples:
+- `txtPage`
+- `lblTitle`
+- `lblDate`
+- `txtInline`
+- `txtTranscript`
+- `txtInput`
+- `pnlPopup`
+- `lblZipContent`
+
+So we have two ways to fix this:
+
+1. **Create the controls in the WinForms Designer**, or  
+2. **Create the controls in code manually**
+
+Because you want speed, I recommend **fixing these forms by creating controls in code inside each form**. That avoids needing to stop and use the designer right now.
+
+Also, `RolodexAreaCodeService.vb` has a syntax problem from multiline string formatting.
+
+---
+
+# Fastest fix plan
+
+Replace the contents of these files with the versions below:
+
+- `FrmPagedTextViewer.vb`
+- `FrmRolodexMenu.vb`
+- `FrmRolodexPrompt.vb`
+- `FrmZipKeyPopup.vb`
+- `RolodexAreaCodeService.vb`
+
+These versions **self-create the controls**, so the undeclared-control errors go away.
+
+---
+
+## 1) Replace `FrmPagedTextViewer.vb`
+
+```vb name=FrmPagedTextViewer.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmPagedTextViewer
+    Inherits Form
+
+    Private txtPage As TextBox
+    Private _pages As New List(Of String)
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Public Sub SetPages(pages As List(Of String))
+        _pages = If(pages, New List(Of String))
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Paged Viewer"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(800, 600)
+        Me.KeyPreview = True
+
+        txtPage = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(txtPage)
+
+        AddHandler Me.Load, AddressOf FrmPagedTextViewer_Load
+        AddHandler Me.KeyDown, AddressOf FrmPagedTextViewer_KeyDown
+    End Sub
+
+    Private Sub FrmPagedTextViewer_Load(sender As Object, e As EventArgs)
+        ShowPage()
+    End Sub
+
+    Private Sub FrmPagedTextViewer_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+            _pageIndex += 1
+
+            If _pageIndex >= _pages.Count Then
+                Me.Close()
+                Return
+            End If
+
+            ShowPage()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub ShowPage()
+        If _pages.Count = 0 Then
+            txtPage.Text = ""
+            Return
+        End If
+
+        txtPage.Text = _pages(_pageIndex)
+    End Sub
+End Class
+```
+
+---
+
+## 2) Replace `FrmRolodexPrompt.vb`
+
+```vb name=FrmRolodexPrompt.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexPrompt
+    Inherits Form
+
+    Private ReadOnly _engine As RolodexPromptEngine
+
+    Private lblTitle As Label
+    Private txtTranscript As TextBox
+    Private txtInput As TextBox
+
+    Public Sub New(engine As RolodexPromptEngine)
+        MyBase.New()
+        _engine = engine
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+        Me.Text = "Rolodex Prompt"
+
+        lblTitle = New Label() With {
+            .AutoSize = False,
+            .Height = 40,
+            .Dock = DockStyle.Top,
+            .ForeColor = Color.White,
+            .BackColor = Color.Black,
+            .Font = New Font("Consolas", 14.0F, FontStyle.Bold),
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Padding = New Padding(10, 0, 0, 0)
+        }
+
+        txtInput = New TextBox() With {
+            .Dock = DockStyle.Bottom,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Height = 28
+        }
+
+        txtTranscript = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Regular),
+            .Dock = DockStyle.Fill,
+            .ScrollBars = ScrollBars.Vertical
+        }
+
+        Me.Controls.Add(txtTranscript)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblTitle)
+
+        AddHandler Me.Load, AddressOf FrmRolodexPrompt_Load
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+    End Sub
+
+    Private Sub FrmRolodexPrompt_Load(sender As Object, e As EventArgs)
+        lblTitle.Text = _engine.Title
+        RefreshTranscript()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim value = txtInput.Text
+            txtInput.Clear()
+
+            _engine.SubmitInput(value)
+
+            If _engine.IsComplete() Then
+                ShowReviewAndCloseIfAccepted()
+                Return
+            End If
+
+            RefreshTranscript()
+        ElseIf e.KeyCode = Keys.Escape Then
+            Me.DialogResult = DialogResult.Cancel
+            Me.Close()
+        End If
+    End Sub
+
+    Private Sub RefreshTranscript()
+        Dim lines As New List(Of String)
+        lines.AddRange(_engine.Transcript)
+
+        Dim prompt = _engine.GetCurrentPrompt()
+        If Not String.IsNullOrWhiteSpace(prompt) Then
+            lines.Add(prompt)
+        End If
+
+        txtTranscript.Text = String.Join(Environment.NewLine & Environment.NewLine, lines)
+        txtTranscript.SelectionStart = txtTranscript.TextLength
+        txtTranscript.ScrollToCaret()
+    End Sub
+
+    Private Sub ShowReviewAndCloseIfAccepted()
+        Dim reviewLines = _engine.GetReviewLines()
+        Dim reviewText = String.Join(Environment.NewLine, reviewLines)
+
+        Dim result = MessageBox.Show(
+            reviewText & Environment.NewLine & Environment.NewLine & "Accept this record?",
+            "Rolodex",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        )
+
+        If result = DialogResult.Yes Then
+            Me.DialogResult = DialogResult.OK
+        Else
+            Me.DialogResult = DialogResult.Cancel
+        End If
+
+        Me.Close()
+    End Sub
+End Class
+```
+
+---
+
+## 3) Replace `FrmRolodexMenu.vb`
+
+```vb name=FrmRolodexMenu.vb
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmRolodexMenu
+    Inherits Form
+
+    Private _inlineMode As RolodexMenuInlineMode = RolodexMenuInlineMode.None
+
+    Private lblTitle As Label
+    Private lblDate As Label
+    Private lblMenu As Label
+    Private txtInline As TextBox
+
+    Public Sub New()
+        MyBase.New()
+        InitializeRolodexUi()
+    End Sub
+
+    Private Sub InitializeRolodexUi()
+        Me.Text = "Rolodex Menu"
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(900, 650)
+        Me.KeyPreview = True
+

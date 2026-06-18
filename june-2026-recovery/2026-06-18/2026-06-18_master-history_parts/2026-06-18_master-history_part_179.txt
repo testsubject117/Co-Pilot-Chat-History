@@ -1,0 +1,2000 @@
+﻿    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)'==''">$([System.String]::Copy('%(BuildCounterLines2.Identity)').Trim())</BuildNumber>
+      <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## What this changes
+- **Release build** increments the counter
+- **Debug build** does not
+- `Generated/BuildInfo.g.vb` is regenerated for both
+- published builds should still work because publish compiles
+
+## What to test next
+Do this in order:
+
+1. check current:
+   - `AMiOffice/build-counter.txt`
+2. build **Release**
+3. confirm:
+   - `build-counter.txt` increments
+   - `Generated/BuildInfo.g.vb` shows same number
+   - Main Menu shows updated build
+4. then build **Debug**
+5. confirm the counter does **not** increment
+
+## One thing to watch for
+If Visual Studio publishes in a configuration other than `Release`, then the increment condition would not fire. But in the normal setup, **Folder Publish** should use Release unless changed.
+
+If you want, after you test this, tell me exactly what happened and Iâ€™ll help you verify whether itâ€™s fully correct or needs one more adjustment.
+
+## @testsubject117
+
+but I think the issue is that the actual text file we had on my local computer is gone. where was that file located and what was it called?
+
+## Copilot
+
+Yes â€” the file is:
+
+- **`build-counter.txt`**
+
+And based on the project file, it is expected to live in the **AMiOffice project folder**:
+
+- **`$(MSBuildProjectDirectory)\build-counter.txt`**
+
+So on your local machine, that should mean:
+
+```text
+C:\Users\capnkirk\source\repos\AMiWinForms\AMiOffice\build-counter.txt
+```
+
+## Why Iâ€™m confident
+Your project file defines:
+
+```xml
+<BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+```
+
+and `MSBuildProjectDirectory` for `AMiOffice.vbproj` is the folder containing:
+
+- `AMiOffice.vbproj`
+
+So the expected local path is the same folder as that project file. îˆ€citeîˆ‚turn0commentary2îˆ‚turn0commentary3îˆ
+
+## Also important
+The repo currently shows that file existing at:
+
+- `AMiOffice/build-counter.txt`
+
+with contents:
+
+```text
+28
+```
+
+So if itâ€™s missing locally, restoring that file in the `AMiOffice` folder is very likely part of the fix. îˆ€citeîˆ‚turn0commentary3îˆ
+
+## What to do right now
+Check whether this file exists locally:
+
+```text
+C:\Users\capnkirk\source\repos\AMiWinForms\AMiOffice\build-counter.txt
+```
+
+If it does not, create it with a starting value like:
+
+```text
+28
+```
+
+or whatever build number you want to resume from.
+
+## Best practical advice
+If you want continuity with what GitHub currently shows, start it at:
+
+```text
+28
+```
+
+Then the next Release build should bump it to:
+
+```text
+29
+```
+
+If you want, I can also tell you:
+1. exactly what `Generated\BuildInfo.g.vb` should look like after restoring it, and  
+2. the quickest safe way to test the counter locally.
+
+## @testsubject117
+
+oh, it is there and it's contents are currently on 29 so your vbproj text replacement will probably fix it
+
+## Copilot
+
+Yes â€” thatâ€™s a very good sign.
+
+## Direct answer
+If:
+
+- `AMiOffice\build-counter.txt` is present locally
+- and it already says `29`
+
+then yes, the problem probably **isnâ€™t the file itself** â€” itâ€™s the **project/build hook behavior**, and the `.vbproj` replacement is the likely fix.
+
+## What that means
+Right now the most likely situation is:
+
+- the counter file exists
+- the app can still read generated build info
+- but the counter is **not being incremented under your current workflow**
+- because the old project logic only increments on **Publish**, not on the build path youâ€™re actually using
+
+## Best next move
+Replace the `.vbproj` with the version I sent, then test this exact sequence:
+
+### Test plan
+1. note current value in:
+   - `AMiOffice\build-counter.txt`
+   - currently `29`
+
+2. build **Release**
+
+3. confirm:
+   - `build-counter.txt` becomes `30`
+   - `AMiOffice\Generated\BuildInfo.g.vb` shows `BuildNumber = "30"`
+   - Main Menu/About shows build `30`
+
+4. then build **Debug**
+
+5. confirm:
+   - `build-counter.txt` stays `30`
+
+## Expected outcome
+If the replacement works correctly:
+
+- **Release increments**
+- **Debug does not**
+- the app display matches the file
+
+## One small caution
+If Visual Studio is publishing or building in some custom configuration other than `Release`, then the condition may need a minor tweak later. But for normal use, this should be the correct fix.
+
+## Short answer
+**Yes â€” since the text file is there and already at 29, the `.vbproj` change is very likely the real fix.**
+
+After you test it once, send me what happened and Iâ€™ll help verify whether itâ€™s fully solved.
+
+## @testsubject117
+
+now the app says build 0
+
+## Copilot
+
+That means the new `.vbproj` change is **reading/building the generated value incorrectly**, not that the counter file is gone.
+
+## Most likely cause
+The line using item metadata inside a property group is fragile:
+
+```xml
+<BuildNumber>$([System.String]::Copy('%(BuildCounterLines.Identity)').Trim())</BuildNumber>
+```
+
+and similarly for `BuildCounterLines2`.
+
+MSBuild can be finicky there, especially when item lists are empty or not evaluated the way we expect. When that expression fails to yield a usable value, your fallback kicks in:
+
+```xml
+<BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+```
+
+So the app ends up showing:
+
+- **Build 0**
+
+## Good news
+That means:
+- the pipeline is running
+- `GenerateBuildInfo` is happening
+- but the **BuildNumber property assignment is bad**
+
+## Best fix
+Use the simpler version from your saved old project file â€” it was actually safer in one important way:
+
+- only read from the file if `$(BuildNumber)` is blank
+- then assign directly from the line item
+- avoid over-complicated reassignments
+
+## Replace just the two targets with this
+In your `.vbproj`, remove the current `IncrementBuildCounter` and `GenerateBuildInfo` targets and replace them with this exact block:
+
+```xml
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter" BeforeTargets="CoreCompile" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <!-- Ensure the file exists -->
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <!-- Read current number -->
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <!-- Increment -->
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <!-- Write back -->
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <!-- Ensure the file exists -->
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <!-- If BuildNumber wasn't set by Release build increment, just read current counter -->
+    <ReadLinesFromFile Condition="'$(BuildNumber)' == ''" File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup Condition="'$(BuildNumber)' == ''">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+```
+
+## Why this is better
+This version:
+- increments simply
+- avoids the string-copy/trim gymnastics that likely zeroed out the value
+- only reads from file if build number was not already set by the increment target
+
+## Also check this immediately
+Open:
+
+```text
+AMiOffice\Generated\BuildInfo.g.vb
+```
+
+and see what it currently says for:
+
+```vb
+Friend Const BuildNumber As String = "..."
+```
+
+If it says `"0"`, that confirms the generation step is writing the wrong number, not the UI.
+
+## Short answer
+**Build 0 means the MSBuild property logic is wrong, not the counter file.**  
+Use the simpler target block above and test again.
+
+If you want, I can now send you the **entire full `.vbproj` file again**, corrected with this safer version.
+
+## @testsubject117
+
+oh, ho ho, I just published and then copied the new release to the virtual machine and ran it. the virtual machine has the counter.txt file too, and it says we're on build 32. I Thought that was the case, I remember seeing somewhere a build 31 folder. well, that's ok. so when I saw it was build 0, I was running the app from visual studio in debug mode. maybe that's why it showed 0?
+
+## Copilot
+
+Yes â€” **exactly**. That makes sense.
+
+## What happened
+You now have two different execution contexts:
+
+### 1. Published / Release copy
+That one:
+- increments the counter
+- generates the right `BuildInfo.g.vb`
+- shows the correct build
+- in your case, now **Build 32**
+
+### 2. Running from Visual Studio in Debug
+That one likely:
+- does **not** increment
+- and with the current `.vbproj` logic may still be generating/using:
+  - `BuildNumber = 0`
+
+So yes â€” the **Build 0** you saw was very likely because you were running the **Debug build from Visual Studio**, not the published Release copy.
+
+## Why this fits perfectly
+You said:
+
+- the VM release copy says **Build 32**
+- you remember seeing a **build 31** folder
+- debug run in Visual Studio showed **Build 0**
+
+That strongly suggests:
+- Publish path is working
+- Debug path is still using fallback/default behavior
+
+## Important conclusion
+So the build counter itself may **not actually be broken anymore** for the real deployment workflow.
+
+If your real build numbering convention is based on **published releases**, then:
+
+## The practical answer is:
+**the publish build counter is functioning**
+
+and the remaining question is only:
+
+> do you want Debug runs in Visual Studio to also display the current real build number instead of 0?
+
+## My recommendation
+Yes â€” fix that too.
+
+Because even if Debug should not increment the number, it should still **display the current counter value**, not `0`.
+
+## Desired behavior
+### Debug:
+- do **not** increment
+- do display current `build-counter.txt` value
+
+### Release/Publish:
+- increment
+- display incremented value
+
+That is the ideal setup.
+
+## So where we are now
+### Good news
+- publish/release numbering appears to be working
+- your actual deployed app may already be fine
+
+### Remaining cleanup
+- make Debug show the current build number instead of 0
+
+## Short answer
+**Yes â€” that is almost certainly why you saw Build 0.**
+You were running the app from **Visual Studio Debug**, while the real published app correctly shows **Build 32**.
+
+## Best next move
+I recommend we do one final cleanup fix:
+
+- keep **Release/Publish incrementing**
+- make **Debug read and display the existing counter value**
+- never show `0` unless the file is truly missing/empty
+
+If you want, I can now give you the **final corrected `.vbproj` target block** specifically for that behavior.
+
+## @testsubject117
+
+yes, we need to fix that, in debug I want to be able to see what build version we're currently on.
+
+## Copilot
+
+Yes â€” thatâ€™s the right behavior.
+
+## Goal
+In **Debug**:
+- do **not** increment the counter
+- but **do** show the current build number from `build-counter.txt`
+
+In **Release / Publish**:
+- increment the counter
+- then show the incremented number
+
+## Why Debug showed 0
+Because the current `GenerateBuildInfo` logic is not reliably reading the current counter into `BuildNumber` when running under Debug, so it falls back to:
+
+```xml
+<BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+```
+
+## Best fix
+Use this logic:
+
+- `IncrementBuildCounter`
+  - runs only for `Release`
+  - increments `build-counter.txt`
+- `GenerateBuildInfo`
+  - always reads the current file value
+  - if `BuildNumber` was already set by `IncrementBuildCounter`, it keeps that value
+  - otherwise, it uses the value from the file
+
+---
+
+# Replace your entire `AMiOffice.vbproj` with this
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <!-- Versioning policy:
+         - AssemblyVersion: changes rarely (typically major releases only)
+         - FileVersion: changes every Release build / Publish (uses BuildNumber)
+         - InformationalVersion: semver + build metadata -->
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Ensure BuildNumber is never blank -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <!-- What Windows shows for file version -->
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+
+    <!-- What Windows shows as "Product version" -->
+    <ProductVersion>$(Version)</ProductVersion>
+
+    <!-- Human-facing / marketing version -->
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter"
+          BeforeTargets="CoreCompile"
+          Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <!-- Ensure the file exists -->
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <!-- Read current number -->
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <!-- Increment -->
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <!-- Write back -->
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <!-- Ensure the file exists -->
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <!-- Always read current counter -->
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- If Release already incremented BuildNumber, keep it.
+         Otherwise use the current file value (Debug / normal local run). -->
+    <PropertyGroup Condition="'$(BuildNumber)' == '' or '$(BuildNumber)' == '0'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+---
+
+# Why this should fix Debug
+The key part is this block:
+
+```xml
+<PropertyGroup Condition="'$(BuildNumber)' == '' or '$(BuildNumber)' == '0'">
+  <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+</PropertyGroup>
+```
+
+That means:
+- if Release already incremented the number, keep it
+- if Debug left it blank or at default `0`, replace it with the real value from `build-counter.txt`
+
+---
+
+# Expected behavior after this
+## Debug in Visual Studio
+- no increment
+- should show current value, e.g. `Build 32`
+
+## Release build / Publish
+- increments counter
+- shows new incremented value, e.g. `Build 33`
+
+---
+
+# Test plan
+After replacing the file:
+
+1. open `build-counter.txt`
+2. note current value
+3. run **Debug**
+4. confirm app shows that same build number
+5. then run **Release** or Publish
+6. confirm counter increments by 1
+
+If you want, after you test it, paste what happened and Iâ€™ll help confirm whether this fully solved it.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	MSB4067	The element <BuildNumber> beneath element <Target> is unrecognized. If you intended this to be a property, enclose it within a <PropertyGroup> element. The project file is invalid on disk and was not reloaded.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\AMiOffice.vbproj	184	
+
+
+## Copilot
+
+Yep â€” that error is because this line was placed directly under `<Target>`:
+
+```xml
+<BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+```
+
+MSBuild only allows properties like that **inside a `<PropertyGroup>`**.
+
+## Fix
+Change that part to:
+
+```xml
+<PropertyGroup>
+  <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+</PropertyGroup>
+```
+
+## Exact corrected section
+In `GenerateBuildInfo`, replace this:
+
+```xml
+    <PropertyGroup Condition="'$(BuildNumber)' == '' or '$(BuildNumber)' == '0'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+```
+
+with this:
+
+```xml
+    <PropertyGroup Condition="'$(BuildNumber)' == '' or '$(BuildNumber)' == '0'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+```
+
+---
+
+## Safer full replacement
+Here is the full corrected `AMiOffice.vbproj` again with that fixed:
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+  </ItemGroup>
+
+  <Target Name="IncrementBuildCounter"
+          BeforeTargets="CoreCompile"
+          Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup Condition="'$(BuildNumber)' == '' or '$(BuildNumber)' == '0'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## Next step
+Reload the project, then test **Debug** first.
+
+What we want:
+- `build-counter.txt` stays the same
+- app shows the current build, not `0`
+
+If you want, after that test, tell me exactly what Debug now shows.
+
+## @testsubject117
+
+please send code for the whole file
+
+## Copilot
+
+Absolutely â€” here is the **entire corrected `AMiOffice.vbproj` file** to replace your current one.
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <StartupObject>AMiOffice.My.MyApplication</StartupObject>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <MyType>WindowsForms</MyType>
+
+    <AssemblyTitle>AMiOffice</AssemblyTitle>
+    <Product>AMiOffice</Product>
+    <Company>Kirk Saffell</Company>
+    <Description>AMiOffice Application</Description>
+
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+
+    <!-- Default fallback only; GenerateBuildInfo should replace this -->
+    <BuildNumber Condition="'$(BuildNumber)'==''">0</BuildNumber>
+
+    <FileVersion>$(Version).$(BuildNumber)</FileVersion>
+    <ProductVersion>$(Version)</ProductVersion>
+    <InformationalVersion>$(Version) (Build $(BuildNumber))</InformationalVersion>
+
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <BuildInfoFile>$(MSBuildProjectDirectory)\Generated\BuildInfo.g.vb</BuildInfoFile>
+
+    <Copyright>Copyright Kirk Saffell 2026</Copyright>
+    <Title>AMiOfficeApplication</Title>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugType>portable</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+  </PropertyGroup>
+
+  <!-- VB global imports to make designer code compile reliably -->
+  <ItemGroup>
+    <Import Include="System" />
+    <Import Include="System.Windows.Forms" />
+    <Import Include="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="FormAbout.Designer.vb">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </Compile>
+    <EmbeddedResource Update="FormAbout.resx">
+      <DependentUpon>FormAbout.vb</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!-- Hard-stop: never compile stray repo-root folders -->
+  <ItemGroup>
+    <Compile Remove="..\My Project\**\*.vb" />
+    <Compile Remove="..\obj\**\*.vb" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Remove="ESC Logo.jpg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="ESC Logo.jpg">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="My Project\Application.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Application.myapp</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Resources.Designer.vb">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+
+    <Compile Update="My Project\Settings.Designer.vb">
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="My Project\Resources.resx">
+      <CustomToolNamespace>My.Resources</CustomToolNamespace>
+      <Generator>VbMyResourcesResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.vb</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="My Project\Application.myapp">
+      <Generator>MyApplicationCodeGenerator</Generator>
+      <LastGenOutput>Application.Designer.vb</LastGenOutput>
+    </None>
+
+    <None Update="My Project\Settings.settings">
+      <CustomToolNamespace>My</CustomToolNamespace>
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.vb</LastGenOutput>
+    </None>
+  </ItemGroup>
+
+  <!-- Prevent compiling any stray BuildInfo file from the project root -->
+  <ItemGroup>
+    <Compile Remove="BuildInfo.g.vb" />
+    <Compile Remove="$(BuildInfoFile)" />
+  </ItemGroup>
+
+  <!-- Increment build number on Release builds only -->
+  <Target Name="IncrementBuildCounter"
+          BeforeTargets="CoreCompile"
+          Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines" />
+    </ReadLinesFromFile>
+
+    <PropertyGroup>
+      <BuildNumber>$([System.Int32]::Parse('%(BuildCounterLines.Identity)') + 1)</BuildNumber>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="$(BuildNumber)" />
+  </Target>
+
+  <!-- Generate BuildInfo.g.vb for all builds -->
+  <Target Name="GenerateBuildInfo" BeforeTargets="CoreCompile">
+    <PropertyGroup>
+      <BuildCounterFile>$(MSBuildProjectDirectory)\build-counter.txt</BuildCounterFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile
+      Condition="!Exists('$(BuildCounterFile)')"
+      File="$(BuildCounterFile)"
+      Overwrite="true"
+      Lines="0" />
+
+    <ReadLinesFromFile File="$(BuildCounterFile)">
+      <Output TaskParameter="Lines" ItemName="BuildCounterLines2" />
+    </ReadLinesFromFile>
+
+    <!-- In Debug, use the existing file value.
+         In Release, keep the incremented value already set above. -->
+    <PropertyGroup Condition="'$(Configuration)' != 'Release'">
+      <BuildNumber>%(BuildCounterLines2.Identity)</BuildNumber>
+    </PropertyGroup>
+
+    <PropertyGroup>
+      <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
+    </PropertyGroup>
+
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(BuildInfoFile)'))" />
+
+    <WriteLinesToFile
+      File="$(BuildInfoFile)"
+      Overwrite="true"
+      Lines="Option Strict On&#xD;&#xA;Option Explicit On&#xD;&#xA;&#xD;&#xA;Friend Module BuildInfo&#xD;&#xA;    Friend Const ProductVersion As String = &quot;$(ProductVersion)&quot;&#xD;&#xA;    Friend Const BuildNumber As String = &quot;$(BuildNumber)&quot;&#xD;&#xA;&#xD;&#xA;    Friend ReadOnly Property DisplayVersion As String&#xD;&#xA;        Get&#xD;&#xA;            Return &quot;AMiOffice v&quot; &amp; ProductVersion &amp; &quot; (Build &quot; &amp; BuildNumber &amp; &quot;)&quot;&#xD;&#xA;        End Get&#xD;&#xA;    End Property&#xD;&#xA;End Module&#xD;&#xA;" />
+
+    <ItemGroup>
+      <Compile Remove="$(BuildInfoFile)" />
+      <Compile Include="$(BuildInfoFile)" Visible="false" />
+    </ItemGroup>
+  </Target>
+
+</Project>
+```
+
+## Why this version is safer
+This version avoids the problematic:
+- direct property assignment outside `PropertyGroup`
+- weird `0` fallback overriding Debug unintentionally
+
+And it uses a simpler rule:
+
+- **Release**: increment counter first
+- **Debug**: just read whatever is already in `build-counter.txt`
+
+## What to test
+### Debug run
+- should show current build from `build-counter.txt`
+- should **not** increment
+
+### Release / Publish
+- should increment
+- should show new incremented build
+
+If you want, after you test it, tell me exactly:
+- what `build-counter.txt` said before
+- what Debug showed
+- what Release/Publish showed
+
+and Iâ€™ll verify whether itâ€™s fully correct.
+
+## @testsubject117
+
+ok, it now says 32 in debug
+
+## Copilot
+
+Perfect â€” that means itâ€™s fixed.
+
+## Current behavior now
+- **Debug** shows the current build number: `32`
+- **Release/Publish** increments the counter
+- the generated build info is now behaving the way you wanted
+
+## So this issue is resolved
+You now have the correct setup:
+
+- **Debug**
+  - no increment
+  - displays current build
+
+- **Release / Publish**
+  - increments build counter
+  - displays new build
+
+## What we fixed today
+1. fixed the truncated/lingering `Computing...` status issue
+2. cleaned up the final report-complete status display
+3. fixed build-number handling so:
+   - Debug shows current build
+   - Release/Publish increments properly
+
+## Next remembered item
+The remaining reminder is:
+
+- **standardize the Castellar title styling globally**
+  so all DOS-style form titles use the same look/font consistently
+
+That would be a good next cleanup task when youâ€™re ready.
+
+If you want, I can help you do that next in the safest way.
+
+## @testsubject117
+
+yep, let's move on to the font
+
+## Copilot
+
+The best next step is to centralize the title font in the shared base form, because `FormLedgerMenu` already uses `DosMenuFormBase` and calls `SetMenuTitle("CHECKS")`, while `FormMainMenu` is still styling its title directly instead of sharing that mechanism. îˆ€citeîˆ‚turn0commentary2îˆ‚turn0commentary1îˆ
+
+## What I found
+- `FormLedgerMenu` inherits `DosMenuFormBase` and uses `SetMenuTitle("CHECKS")`, so the shared title styling likely belongs there. îˆ€citeîˆ‚turn0commentary2îˆ
+- `FormMainMenu` sets only `lblMainMenu.Text = "MAIN MENU"` in code and does not show any shared title-font helper in the file itself. îˆ€citeîˆ‚turn0commentary1îˆ
+- The code search didnâ€™t find any explicit `Castellar` usage in the repo search results I got, so the font may be set in designer files or in `DosMenuFormBase`, which I havenâ€™t opened yet. Search results may be incomplete due to search limits. îˆ€citeîˆ‚turn0commentary3îˆ
+
+## Recommendation
+Before changing files, I should inspect:
+1. `DosMenuFormBase`
+2. `FormMainMenu.Designer.vb`
+3. possibly any shared designer/base form file that owns the title label
+
+That will let me:
+- identify the actual title label/control used in shared DOS forms
+- see whether the intended Castellar styling already exists somewhere
+- give you the correct whole-file replacement instead of guessing
+
+## Short answer
+We should **not guess** the font implementation. We should inspect the shared base form first, because that is almost certainly where the global title style belongs. îˆ€citeîˆ‚turn0commentary2îˆ‚turn0commentary1îˆ
+
+If you want, Iâ€™ll next inspect `DosMenuFormBase` and the main menu designer so I can give you the exact fix.
+
+## @testsubject117
+
+yes, do that
+
+## Copilot
+
+I found the key part: the shared DOS base form already sets the title to **Castellar, 36pt, bold, yellow on black** in `DosMenuFormBase`, so that is already the global style for forms inheriting from that base. `FormLedgerMenu` gets it automatically via `SetMenuTitle("CHECKS")`. `FormMainMenu` separately uses the same Castellar styling in its designer, but `FormLedgerDoesntBalance` was using `Times New Roman`, which is why it looked off. îˆ€citeîˆ‚turn0commentary4îˆ‚turn0commentary5îˆ‚turn0commentary6îˆ
+
+## What this means
+- `DosMenuFormBase` already has the shared title style:
+  - `New Font("Castellar", 36.0F, FontStyle.Bold, ...)` îˆ€citeîˆ‚turn0commentary4îˆ
+- `FormMainMenu.Designer.vb` also uses:
+  - `New Font("Castellar", 36F, FontStyle.Bold, ...)` îˆ€citeîˆ‚turn0commentary5îˆ
+- So the remaining work is to make standalone forms like `FormLedgerDoesntBalance` use the same title font and preferably centralize it in a helper to avoid drift. That conclusion is an inference from the code I inspected. îˆ€citeîˆ‚turn0commentary4îˆ‚turn0commentary5îˆ
+
+## Best next step
+The safest low-risk fix is:
+1. create a shared helper/module for DOS title styling
+2. use it in standalone forms first, especially `FormLedgerDoesntBalance`
+3. optionally update `DosMenuFormBase` and `FormMainMenu` to consume the same helper later
+
+## Immediate practical fix
+For `FormLedgerDoesntBalance`, change:
+
+```vb
+lblHeaderTitle.Font = New Font("Times New Roman", 34.0F, FontStyle.Regular, GraphicsUnit.Point)
+```
+
+to match the real shared look:
+
+```vb
+lblHeaderTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+```
+
+and keep:
+- yellow foreground
+- black background
+- left alignment
+
+That will visually match the shared DOS menus much more closely. This recommendation is directly supported by the base form and main menu code. îˆ€citeîˆ‚turn0commentary4îˆ‚turn0commentary5îˆ
+
+## Recommendation
+If you want a true global fix, the next code change should be a shared helper like:
+
+```vb
+Friend Module UiTheme
+    Friend Function CreateDosTitleFont() As Font
+        Return New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+    End Function
+End Module
+```
+
+Then use that from:
+- `DosMenuFormBase`
+- `FormMainMenu`
+- `FormLedgerDoesntBalance`
+
+## Short answer
+You already **do** have a de facto global title style in the shared DOS base form; `FormLedgerDoesntBalance` is the outlier and should be switched from Times New Roman to Castellar to match. îˆ€citeîˆ‚turn0commentary4îˆ‚turn0commentary5îˆ
+
+If you want, I can now give you:
+1. a small shared helper module file, and  
+2. the exact full-file replacement for `FormLedgerDoesntBalance.vb` to use it.
+
+## @testsubject117
+
+End of statement expected.
+
+## Copilot
+
+That error was almost certainly caused by using a C#-style comment or a malformed XML/VB line in something I suggested earlier.
+
+## Direct answer
+For the font task, the safest thing is: **do not add a helper module yet**.  
+First make the simple direct fix in `FormLedgerDoesntBalance.vb`:
+
+### Change this line
+```vb
+lblHeaderTitle.Font = New Font("Times New Roman", 34.0F, FontStyle.Regular, GraphicsUnit.Point)
+```
+
+### To this
+```vb
+lblHeaderTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+```
+
+That should compile cleanly in VB.
+
+## Why
+From the files we checked:
+- `DosMenuFormBase` already uses:
+  - `Castellar`, `36.0F`, `Bold`
+- `FormMainMenu.Designer.vb` also uses:
+  - `Castellar`, `36F`, `Bold`
+
+So this one-line change makes `FormLedgerDoesntBalance` match the existing shared look.
+
+## Most likely cause of â€œEnd of statement expected.â€
+Common causes in VB:
+- using `//` instead of `'`
+- malformed multiline XML/property syntax
+- putting code outside a method/class
+- C# syntax like `{}` or `;`
+
+## Best next step
+If you want, I can now send you a **full replacement of `FormLedgerDoesntBalance.vb`** with only the font updated to Castellar and nothing else risky changed.
+
+## @testsubject117
+
+please generate code to replace the entire file
+
+## Copilot
+
+Yes â€” here is the full replacement for `FormLedgerDoesntBalance.vb` with the title font changed to match the existing DOS-style forms:
+
+- **Castellar**
+- **36 pt**
+- **Bold**
+- yellow on black
+
+I kept the working status-area and progress fixes intact.
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Text
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Public Class FormLedgerDoesntBalance
+    Inherits System.Windows.Forms.Form
+
+    Private Const ScreenTitle As String = "Checks - Doesn't Balance"
+    Private Const Tolerance As Decimal = 1D ' DOS treated < 1 as OK
+
+    ' Row highlighting thresholds
+    Private Const LargeDeltaWarn As Decimal = 25D
+    Private Const LargeDeltaSevere As Decimal = 100D
+
+    Private cts As CancellationTokenSource
+
+    Private ReadOnly pnlHeader As New Panel()
+    Private ReadOnly lblHeaderTitle As New Label()
+    Private ReadOnly lblHeaderClock As New Label()
+    Private ReadOnly tmrClock As System.Windows.Forms.Timer = New System.Windows.Forms.Timer()
+
+    Private ReadOnly pnlCommands As New FlowLayoutPanel()
+    Private ReadOnly pnlStatus As New Panel()
+
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly btnRefresh As New Button()
+    Private ReadOnly btnCancel As New Button()
+    Private ReadOnly btnCopyRow As New Button()
+    Private ReadOnly btnExportCsv As New Button()
+    Private ReadOnly btnClose As New Button()
+    Private ReadOnly cboFilter As New ComboBox()
+    Private ReadOnly lblFilter As New Label()
+    Private ReadOnly lblStatusTop As New Label()
+    Private ReadOnly lblStatusBottom As New Label()
+
+    ' Keep the full results so we can filter/sort without re-running the report.
+    Private allRows As List(Of BalanceRow) = New List(Of BalanceRow)()
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Text = ScreenTitle
+        Width = 1200
+        Height = 850
+        StartPosition = FormStartPosition.CenterParent
+        BackColor = Color.FromArgb(34, 34, 34)
+        ForeColor = Color.Gainsboro
+        KeyPreview = True
+
+        BuildUi()
+        UpdateClock()
+
+        tmrClock.Interval = 1000
+        AddHandler tmrClock.Tick, Sub() UpdateClock()
+        tmrClock.Start()
+
+        FireAndForget(RunReportAsync())
+    End Sub
+
+    Protected Overrides Sub OnFormClosed(e As FormClosedEventArgs)
+        If tmrClock IsNot Nothing Then
+            tmrClock.Stop()
+        End If
+
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        MyBase.OnFormClosed(e)
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub BuildUi()
+        SuspendLayout()
+
+        pnlHeader.Dock = DockStyle.Top
+        pnlHeader.Height = 100
+        pnlHeader.BackColor = Color.Black
+        pnlHeader.Padding = New Padding(18, 10, 18, 10)
+
+        lblHeaderTitle.AutoSize = False
+        lblHeaderTitle.Left = 18
+        lblHeaderTitle.Top = 8
+        lblHeaderTitle.Width = 420
+        lblHeaderTitle.Height = 70
+        lblHeaderTitle.BackColor = Color.Black
+        lblHeaderTitle.ForeColor = Color.Yellow
+        lblHeaderTitle.Font = New Font("Castellar", 36.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblHeaderTitle.Text = "CHECKS"
+        lblHeaderTitle.TextAlign = ContentAlignment.MiddleLeft
+
+        lblHeaderClock.AutoSize = False
+        lblHeaderClock.Anchor = AnchorStyles.Top Or AnchorStyles.Right
+        lblHeaderClock.Width = 420
+        lblHeaderClock.Height = 40
+        lblHeaderClock.Left = ClientSize.Width - lblHeaderClock.Width - 18
+        lblHeaderClock.Top = 22
+        lblHeaderClock.BackColor = Color.Black
+        lblHeaderClock.ForeColor = Color.Yellow
+        lblHeaderClock.Font = New Font("Segoe UI", 13.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblHeaderClock.TextAlign = ContentAlignment.MiddleRight
+
+        AddHandler pnlHeader.Resize,
+            Sub()
+                lblHeaderClock.Left = pnlHeader.ClientSize.Width - lblHeaderClock.Width - 18
+            End Sub
+
+        pnlHeader.Controls.Add(lblHeaderTitle)
+        pnlHeader.Controls.Add(lblHeaderClock)
+
+        pnlCommands.Dock = DockStyle.Top
+        pnlCommands.Height = 64
+        pnlCommands.Padding = New Padding(12, 10, 12, 8)
+        pnlCommands.FlowDirection = FlowDirection.LeftToRight
+        pnlCommands.WrapContents = False
+        pnlCommands.BackColor = Color.FromArgb(34, 34, 34)
+
+        StyleMenuButton(btnRefresh, "Refresh", 110)
+        StyleMenuButton(btnCancel, "Cancel", 110)
+        StyleMenuButton(btnCopyRow, "Copy Row", 120)
+        StyleMenuButton(btnExportCsv, "Export CSV", 130)
+        StyleMenuButton(btnClose, "(ESC) Close", 130)
+
+        btnCancel.Enabled = False
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+
+        AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
+        AddHandler btnCancel.Click, AddressOf btnCancel_Click
+        AddHandler btnCopyRow.Click, AddressOf btnCopyRow_Click
+        AddHandler btnExportCsv.Click, AddressOf btnExportCsv_Click
+        AddHandler btnClose.Click, Sub() Close()
+
+        lblFilter.AutoSize = True
+        lblFilter.Padding = New Padding(10, 9, 0, 0)
+        lblFilter.ForeColor = Color.Gainsboro
+        lblFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblFilter.Text = "Filter:"
+
+        cboFilter.DropDownStyle = ComboBoxStyle.DropDownList
+        cboFilter.Width = 220
+        cboFilter.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        cboFilter.BackColor = Color.White
+        cboFilter.ForeColor = Color.Black
+        cboFilter.Items.Clear()
+        cboFilter.Items.Add(FilterMode.AllUnbalanced)
+        cboFilter.Items.Add(FilterMode.NoMapping)
+        cboFilter.Items.Add(FilterMode.DeltaOnly)
+        cboFilter.SelectedIndex = 0
+        AddHandler cboFilter.SelectedIndexChanged, AddressOf cboFilter_SelectedIndexChanged
+
+        pnlStatus.Width = 250
+        pnlStatus.Height = 38
+        pnlStatus.Margin = New Padding(12, 0, 0, 0)
+        pnlStatus.Padding = New Padding(0)
+        pnlStatus.BackColor = Color.Transparent
+
+        lblStatusTop.AutoSize = False
+        lblStatusTop.Left = 0
+        lblStatusTop.Top = 0
+        lblStatusTop.Width = 250
+        lblStatusTop.Height = 18
+        lblStatusTop.Margin = New Padding(0)
+        lblStatusTop.ForeColor = Color.Gainsboro
+        lblStatusTop.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        lblStatusTop.TextAlign = ContentAlignment.MiddleLeft
+        lblStatusTop.Text = ""
+
+        lblStatusBottom.AutoSize = False
+        lblStatusBottom.Left = 0
+        lblStatusBottom.Top = 18
+        lblStatusBottom.Width = 250
+        lblStatusBottom.Height = 16
+        lblStatusBottom.Margin = New Padding(0)
+        lblStatusBottom.ForeColor = Color.Gainsboro
+        lblStatusBottom.Font = New Font("Segoe UI", 9.0F, FontStyle.Regular, GraphicsUnit.Point)
+        lblStatusBottom.TextAlign = ContentAlignment.MiddleLeft
+        lblStatusBottom.Text = ""
+
+        pnlStatus.Controls.Add(lblStatusTop)
+        pnlStatus.Controls.Add(lblStatusBottom)
+
+        pnlCommands.Controls.Add(btnRefresh)
+        pnlCommands.Controls.Add(btnCancel)
+        pnlCommands.Controls.Add(btnCopyRow)
+        pnlCommands.Controls.Add(btnExportCsv)
+        pnlCommands.Controls.Add(btnClose)
+        pnlCommands.Controls.Add(lblFilter)
+        pnlCommands.Controls.Add(cboFilter)
+        pnlCommands.Controls.Add(pnlStatus)
+
+        dgv.Dock = DockStyle.Fill
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.AutoGenerateColumns = False
+        dgv.MultiSelect = False
+        dgv.BackgroundColor = Color.Black
+        dgv.BorderStyle = BorderStyle.None
+        dgv.GridColor = Color.DimGray
+        dgv.RowHeadersVisible = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single
+        dgv.CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal
+        dgv.ColumnHeadersHeight = 34
+        dgv.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        dgv.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Regular, GraphicsUnit.Point)
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.DefaultCellStyle.SelectionBackColor = Color.FromArgb(45, 85, 140)
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+        dgv.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(18, 18, 18)
+
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Gainsboro
+        dgv.ColumnHeadersDefaultCellStyle.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+
+        AddHandler dgv.SelectionChanged, AddressOf dgv_SelectionChanged
+        AddHandler dgv.RowPrePaint, AddressOf dgv_RowPrePaint
+
+        dgv.Columns.Clear()
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Customer", .DataPropertyName = NameOf(BalanceRow.Customer), .Width = 140})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Date", .DataPropertyName = NameOf(BalanceRow.DateText), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check #", .DataPropertyName = NameOf(BalanceRow.CheckNumber), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Check Amount", .DataPropertyName = NameOf(BalanceRow.CheckAmount), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Count", .DataPropertyName = NameOf(BalanceRow.InvoiceCount), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Invoice Sum", .DataPropertyName = NameOf(BalanceRow.InvoiceSum), .Width = 120})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Delta", .DataPropertyName = NameOf(BalanceRow.Delta), .Width = 110})
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {.HeaderText = "Note", .DataPropertyName = NameOf(BalanceRow.Note), .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill})
+
+        Controls.Add(dgv)
+        Controls.Add(pnlCommands)
+        Controls.Add(pnlHeader)
+
+        ResumeLayout()
+    End Sub
+
+    Private Sub StyleMenuButton(btn As Button, caption As String, width As Integer)
+        btn.Text = caption
+        btn.Width = width
+        btn.Height = 30
+        btn.Margin = New Padding(0, 0, 8, 0)
+        btn.FlatStyle = FlatStyle.Standard
+        btn.BackColor = Color.Silver
+        btn.ForeColor = Color.Black
+        btn.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold, GraphicsUnit.Point)
+        btn.UseVisualStyleBackColor = True
+    End Sub
+
+    Private Sub UpdateClock()
+        lblHeaderClock.Text = DateTime.Now.ToString("dddd  MM-dd-yyyy      hh:mm:ss tt")
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs)
+        If cts IsNot Nothing Then cts.Cancel()
+    End Sub
+
+    Private Async Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        Await RunReportAsync()
+    End Sub
+
+    Private Sub btnCopyRow_Click(sender As Object, e As EventArgs)
+        Dim r As BalanceRow = TryCast(dgv.CurrentRow?.DataBoundItem, BalanceRow)
+        If r Is Nothing Then Return
+
+        Dim text As String =
+            r.Customer & vbTab &
+            r.DateText & vbTab &
+            r.CheckNumber & vbTab &
+            r.CheckAmount & vbTab &
+            r.InvoiceCount & vbTab &
+            r.InvoiceSum & vbTab &
+            r.Delta & vbTab &
+            r.Note
+
+        Clipboard.SetText(text)
+        lblStatusTop.Text = "Copied selected row to clipboard."
+        lblStatusBottom.Text = ""
+    End Sub
+
+    Private Sub btnExportCsv_Click(sender As Object, e As EventArgs)
+        Dim rows As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+        If rows Is Nothing OrElse rows.Count = 0 Then
+            MessageBox.Show(Me, "There are no rows to export.", ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Return
+        End If
+
+        Using sfd As New SaveFileDialog()
+            sfd.Title = "Export CSV"
+            sfd.Filter = "CSV (*.csv)|*.csv|All files (*.*)|*.*"
+            sfd.FileName = $"LedgerDoesntBalance_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            If sfd.ShowDialog(Me) <> DialogResult.OK Then Return
+
+            Try
+                Dim sb As New StringBuilder()
+                sb.AppendLine("Customer,Date,CheckNumber,CheckAmount,InvoiceCount,InvoiceSum,Delta,Note")
+
+                For Each r In rows
+                    sb.AppendLine(
+                        Csv(r.Customer) & "," &
+                        Csv(r.DateText) & "," &
+                        Csv(r.CheckNumber) & "," &
+                        Csv(r.CheckAmount) & "," &
+                        Csv(r.InvoiceCount) & "," &
+                        Csv(r.InvoiceSum) & "," &
+                        Csv(r.Delta) & "," &
+                        Csv(r.Note)
+                    )
+                Next
+
+                IO.File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8)
+                lblStatusTop.Text = $"Exported {rows.Count:N0} row(s) to CSV."
+                lblStatusBottom.Text = ""
+            Catch ex As Exception
+                MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+            End Try
+        End Using
+    End Sub
+
+    Private Sub cboFilter_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilterAndBind()
+    End Sub
+
+    Private Sub dgv_SelectionChanged(sender As Object, e As EventArgs)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Sub dgv_RowPrePaint(sender As Object, e As DataGridViewRowPrePaintEventArgs)
+        Dim row As DataGridViewRow = dgv.Rows(e.RowIndex)
+        Dim data As BalanceRow = TryCast(row.DataBoundItem, BalanceRow)
+        If data Is Nothing Then Return
+
+        row.DefaultCellStyle.BackColor = dgv.DefaultCellStyle.BackColor
+        row.DefaultCellStyle.ForeColor = dgv.DefaultCellStyle.ForeColor
+        row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+        row.DefaultCellStyle.SelectionForeColor = Color.Black
+
+        If data.IsNoMapping Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(250, 245, 190)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(253, 249, 205)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+            row.DefaultCellStyle.Font = dgv.DefaultCellStyle.Font
+            Return
+        End If
+
+        Dim absDelta As Decimal = Math.Abs(data.DeltaValue)
+        If absDelta >= LargeDeltaSevere Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(249, 232, 236)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(252, 238, 241)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        ElseIf absDelta >= LargeDeltaWarn Then
+            row.DefaultCellStyle.BackColor = Color.FromArgb(252, 239, 242)
+            row.DefaultCellStyle.ForeColor = Color.Black
+            row.DefaultCellStyle.SelectionBackColor = Color.FromArgb(254, 244, 246)
+            row.DefaultCellStyle.SelectionForeColor = Color.Black
+        End If
+    End Sub
+
+    Private Async Function RunReportAsync() As Task
+        If cts IsNot Nothing Then
+            cts.Cancel()
+            cts.Dispose()
+            cts = Nothing
+        End If
+
+        cts = New CancellationTokenSource()
+        Dim token As CancellationToken = cts.Token
+
+        btnRefresh.Enabled = False
+        btnCancel.Enabled = True
+        btnCopyRow.Enabled = False
+        btnExportCsv.Enabled = False
+        btnClose.Enabled = False
+        cboFilter.Enabled = False
+        lblStatusTop.Text = "Starting..."
+        lblStatusBottom.Text = ""
+        dgv.DataSource = Nothing
+        allRows = New List(Of BalanceRow)()
+
+        Dim ledgerPath As String = LegacyDataPaths.LedgerCur
+        Dim checkInvPath As String = LegacyDataPaths.CheckInv
+        Dim invoiceChkPath As String = LegacyDataPaths.InvoiceChk
+
+        If Not IO.File.Exists(ledgerPath) Then
+            UiFileErrors.ShowMissingRequiredFile(Me, ScreenTitle, ledgerPath)
+            lblStatusTop.Text = "Missing LEDGER.CUR"
+            lblStatusBottom.Text = ""
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+            Return
+        End If
+
+        Dim progress As IProgress(Of ProgressInfo) =
+            New Progress(Of ProgressInfo)(
+                Sub(p As ProgressInfo)
+                    If token.IsCancellationRequested Then Return
+
+                    lblStatusTop.Text = p.Message
+
+                    If p.Total > 0 Then
+                        lblStatusBottom.Text = $"{p.Current:N0}/{p.Total:N0}"
+                    Else
+                        lblStatusBottom.Text = ""
+                    End If
+                End Sub
+            )
+
+        Try
+            Dim rows As List(Of BalanceRow) =
+                Await Task.Run(Function() ComputeRows(ledgerPath, checkInvPath, invoiceChkPath, token, progress), token)
+
+            If token.IsCancellationRequested Then
+                lblStatusTop.Text = "Cancelled"
+                lblStatusBottom.Text = ""
+                Return
+            End If
+
+            allRows = rows
+            ApplyFilterAndBind()
+        Catch ex As OperationCanceledException
+            lblStatusTop.Text = "Cancelled"
+            lblStatusBottom.Text = ""
+        Catch ex As Exception
+            lblStatusTop.Text = "Error running report"
+            lblStatusBottom.Text = ""
+            MessageBox.Show(Me, ex.ToString(), ScreenTitle, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            btnRefresh.Enabled = True
+            btnCancel.Enabled = False
+            btnClose.Enabled = True
+            cboFilter.Enabled = True
+
+            Dim current As List(Of BalanceRow) = TryCast(dgv.DataSource, List(Of BalanceRow))
+            btnExportCsv.Enabled = (current IsNot Nothing AndAlso current.Count > 0)
+        End Try
+    End Function
+
+    Private Sub ApplyFilterAndBind()
+        Dim mode As String = TryCast(cboFilter.SelectedItem, String)
+        If String.IsNullOrWhiteSpace(mode) Then mode = FilterMode.AllUnbalanced
+
+        Dim filtered As IEnumerable(Of BalanceRow) = allRows
+
+        Select Case mode
+            Case FilterMode.NoMapping
+                filtered = filtered.Where(Function(r) r.IsNoMapping)
+            Case FilterMode.DeltaOnly
+                filtered = filtered.Where(Function(r) Not r.IsNoMapping)
+            Case Else
+        End Select
+
+        Dim sorted As List(Of BalanceRow) =
+            filtered.OrderByDescending(Function(r) If(r.IsNoMapping, Decimal.MaxValue, Math.Abs(r.DeltaValue))).ToList()
+
+        dgv.DataSource = sorted
+
+        lblStatusTop.Text = "Report complete"
+        lblStatusBottom.Text = $"{allRows.Count:N0} checked"
+
+        btnExportCsv.Enabled = (sorted.Count > 0)
+        btnCopyRow.Enabled = (dgv.CurrentRow IsNot Nothing AndAlso dgv.CurrentRow.DataBoundItem IsNot Nothing)
+    End Sub
+
+    Private Shared Function ComputeRows(
+        ledgerPath As String,
+        checkInvPath As String,
+        invoiceChkPath As String,
+        token As CancellationToken,
+        progress As IProgress(Of ProgressInfo)
+    ) As List(Of BalanceRow)
+
+        token.ThrowIfCancellationRequested()
+        progress?.Report(New ProgressInfo("Loading ledger...", 0, 0))
+
+        Dim ledger As List(Of LedgerEntry) = LedgerCurReader.ReadAll(ledgerPath)
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Loading CHECK.INV...", 0, 0))
+
+        Dim invIndex As New Dictionary(Of String, List(Of Long))(StringComparer.OrdinalIgnoreCase)
+        If IO.File.Exists(checkInvPath) Then
+            Try
+                Dim blocks = CheckInvReader.ReadAll(checkInvPath)
+                Dim i As Integer = 0
+                For Each b In blocks
+                    token.ThrowIfCancellationRequested()
+                    i += 1
+                    If (i Mod 250) = 0 Then
+                        progress?.Report(New ProgressInfo("Indexing CHECK.INV...", i, blocks.Count))
+                    End If
+
+                    Dim key = BuildKey(b.CustomerCode, b.CheckNumber)
+                    Dim lst As List(Of Long) = Nothing
+                    If Not invIndex.TryGetValue(key, lst) Then
+                        lst = New List(Of Long)()
+                        invIndex(key) = lst
+                    End If
+
+                    If b.Invoices IsNot Nothing Then
+                        For Each s In b.Invoices
+                            Dim n As Long
+                            If Long.TryParse(If(s, "").Trim(), n) Then
+                                lst.Add(n)
+                            End If
+                        Next
+                    End If
+                Next
+            Catch
+                ' Best effort; keep what we have.
+            End Try
+        End If
+
+        token.ThrowIfCancellationRequested()
+
+        progress?.Report(New ProgressInfo("Computing rows...", 0, ledger.Count))
+
+        Dim amtCache As New Dictionary(Of Long, Decimal)()
+        Dim rows As New List(Of BalanceRow)()
+
+        Dim idx As Integer = 0
+        For Each e In ledger
+            token.ThrowIfCancellationRequested()
+
+            idx += 1
+            If (idx Mod 250) = 0 Then
+                progress?.Report(New ProgressInfo("Computing rows...", idx, ledger.Count))
+            End If
+
+            Dim key = BuildKey(e.Customer, e.CheckNumber)
+
+            Dim invNos As List(Of Long) = Nothing
+            Dim hasMapping As Boolean = invIndex.TryGetValue(key, invNos)
+
+            If Not hasMapping OrElse invNos Is Nothing OrElse invNos.Count = 0 Then
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = 0,
+                    .InvoiceSumValue = 0D,
+                    .DeltaValue = 0D,
+                    .Note = "No CHECK.INV mapping",
+                    .IsNoMapping = True
+                })
+                Continue For
+            End If
+
+            Dim sum As Decimal = 0D
+            Dim foundAny As Boolean = False
+
+            For Each invNo In invNos
+                token.ThrowIfCancellationRequested()
+
+                Dim a As Decimal = 0D
+                If amtCache.TryGetValue(invNo, a) Then
+                    sum += a
+                    foundAny = True
+                Else
+                    Dim rec = InvoiceChkReader.ReadRecord(invoiceChkPath, invNo)
+                    If rec.IsFound Then
+                        a = rec.Amount
+                        amtCache(invNo) = a
+                        sum += a
+                        foundAny = True
+                    Else
+                        amtCache(invNo) = 0D
+                    End If
+                End If
+            Next
+
+            Dim delta As Decimal = sum - e.Amount
+            Dim unbalanced As Boolean = (Not foundAny) OrElse (Math.Abs(delta) >= Tolerance)
+
+            If unbalanced Then
+                Dim note As String = If(Not foundAny, "Invoices not found in INVOICE.CHK", "")
+                rows.Add(New BalanceRow With {
+                    .Customer = SafeTrimEnd(e.Customer),
+                    .DateText = SafeTrimEnd(e.DateText),
+                    .CheckNumber = SafeTrim(e.CheckNumber),
+                    .CheckAmountValue = e.Amount,
+                    .InvoiceCountValue = invNos.Count,
+                    .InvoiceSumValue = sum,
+                    .DeltaValue = delta,
+                    .Note = note,
+                    .IsNoMapping = False
+                })
+            End If
+        Next
+
+        ' Final exact progress update so the live counter reaches the true final row count.
+        progress?.Report(New ProgressInfo("Computing rows...", ledger.Count, ledger.Count))
+        progress?.Report(New ProgressInfo("Done.", ledger.Count, ledger.Count))
+
+        Return rows
+    End Function
+
+    Private Shared Sub FireAndForget(t As Task)
+        If t Is Nothing Then Return
+
+        t.ContinueWith(
+            Sub(completed As Task)
+                Dim ignored = completed.Exception
+            End Sub,
