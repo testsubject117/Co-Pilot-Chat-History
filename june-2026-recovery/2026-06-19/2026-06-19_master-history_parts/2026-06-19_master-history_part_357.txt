@@ -1,0 +1,2000 @@
+﻿    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        ' Place overlay at the Y-position where the prompt line is in the screen.
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        ' Small inset to align with TextBox's internal text origin
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If _mode <> InputMode.Menu Then Return
+
+        Select Case e.KeyCode
+            Case Keys.Escape
+                Me.Close()
+                e.Handled = True
+
+            Case Keys.D1, Keys.NumPad1
+                BeginCustomerPrompt()
+                e.Handled = True
+
+            Case Keys.D2, Keys.NumPad2
+                RunViewAllCustomers()
+                e.Handled = True
+
+            Case Keys.D3, Keys.NumPad3
+                BeginInvoiceLookupPrompt()
+                e.Handled = True
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+        End Select
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            pnlPrompt.Visible = False
+            _mode = InputMode.Menu
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                RenderMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' IMPORTANT: If your LogBookEntry uses a different property name than InvoiceNumber,
+                ' change this line accordingly (e.g. entry.InvoiceNo, entry.Invoice, entry.InvoiceNum).
+                Dim inv As String = entry.InvoiceNumber
+
+                If String.IsNullOrEmpty(inv) Then Continue For
+                If String.Equals(inv.Trim(), invoiceInput.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    ' -----------------------------
+    ' Paging helpers (3 entries/page, DOS-like)
+    ' -----------------------------
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+### One thing to check after you drop this in
+If it doesnâ€™t compile, itâ€™ll be because `entry.InvoiceNumber` is named differently in your model. If you paste the `LogBookEntry` class (or just the properties), Iâ€™ll adjust that line and resend the full file.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)	ENC0021	Adding enum value requires restarting the application.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	29	
+Error (active)	BC30512	Option Strict On disallows implicit conversions from 'Integer?' to 'String'.	AMiOffice	C:\Users\CapnKirk\source\repos\AmiWinForms\AMiOffice\FormLogBookMenu.vb	377	
+
+
+## Copilot
+
+Make these two fixes:
+
+## 1) ENC0021 (Edit-and-Continue)
+That one isnâ€™t a code problem: Visual Studio canâ€™t apply â€œadded enum valueâ€ while debugging.
+
+- **Stop debugging** (Shift+F5)
+- Rebuild
+- Start again
+
+(Or avoid changing enums while running, but stopping/restarting is the normal fix.)
+
+## 2) `Integer?` to `String` (invoice field type)
+Your `entry.InvoiceNumber` is a **nullable Integer (`Integer?`)**, not a String. So this line:
+
+```vbnet
+Dim inv As String = entry.InvoiceNumber
+```
+
+must become something like:
+
+- treat invoice input as an Integer
+- compare to `entry.InvoiceNumber.Value`
+
+Here is the **minimal patch** inside `RunInvoiceLookup` (replace the body with this version):
+
+```vbnet name=FormLogBookMenu.vb
+' Replace your RunInvoiceLookup(invoiceInput As String) with this version
+Private Sub RunInvoiceLookup(invoiceInput As String)
+    If String.IsNullOrWhiteSpace(invoiceInput) Then
+        RenderMenu()
+        Return
+    End If
+
+    Dim invoiceNum As Integer
+    If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+        Using v As New FrmDosPagedViewer()
+            v.Text = "LOG BOOK"
+            v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+            v.ShowDialog(Me)
+        End Using
+        RenderMenu()
+        Return
+    End If
+
+    Dim reader As New LogBookReader(DataDir)
+
+    Dim pages As New List(Of String)()
+    Dim pageSb As New System.Text.StringBuilder()
+    Dim pageEntryCount As Integer = 0
+
+    Try
+        For Each entry In reader.ReadEntries(_yearTwoDigit)
+            If entry Is Nothing Then Continue For
+
+            ' InvoiceNumber is Integer?
+            If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            End If
+        Next
+    Catch ex As Exception
+        Using v As New FrmDosPagedViewer()
+            v.Text = "LOG BOOK"
+            v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+            v.ShowDialog(Me)
+        End Using
+        RenderMenu()
+        Return
+    End Try
+
+    FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+    If pages.Count = 0 Then
+        Using v As New FrmDosPagedViewer()
+            v.Text = "LOG BOOK"
+            v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+            v.ShowDialog(Me)
+        End Using
+        RenderMenu()
+        Return
+    End If
+
+    pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+    Using viewer As New FrmDosPagedViewer()
+        viewer.Text = "LOG BOOK"
+        viewer.SetPages(pages)
+        viewer.ShowDialog(Me)
+    End Using
+
+    RenderMenu()
+End Sub
+```
+
+### Optional (avoid editing the enum in the future)
+If you want to avoid adding enum members (and triggering ENC0021), we can remove the enum additions and just use a Boolean like `_isInvoicePromptActive`, but you donâ€™t have toâ€”just restart debugging when you change enums.
+
+If you paste the `LogBookEntry` type (or just its `InvoiceNumber` declaration), I can also make sure the comparison matches DOS exactly (e.g., whether it allows leading zeros).
+
+## @testsubject117
+
+Please generate the code to replace the entire file
+
+## Copilot
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen (display only)
+    Private ReadOnly txtScreen As TextBox
+
+    ' Prompt overlay (NOT docked at bottom; positioned near prompt line)
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+        AddHandler Me.KeyDown, AddressOf OnFormKeyDown
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        ' Place overlay at the Y-position where the prompt line is in the screen.
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        ' Small inset to align with TextBox's internal text origin
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    Private Sub OnFormKeyDown(sender As Object, e As KeyEventArgs)
+        If _mode <> InputMode.Menu Then Return
+
+        Select Case e.KeyCode
+            Case Keys.Escape
+                Me.Close()
+                e.Handled = True
+
+            Case Keys.D1, Keys.NumPad1
+                BeginCustomerPrompt()
+                e.Handled = True
+
+            Case Keys.D2, Keys.NumPad2
+                RunViewAllCustomers()
+                e.Handled = True
+
+            Case Keys.D3, Keys.NumPad3
+                BeginInvoiceLookupPrompt()
+                e.Handled = True
+
+            Case Keys.Q
+                Me.Close()
+                e.Handled = True
+        End Select
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            pnlPrompt.Visible = False
+            _mode = InputMode.Menu
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                RenderMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' InvoiceNumber is Integer?
+                If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    ' -----------------------------
+    ' Paging helpers (3 entries/page, DOS-like)
+    ' -----------------------------
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+## @testsubject117
+
+it's doing something weird now. I click on (3) and it asks for an invoice number, I begin typing the number but when I put the 2nd digit in, it automatically opens a search window that contains a search for invoices beginning with 73, which is what I typed. ok, I see what's happening. it's putting that leading character in again, when i click 3, I get the enter invoice number prompt. I type 7, nothing happens, the 7 is shown, I type 2, a window opens containing invoices starting with 73. I saw a few times on the line that asks for the invoice #, that the # 3 is being auto generated and inserted. is this because for user convenience it's trying to display the key they clicked on? (3)
+
+## Copilot
+
+That behavior happens because the **menu keystroke is leaking into the prompt TextBox**.
+
+Sequence right now:
+
+1. You press `3` â†’ `OnFormKeyDown` switches to prompt mode and calls `txtInput.Focus()`.
+2. The *same keypress* (or its KeyPress/WM_CHAR) then lands in `txtInput`, so it types an extra character (often the `3`, sometimes it shifts what you intended), and your prompt handler runs with a polluted bufferâ€”so you end up searching for the wrong prefix like `73`.
+
+Fix: when entering prompt mode, **eat the initiating key** and/or ignore the first character typed into the input box. The clean WinForms way is:
+
+- intercept keys at the form level using `ProcessCmdKey`
+- when user hits `1` or `3`, start the prompt and **return True** (consume it)
+- remove `Me.KeyDown` handling for menu selection so the key never reaches the TextBox
+
+Below is a full-file replacement that does exactly that and also prevents double-handling. (It keeps your overlay prompt UI and 3-entries-per-page logic.)
+
+## Replace entire file: `FormLogBookMenu.vb`
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen (display only)
+    Private ReadOnly txtScreen As TextBox
+
+    ' Prompt overlay (NOT docked at bottom; positioned near prompt line)
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    ' When we enter a prompt from a menu key, the initiating key can "leak" into txtInput.
+    ' Set this True when we open a prompt; then the first KeyPress into txtInput is ignored.
+    Private _ignoreNextInputKeyPress As Boolean = False
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+
+        ' IMPORTANT: We do NOT use Me.KeyDown for menu selection anymore.
+        ' We handle menu keys in ProcessCmdKey so the initiating key is consumed.
+
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+        AddHandler txtInput.KeyPress, AddressOf OnInputKeyPress
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    ' Consume menu keys here so they cannot "leak" into txtInput when we Focus() it.
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close()
+                    Return True
+
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt()
+                    Return True
+
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers()
+                    Return True
+
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt()
+                    Return True
+
+                Case Keys.Q
+                    Me.Close()
+                    Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+        _ignoreNextInputKeyPress = False
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    ' Ignore the first typed character after opening the prompt (prevents leaking menu key into txtInput)
+    Private Sub OnInputKeyPress(sender As Object, e As KeyPressEventArgs)
+        If Not _ignoreNextInputKeyPress Then Return
+
+        _ignoreNextInputKeyPress = False
+        e.Handled = True
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            pnlPrompt.Visible = False
+            _mode = InputMode.Menu
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                RenderMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' InvoiceNumber is Integer?
+                If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    ' -----------------------------
+    ' Paging helpers (3 entries/page, DOS-like)
+    ' -----------------------------
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+### After you replace it
+- Stop debugging and restart (since weâ€™re modifying behavior while running).
+- Try: click `(3)`, then type `736254` (or any invoice). It should **not** inject `3` anymore.
+
+If it still injects characters, tell me whether you are **clicking the button** with the mouse or pressing `3` on the keyboardâ€”thereâ€™s a slightly different fix for mouse-click (focus transfer) vs keypress.
+
+## @testsubject117
+
+but wait. I'm pressing 72, then why is it looking for 73?
+
+## Copilot
+
+Because the input is getting **polluted by an extra character** from the menu selection, and that shifts what ends up in the TextBox.
+
+In your case youâ€™re *seeing* `72` on-screen, but the actual buffer being used for the search is effectively getting an extra `3` inserted (often as the **2nd character**), so it becomes `7` + `3` â€¦ which is why the search window shows invoices starting with **`73`**.
+
+This can happen two common ways in WinForms:
+
+1) **The initiating â€œ3â€ key** (used to pick option 3) leaks into the prompt TextBox after you call `txtInput.Focus()`. So the first character typed is actually the leftover `3`, not what you think.
+
+2) You currently have **two key paths** active (Form-level and TextBox-level), so a single physical key press can generate both a `KeyDown` action (switching modes) and a `KeyPress/WM_CHAR` character that lands in the TextBox.
+
+### The fix
+Use the full-file replacement I sent in the previous message. It fixes this by:
+- handling menu selection in `ProcessCmdKey` and **returning True** (consuming the key)
+- ignoring the first `KeyPress` into the input field right after opening the prompt (`_ignoreNextInputKeyPress`)
+
+That combination stops the â€œ3â€ from ever becoming part of the invoice input, which in turn stops the `72 â†’ 73` confusion.
+
+### Quick verification (takes 10 seconds)
+After applying the replacement:
+1) Open (3)
+2) Type `72`
+3) Press Enter
+
+If it still searches `73`, tell me **exactly** how you enter option (3):
+- do you press the `3` key, or
+- do you click a button labeled â€œ(3) Look up an invoiceâ€?
+
+(Mouse-click can require one extra line: `Me.ActiveControl = Nothing` before focusing `txtInput`, but weâ€™ll only add that if needed.)
+
+## @testsubject117
+
+also, still, when I press, 7, nothing, then 2 it opens the window, shouldn't it wait for the entire number to be typed out? 726218?
+
+## Copilot
+
+Yes â€” it **should wait until you press Enter**. If itâ€™s opening the viewer as soon as you type the 2nd digit, that means **something else in your project is still wired to â€œsearch on every keypress/changeâ€** (likely `TextChanged` on the input, or `KeyUp/KeyDown` on the form) and is calling the invoice lookup with the *current prefix* (`"73"`/`"72"`).
+
+In the full-file replacement I gave, the lookup only runs here:
+
+- `OnInputKeyDown` **when** `e.KeyCode = Keys.Enter`
+
+So if itâ€™s still popping early, one of these is true:
+
+1) You didnâ€™t remove/replace the previous `Me.KeyDown` menu handler version (old code still running), **or**
+2) There is an additional handler elsewhere (designer or another class) hooked to `txtInput.TextChanged` / `KeyPress` that triggers a search window.
+
+### Fast way to find the culprit
+In Visual Studio, do **Find in Files** for any of these:
+
+- `TextChanged`
+- `AddHandler txtInput.TextChanged`
+- `Handles txtInput.TextChanged`
+- `RunInvoiceLookup(`  
+- `SetPages(` or `ShowDialog(` near invoice logic
+
+Specifically search within `FormLogBookMenu.vb` firstâ€”if thereâ€™s a `Handles txtInput.TextChanged` it will fire every character.
+
+### Fix (what you want)
+Make sure **only** this triggers the invoice lookup:
+
+```vbnet
+If e.KeyCode <> Keys.Enter Then Return
+```
+
+and there is **no** `TextChanged` handler calling invoice lookup.
+
+---
+
+## To get you unblocked immediately
+Please paste your *current* `FormLogBookMenu.vb` as it exists **right now** (after your edits), or tell me if youâ€™re clicking (3) via mouse button or pressing the `3` key. Iâ€™ll point out the exact line thatâ€™s causing â€œauto-search on 2nd digitâ€ and regenerate the whole file cleanly.
+
+If you want to self-check right now: put a breakpoint on `RunInvoiceLookup` and type `7` then `2`. If the breakpoint hits before you press Enter, youâ€™ve confirmed thereâ€™s a non-Enter path calling it.
+
+## @testsubject117
+
+I used the full file replacement, it didn't fix it
+
+## Copilot
+
+Then thereâ€™s almost certainly **another control / form** in the project thatâ€™s intercepting keystrokes and launching that â€œinvoice prefix searchâ€ window (very likely the original DOS-style â€œtype-to-searchâ€ UI), and itâ€™s still active while your prompt is up.
+
+The key detail you gaveâ€”**it opens on the 2nd digit and searches â€œinvoices beginning with 73â€**â€”is classic â€œincremental searchâ€ behavior driven by something like:
+
+- a global `KeyPreview` handler on the parent/main form,
+- an `Application.AddMessageFilter(...)`,
+- or a handler on the *viewer* / *menu screen* textbox that sees keystrokes even when your prompt textbox has focus.
+
+### Letâ€™s confirm in 30 seconds (no guessing)
+Do this once:
+
+1) Put a breakpoint at the **first line of `RunInvoiceLookup`** in `FormLogBookMenu.vb`.
+2) Run, choose (3), type `7`, then `2` (donâ€™t press Enter).
+
+**If the breakpoint does NOT hit** but the search window still opens, the window is being opened by **other code** (not `RunInvoiceLookup`), and we need to find that code.
+
+### The fastest way to locate it
+In Visual Studio **Find in Files** (entire solution) for any of these strings that are likely inside that window logic:
+
+- `INVOICE`
+- `Invoice`
+- `begins with`
+- `StartsWith(`
+- `Like "73*"`
+- `SetPages(` (if it uses the same viewer)
+- `FrmDosPagedViewer`
+- `ShowDialog(` near invoice code
+- `Look up an invoice`
+- `RunInvoice` / `InvoiceLookup`
+
+Also search for global key hooks:
+
+- `Application.AddMessageFilter`
+- `PreFilterMessage`
+- `ProcessCmdKey`
+- `KeyPreview = True`
+- `KeyDown` handlers in `FormMainMenu` or your main shell form
+
+### One thing I need from you
+Paste **one** of the following, and Iâ€™ll tell you exactly what to change:
+
+**Option A (best):** the code for the window that pops up (the form/class name from its title bar or from the debugger call stack)
+
+**Option B:** when it pops up, open **Debug â†’ Windows â†’ Call Stack** and paste the call stack text (even just the top ~15 lines)
+
+That will pinpoint the exact handler thatâ€™s firing on the 2nd digit.
+
+---
+
+### Why my â€œconsume key + ignore first KeyPressâ€ didnâ€™t fix it
+That fix only stops the menu-selection key (`3`) from leaking into `txtInput`. It **cannot** stop a completely different component from responding to keystrokes while your prompt is active.
+
+Once we find the other handler, the correct DOS-like fix will be:
+
+- when `_mode <> Menu`, that handler must **return immediately** and not perform incremental searches, **or**
+- we temporarily disable that handler while the prompt overlay is visible.
+
+Send the call stack (Option B) and Iâ€™ll generate the exact whole-file replacement(s) needed.
+
+## @testsubject117
+
+ok, I'm going to paste the current code to you, please review and tell me what needs changing
+
+## Copilot
+
+Paste it and Iâ€™ll review it line-by-line.
+
+To make sure I can pinpoint the â€œopens on 2nd digitâ€ problem quickly, please include **all of these** in your paste:
+
+1) The entire `FormLogBookMenu.vb` (current version)
+2) The **Designer file** if it exists (`FormLogBookMenu.Designer.vb`) â€” sometimes events are wired there
+3) If the popup window is `FrmDosPagedViewer`, paste `FrmDosPagedViewer.vb` too (or at least the event handlers + constructor)
+
+Also tell me exactly how you trigger (3):
+- **keyboard**: press `3` / `NumPad3`
+- **mouse**: click somewhere on-screen (and where)
+
+Once I have the code, Iâ€™ll call out:
+- the exact event thatâ€™s firing early (TextChanged/KeyPress/KeyUp/etc.)
+- the exact line to remove/guard (`If _mode <> Menu Then Return` style)
+- and Iâ€™ll give you an **entire-file replacement** for whichever file(s) need it.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
+
+    Private ReadOnly _yearTwoDigit As Integer
+
+    ' Screen (display only)
+    Private ReadOnly txtScreen As TextBox
+
+    ' Prompt overlay (NOT docked at bottom; positioned near prompt line)
+    Private ReadOnly pnlPrompt As Panel
+    Private ReadOnly lblPrompt As Label
+    Private ReadOnly txtInput As TextBox
+
+    Private _mode As InputMode = InputMode.Menu
+
+    ' When we enter a prompt from a menu key, the initiating key can "leak" into txtInput.
+    ' Set this True when we open a prompt; then the first KeyPress into txtInput is ignored.
+    Private _ignoreNextInputKeyPress As Boolean = False
+
+    Private Enum InputMode
+        Menu
+        ViewOneCustomerPrompt
+        InvoiceLookupPrompt
+    End Enum
+
+    Public Sub New(yearTwoDigit As Integer)
+        _yearTwoDigit = yearTwoDigit
+
+        Me.Text = $"LOG BOOK ({_yearTwoDigit:00})"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(980, 680)
+
+        txtScreen = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .HideSelection = True,
+            .ShortcutsEnabled = False,
+            .WordWrap = False
+        }
+
+        pnlPrompt = New Panel() With {
+            .Visible = False,
+            .BackColor = Color.Black
+        }
+
+        lblPrompt = New Label() With {
+            .AutoSize = True,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Text = ""
+        }
+
+        txtInput = New TextBox() With {
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Font = Me.Font,
+            .Left = 0,
+            .Top = 0,
+            .Width = 350
+        }
+
+        pnlPrompt.Controls.Add(lblPrompt)
+        pnlPrompt.Controls.Add(txtInput)
+
+        Me.Controls.Add(txtScreen)
+        Me.Controls.Add(pnlPrompt)
+
+        AddHandler Me.Shown, Sub() RenderMenu()
+
+        ' IMPORTANT: We do NOT use Me.KeyDown for menu selection anymore.
+        ' We handle menu keys in ProcessCmdKey so the initiating key is consumed.
+
+        AddHandler txtInput.KeyDown, AddressOf OnInputKeyDown
+        AddHandler txtInput.KeyPress, AddressOf OnInputKeyPress
+
+        AddHandler Me.Resize, Sub()
+                                  If pnlPrompt.Visible Then
+                                      PositionPromptOverlay()
+                                  End If
+                              End Sub
+    End Sub
+
+    ' Consume menu keys here so they cannot "leak" into txtInput when we Focus() it.
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _mode = InputMode.Menu Then
+            Select Case keyData
+                Case Keys.Escape
+                    Me.Close()
+                    Return True
+
+                Case Keys.D1, Keys.NumPad1
+                    BeginCustomerPrompt()
+                    Return True
+
+                Case Keys.D2, Keys.NumPad2
+                    RunViewAllCustomers()
+                    Return True
+
+                Case Keys.D3, Keys.NumPad3
+                    BeginInvoiceLookupPrompt()
+                    Return True
+
+                Case Keys.Q
+                    Me.Close()
+                    Return True
+            End Select
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub RenderMenu(Optional promptLine As String = Nothing)
+        _mode = InputMode.Menu
+        pnlPrompt.Visible = False
+        txtInput.Text = ""
+        lblPrompt.Text = ""
+        _ignoreNextInputKeyPress = False
+
+        Dim leftDate As String = Date.Now.ToString("MM-dd-yyyy")
+        Dim rightTime As String = Date.Now.ToString("HH:mm")
+
+        Dim sb As New System.Text.StringBuilder()
+        sb.AppendLine("LOG BOOK")
+        sb.AppendLine()
+        sb.AppendLine($"{leftDate}    Year in use: {_yearTwoDigit:00}".PadRight(60) & rightTime)
+        sb.AppendLine()
+        sb.AppendLine("(1) View one customer")
+        sb.AppendLine("(2) View all customers")
+        sb.AppendLine("(3) Look up an invoice")
+        sb.AppendLine("(4) Look up a P.O. Number")
+        sb.AppendLine("(5) Look up the last date of business for a customer")
+        sb.AppendLine("(6) Scan Entire Logbook to find Customers with a certain Spec. or Part Number")
+        sb.AppendLine("(7) Scan logbook for errors")
+        sb.AppendLine("(8) Scan 2026 Logbook to find ANYTHING")
+        sb.AppendLine("(Q) QUIT")
+        sb.AppendLine()
+
+        If Not String.IsNullOrEmpty(promptLine) Then
+            sb.AppendLine(promptLine)
+        End If
+
+        txtScreen.Text = sb.ToString()
+    End Sub
+
+    Private Sub BeginCustomerPrompt()
+        _mode = InputMode.ViewOneCustomerPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="CUSTOMER NAME?")
+
+        lblPrompt.Text = "CUSTOMER NAME? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub BeginInvoiceLookupPrompt()
+        _mode = InputMode.InvoiceLookupPrompt
+        _ignoreNextInputKeyPress = True
+
+        RenderMenu(promptLine:="INVOICE NUMBER TO LOOK UP?")
+
+        lblPrompt.Text = "INVOICE NUMBER TO LOOK UP? "
+        txtInput.Text = ""
+        pnlPrompt.Visible = True
+
+        PositionPromptOverlay()
+
+        pnlPrompt.BringToFront()
+        txtInput.BringToFront()
+        txtInput.Focus()
+    End Sub
+
+    Private Sub PositionPromptOverlay()
+        Dim allLines As String() = txtScreen.Text.Split(New String() {vbCrLf}, StringSplitOptions.None)
+
+        Dim promptLineIndex As Integer = -1
+        Dim promptText As String = lblPrompt.Text.TrimEnd()
+
+        For i As Integer = allLines.Length - 1 To 0 Step -1
+            If allLines(i).Trim().Equals(promptText.Trim(), StringComparison.OrdinalIgnoreCase) Then
+                promptLineIndex = i
+                Exit For
+            End If
+        Next
+
+        Dim lineH As Integer = TextRenderer.MeasureText("W", txtScreen.Font).Height
+
+        Dim insetX As Integer = txtScreen.Left + 2
+        Dim insetY As Integer = txtScreen.Top + 2
+
+        If promptLineIndex < 0 Then
+            promptLineIndex = allLines.Length - 1
+        End If
+
+        pnlPrompt.Left = insetX
+        pnlPrompt.Top = insetY + (promptLineIndex * lineH)
+        pnlPrompt.Width = txtScreen.ClientSize.Width - 4
+        pnlPrompt.Height = lineH
+
+        lblPrompt.Left = 0
+        lblPrompt.Top = 0
+
+        Dim promptW As Integer = TextRenderer.MeasureText(lblPrompt.Text, lblPrompt.Font).Width
+        txtInput.Left = promptW
+        txtInput.Top = 0
+        txtInput.Height = lineH
+        txtInput.Width = Math.Max(250, pnlPrompt.Width - txtInput.Left - 10)
+    End Sub
+
+    ' Ignore the first typed character after opening the prompt (prevents leaking menu key into txtInput)
+    Private Sub OnInputKeyPress(sender As Object, e As KeyPressEventArgs)
+        If Not _ignoreNextInputKeyPress Then Return
+
+        _ignoreNextInputKeyPress = False
+        e.Handled = True
+    End Sub
+
+    Private Sub OnInputKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            RenderMenu()
+            pnlPrompt.Visible = False
+            _mode = InputMode.Menu
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode <> Keys.Enter Then Return
+
+        Dim input As String = txtInput.Text.Trim()
+        pnlPrompt.Visible = False
+
+        Select Case _mode
+            Case InputMode.ViewOneCustomerPrompt
+                RunViewOneCustomer(input)
+
+            Case InputMode.InvoiceLookupPrompt
+                RunInvoiceLookup(input)
+
+            Case Else
+                RenderMenu()
+        End Select
+
+        e.Handled = True
+    End Sub
+
+    Private Sub RunViewOneCustomer(customerInput As String)
+        If String.IsNullOrWhiteSpace(customerInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                If entry.Customer Is Nothing Then Continue For
+
+                If entry.Customer.StartsWith(customerInput, StringComparison.OrdinalIgnoreCase) Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunViewAllCustomers()
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+                AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)
+            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    Private Sub RunInvoiceLookup(invoiceInput As String)
+        If String.IsNullOrWhiteSpace(invoiceInput) Then
+            RenderMenu()
+            Return
+        End If
+
+        Dim invoiceNum As Integer
+        If Not Integer.TryParse(invoiceInput.Trim(), invoiceNum) Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("INVALID INVOICE NUMBER, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        Dim reader As New LogBookReader(DataDir)
+
+        Dim pages As New List(Of String)()
+        Dim pageSb As New System.Text.StringBuilder()
+        Dim pageEntryCount As Integer = 0
+
+        Try
+            For Each entry In reader.ReadEntries(_yearTwoDigit)
+                If entry Is Nothing Then Continue For
+
+                ' InvoiceNumber is Integer?
+                If entry.InvoiceNumber.HasValue AndAlso entry.InvoiceNumber.Value = invoiceNum Then
+                    AddEntryToPages(entry.FormatForDosViewer(), pages, pageSb, pageEntryCount)
+                End If
+            Next
+        Catch ex As Exception
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("ERROR READING LOG BOOK:" & vbCrLf & ex.Message)
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End Try
+
+        FlushPageIfNeeded(pages, pageSb, pageEntryCount)
+
+        If pages.Count = 0 Then
+            Using v As New FrmDosPagedViewer()
+                v.Text = "LOG BOOK"
+                v.SetSinglePage("END OF LOG BOOK, HIT [ESC] to Exit")
+                v.ShowDialog(Me)
+            End Using
+            RenderMenu()
+            Return
+        End If
+
+        pages.Add("END OF LOG BOOK, HIT [ESC] to Exit")
+
+        Using viewer As New FrmDosPagedViewer()
+            viewer.Text = "LOG BOOK"
+            viewer.SetPages(pages)

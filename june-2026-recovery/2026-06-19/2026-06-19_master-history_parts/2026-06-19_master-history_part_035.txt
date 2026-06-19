@@ -1,0 +1,2000 @@
+﻿- a split between **legacy file + in-memory repository** is not clean
+- duplicate reconciliation is messy
+- it moves you away from DOS truth
+
+So the better architecture is:
+
+- **Add Checks** writes to `LEDGER.CUR`
+- **Delete Checks** removes from `LEDGER.CUR`
+- **View Checks** reads from `LEDGER.CUR`
+- **Find a Check #**, **Find an Invoice #**, totals, etc. also read from the same legacy-backed source where appropriate
+
+That is much more DOS-faithful.
+
+---
+
+## What this means
+The runtime `CheckRepository` was useful as a temporary bridge to prove flow and complete UI behavior quickly.
+
+But now that youâ€™re aiming for:
+- DOS-true behavior
+- full Checks menu completion
+- clean architecture
+
+we should move away from it.
+
+---
+
+## Good news
+You already had a `FormLedgerView.vb` that read from `LEDGER.CUR`, so that tells us:
+
+- the file path is already known
+- there is already a reader:
+  - `LedgerCurReader.ReadAll(path)`
+- there is already a model:
+  - `LedgerEntry`
+
+So this is not theoretical â€” your project already knows how to read `LEDGER.CUR`.
+
+---
+
+## The real next question
+The question is no longer â€œshould we use `LEDGER.CUR`?â€
+
+I think the answer is **yes**.
+
+The real question is:
+
+## Do you already have write/update support for `LEDGER.CUR`?
+We need to know whether the project already contains code for:
+- adding a ledger record
+- updating/replacing records
+- deleting/removing/purging a check record
+
+If yes, we should use that.
+If not, we need to build it.
+
+---
+
+## Best next step
+We should inspect the existing ledger file support in your codebase.
+
+Specifically, we need to find:
+1. `LedgerCurReader`
+2. any `LedgerCurWriter`, `LedgerWriter`, `LedgerEditor`, or similar
+3. any code that appends to or rewrites `LEDGER.CUR`
+4. any delete logic tied to checks
+
+---
+
+## Recommendation
+At this point, the correct move is:
+
+### revert the temporary repository approach for check storage
+and
+### wire the check screens to `LEDGER.CUR`
+
+That will give you:
+- one authoritative source
+- DOS-like behavior
+- cleaner long-term logic
+- consistent search/view/delete/add behavior
+
+---
+
+## Important note
+That probably means we should eventually remove or stop using:
+- `CheckRepository.vb`
+
+But I would not delete it yet until the `LEDGER.CUR` path is fully restored and working.
+
+---
+
+## Short answer
+Yes â€” and I think youâ€™re right.  
+Using **`LEDGER.CUR` as the single source of truth** is cleaner and more DOS-faithful than keeping old data in one place and new data in another.
+
+## Next step
+Please let me inspect the ledger file support so we can wire everything back to `LEDGER.CUR`.
+
+Paste whichever of these you have:
+- `LedgerCurReader.vb`
+- `LedgerEntry.vb`
+- any file with names like:
+  - `LedgerCurWriter`
+  - `LedgerWriter`
+  - `LedgerEditor`
+  - `LedgerCurFile`
+  - `LedgerService`
+
+If youâ€™re not sure what exists, search for:
+- `Class LedgerCurReader`
+- `ReadAll(`
+- `LedgerCur`
+- `LEDGER.CUR`
+
+and paste the results.
+
+## @testsubject117
+
+ok, just to make sure, please clarify for me, is the data we want for view checks the data that lives in ledger.cur or am I wrong about that?
+
+## Copilot
+
+Yes â€” **based on everything youâ€™ve shown, `View Checks` should be reading from `LEDGER.CUR`**.
+
+## Direct answer
+You are **not wrong**.
+
+The data for **View Checks** appears to be the check ledger data stored in:
+
+- **`LEDGER.CUR`**
+
+Thatâ€™s also supported by the code you pasted earlier, because your original `FormLedgerView.vb` was explicitly loading:
+
+```vbnet
+Dim path = LegacyDataPaths.LedgerCur
+_all.AddRange(LedgerCurReader.ReadAll(path))
+```
+
+So the project already treats `LEDGER.CUR` as the source for that screen.
+
+---
+
+## Why Iâ€™m confident
+From your existing code:
+
+### `FormLedgerView.vb`
+It had:
+- customer filter
+- check number filter
+- year/month filter
+- amount total
+- check grid
+
+And it loaded from:
+
+- `LegacyDataPaths.LedgerCur`
+
+That strongly indicates that **ledger entries/check records for View Checks live in `LEDGER.CUR`**.
+
+---
+
+## Important nuance
+That does **not automatically mean** every related detail also lives entirely in `LEDGER.CUR`.
+
+From the code you showed:
+- main check list came from `LEDGER.CUR`
+- invoice details came from:
+  - `CHECK.INV`
+  - and `INVOICE.CHK`-style data via `InvoiceChkReader`
+
+So likely:
+
+### Main check list / View Checks screen
+- **`LEDGER.CUR`**
+
+### Extra invoice linkage/details
+- **`CHECK.INV`**
+- **invoice-related files**
+
+---
+
+## So the short practical answer is
+For **View Checks**, yes:
+- the main rows you want are in **`LEDGER.CUR`**
+
+For deeper linked invoice details:
+- there may be supporting files too
+
+---
+
+## DOS-faithful interpretation
+If DOS â€œView Checksâ€ showed legitimate existing customer checks, and your old WinForms version found them by reading `LEDGER.CUR`, then that strongly suggests:
+
+- **`LEDGER.CUR` is the right main source of truth for View Checks**
+
+So your instinct is correct.
+
+---
+
+## Bottom line
+### Yes:
+`View Checks` should use **`LEDGER.CUR`** for the main check data.
+
+### Probably also:
+Some related functions may use other files for invoice associations/details.
+
+---
+
+## Short answer
+Yes â€” for the **main View Checks list**, `LEDGER.CUR` is almost certainly the correct DOS-backed data source.
+
+If you want, next send me:
+- `LedgerCurReader.vb`
+- `LedgerEntry.vb`
+
+and Iâ€™ll help you move the Checks screens back toward the proper `LEDGER.CUR`-based architecture.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes â€” this confirms it.
+
+## Direct answer
+**`LEDGER.CUR` is the main data source for View Checks.**
+
+Your reader makes that very clear.
+
+Each check entry in `LEDGER.CUR` is being parsed as a **6-line record**:
+
+1. `Customer`
+2. `DateText`
+3. `CheckNumber`
+4. `InvoiceDiffText`
+5. `Amount`
+6. `Reference`
+
+So for **View Checks**, the main rows absolutely belong to `LEDGER.CUR`.
+
+---
+
+## What this tells us
+Your current legacy structure for a check record is:
+
+```text
+"Customer"
+"Date"
+"CheckNumber"
+"InvoiceDiffText"
+Amount
+"Reference"
+```
+
+And your existing `LedgerCurReader.ReadAll(path)` already turns that into:
+
+- `Customer`
+- `DateText`
+- `CheckNumber`
+- `InvoiceDiffText`
+- `Amount`
+- `Reference`
+
+That means:
+- View Checks should read from `LEDGER.CUR`
+- Add Checks should eventually append/write a 6-line record to `LEDGER.CUR`
+- Delete Checks should eventually remove the matching 6-line record from `LEDGER.CUR`
+
+That is the clean DOS-faithful direction.
+
+---
+
+## Very important implication
+This means the temporary `CheckRepository` was only a stopgap.
+
+If you want DOS truth, then the real architecture should be:
+
+- **View Checks** â†’ `LEDGER.CUR`
+- **Find a Check #** â†’ likely `LEDGER.CUR`
+- **Company totals** â†’ likely `LEDGER.CUR`
+- **Add Checks** â†’ write to `LEDGER.CUR`
+- **Delete Checks** â†’ remove from `LEDGER.CUR`
+
+That gives you one source of truth.
+
+---
+
+## My recommendation now
+We should pivot back to `LEDGER.CUR` and stop building more check features around `CheckRepository`.
+
+### Specifically:
+1. restore **View Checks** to use `LEDGER.CUR`
+2. make it keep the newer DOS-closer layout if possible
+3. then change **Add Checks** to write a new 6-line record into `LEDGER.CUR`
+4. then change **Delete Checks** to remove the matching 6-line record from `LEDGER.CUR`
+
+That will make the whole menu cleaner and much closer to DOS.
+
+---
+
+## What we need next
+To do that safely, the next thing we need is the path info and any existing write helpers.
+
+Please paste:
+
+- `LegacyDataPaths.vb`
+
+And if they exist, search for any of these and paste them:
+- `WriteAll(`
+- `AppendAllLines(`
+- `StreamWriter(`
+- `LEDGER.CUR`
+- `LedgerCur`
+- `CheckInvReader`
+- `InvoiceChkReader`
+
+But the single most important next file is:
+
+- **`LegacyDataPaths.vb`**
+
+because we need to know exactly where `LEDGER.CUR` lives.
+
+---
+
+## Short answer
+Yes â€” this confirms you were right.  
+**View Checks should use `LEDGER.CUR`** for its main data.  
+The file format is already understood by your project via `LedgerCurReader`.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System.Globalization
+Imports System.IO
+
+Public NotInheritable Class LedgerCurReader
+    Private Sub New()
+    End Sub
+
+    Public Shared Function ReadAll(path As String) As List(Of LedgerEntry)
+        Dim results As New List(Of LedgerEntry)()
+
+        If Not File.Exists(path) Then
+            Return results
+        End If
+
+        Dim lines As String() = File.ReadAllLines(path)
+
+        ' Collect non-null lines; skip truly blank lines.
+        ' Also strip DOS EOF marker (^Z / ChrW(26)) which can appear at end-of-file.
+        Dim cleaned As New List(Of String)(lines.Length)
+        For Each raw In lines
+            If raw Is Nothing Then Continue For
+
+            ' Remove ^Z anywhere in the line (some legacy files include it at EOF).
+            Dim s As String = raw.Replace(ChrW(26), "").Trim()
+
+            If s = "" Then
+                ' skip truly blank lines (not a data line)
+                Continue For
+            End If
+
+            cleaned.Add(s)
+        Next
+
+        ' Each entry is 6 lines
+        Dim i As Integer = 0
+        While i + 5 < cleaned.Count
+            Dim e As New LedgerEntry() With {
+                .Customer = Unquote(cleaned(i)),
+                .DateText = Unquote(cleaned(i + 1)),
+                .CheckNumber = Unquote(cleaned(i + 2)),
+                .InvoiceDiffText = Unquote(cleaned(i + 3)),
+                .Amount = ParseDecimal(cleaned(i + 4)),
+                .Reference = Unquote(cleaned(i + 5))
+            }
+            results.Add(e)
+            i += 6
+        End While
+
+        Return results
+    End Function
+
+    Private Shared Function Unquote(s As String) As String
+        If s Is Nothing Then Return ""
+        s = s.Trim()
+
+        ' Handle GW-BASIC style: "TEXT" or ""
+        If s.Length >= 2 AndAlso
+           s.StartsWith("""", StringComparison.Ordinal) AndAlso
+           s.EndsWith("""", StringComparison.Ordinal) Then
+
+            s = s.Substring(1, s.Length - 2)
+        End If
+
+        Return s
+    End Function
+
+    Private Shared Function ParseDecimal(s As String) As Decimal
+        If s Is Nothing Then Return 0D
+        s = s.Trim()
+
+        Dim d As Decimal
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, d) Then Return d
+        If Decimal.TryParse(s, NumberStyles.Any, CultureInfo.CurrentCulture, d) Then Return d
+        Return 0D
+    End Function
+End Class
+
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+## Copilot
+
+Yes â€” this is the same file again, and it still confirms the same thing:
+
+## Direct answer
+**`LEDGER.CUR` is the correct main source for View Checks.**
+
+This code clearly parses **check records** from that file.
+
+---
+
+## What I need next
+To move from â€œconfirmedâ€ to â€œfixing it,â€ I now need the **path definition** for the file.
+
+Please paste:
+
+```text
+LegacyDataPaths.vb
+```
+
+Thatâ€™s the next most important file.
+
+---
+
+## Why I need that file
+Your old View Checks code used:
+
+```vbnet
+Dim path = LegacyDataPaths.LedgerCur
+```
+
+So to wire Add/Delete/View back to the real DOS-backed data, I need to know:
+
+- where `LEDGER.CUR` lives
+- whether there are related paths nearby
+- whether the app is already set up to read/write those files in one place
+
+---
+
+## After that
+Once you paste `LegacyDataPaths.vb`, I can help you:
+
+1. restore **View Checks** to `LEDGER.CUR`
+2. keep the improved DOS-like presentation
+3. then move **Add Checks** and **Delete Checks** off `CheckRepository` and onto `LEDGER.CUR`
+
+---
+
+## Short answer
+Yes â€” this confirms the source again.  
+Now please paste **`LegacyDataPaths.vb`** next.
+
+## @testsubject117
+
+```
+' LegacyDataPaths.vb  (Add as Class, NOT a form)
+Option Strict On
+Option Explicit On
+
+Imports System.IO
+
+Public NotInheritable Class LegacyDataPaths
+    Private Sub New()
+    End Sub
+
+    Public Shared ReadOnly Property BaseDataDir As String = "\\invoice\MainMenu\Data"
+
+    Public Shared ReadOnly Property LedgerCur As String =
+        Path.Combine(BaseDataDir, "LEDGER.CUR")
+    Public Shared ReadOnly Property CheckInv As String = Path.Combine(BaseDataDir, "CHECK.INV")
+    Public Shared ReadOnly Property InvoiceChk As String = Path.Combine(BaseDataDir, "INVOICE.CHK")
+    Public Shared ReadOnly Property OtherChk As String = Path.Combine(BaseDataDir, "OTHER.CHK")
+    Public Shared ReadOnly Property EmpNameDat As String = Path.Combine(BaseDataDir, "EMPNAME.DAT")
+End Class
+```
+
+## Copilot
+
+Yes â€” perfect. Now we have what we need.
+
+## Direct answer
+This confirms the real file path for checks is:
+
+```text
+\\invoice\MainMenu\Data\LEDGER.CUR
+```
+
+So if you want DOS-faithful behavior, the right move is:
+
+- **View Checks** reads from `LEDGER.CUR`
+- **Add Checks** writes to `LEDGER.CUR`
+- **Delete Checks** removes from `LEDGER.CUR`
+
+That is much cleaner than keeping `CheckRepository` as a separate source of truth.
+
+---
+
+## What we know now
+From your files:
+
+### `LegacyDataPaths`
+- `LedgerCur = \\invoice\MainMenu\Data\LEDGER.CUR`
+
+### `LedgerCurReader`
+Each ledger record is 6 lines:
+1. customer
+2. date
+3. check number
+4. invoice diff text
+5. amount
+6. reference
+
+That gives us enough to read the file reliably.
+
+---
+
+## Recommendation
+We should now **pivot away from `CheckRepository`** for regular checks and go back to `LEDGER.CUR`.
+
+But to do that safely, we need a writer.
+
+## Next step
+We need to create a small helper for:
+- reading all ledger records
+- writing all ledger records back
+- appending one ledger record
+
+That will let us:
+- restore View Checks to `LEDGER.CUR`
+- make Add Checks append
+- make Delete Checks remove + rewrite
+
+---
+
+# What I recommend we do next
+## Step 1
+Create a new file named:
+
+```text
+LedgerCurWriter.vb
+```
+
+with helper methods for:
+- formatting a `LedgerEntry`
+- writing all entries back to `LEDGER.CUR`
+
+## Step 2
+Change `FormLedgerView.vb` back to `LEDGER.CUR`, but keep the newer DOS-like screen style
+
+## Step 3
+Change `FormAddChecks.vb` so final `Y` appends a real record to `LEDGER.CUR`
+
+## Step 4
+Change `FormDeleteCheck.vb` so it removes the matching record from `LEDGER.CUR`
+
+---
+
+## If you want, here is the next code to paste
+### Create a new file: `LedgerCurWriter.vb`
+
+```vbnet name=LedgerCurWriter.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+## Then after that
+I can give you the next **real `LEDGER.CUR`-backed** replacements for:
+
+- `FormLedgerView.vb`
+- `FormAddChecks.vb`
+- `FormDeleteCheck.vb`
+
+---
+
+## Important caution
+This will start writing to the real network file:
+
+```text
+\\invoice\MainMenu\Data\LEDGER.CUR
+```
+
+So before we do that, I want to make sure you are comfortable with that.
+
+## Question
+Do you want the next step to be:
+1. **real write/delete against the live `LEDGER.CUR` file**, or
+2. first create the writer helper and inspect one or two real records before enabling writes?
+
+## @testsubject117
+
+do you need LedgerEntry?
+
+## Copilot
+
+Yes â€” but you already gave it to me.
+
+## Direct answer
+I **do need `LedgerEntry`**, and it was included in the code you pasted earlier.
+
+This part is `LedgerEntry`:
+
+```vbnet
+Public Class LedgerEntry
+    Public Property Customer As String
+    Public Property DateText As String
+    Public Property CheckNumber As String
+    Public Property InvoiceDiffText As String
+    Public Property Amount As Decimal
+    Public Property Reference As String
+End Class
+```
+
+So we already have it.
+
+---
+
+## What that means
+We now already have the pieces needed to start working with `LEDGER.CUR`:
+
+- `LegacyDataPaths`
+- `LedgerCurReader`
+- `LedgerEntry`
+
+The next missing piece is just:
+- **`LedgerCurWriter`** for writing/appending/removing records
+
+---
+
+## Short answer
+Yes â€” I need `LedgerEntry`, but you already provided it, so weâ€™re good there.
+
+## @testsubject117
+
+is ledgercurwriter a class or form?
+
+## Copilot
+
+A **class**, not a form.
+
+## Direct answer
+Create **`LedgerCurWriter.vb`** as a normal **class/code file**.
+
+It should **not** be:
+- a Windows Form
+- a UserControl
+- a Component
+
+Just a regular VB class file, like `LegacyDataPaths.vb`.
+
+---
+
+## In Visual Studio
+Do this:
+
+- right-click project
+- **Add**
+- **Class...**
+- name it:
+
+```text
+LedgerCurWriter.vb
+```
+
+Then paste the code into that file.
+
+---
+
+## Think of it like this
+### Forms
+Forms are UI screens, like:
+- `FormAddChecks`
+- `FormDeleteCheck`
+- `FormLedgerView`
+
+### Classes
+Classes are helper logic/data files, like:
+- `LegacyDataPaths`
+- `LedgerCurReader`
+- `LedgerCurWriter`
+
+`LedgerCurWriter` is just file-writing logic.
+
+---
+
+## Short answer
+**Class file.** Create `LedgerCurWriter.vb` as a regular class, not a form.
+
+## @testsubject117
+
+yes, I have backup copies of the file, it's fine.
+
+## Copilot
+
+Great â€” then yes, the right next step is to move back to the real file.
+
+## Direct answer
+Since you have backups, we should now switch the checks flow to use **`LEDGER.CUR` as the source of truth**.
+
+That means:
+
+1. create `LedgerCurWriter.vb`
+2. update **View Checks** to read from `LEDGER.CUR`
+3. update **Add Checks** to append to `LEDGER.CUR`
+4. update **Delete Checks** to remove from `LEDGER.CUR`
+
+That gets you much closer to true DOS behavior.
+
+---
+
+# Step 1 â€” create `LedgerCurWriter.vb`
+Create a **class file** named:
+
+```text
+LedgerCurWriter.vb
+```
+
+and paste this in:
+
+```vbnet name=LedgerCurWriter.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+# Step 2 â€” replace `FormLedgerView.vb`
+Replace the full file with this `LEDGER.CUR`-backed version:
+
+```vbnet name=FormLedgerView.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+    Inherits Form
+
+    Private ReadOnly _customerFilter As String
+    Private ReadOnly _checkFilter As String
+    Private ReadOnly _yearFilter As String
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblFilterLine As New Label()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+        MyBase.New()
+
+        _customerFilter = If(customerFilter, "").Trim()
+        _checkFilter = If(checkFilter, "").Trim()
+        _yearFilter = If(yearFilter, "").Trim()
+
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "View Checks"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** View Checks *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblFilterLine.AutoSize = False
+        lblFilterLine.ForeColor = Color.White
+        lblFilterLine.BackColor = Color.Black
+        lblFilterLine.SetBounds(24, 70, 920, 28)
+
+        dgv.SetBounds(24, 110, 920, 420)
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.Gray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.MultiSelect = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.RowHeadersVisible = False
+        dgv.AutoGenerateColumns = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Navy
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Customer",
+            .DataPropertyName = "Customer",
+            .Width = 220
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Check #",
+            .DataPropertyName = "CheckNumber",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Reference",
+            .DataPropertyName = "Reference",
+            .Width = 140
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Date",
+            .DataPropertyName = "DateText",
+            .Width = 130
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Amount",
+            .DataPropertyName = "AmountDisplay",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Difference",
+            .DataPropertyName = "InvoiceDiffText",
+            .Width = 170,
+            .AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill
+        })
+
+        lblTotal.AutoSize = False
+        lblTotal.ForeColor = Color.White
+        lblTotal.BackColor = Color.Black
+        lblTotal.SetBounds(24, 545, 500, 28)
+
+        btnClose.Text = "Close"
+        btnClose.SetBounds(834, 545, 110, 34)
+        AddHandler btnClose.Click, Sub() Me.Close()
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblFilterLine)
+        Me.Controls.Add(dgv)
+        Me.Controls.Add(lblTotal)
+        Me.Controls.Add(btnClose)
+
+        AddHandler Me.Load, AddressOf FormLedgerView_Load
+    End Sub
+
+    Private Sub FormLedgerView_Load(sender As Object, e As EventArgs)
+        LoadFilteredChecks()
+    End Sub
+
+    Private Sub LoadFilteredChecks()
+        Dim allChecks = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim q = allChecks.AsEnumerable()
+
+        If _customerFilter <> "" Then
+            q = q.Where(Function(x) x.Customer IsNot Nothing AndAlso
+                                    x.Customer.IndexOf(_customerFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _checkFilter <> "" Then
+            q = q.Where(Function(x) x.CheckNumber IsNot Nothing AndAlso
+                                    x.CheckNumber.IndexOf(_checkFilter, StringComparison.OrdinalIgnoreCase) >= 0)
+        End If
+
+        If _yearFilter <> "" Then
+            q = q.Where(Function(x) YearMatches(x.DateText, _yearFilter))
+        End If
+
+        Dim rows = q.
+            Select(Function(x) New LedgerViewRow With {
+                .Customer = x.Customer,
+                .CheckNumber = x.CheckNumber,
+                .Reference = x.Reference,
+                .DateText = x.DateText,
+                .InvoiceDiffText = x.InvoiceDiffText,
+                .AmountValue = x.Amount,
+                .AmountDisplay = x.Amount.ToString("0.00")
+            }).
+            OrderBy(Function(x) x.Customer).
+            ThenBy(Function(x) x.CheckNumber).
+            ToList()
+
+        dgv.DataSource = rows
+
+        Dim total = rows.Sum(Function(x) x.AmountValue)
+        lblTotal.Text = "Total Amount: $" & total.ToString("0.00")
+
+        Dim custDisplay As String = If(_customerFilter = "", "ALL", _customerFilter)
+        Dim chkDisplay As String = If(_checkFilter = "", "ALL", _checkFilter)
+        Dim yearDisplay As String = If(_yearFilter = "", "ALL", _yearFilter)
+
+        lblFilterLine.Text = "Customer: " & custDisplay & "   Check #: " & chkDisplay & "   Year: " & yearDisplay
+
+        If rows.Count = 0 Then
+            MessageBox.Show("No checks found for the selected criteria.",
+                            "View Checks",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information)
+        End If
+    End Sub
+
+    Private Function YearMatches(dateText As String, requestedYear As String) As Boolean
+        If String.IsNullOrWhiteSpace(requestedYear) Then Return True
+        If String.IsNullOrWhiteSpace(dateText) Then Return False
+
+        Dim normalizedRequested = requestedYear.Trim()
+
+        If normalizedRequested.Length = 2 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase)
+        End If
+
+        If normalizedRequested.Length = 4 Then
+            Return dateText.Trim().EndsWith(normalizedRequested, StringComparison.OrdinalIgnoreCase) OrElse
+                   dateText.Trim().EndsWith(normalizedRequested.Substring(2), StringComparison.OrdinalIgnoreCase)
+        End If
+
+        Return dateText.IndexOf(normalizedRequested, StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Class LedgerViewRow
+        Public Property Customer As String
+        Public Property CheckNumber As String
+        Public Property Reference As String
+        Public Property DateText As String
+        Public Property InvoiceDiffText As String
+        Public Property AmountValue As Decimal
+        Public Property AmountDisplay As String
+    End Class
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If keyData = Keys.Escape Then
+            Me.Close()
+            Return True
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+End Class
+```
+
+---
+
+# Step 3 â€” update `FormAddChecks.vb`
+You do **not** need to replace the whole file this time.
+
+## Find this method:
+```vbnet
+Private Sub FinishFlow()
+    SaveCheckToRepository()
+    Me.DialogResult = DialogResult.OK
+    Me.Close()
+End Sub
+```
+
+## Replace it with:
+```vbnet
+Private Sub FinishFlow()
+    SaveCheckToLedgerCur()
+    Me.DialogResult = DialogResult.OK
+    Me.Close()
+End Sub
+```
+
+---
+
+## Then find this whole method:
+```vbnet
+Private Sub SaveCheckToRepository()
+    Dim amountValue As Decimal = 0D
+    Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+
+    Dim record As New CheckRepository.CheckRecord()
+    record.CustomerName = enteredCompany
+    record.CheckNumber = enteredCheckNumber
+    record.Reference = enteredCheckReference
+    record.CheckDate = enteredDateText
+    record.Amount = amountValue
+
+    If enteredLowestInvoice IsNot Nothing AndAlso enteredLowestInvoice <> "" AndAlso enteredLowestInvoice <> "-1" Then
+        record.PaidInvoices.Add(enteredLowestInvoice)
+    End If
+
+    If enteredHighestInvoice IsNot Nothing AndAlso enteredHighestInvoice <> "" AndAlso enteredHighestInvoice <> enteredLowestInvoice Then
+        record.PaidInvoices.Add(enteredHighestInvoice)
+    End If
+
+    CheckRepository.AddOrReplace(record)
+End Sub
+```
+
+## Replace it with:
+```vbnet
+Private Sub SaveCheckToLedgerCur()
+    Dim amountValue As Decimal = 0D
+    Decimal.TryParse(enteredAmount, NumberStyles.Any, CultureInfo.InvariantCulture, amountValue)
+
+    Dim entry As New LedgerEntry()
+    entry.Customer = enteredCompany
+    entry.DateText = enteredDateText
+    entry.CheckNumber = enteredCheckNumber
+    entry.InvoiceDiffText = "0"
+    entry.Amount = amountValue
+    entry.Reference = enteredCheckReference
+
+    LedgerCurWriter.Append(LegacyDataPaths.LedgerCur, entry)
+End Sub
+```
+
+---
+
+# Step 4 â€” replace `FormDeleteCheck.vb`
+Replace the full file with this real `LEDGER.CUR` version:
+
+```vbnet name=FormDeleteCheck.vb
+Option Strict On
+Option Explicit On
+
+Imports System.Linq
+Imports System.Windows.Forms
+Imports System.Drawing
+
+Public Class FormDeleteCheck
+    Inherits Form
+
+    Private Enum DeleteCheckState
+        EnterCheckNumber
+        ConfirmDelete
+        Deleting
+    End Enum
+
+    Private _state As DeleteCheckState = DeleteCheckState.EnterCheckNumber
+    Private _currentCheck As LedgerEntry = Nothing
+
+    Private lblTitle As Label
+    Private lblLine1 As Label
+    Private txtInput As TextBox
+    Private lblCustomer As Label
+    Private lblDate As Label
+    Private lblCheckInfo As Label
+    Private lblInvoices As Label
+    Private lblAmount As Label
+    Private lblPrompt As Label
+    Private lblStatus1 As Label
+    Private lblStatus2 As Label
+    Private lblStatus3 As Label
+
+    Public Sub New()
+        MyBase.New()
+        InitializeDeleteCheckForm()
+    End Sub
+
+    Private Sub InitializeDeleteCheckForm()
+        Me.Text = "Delete Check"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Me.ClientSize = New Size(900, 500)
+        Me.FormBorderStyle = FormBorderStyle.FixedDialog
+        Me.MaximizeBox = False
+        Me.MinimizeBox = False
+        Me.KeyPreview = True
+
+        lblTitle = CreateLabel(20, 20, 500, 25)
+        lblLine1 = CreateLabel(20, 60, 400, 25)
+
+        txtInput = New TextBox()
+        txtInput.Name = "txtInput"
+        txtInput.Location = New Point(20, 95)
+        txtInput.Size = New Size(200, 26)
+        txtInput.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        AddHandler txtInput.KeyDown, AddressOf txtInput_KeyDown
+
+        lblCustomer = CreateLabel(20, 140, 350, 25)
+        lblDate = CreateLabel(520, 140, 250, 25)
+        lblCheckInfo = CreateLabel(20, 170, 700, 25)
+        lblInvoices = CreateLabel(20, 200, 800, 25)
+        lblAmount = CreateLabel(20, 230, 300, 25)
+        lblPrompt = CreateLabel(20, 290, 850, 25)
+        lblStatus1 = CreateLabel(20, 330, 850, 25)
+        lblStatus2 = CreateLabel(20, 360, 850, 25)
+        lblStatus3 = CreateLabel(20, 390, 850, 50)
+
+        Me.Controls.Add(lblTitle)
+        Me.Controls.Add(lblLine1)
+        Me.Controls.Add(txtInput)
+        Me.Controls.Add(lblCustomer)
+        Me.Controls.Add(lblDate)
+        Me.Controls.Add(lblCheckInfo)
+        Me.Controls.Add(lblInvoices)
+        Me.Controls.Add(lblAmount)
+        Me.Controls.Add(lblPrompt)
+        Me.Controls.Add(lblStatus1)
+        Me.Controls.Add(lblStatus2)
+        Me.Controls.Add(lblStatus3)
+
+        SetupInitialScreen()
+    End Sub
+
+    Private Function CreateLabel(x As Integer, y As Integer, w As Integer, h As Integer) As Label
+        Dim lbl As New Label()
+        lbl.AutoSize = False
+        lbl.Location = New Point(x, y)
+        lbl.Size = New Size(w, h)
+        lbl.ForeColor = Color.White
+        lbl.BackColor = Color.Black
+        lbl.Font = New Font("Consolas", 12.0F, FontStyle.Regular)
+        Return lbl
+    End Function
+
+    Private Sub SetupInitialScreen()
+        _state = DeleteCheckState.EnterCheckNumber
+        _currentCheck = Nothing
+
+        lblTitle.Text = "***** Delete A Check *****"
+        lblLine1.Text = "Check # [ENTER = Quit]?"
+        txtInput.Visible = True
+        txtInput.Text = ""
+        txtInput.Enabled = True
+        txtInput.Focus()
+
+        lblCustomer.Text = ""
+        lblDate.Text = ""
+        lblCheckInfo.Text = ""
+        lblInvoices.Text = ""
+        lblAmount.Text = ""
+        lblPrompt.Text = ""
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+    End Sub
+
+    Private Sub ShowCheckDetails(info As LedgerEntry)
+        _state = DeleteCheckState.ConfirmDelete
+        _currentCheck = info
+
+        lblTitle.Text = ""
+        lblLine1.Text = ""
+        txtInput.Visible = False
+
+        lblCustomer.Text = "Customer: " & info.Customer
+        lblDate.Text = "Date: " & info.DateText
+        lblCheckInfo.Text = "Check #: " & info.CheckNumber & "    Reference: " & info.Reference
+        lblInvoices.Text = "Difference: " & info.InvoiceDiffText
+        lblAmount.Text = "Amount: $    " & info.Amount.ToString("0.00")
+        lblPrompt.Text = "Delete the check Above & Reset the Invoices to UnPaid (Y\N) ?"
+
+        lblStatus1.Text = ""
+        lblStatus2.Text = ""
+        lblStatus3.Text = ""
+
+        Me.Focus()
+    End Sub
+
+    Private Sub ShowDeletingScreen()
+        _state = DeleteCheckState.Deleting
+
+        lblStatus1.Text = "Deleting Check..."
+        lblStatus2.Text = ""
+        lblStatus3.Text = "Please Wait.." & Environment.NewLine & "Purging part of .INV file..."
+
+        Me.Refresh()
+        Application.DoEvents()
+    End Sub
+
+    Private Sub txtInput_KeyDown(sender As Object, e As KeyEventArgs)
+        If _state <> DeleteCheckState.EnterCheckNumber Then Return
+
+        If e.KeyCode = Keys.Enter Then
+            e.SuppressKeyPress = True
+
+            Dim checkNo As String = txtInput.Text.Trim()
+
+            If checkNo = "" Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return
+            End If
+
+            Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+            Dim found = entries.FirstOrDefault(Function(x) String.Equals(x.CheckNumber, checkNo, StringComparison.OrdinalIgnoreCase))
+
+            If found Is Nothing Then
+                MessageBox.Show("Check not found.", "Delete Check", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                txtInput.SelectAll()
+                txtInput.Focus()
+                Return
+            End If
+
+            ShowCheckDetails(found)
+        End If
+    End Sub
+
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _state = DeleteCheckState.ConfirmDelete Then
+            If keyData = Keys.Y Then
+                If _currentCheck IsNot Nothing Then
+                    ShowDeletingScreen()
+                    DeleteCheck(_currentCheck)
+                    Me.DialogResult = DialogResult.OK
+                    Me.Close()
+                    Return True
+                End If
+            End If
+
+            If keyData = Keys.N Then
+                Me.DialogResult = DialogResult.Cancel
+                Me.Close()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub DeleteCheck(info As LedgerEntry)
+        Dim entries = LedgerCurReader.ReadAll(LegacyDataPaths.LedgerCur)
+
+        Dim updated = entries.
+            Where(Function(x) Not (String.Equals(x.Customer, info.Customer, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.DateText, info.DateText, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.CheckNumber, info.CheckNumber, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   String.Equals(x.Reference, info.Reference, StringComparison.OrdinalIgnoreCase) AndAlso
+                                   x.Amount = info.Amount)).
+            ToList()
+
+        LedgerCurWriter.WriteAll(LegacyDataPaths.LedgerCur, updated)
+        Threading.Thread.Sleep(750)
+    End Sub
+
+End Class
+```
+
+---
+
+# Step 5 â€” keep this in `FormLedgerMenu.vb`
+Make sure this still exists:
+
+```vbnet
+Using f As New FormLedgerView(cust, chk, yr)
+    f.ShowDialog(Me)
+End Using
+```
+
+---
+
+# How to test safely
+Since this now writes to the real file:
+
+## Test 1
+- make a fresh backup of `LEDGER.CUR`
+- run app
+- use **View Checks**
+- confirm old real records appear again
+
+## Test 2
+- Add a tiny test check
+- View Checks and confirm it appears
+
+## Test 3
+- Delete that same test check
+- View Checks and confirm it is gone
+
+## Test 4
+- compare file before/after if needed
+
+---
+
+## Important note
+Once this works, `CheckRepository.vb` becomes temporary leftover code and we can stop using it for regular checks.
+
+## Short answer
+Yes â€” now that youâ€™ve confirmed backups exist, we should move the checks flow back onto **real `LEDGER.CUR` data**.  
+Start by creating `LedgerCurWriter.vb`, then make the three updates above.
+
+## @testsubject117
+
+Severity	Code	Description	Project	File	Line	Suppression State
+Error (active)		Fatal error.	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		Internal CLR error. (0x80131506)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.Metadata.PE.PEMethodSymbol.GetUseSiteInfo()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindAttributeNamedArgument(Microsoft.CodeAnalysis.VisualBasic.Symbols.TypeSymbol, Microsoft.CodeAnalysis.VisualBasic.Syntax.SimpleArgumentSyntax, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindAttributeArguments(Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.Syntax.ArgumentListSyntax, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.BindAttribute(Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax, Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.GetAttribute(Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax, Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Binder.GetAttributes(System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Binder>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeSyntax>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.VisualBasic.Symbols.NamedTypeSymbol>, Microsoft.CodeAnalysis.VisualBasic.Symbols.VisualBasicAttributeData[], Microsoft.CodeAnalysis.VisualBasic.Symbol, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbol.LoadAndValidateAttributes(Microsoft.CodeAnalysis.Collections.OneOrMany`1<Microsoft.CodeAnalysis.SyntaxList`1<Microsoft.CodeAnalysis.VisualBasic.Syntax.AttributeListSyntax>>, Microsoft.CodeAnalysis.CustomAttributesBag`1<Microsoft.CodeAnalysis.VisualBasic.Symbols.VisualBasicAttributeData> ByRef, Microsoft.CodeAnalysis.VisualBasic.Symbols.AttributeLocation)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceAssemblySymbol.EnsureAttributesAreBound()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceAssemblySymbol.GetAttributes()	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.Symbols.SourceModuleSymbol.GetAllDeclarationErrors(Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag, System.Threading.CancellationToken, Boolean ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilation.GetDiagnosticsWithoutFiltering(Microsoft.CodeAnalysis.CompilationStage, Boolean, Microsoft.CodeAnalysis.VisualBasic.BindingDiagnosticBag, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.VisualBasicCompilation.GetDiagnostics(Microsoft.CodeAnalysis.CompilationStage, Boolean, Microsoft.CodeAnalysis.DiagnosticBag, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.CompileAndEmit(Microsoft.CodeAnalysis.TouchedFileLogger, Microsoft.CodeAnalysis.Compilation ByRef, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.ISourceGenerator>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AdditionalText>, Microsoft.CodeAnalysis.AnalyzerConfigSet, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.AnalyzerConfigOptionsResult>, System.Collections.Immutable.ImmutableArray`1<Microsoft.CodeAnalysis.EmbeddedText>, Microsoft.CodeAnalysis.DiagnosticBag, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken, System.Threading.CancellationTokenSource ByRef, Microsoft.CodeAnalysis.Diagnostics.AnalyzerDriver ByRef, System.Nullable`1<Microsoft.CodeAnalysis.GeneratorDriverTimingInfo> ByRef)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.RunCore(System.IO.TextWriter, Microsoft.CodeAnalysis.ErrorLogger, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommonCompiler.Run(System.IO.TextWriter, System.Threading.CancellationToken)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.ConsoleUtil.RunWithUtf8Output[[System.Int32, System.Private.CoreLib, Version=10.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]](System.Func`2<System.IO.TextWriter,Int32>)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Vbc.Run(System.String[], Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, Microsoft.CodeAnalysis.IAnalyzerAssemblyLoader)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.RunCompilation(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.BuildPaths, System.IO.TextWriter, System.String)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.CommandLine.BuildClient.Run(System.Collections.Generic.IEnumerable`1<System.String>, Microsoft.CodeAnalysis.CommandLine.RequestLanguage, Microsoft.CodeAnalysis.CommandLine.CompileFunc, Microsoft.CodeAnalysis.CommandLine.CompileOnServerFunc, Microsoft.CodeAnalysis.CommandLine.ICompilerServerLogger)	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.MainCore(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+Error (active)		   at Microsoft.CodeAnalysis.VisualBasic.CommandLine.Program.Main(System.String[])	AMiOffice	C:\Program Files\dotnet\sdk\10.0.300\Roslyn\Microsoft.VisualBasic.Core.targets	57	
+
+
+## Copilot
+
+This looks like a **VB/Roslyn compiler crash**, not a normal code error.
+
+## Direct answer
+The most likely cause is **a bad attribute or malformed designer/project metadata**, not the `LEDGER.CUR` logic itself.
+
+The key clue is this part of the stack:
+
+- `BindAttributeNamedArgument`
+- `BindAttributeArguments`
+- `BindAttribute`
+- `LoadAndValidateAttributes`
+
+That usually means the compiler choked while processing an **attribute**, often in one of these places:
+
+- `AssemblyInfo.vb`
+- `Application.Designer.vb`
+- `Resources.Designer.vb`
+- `Settings.Designer.vb`
+- a form designer file
+- a pasted attribute with invalid syntax
+- duplicated/conflicting generated code
+
+---
+
+## What to do first
+### 1. Undo the very last file you added/changed
+The fastest way to isolate this is:
+
+- temporarily remove or exclude **`LedgerCurWriter.vb`**
+- build again
+
+If the crash disappears, then there is likely a syntax/encoding/paste issue in that file or a side effect from adding it.
+
+Even though `LedgerCurWriter.vb` has no attributes, compiler crashes can sometimes happen indirectly when the project state gets weird.
+
+---
+
+## 2. Clean/Rebuild
+Do this exactly:
+
+- **Close Visual Studio**
+- reopen solution
+- **Build > Clean Solution**
+- **Build > Rebuild Solution**
+
+If still broken:
+
+- delete the projectâ€™s:
+  - `bin`
+  - `obj`
+- reopen Visual Studio
+- rebuild
+
+---
+
+## 3. Check recently edited files for accidental attributes
+Open the files you recently edited and look at the very top for anything like:
+
+```vbnet
+<Assembly: ...>
+<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated(...)>
+<System.Diagnostics.DebuggerStepThrough(...)>
+```
+
+Especially malformed ones.
+
+Check these files first:
+- `FormLedgerView.vb`
+- `FormDeleteCheck.vb`
+- `FormAddChecks.vb`
+- `LedgerCurWriter.vb`
+
+You want to make sure nothing weird got pasted above `Option Strict On`.
+
+---
+
+## 4. Check AssemblyInfo / generated files
+Because the crash is specifically around attributes, inspect:
+
+- `My Project\AssemblyInfo.vb`
+- `My Project\Application.Designer.vb`
+- `My Project\Resources.Designer.vb`
+- `My Project\Settings.Designer.vb`
+
+Look for:
+- invalid pasted text
+- broken quotes
+- duplicate attributes
+- incomplete attribute lines
+
+---
+
+## 5. Easiest isolation method
+If you want the quickest binary test:
+
+### Temporarily revert these 3 files only:
+- `FormLedgerView.vb`
+- `FormDeleteCheck.vb`
+- `FormAddChecks.vb`
+
+and keep project otherwise unchanged.
+
+Then build.
+
+### If build succeeds:
+One of those pasted replacements introduced the compiler crash.
+
+### If build still fails:
+The issue is likely:
+- `LedgerCurWriter.vb`
+- or a generated/designer/project file that got touched indirectly
+
+---
+
+## Most likely practical culprit
+Since this is happening after recent code pastes, common real-world causes are:
+
+- a hidden bad character pasted into a `.vb` file
+- smart quotes
+- malformed XML/doc/attribute line
+- corrupted designer file merge
+- duplicated partial class or namespace mismatch causing Roslyn to blow up
+
+---
+
+## Best immediate next step
+Please paste the full contents of:
+
+1. **`LedgerCurWriter.vb`**
+2. the top ~40 lines of **`FormLedgerView.vb`**
+3. if possible, **`My Project\AssemblyInfo.vb`**
+
+That will let me check for the most likely compiler-crash triggers.
+
+---
+
+## Quick workaround if you want to keep moving now
+If you need to get unstuck immediately:
+
+1. remove `LedgerCurWriter.vb`
+2. restore the last known building versions of:
+   - `FormLedgerView.vb`
+   - `FormDeleteCheck.vb`
+   - `FormAddChecks.vb`
+3. verify build works again
+4. then reintroduce the file changes **one at a time**
+
+Thatâ€™s the safest way to isolate a Roslyn crash.
+
+---
+
+## Short answer
+This does **not** look like a normal code error in your business logic.  
+It looks like a **compiler crash while binding attributes**. Start by removing/reverting the most recent files, then clean `bin/obj`, and paste `LedgerCurWriter.vb` plus `AssemblyInfo.vb` if you want me to pinpoint it.
+
+## @testsubject117
+
+I will send you the code for each file and you tell me what needs to be fixed
+
+## Copilot
+
+Yes â€” do that.
+
+## Direct answer
+Send me the files **one at a time**, and Iâ€™ll tell you exactly:
+- what is wrong
+- what to change
+- whether the file is safe as-is
+
+## Best order
+Please send them in this order:
+
+1. **`LedgerCurWriter.vb`**
+2. **`FormLedgerView.vb`**
+3. **`FormDeleteCheck.vb`**
+4. **the changed part of `FormAddChecks.vb`**
+5. **`My Project\AssemblyInfo.vb`** if needed
+
+## Important
+Paste the **exact current contents** from your project, not what you intended to paste.
+
+That matters because compiler crashes are often caused by:
+- one stray character
+- broken quotes
+- partial paste
+- invalid top-of-file content
+
+Send the first one when ready: **`LedgerCurWriter.vb`**.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+
+```
+
+## Copilot
+
+This file looks basically fine, but there is **one thing I would fix immediately**.
+
+## Direct answer
+Add the missing import for `List`/`IEnumerable` support.
+
+Right now you have:
+
+```vbnet
+Imports System
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+```
+
+You should add:
+
+```vbnet
+Imports System.Collections.Generic
+```
+
+So the top should be:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+```
+
+---
+
+## Why
+You are using:
+
+- `IEnumerable(Of LedgerEntry)`
+- `List(Of String)`
+
+Those usually need:
+
+```vbnet
+Imports System.Collections.Generic
+```
+
+Sometimes projects compile without it because of implicit/global imports, but I would not rely on that.
+
+---
+
+## Is this likely the Roslyn crash?
+Probably **not by itself**.
+
+This file does **not** contain attributes, designer code, or anything obviously crash-inducing.
+
+So:
+- this file is **mostly okay**
+- it is **not the most likely cause** of the compiler internal error
+
+---
+
+## Corrected version
+Use this exact version:
+
+```vbnet
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Globalization
+Imports System.IO
+Imports System.Text
+
+Public NotInheritable Class LedgerCurWriter
+    Private Sub New()
+    End Sub
+
+    Public Shared Sub WriteAll(path As String, entries As IEnumerable(Of LedgerEntry))
+        Dim lines As New List(Of String)()
+
+        For Each entry In entries
+            lines.AddRange(ToLines(entry))
+        Next
+
+        File.WriteAllLines(path, lines, Encoding.ASCII)
+    End Sub
+
+    Public Shared Sub Append(path As String, entry As LedgerEntry)
+        Dim lines = ToLines(entry)
+
+        Using sw As New StreamWriter(path, append:=True, encoding:=Encoding.ASCII)
+            For Each line In lines
+                sw.WriteLine(line)
+            Next
+        End Using
+    End Sub
+
+    Public Shared Function ToLines(entry As LedgerEntry) As List(Of String)
+        Dim lines As New List(Of String)()
+
+        lines.Add(Quote(entry.Customer))
+        lines.Add(Quote(entry.DateText))
+        lines.Add(Quote(entry.CheckNumber))
+        lines.Add(Quote(entry.InvoiceDiffText))
+        lines.Add(entry.Amount.ToString(CultureInfo.InvariantCulture))
+        lines.Add(Quote(entry.Reference))
+
+        Return lines
+    End Function
+
+    Private Shared Function Quote(value As String) As String
+        If value Is Nothing Then value = ""
+        value = value.Replace("""", "")
+        Return """" & value & """"
+    End Function
+End Class
+```
+
+---
+
+## Next file
+Send **`FormLedgerView.vb`** next.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Linq
+Imports System.Windows.Forms
+
+Public Class FormLedgerView
+    Inherits Form
+
+    Private ReadOnly _customerFilter As String
+    Private ReadOnly _checkFilter As String
+    Private ReadOnly _yearFilter As String
+
+    Private ReadOnly lblTitle As New Label()
+    Private ReadOnly lblFilterLine As New Label()
+    Private ReadOnly dgv As New DataGridView()
+    Private ReadOnly lblTotal As New Label()
+    Private ReadOnly btnClose As New Button()
+
+    Public Sub New(customerFilter As String, checkFilter As String, yearFilter As String)
+        MyBase.New()
+
+        _customerFilter = If(customerFilter, "").Trim()
+        _checkFilter = If(checkFilter, "").Trim()
+        _yearFilter = If(yearFilter, "").Trim()
+
+        InitializeCustomComponents()
+    End Sub
+
+    Private Sub InitializeCustomComponents()
+        Me.Text = "View Checks"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.Size = New Size(980, 640)
+        Me.MinimumSize = New Size(980, 640)
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 12.0!, FontStyle.Regular)
+        Me.KeyPreview = True
+
+        lblTitle.AutoSize = False
+        lblTitle.Text = "***** View Checks *****"
+        lblTitle.TextAlign = ContentAlignment.MiddleLeft
+        lblTitle.Font = New Font("Consolas", 16.0!, FontStyle.Regular)
+        lblTitle.ForeColor = Color.White
+        lblTitle.BackColor = Color.Black
+        lblTitle.SetBounds(24, 20, 920, 32)
+
+        lblFilterLine.AutoSize = False
+        lblFilterLine.ForeColor = Color.White
+        lblFilterLine.BackColor = Color.Black
+        lblFilterLine.SetBounds(24, 70, 920, 28)
+
+        dgv.SetBounds(24, 110, 920, 420)
+        dgv.BackgroundColor = Color.Black
+        dgv.GridColor = Color.Gray
+        dgv.BorderStyle = BorderStyle.FixedSingle
+        dgv.ReadOnly = True
+        dgv.AllowUserToAddRows = False
+        dgv.AllowUserToDeleteRows = False
+        dgv.AllowUserToResizeRows = False
+        dgv.MultiSelect = False
+        dgv.SelectionMode = DataGridViewSelectionMode.FullRowSelect
+        dgv.RowHeadersVisible = False
+        dgv.AutoGenerateColumns = False
+        dgv.EnableHeadersVisualStyles = False
+        dgv.ColumnHeadersDefaultCellStyle.BackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.ForeColor = Color.Yellow
+        dgv.ColumnHeadersDefaultCellStyle.SelectionBackColor = Color.Black
+        dgv.ColumnHeadersDefaultCellStyle.SelectionForeColor = Color.Yellow
+        dgv.DefaultCellStyle.BackColor = Color.Black
+        dgv.DefaultCellStyle.ForeColor = Color.White
+        dgv.DefaultCellStyle.SelectionBackColor = Color.Navy
+        dgv.DefaultCellStyle.SelectionForeColor = Color.White
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Customer",
+            .DataPropertyName = "Customer",
+            .Width = 220
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            .HeaderText = "Check #",
+            .DataPropertyName = "CheckNumber",
+            .Width = 120
+        })
+
+        dgv.Columns.Add(New DataGridViewTextBoxColumn() With {

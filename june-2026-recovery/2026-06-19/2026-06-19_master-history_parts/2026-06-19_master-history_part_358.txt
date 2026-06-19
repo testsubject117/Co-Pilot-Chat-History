@@ -1,0 +1,2000 @@
+﻿            viewer.ShowDialog(Me)
+        End Using
+
+        RenderMenu()
+    End Sub
+
+    ' -----------------------------
+    ' Paging helpers (3 entries/page, DOS-like)
+    ' -----------------------------
+    Private Sub AddEntryToPages(entryText As String,
+                               pages As List(Of String),
+                               pageSb As System.Text.StringBuilder,
+                               ByRef pageEntryCount As Integer)
+
+        Const EntriesPerPage As Integer = 3
+
+        Dim block As String = (If(entryText, "")).TrimEnd()
+
+        If pageEntryCount >= EntriesPerPage Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+
+        If pageSb.Length > 0 Then
+            pageSb.AppendLine()
+        End If
+
+        pageSb.Append(block)
+        pageSb.AppendLine()
+        pageEntryCount += 1
+    End Sub
+
+    Private Sub FlushPageIfNeeded(pages As List(Of String),
+                                 pageSb As System.Text.StringBuilder,
+                                 ByRef pageEntryCount As Integer)
+        If pageSb.Length > 0 Then
+            pages.Add(pageSb.ToString().TrimEnd())
+            pageSb.Clear()
+            pageEntryCount = 0
+        End If
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Your `FormLogBookMenu.vb` looks fine: **nothing in this file can open a search window on the 2nd digit**. In this code, the only place that launches a results window for (3) is `RunInvoiceLookup`, and that is only called from `OnInputKeyDown` when `Enter` is pressed.
+
+So if a window opens when you type the **second digit**, the cause is **outside this file** (or in a designer-wired handler you havenâ€™t pasted).
+
+## What to change (the real fix)
+You need to find and disable the **global/incremental search key handler** while `_mode <> Menu` (prompt is active). Common locations:
+
+- `FormMain`, `MDIParent`, â€œmain menuâ€ form
+- `Application.AddMessageFilter(...)` / `IMessageFilter.PreFilterMessage`
+- another form with `KeyPreview = True` and a `KeyDown/KeyPress` handler
+- `FrmDosPagedViewer` or a shared â€œDOS screenâ€ control listening to `KeyPress` / `TextChanged`
+
+### The symptom matches exactly this pattern
+Some handler is building a prefix string as you type and opening a â€œsearch resultsâ€ viewer for invoice prefixes (e.g., `73*`). Thatâ€™s why:
+- `7` does nothing
+- `2` triggers the â€œprefix searchâ€ window
+- you sometimes see a `3` injected (because the handler still thinks youâ€™re in menu mode / option 3)
+
+## How to prove it in 10 seconds
+Set a breakpoint on **every place that opens that popup**. Since you donâ€™t know where, do this:
+
+1) In Visual Studio: **Debug â†’ New Breakpoint â†’ Break at Functionâ€¦**
+2) Add breakpoints for:
+   - `System.Windows.Forms.Form.ShowDialog`
+   - `System.Windows.Forms.Form.Show`
+
+Now reproduce: press (3), type `7`, type `2`.
+
+When it breaks, look at the **Call Stack**. The first non-framework method in your code is the exact offender. Paste that call stack and Iâ€™ll tell you the exact line to guard.
+
+(If breaking on `Show/ShowDialog` is too noisy, we can instead breakpoint the specific form constructor once we know the form name.)
+
+## What the eventual code change will look like
+Wherever that incremental-search handler is, add a guard like:
+
+```vbnet
+If TypeOf ActiveForm Is FormLogBookMenu Then
+    Dim m = DirectCast(ActiveForm, FormLogBookMenu)
+    ' If the prompt overlay is visible, ignore global keystrokes.
+    If m.IsPromptActive Then Return
+End If
+```
+
+or simpler inside that handler:
+
+```vbnet
+If pnlPrompt.Visible Then Return
+```
+
+But to write the exact patch, I need to see the handler.
+
+## What I need from you
+Paste **one** of these and I can generate the full-file replacement(s):
+
+1) `FormLogBookMenu.Designer.vb` (in case `TextChanged` is wired there), **and/or**
+2) The code for your main form (whatever opens `FormLogBookMenu`), **and/or**
+3) The **Call Stack** captured when the popup opens on the 2nd digit (best).
+
+Once you paste the call stack, Iâ€™ll respond with â€œreplace entire file X with thisâ€ for the correct file (it likely wonâ€™t be `FormLogBookMenu.vb`).
+
+## @testsubject117
+
+would this search key handler be in formmainmenu.vb?
+
+## Copilot
+
+Yes â€” **`FormMainMenu.vb` is one of the most likely places**.
+
+If your app has a â€œmain shellâ€ form (often the startup form / MDI parent) it commonly has:
+
+- `KeyPreview = True`
+- `FormMainMenu_KeyDown` / `KeyPress`
+- logic like â€œas you type digits, jump/searchâ€ (especially for legacy DOS behavior)
+
+That kind of handler can still fire even when you open `FormLogBookMenu` (depending on ownership, focus, or message filtering), and it would explain why typing `7` then `2` triggers an invoice-prefix search window.
+
+### What to look for in `FormMainMenu.vb`
+Search in that file for any of:
+
+- `KeyDown`, `KeyPress`, `KeyUp`
+- `KeyPreview`
+- `ProcessCmdKey`
+- `Application.AddMessageFilter`
+- `PreFilterMessage`
+- `StartsWith`
+- `Like`
+- `Invoice`
+- any code that calls `Show()` / `ShowDialog()` for a search/results form
+
+### The fix pattern (likely)
+In that handler, add an early return when the active form is your prompt screen:
+
+```vbnet
+' Example guard inside FormMainMenu key handler:
+If Application.OpenForms IsNot Nothing Then
+    Dim lb = TryCast(Application.OpenForms.OfType(Of FormLogBookMenu)().FirstOrDefault(), FormLogBookMenu)
+    If lb IsNot Nothing AndAlso lb.PromptVisible Then Return
+End If
+```
+
+â€¦but I donâ€™t want to guess the exact property/structure. The cleanest approach is:
+
+1) **Paste `FormMainMenu.vb`** (and `FormMainMenu.Designer.vb` if it wires events)
+2) Tell me the name/class of the popup window that appears
+3) Iâ€™ll point to the exact method and generate an **entire-file replacement** with the correct guard.
+
+If you paste `FormMainMenu.vb` next, I can likely solve this in one pass.
+
+## @testsubject117
+
+```
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' --- DOS-style bottom prompt state (for E flow) ---
+    Private _isLogBookYearPromptActive As Boolean = False
+    Private _logBookYearBuffer As String = ""
+    Private _logBookDefaultYear As Integer = 0
+
+    ' Remember AcceptButton so we can restore it after prompt mode
+    Private _savedAcceptButton As IButtonControl = Nothing
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow per request)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels) - increased per request
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Was 18; moved up another 5px -> 23
+    Private Const PromptLiftPx As Integer = 23
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    ' Catch Enter/Esc even when a Button has focus (most reliable).
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _isLogBookYearPromptActive Then
+            If keyData = Keys.Escape Then
+                StopLogBookYearPrompt()
+                Return True
+            End If
+
+            If keyData = Keys.Enter Then
+                AcceptLogBookYearPrompt()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        Dim ch As Char = e.KeyChar
+
+        ' --- E year prompt mode: digits/backspace here; Enter/Esc handled in ProcessCmdKey ---
+        If _isLogBookYearPromptActive Then
+            e.Handled = True
+
+            If ch = ChrW(Keys.Back) Then
+                If _logBookYearBuffer.Length > 0 Then
+                    _logBookYearBuffer = _logBookYearBuffer.Substring(0, _logBookYearBuffer.Length - 1)
+                    RefreshLogBookYearPromptLine()
+                End If
+                Return
+            End If
+
+            If Char.IsDigit(ch) Then
+                If _logBookYearBuffer.Length < 4 Then
+                    _logBookYearBuffer &= ch
+                    RefreshLogBookYearPromptLine()
+                End If
+                Return
+            End If
+
+            ' Ignore everything else while prompting
+            Return
+        End If
+
+        ' Normal main menu behavior:
+        Dim s As String = ch.ToString()
+        If s = vbCr OrElse s = vbLf Then Return
+        HandleMenuKey(s)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    Return
+            End Select
+        End If
+
+        ' If we're in the DOS-style E year prompt mode, ignore all menu keys.
+        If _isLogBookYearPromptActive Then
+            Return
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                StartLogBookYearPrompt()
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style E (Log Book year) prompt
+    ' -------------------------------
+    Private Sub StartLogBookYearPrompt()
+        _isLogBookYearPromptActive = True
+        _logBookYearBuffer = ""
+        _logBookDefaultYear = DateTime.Now.Year
+
+        ' Prevent Enter from being treated like "click focused button"
+        _savedAcceptButton = Me.AcceptButton
+        Me.AcceptButton = Nothing
+        Me.ActiveControl = Nothing
+
+        _promptBorderColor = Color.Yellow
+        RefreshLogBookYearPromptLine()
+    End Sub
+
+    Private Sub RefreshLogBookYearPromptLine()
+        Dim prompt As String =
+            "What year do you want to use [Enter = " & _logBookDefaultYear.ToString() & "]? " &
+            _logBookYearBuffer
+
+        ShowBottomPrompt(prompt)
+    End Sub
+
+    Private Sub StopLogBookYearPrompt()
+        _isLogBookYearPromptActive = False
+        _logBookYearBuffer = ""
+
+        ' Restore AcceptButton behavior
+        Me.AcceptButton = _savedAcceptButton
+        _savedAcceptButton = Nothing
+
+        HideBottomPrompt()
+    End Sub
+
+    Private Sub AcceptLogBookYearPrompt()
+        Dim chosenYear As Integer = _logBookDefaultYear
+
+        If Not String.IsNullOrWhiteSpace(_logBookYearBuffer) Then
+            Dim n As Integer
+            If Integer.TryParse(_logBookYearBuffer, n) Then
+                chosenYear = n
+            End If
+        End If
+
+        Dim twoDigit As Integer
+        If chosenYear >= 0 AndAlso chosenYear <= 99 Then
+            twoDigit = chosenYear
+        Else
+            twoDigit = chosenYear Mod 100
+        End If
+
+        StopLogBookYearPrompt()
+
+        Try
+            Using f As New FormLogBookMenu(twoDigit)
+                f.ShowDialog(Me)
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Unable to open Log Book:" & Environment.NewLine & ex.Message,
+                            "LOG BOOK",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+## Copilot
+
+Yes â€” itâ€™s in **this file** (or at least this file is *capable* of causing exactly what youâ€™re seeing).
+
+### Whatâ€™s happening
+`FormMainMenu` has `Me.KeyPreview = True` and handles **`Me.KeyPress`**:
+
+```vbnet
+Private Sub FormMainMenu_KeyPress(...) Handles Me.KeyPress
+    ...
+    HandleMenuKey(s)
+End Sub
+```
+
+So when the Log Book dialog is open and you type `7` then `2`, **those keypresses can still be reaching the main menu** (WinForms message routing + KeyPreview + focus/ownership quirks). The main menu then calls `HandleMenuKey("7")`, `HandleMenuKey("2")`, etc.
+
+Even though your posted `HandleMenuKey` doesnâ€™t open an invoice search, it *does* show other dialogs for some keys, andâ€”more importantlyâ€”this proves the main menu is still reacting to keystrokes while a modal is open. If you have *any* invoice incremental-search code elsewhere, this is the mechanism that triggers it.
+
+### Fix: when any modal dialog is open, ignore main-menu keystrokes
+Add a guard at the top of `FormMainMenu_KeyPress`:
+
+- If a modal dialog is open (like `FormLogBookMenu`), **do nothing**.
+
+WinForms gives you `Me.ActiveMdiChild` sometimes, but simplest: check `Application.OpenForms` for any form (other than `Me`) that is `Modal` or simply check `Me.Modal` (main menu isnâ€™t modal). A reliable approach is: if there is an open form that is **not** `FormMainMenu` and is **Visible** and has **Focus/ContainsFocus**, then donâ€™t handle.
+
+Below is an **entire-file replacement** for `FormMainMenu.vb` with a minimal, safe change:
+- adds `ShouldIgnoreKeyPress()` helper
+- returns early in `FormMainMenu_KeyPress` when another form (like `FormLogBookMenu`) has focus
+
+It does **not** change menu behavior otherwise.
+
+---
+
+## Replace entire file: `FormMainMenu.vb`
+
+```vbnet name=FormMainMenu.vb
+Option Strict Off
+Option Explicit On
+
+Imports System
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Partial Public Class FormMainMenu
+
+    Private _buildInfo As String = ""
+
+    ' --- DOS-style bottom prompt state (for J flow) ---
+    Private _isActualNamesPromptActive As Boolean = False
+
+    ' --- DOS-style bottom prompt state (for E flow) ---
+    Private _isLogBookYearPromptActive As Boolean = False
+    Private _logBookYearBuffer As String = ""
+    Private _logBookDefaultYear As Integer = 0
+
+    ' Remember AcceptButton so we can restore it after prompt mode
+    Private _savedAcceptButton As IButtonControl = Nothing
+
+    ' Outer container (gray) that sits at the bottom, and inner prompt (black)
+    Private pnlPromptContainer As Panel = Nothing
+    Private pnlPromptHost As Panel = Nothing
+    Private lblPrompt As Label = Nothing
+
+    ' Border color for the prompt box (yellow per request)
+    Private _promptBorderColor As Color = Color.Yellow
+
+    ' Border thickness for the prompt box (in pixels) - increased per request
+    Private Const PromptBorderPx As Integer = 2
+
+    ' How far above the bottom edge the black prompt sits (in pixels)
+    ' Was 18; moved up another 5px -> 23
+    Private Const PromptLiftPx As Integer = 23
+
+    Protected Overrides Sub OnLoad(e As EventArgs)
+        MyBase.OnLoad(e)
+
+        Me.KeyPreview = True
+
+        BuildMenu()
+
+        _buildInfo = "   " & BuildInfo.DisplayVersion
+        Me.Text = "Active Magnetic Inspection Main Menu Application   " & BuildInfo.DisplayVersion
+
+        lblMainMenu.Text = "MAIN MENU"
+        UpdateHeaderClock()
+        tmrClock.Interval = 1000
+        tmrClock.Start()
+
+        lblDateTime.TextAlign = ContentAlignment.MiddleLeft
+        lblDateTime.Padding = New Padding(0, 10, 0, 0)
+        lblDateTime.Margin = New Padding(0)
+
+        Me.BeginInvoke(New Action(Sub()
+                                      ResizeButtonsToPanel(flpLeft)
+                                      ResizeButtonsToPanel(flpRight)
+                                  End Sub))
+    End Sub
+
+    ' Catch Enter/Esc even when a Button has focus (most reliable).
+    Protected Overrides Function ProcessCmdKey(ByRef msg As Message, keyData As Keys) As Boolean
+        If _isLogBookYearPromptActive Then
+            If keyData = Keys.Escape Then
+                StopLogBookYearPrompt()
+                Return True
+            End If
+
+            If keyData = Keys.Enter Then
+                AcceptLogBookYearPrompt()
+                Return True
+            End If
+        End If
+
+        Return MyBase.ProcessCmdKey(msg, keyData)
+    End Function
+
+    Private Sub flpLeft_SizeChanged(sender As Object, e As EventArgs) Handles flpLeft.SizeChanged
+        ResizeButtonsToPanel(flpLeft)
+    End Sub
+
+    Private Sub flpRight_SizeChanged(sender As Object, e As EventArgs) Handles flpRight.SizeChanged
+        ResizeButtonsToPanel(flpRight)
+    End Sub
+
+    Private Sub tmrClock_Tick(sender As Object, e As EventArgs) Handles tmrClock.Tick
+        UpdateHeaderClock()
+    End Sub
+
+    Private Sub UpdateHeaderClock()
+        Dim now As DateTime = DateTime.Now
+
+        lblDateTime.Text = _buildInfo & "          " &
+                       now.ToString("dddd") & "  " &
+                       now.ToString("MM-dd-yyyy") & "          " &
+                       now.ToString("hh:mm:ss tt")
+    End Sub
+
+    Private Sub BuildMenu()
+        If flpLeft Is Nothing OrElse flpRight Is Nothing Then Return
+
+        flpLeft.Controls.Clear()
+        flpRight.Controls.Clear()
+
+        ' Left column
+        AddMenuButton(flpLeft, "A", "Shop Card Generator")
+        AddMenuButton(flpLeft, "B", "Invoice Generator")
+        AddMenuButton(flpLeft, "C", "Checks and Cash Receipts")
+        AddMenuButton(flpLeft, "D", "View Sales Journal")
+        AddMenuButton(flpLeft, "E", "View Log Book")
+        AddMenuButton(flpLeft, "F", "Price List Program")
+        AddMenuButton(flpLeft, "G", "Print Records / Void Invoices")
+        AddMenuButton(flpLeft, "H", "Quick Message Flashing")
+        AddMenuButton(flpLeft, "I", "Backup Price List & Rolodex")
+        AddMenuButton(flpLeft, "J", "Print Out Customers Actual Names")
+        AddMenuButton(flpLeft, "K", "Cash Disbursements")
+        AddMenuButton(flpLeft, "L", "Business Expenses Account")
+        AddMenuButton(flpLeft, "M", "Quotation Form Generator")
+        AddMenuButton(flpLeft, "N", "Rolodex")
+
+        ' Right column
+        AddMenuButton(flpRight, "O", "Copy Spec Index")
+        AddMenuButton(flpRight, "P", "Entire Ledger Viewing")
+        AddMenuButton(flpRight, "Q", "Word Processor")
+        AddMenuButton(flpRight, "R", "Find Word Processor Text")
+        AddMenuButton(flpRight, "T", "Change Date or Time")
+        AddMenuButton(flpRight, "X", "Typewriter Mode")
+        AddMenuButton(flpRight, "Y", "Ed Dean's Personal Backup")
+        AddMenuButton(flpRight, "Z", "Personal Calendar")
+        AddMenuButton(flpRight, "1", "Mileage Tracking")
+        AddMenuButton(flpRight, "2", "Product Purchasing")
+        AddMenuButton(flpRight, "3", "Miscellaneous Menu")
+        AddMenuButton(flpRight, "4", "Add Entries to Log Book")
+        AddMenuButton(flpRight, "6", "Cadmium Cards")
+        AddMenuButton(flpRight, "7", "Emergency PAYROLL System")
+        AddMenuButton(flpRight, "?", "About AMiOffice Menu System")
+    End Sub
+
+    Private Sub AddMenuButton(panel As FlowLayoutPanel, key As String, text As String)
+        Dim btn As New Button()
+
+        btn.AutoSize = False
+        btn.Height = 36
+        btn.Font = New Font("Segoe UI", 12.0F, FontStyle.Bold, GraphicsUnit.Point, CByte(0))
+        btn.TextAlign = ContentAlignment.MiddleLeft
+        btn.Text = "(" & key & ") " & text
+        btn.Tag = key
+        btn.Margin = New Padding(3, 3, 3, 6)
+
+        btn.UseVisualStyleBackColor = False
+        btn.BackColor = Color.Black
+        btn.ForeColor = Color.White
+        btn.FlatStyle = FlatStyle.Flat
+        btn.FlatAppearance.BorderColor = Color.DimGray
+        btn.FlatAppearance.BorderSize = 1
+        btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(32, 32, 32)
+        btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(64, 64, 64)
+        btn.AutoEllipsis = True
+
+        AddHandler btn.Click, Sub(sender, args) HandleMenuKey(CStr(btn.Tag))
+
+        panel.Controls.Add(btn)
+    End Sub
+
+    Protected Overrides Sub OnResize(e As EventArgs)
+        MyBase.OnResize(e)
+        ResizeButtonsToPanel(flpLeft)
+        ResizeButtonsToPanel(flpRight)
+
+        If pnlPromptHost IsNot Nothing AndAlso pnlPromptHost.Visible Then
+            pnlPromptHost.Invalidate()
+        End If
+
+        If pnlPromptContainer IsNot Nothing AndAlso pnlPromptContainer.Visible Then
+            LayoutPromptWithinContainer()
+        End If
+    End Sub
+
+    Private Sub ResizeButtonsToPanel(panel As FlowLayoutPanel)
+        If panel Is Nothing Then Return
+
+        Dim targetWidth As Integer =
+            panel.ClientSize.Width -
+            panel.Padding.Left - panel.Padding.Right -
+            SystemInformation.VerticalScrollBarWidth - 6
+
+        If targetWidth < 150 Then targetWidth = 150
+
+        For Each c As Control In panel.Controls
+            Dim btn = TryCast(c, Button)
+            Dim lbl = TryCast(c, Label)
+
+            If btn IsNot Nothing Then
+                btn.Width = targetWidth
+            ElseIf lbl IsNot Nothing Then
+                lbl.Width = targetWidth
+            End If
+        Next
+    End Sub
+
+    Private Function ShouldIgnoreKeyPress() As Boolean
+        ' If another form (like the Log Book dialog) currently has focus,
+        ' do NOT process menu keystrokes here.
+        Try
+            For Each f As Form In Application.OpenForms
+                If f Is Nothing Then Continue For
+                If Object.ReferenceEquals(f, Me) Then Continue For
+                If Not f.Visible Then Continue For
+
+                ' If that other form (or one of its controls) has focus, ignore.
+                If f.ContainsFocus Then
+                    Return True
+                End If
+            Next
+        Catch
+            ' If anything goes weird, fail open (do not ignore).
+        End Try
+
+        Return False
+    End Function
+
+    Private Sub FormMainMenu_KeyPress(sender As Object, e As KeyPressEventArgs) Handles Me.KeyPress
+        ' CRITICAL: don't let main menu keystrokes fire while a modal child dialog is active.
+        If ShouldIgnoreKeyPress() Then
+            Return
+        End If
+
+        Dim ch As Char = e.KeyChar
+
+        ' --- E year prompt mode: digits/backspace here; Enter/Esc handled in ProcessCmdKey ---
+        If _isLogBookYearPromptActive Then
+            e.Handled = True
+
+            If ch = ChrW(Keys.Back) Then
+                If _logBookYearBuffer.Length > 0 Then
+                    _logBookYearBuffer = _logBookYearBuffer.Substring(0, _logBookYearBuffer.Length - 1)
+                    RefreshLogBookYearPromptLine()
+                End If
+                Return
+            End If
+
+            If Char.IsDigit(ch) Then
+                If _logBookYearBuffer.Length < 4 Then
+                    _logBookYearBuffer &= ch
+                    RefreshLogBookYearPromptLine()
+                End If
+                Return
+            End If
+
+            ' Ignore everything else while prompting
+            Return
+        End If
+
+        ' Normal main menu behavior:
+        Dim s As String = ch.ToString()
+        If s = vbCr OrElse s = vbLf Then Return
+        HandleMenuKey(s)
+    End Sub
+
+    Protected Overrides Sub OnKeyDown(e As KeyEventArgs)
+        MyBase.OnKeyDown(e)
+
+        If _isActualNamesPromptActive AndAlso e.KeyCode = Keys.Escape Then
+            StopActualNamesPrompt()
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub HandleMenuKey(ch As String)
+        If String.IsNullOrEmpty(ch) Then Return
+
+        Dim up As String = ch
+        If up.Length = 1 AndAlso Char.IsLetter(up(0)) Then
+            up = up.ToUpperInvariant()
+        End If
+
+        ' If we're in the DOS-style J prompt mode, only P/Q matter.
+        If _isActualNamesPromptActive Then
+            Select Case up
+                Case "P"
+                    StopActualNamesPrompt()
+                    OpenActualCustomerNames()
+                    Return
+
+                Case "Q"
+                    StopActualNamesPrompt()
+                    Return
+
+                Case Else
+                    Return
+            End Select
+        End If
+
+        ' If we're in the DOS-style E year prompt mode, ignore all menu keys.
+        If _isLogBookYearPromptActive Then
+            Return
+        End If
+
+        Select Case up
+            Case "A"
+                NotYet("Shop Card Generator")
+
+            Case "B"
+                NotYet("Invoice Generator")
+
+            Case "C"
+                Using f As New FormLedgerMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "D"
+                NotYet("View Sales Journal (SALES)")
+
+            Case "E"
+                StartLogBookYearPrompt()
+
+            Case "F"
+                NotYet("Price List Program (plist)")
+
+            Case "G"
+                NotYet("Print/Void Invoices (BOOT)")
+
+            Case "H"
+                NotYet("Quick Message Flashing")
+
+            Case "I"
+                Try
+                    Cursor = Cursors.WaitCursor
+                    MigrationService.EnsureFoldersAndMigrateOnce()
+                    BackupService.RunBackupPriceListAndRolodex()
+                    MessageBox.Show("Backup complete." & Environment.NewLine & AppPaths.BackupDir,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Catch ex As Exception
+                    MessageBox.Show("Backup failed: " & ex.Message,
+                                    "Backup", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Finally
+                    Cursor = Cursors.Default
+                End Try
+
+            Case "J"
+                StartActualNamesPrompt()
+
+            Case "K"
+                NotYet("Cash Disbursements (BILL)")
+
+            Case "L"
+                NotYet("Business Expenses Account (password)")
+
+            Case "M"
+                NotYet("Quotation Form Generator (QUOTE)")
+
+            Case "N"
+                Using f As New FrmRolodexMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "O"
+                NotYet("Copy Spec Index")
+
+            Case "P"
+                NotYet("Entire Ledger Viewing (ENTIRE)")
+
+            Case "Q"
+                NotYet("Word Processor")
+
+            Case "R"
+                NotYet("Find Word Processor Text")
+
+            Case "T"
+                NotYet("Change Date or Time")
+
+            Case "X"
+                NotYet("Typewriter Mode")
+
+            Case "Y"
+                NotYet("Ed Dean's Personal Backup")
+
+            Case "Z"
+                Using f As New FormPersonalCalendar()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "1"
+                Using f As New FormMileageTracking()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "2"
+                NotYet("Product Purchasing")
+
+            Case "3"
+                Using f As New FormMiscMenu()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case "4"
+                NotYet("Add Entries to Log Book")
+
+            Case "6"
+                NotYet("Cadmium Cards")
+
+            Case "7"
+                NotYet("Emergency PAYROLL System")
+
+            Case "?"
+                Using f As New FormAbout()
+                    f.ShowDialog(Me)
+                End Using
+
+            Case Else
+                ' ignore unknown keys
+        End Select
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style E (Log Book year) prompt
+    ' -------------------------------
+    Private Sub StartLogBookYearPrompt()
+        _isLogBookYearPromptActive = True
+        _logBookYearBuffer = ""
+        _logBookDefaultYear = DateTime.Now.Year
+
+        ' Prevent Enter from being treated like "click focused button"
+        _savedAcceptButton = Me.AcceptButton
+        Me.AcceptButton = Nothing
+        Me.ActiveControl = Nothing
+
+        _promptBorderColor = Color.Yellow
+        RefreshLogBookYearPromptLine()
+    End Sub
+
+    Private Sub RefreshLogBookYearPromptLine()
+        Dim prompt As String =
+            "What year do you want to use [Enter = " & _logBookDefaultYear.ToString() & "]? " &
+            _logBookYearBuffer
+
+        ShowBottomPrompt(prompt)
+    End Sub
+
+    Private Sub StopLogBookYearPrompt()
+        _isLogBookYearPromptActive = False
+        _logBookYearBuffer = ""
+
+        ' Restore AcceptButton behavior
+        Me.AcceptButton = _savedAcceptButton
+        _savedAcceptButton = Nothing
+
+        HideBottomPrompt()
+    End Sub
+
+    Private Sub AcceptLogBookYearPrompt()
+        Dim chosenYear As Integer = _logBookDefaultYear
+
+        If Not String.IsNullOrWhiteSpace(_logBookYearBuffer) Then
+            Dim n As Integer
+            If Integer.TryParse(_logBookYearBuffer, n) Then
+                chosenYear = n
+            End If
+        End If
+
+        Dim twoDigit As Integer
+        If chosenYear >= 0 AndAlso chosenYear <= 99 Then
+            twoDigit = chosenYear
+        Else
+            twoDigit = chosenYear Mod 100
+        End If
+
+        StopLogBookYearPrompt()
+
+        Try
+            Using f As New FormLogBookMenu(twoDigit)
+                f.ShowDialog(Me)
+            End Using
+        Catch ex As Exception
+            MessageBox.Show("Unable to open Log Book:" & Environment.NewLine & ex.Message,
+                            "LOG BOOK",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub NotYet(feature As String)
+        MessageBox.Show("Not implemented yet: " & feature, "Port status", MessageBoxButtons.OK, MessageBoxIcon.Information)
+    End Sub
+
+    ' -------------------------------
+    ' DOS-style prompt bar (bottom)
+    ' -------------------------------
+    Private Sub EnsurePromptUi()
+        If pnlPromptContainer IsNot Nothing Then Return
+
+        pnlPromptContainer = New Panel() With {
+            .Visible = False,
+            .Height = 28 + (PromptLiftPx * 2),
+            .Dock = DockStyle.Bottom,
+            .BackColor = Color.FromArgb(45, 45, 45),
+            .Padding = New Padding(0)
+        }
+
+        pnlPromptHost = New Panel() With {
+            .Visible = True,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .Padding = New Padding(10, 3, 10, 3)
+        }
+
+        lblPrompt = New Label() With {
+            .Dock = DockStyle.Fill,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = New Font("Consolas", 12.0F, FontStyle.Bold, GraphicsUnit.Point),
+            .AutoEllipsis = True
+        }
+
+        pnlPromptHost.Controls.Add(lblPrompt)
+        pnlPromptContainer.Controls.Add(pnlPromptHost)
+        Me.Controls.Add(pnlPromptContainer)
+
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+
+        AddHandler pnlPromptHost.Paint, AddressOf pnlPromptHost_Paint
+    End Sub
+
+    Private Sub LayoutPromptWithinContainer()
+        If pnlPromptContainer Is Nothing OrElse pnlPromptHost Is Nothing Then Return
+
+        pnlPromptHost.Left = 0
+        pnlPromptHost.Width = pnlPromptContainer.ClientSize.Width
+        pnlPromptHost.Top = PromptLiftPx
+    End Sub
+
+    Private Sub pnlPromptHost_Paint(sender As Object, e As PaintEventArgs)
+        Dim p As Panel = DirectCast(sender, Panel)
+
+        Using pen As New Pen(_promptBorderColor, CSng(PromptBorderPx))
+            Dim inset As Integer = CInt(Math.Ceiling(PromptBorderPx / 2.0R))
+            Dim r As Rectangle = p.ClientRectangle
+            r.X += inset
+            r.Y += inset
+            r.Width -= (inset * 2) + 1
+            r.Height -= (inset * 2) + 1
+
+            If r.Width > 0 AndAlso r.Height > 0 Then
+                e.Graphics.DrawRectangle(pen, r)
+            End If
+        End Using
+    End Sub
+
+    Private Sub ShowBottomPrompt(text As String)
+        EnsurePromptUi()
+
+        lblPrompt.Text = text
+        pnlPromptContainer.Visible = True
+        pnlPromptContainer.BringToFront()
+        LayoutPromptWithinContainer()
+        pnlPromptHost.Invalidate()
+    End Sub
+
+    Private Sub HideBottomPrompt()
+        If pnlPromptContainer Is Nothing Then Return
+        pnlPromptContainer.Visible = False
+        If lblPrompt IsNot Nothing Then lblPrompt.Text = ""
+    End Sub
+
+    Private Sub StartActualNamesPrompt()
+        _isActualNamesPromptActive = True
+        _promptBorderColor = Color.Yellow
+        ShowBottomPrompt("Push P to Print Out Actual Names, or Q to Quit")
+    End Sub
+
+    Private Sub StopActualNamesPrompt()
+        _isActualNamesPromptActive = False
+        HideBottomPrompt()
+    End Sub
+
+    ' -------------------------------
+    ' Existing J action (invoked by P)
+    ' -------------------------------
+    Private Sub OpenActualCustomerNames()
+        Try
+            Dim realNamePath As String = System.IO.Path.Combine(LegacyDataPaths.BaseDataDir, "REALNAME.DAT")
+            Dim svc As New ActualCustomerNamesService(realNamePath)
+
+            If Not svc.DataFileExists() Then
+                MessageBox.Show("REALNAME.DAT was not found:" & Environment.NewLine & realNamePath,
+                                "Actual Customer Names",
+                                MessageBoxButtons.OK,
+                                MessageBoxIcon.Warning)
+                Return
+            End If
+
+            Dim text As String = svc.BuildDisplayText()
+
+            Using f As New FrmPagedTextViewer()
+                f.SetPages(New List(Of String) From {text})
+                f.ShowDialog(Me)
+            End Using
+
+        Catch ex As Exception
+            MessageBox.Show("Unable to load Actual Customer Names:" & Environment.NewLine & ex.Message,
+                            "Actual Customer Names",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+End Class
+```
+
+Key thing: `FormMainMenu_KeyPress` is still firing when a modal dialog is open, which it shouldnâ€™t. The guard I suggested should address the â€œopens on 2nd digitâ€ symptom by preventing MainMenu from consuming those digits at all.
+
+If you apply the above and it still happens, then the popup is coming from an `Application.AddMessageFilter` somewhere elseâ€”then weâ€™d search for that next.
+
+If you want, tell me what the popup window title is when it opens on the 2nd digit, and I can tell whether itâ€™s being launched from main menu or from the logbook form.
+
+## @testsubject117
+
+rebuilt, still happens
+
+## Copilot
+
+Then `FormMainMenu_KeyPress` isnâ€™t the code thatâ€™s opening that popup (or it isnâ€™t even receiving the keystrokes in that moment). The remaining usual suspect is a **global message hook**:
+
+- `Application.AddMessageFilter(...)` / `IMessageFilter.PreFilterMessage`
+- a custom `NativeWindow` override
+- a shared â€œDOS keyboard handlerâ€ class
+- or the popup form itself is listening globally
+
+At this point we should stop guessing and **capture the call stack at the moment the popup opens**.
+
+## Do this (fast + definitive)
+1) In Visual Studio: **Debug â†’ New Breakpoint â†’ Break at Functionâ€¦**
+2) Add breakpoints for:
+   - `System.Windows.Forms.Form.ShowDialog`
+   - `System.Windows.Forms.Form.Show`
+
+3) Run, go to Log Book â†’ press (3) â†’ type `7` then `2`.
+
+When it breaks, open **Debug â†’ Windows â†’ Call Stack**, and paste the first ~20 lines here.
+
+That will tell us *exactly* which method is calling `Show/ShowDialog` and weâ€™ll patch the correct file.
+
+## Alternative if Show/ShowDialog breakpoints are too noisy
+Tell me the **class name** of the popup form (you can get it by clicking the popup window and looking at the Visual Studio **Document Outline** or by adding this temporary line in its constructor):
+
+```vbnet
+Debug.WriteLine(Me.GetType().FullName)
+```
+
+â€¦but the call stack method is still the cleanest.
+
+## While youâ€™re there: quick â€œmessage filterâ€ search
+In VS â€œFind in Filesâ€ (entire solution) for:
+
+- `AddMessageFilter`
+- `IMessageFilter`
+- `PreFilterMessage`
+- `WM_KEYDOWN`
+- `WM_CHAR`
+
+If you find any, paste that class/file too.
+
+Once you paste the call stack, Iâ€™ll generate the **entire-file replacement** for the *actual* culprit.
+
+## @testsubject117
+
+uh,,, I don't see anything that says new breakpoint break at function, I have new breakpoint, function breakpoint
+
+## Copilot
+
+Use **Function Breakpoint** â€” thatâ€™s the one.
+
+### Steps (Visual Studio)
+1) **Debug â†’ New Breakpoint â†’ Function Breakpointâ€¦**
+2) In the box, type **exactly** (one at a time) and click OK:
+
+- `System.Windows.Forms.Form.ShowDialog`
+- `System.Windows.Forms.Form.Show`
+
+3) Run (F5), reproduce: Log Book â†’ (3) â†’ type `7` then `2`.
+
+4) When it breaks:
+   - Open **Debug â†’ Windows â†’ Call Stack**
+   - Copy/paste the top ~20 lines here (or a screenshot)
+
+That call stack will identify which of your methods is launching the popup on the 2nd digit.
+
+If Visual Studio asks for a signature and wonâ€™t accept the names above, tell me which VS edition/version youâ€™re on (.NET Framework vs .NET) and what it prompts forâ€”Iâ€™ll give the exact format it wants.
+
+## @testsubject117
+
+it just launched the search window, nothing else happened, was it supposed to stop and give me a message?
+
+## Copilot
+
+It was supposed to **break into the debugger** (pause execution and highlight a line of code) *when* the popup form calls `Show()` or `ShowDialog()`. If it didnâ€™t pause, one of these is true:
+
+1) You werenâ€™t running under the debugger (**F5**), or you launched without debugging (**Ctrl+F5**).
+2) The popup isnâ€™t being shown via `Form.Show/ShowDialog` (less common, but possible if itâ€™s not a Form, or itâ€™s being created/shown in another way).
+3) The function breakpoint didnâ€™t bind (very common in VS): it silently fails until the method is loaded / the name is correct.
+
+Letâ€™s do a method that always works.
+
+## Guaranteed approach: break on all thrown exceptions (to get a call stack)
+Even if thereâ€™s no exception, we can force one.
+
+### Step A â€” Turn on breaking
+1) **Debug â†’ Windows â†’ Exception Settings**
+2) In the search box type `System.Exception`
+3) Check **Thrown** (or check â€œCommon Language Runtime Exceptionsâ€ â†’ Thrown)
+
+Now, we need a way to force an exception right when the popup opens.
+
+## Guaranteed approach: add ONE line that forces a break
+Since we donâ€™t know where the popup is created, weâ€™ll find it by searching for the popupâ€™s title text.
+
+### Step B â€” Find the popup code location
+When the popup appears, what is its **exact window title text** (top of the window)? Copy it exactly.
+
+Then in Visual Studio **Find in Files** (Ctrl+Shift+F) for a distinctive substring from that title, OR for something inside the popup like:
+
+- `INVOICE`
+- `Invoices beginning with`
+- `BEGINNING WITH`
+- the column headers you see in that popup
+
+Once you find the form/class that creates that popup, add this line at the very top of the code that opens it:
+
+```vbnet
+Debugger.Break()
+```
+
+That will *always* pause execution (only when debugging).
+
+### If you tell me the popup title
+Reply with the popup window title (exactly as shown). Then I can tell you what string to search for and what file itâ€™s probably in.
+
+---
+
+## Quick sanity check (most common issue)
+When you tested the function breakpoint, did you start with **F5**?
+
+- **F5** = debugger attached (breakpoints work)
+- **Ctrl+F5** = no debugger (breakpoints do nothing)
+
+If you were using Ctrl+F5, rerun with F5 and try again.
+
+---
+
+Answer these two and weâ€™ll lock it down fast:
+1) Are you running with **F5** or **Ctrl+F5**?
+2) What is the **exact title text** of the popup search window?
+
+## @testsubject117
+
+the window title that pops up is "LOG BOOK"
+
+## Copilot
+
+Thatâ€™s the smoking gun: the popup is **another instance of your log book viewer** (`FrmDosPagedViewer`) being opened by some â€œtype-ahead searchâ€ code, and your function breakpoint likely didnâ€™t bind.
+
+Since the popup title is just **â€œLOG BOOKâ€**, the simplest, guaranteed way to catch *who opens it* is to add a debug break **inside `FrmDosPagedViewer`** (because *every* time that popup opens, it goes through that constructor / Shown handler).
+
+## What to change (temporary, for diagnosis)
+Open `FrmDosPagedViewer.vb` and add this at the top of its constructor (`Public Sub New()`), **first line**:
+
+```vbnet
+If Debugger.IsAttached Then Debugger.Break()
+```
+
+Then run with **F5**, reproduce the issue (Log Book â†’ (3) â†’ type `7` then `2`).  
+Visual Studio will break and show you the exact line that called it in the **Call Stack**.
+
+### Why this works
+Even if the popup is created without `ShowDialog`, it still must instantiate `FrmDosPagedViewer` (or at least run some method in it). `Debugger.Break()` is a guaranteed stop.
+
+## After it breaks
+Go to **Debug â†’ Windows â†’ Call Stack** and paste the call stack here. The first non-framework line in *your* code is the exact handler we need to fix.
+
+---
+
+## If youâ€™d rather not edit code: use â€œBreak Allâ€
+1) Run with **F5**
+2) As soon as the unwanted LOG BOOK popup appears, click **Debug â†’ Break All**
+3) Then open **Call Stack**
+
+This *sometimes* lands you in message loop code (less precise), but often still shows the last UI action that opened the form.
+
+---
+
+### Next step
+Paste `FrmDosPagedViewer.vb` here (entire file) and I can also tell you exactly where to drop the `Debugger.Break()` line and then generate the final corrected files once we identify the caller.
+
+## @testsubject117
+
+```
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FrmDosPagedViewer
+    Inherits Form
+
+    Private ReadOnly _txt As TextBox
+    Private ReadOnly _lblHint As Label
+
+    Private _pages As List(Of String) = New List(Of String)()
+    Private _pageIndex As Integer = 0
+
+    Public Sub New()
+        Me.Text = "Viewer"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(900, 650)
+
+        _txt = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Dock = DockStyle.Fill,
+            .Font = Me.Font
+        }
+
+        _lblHint = New Label() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = Me.Font,
+            .Text = "[ENTER = More]   [ESC = Quit]"
+        }
+
+        Me.Controls.Add(_txt)
+        Me.Controls.Add(_lblHint)
+
+        AddHandler Me.KeyDown, AddressOf OnViewerKeyDown
+    End Sub
+
+    Public Sub SetPages(pages As IEnumerable(Of String))
+        _pages = New List(Of String)(If(pages, Array.Empty(Of String)()))
+        _pageIndex = 0
+        Render()
+    End Sub
+
+    Public Sub SetSinglePage(text As String)
+        SetPages(New String() {If(text, "")})
+    End Sub
+
+    Private Sub OnViewerKeyDown(sender As Object, e As KeyEventArgs)
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            If _pageIndex < _pages.Count - 1 Then
+                _pageIndex += 1
+                Render()
+            Else
+                ' Stay on last page until ESC (DOS-like).
+            End If
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub Render()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then
+            _txt.Text = ""
+            Return
+        End If
+
+        _txt.Text = _pages(_pageIndex)
+        _txt.SelectionStart = 0
+        _txt.SelectionLength = 0
+    End Sub
+End Class
+```
+here's my entire FrmDosPagedViewer.vb file, please regenerate the code with the fixes in place in the code: 
+
+## Copilot
+
+You donâ€™t need to change `FrmDosPagedViewer` to â€œfixâ€ the early popup (it isnâ€™t causing it), but you *do* need a reliable way to (a) stop the â€œ7 then 2 opens a LOG BOOK windowâ€ behavior and (b) prevent keystrokes from leaking around.
+
+Given what weâ€™ve learned, the most effective fix you can apply **inside `FrmDosPagedViewer` itself** is:
+
+1) **Make the viewer consume all digit keys** so they canâ€™t â€œfall throughâ€ to whatever global incremental-search handler is running elsewhere.
+2) Ensure the TextBox cannot take focus (so keystrokes always go to the form).
+3) (Optional but recommended) Add a one-line debug break you can temporarily enable to catch the caller.
+
+Below is a full-file replacement that does those things while keeping DOS behavior (ENTER=More, ESC=Quit).
+
+## Replace entire file: `FrmDosPagedViewer.vb`
+
+```vbnet name=FrmDosPagedViewer.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+Imports System.Diagnostics
+
+Public Class FrmDosPagedViewer
+    Inherits Form
+
+    Private ReadOnly _txt As TextBox
+    Private ReadOnly _lblHint As Label
+
+    Private _pages As List(Of String) = New List(Of String)()
+    Private _pageIndex As Integer = 0
+
+    ' Set True temporarily if you need to catch who is opening this viewer unexpectedly.
+    Private Const DebugBreakOnOpen As Boolean = False
+
+    Public Sub New()
+        If DebugBreakOnOpen AndAlso Debugger.IsAttached Then
+            Debugger.Break()
+        End If
+
+        Me.Text = "Viewer"
+        Me.StartPosition = FormStartPosition.CenterParent
+        Me.KeyPreview = True
+        Me.BackColor = Color.Black
+        Me.ForeColor = Color.White
+        Me.Font = New Font("Consolas", 11.0F, FontStyle.Bold, GraphicsUnit.Point)
+        Me.Size = New Size(900, 650)
+
+        _txt = New TextBox() With {
+            .Multiline = True,
+            .ReadOnly = True,
+            .TabStop = False,
+            .ScrollBars = ScrollBars.None,
+            .BorderStyle = BorderStyle.None,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .Dock = DockStyle.Fill,
+            .Font = Me.Font,
+            .ShortcutsEnabled = False
+        }
+
+        ' Prevent the textbox from ever receiving focus (keeps keystrokes on the Form handler).
+        AddHandler _txt.GotFocus, Sub()
+                                     Me.Select()
+                                 End Sub
+
+        _lblHint = New Label() With {
+            .Dock = DockStyle.Bottom,
+            .Height = 28,
+            .BackColor = Color.Black,
+            .ForeColor = Color.White,
+            .TextAlign = ContentAlignment.MiddleLeft,
+            .Font = Me.Font,
+            .Text = "[ENTER = More]   [ESC = Quit]"
+        }
+
+        Me.Controls.Add(_txt)
+        Me.Controls.Add(_lblHint)
+
+        AddHandler Me.KeyDown, AddressOf OnViewerKeyDown
+        AddHandler Me.Shown, Sub()
+                                 ' Ensure the form (not the TextBox) owns keyboard input.
+                                 Me.Select()
+                             End Sub
+    End Sub
+
+    Public Sub SetPages(pages As IEnumerable(Of String))
+        _pages = New List(Of String)(If(pages, Array.Empty(Of String)()))
+        _pageIndex = 0
+        Render()
+    End Sub
+
+    Public Sub SetSinglePage(text As String)
+        SetPages(New String() {If(text, "")})
+    End Sub
+
+    Private Sub OnViewerKeyDown(sender As Object, e As KeyEventArgs)
+        ' IMPORTANT:
+        ' Swallow digits and common typing keys so they can't trigger any global "type-to-search"
+        ' handler elsewhere while this viewer is open.
+        If (e.KeyCode >= Keys.D0 AndAlso e.KeyCode <= Keys.D9) OrElse
+           (e.KeyCode >= Keys.NumPad0 AndAlso e.KeyCode <= Keys.NumPad9) Then
+
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Escape Then
+            Me.Close()
+            e.Handled = True
+            Return
+        End If
+
+        If e.KeyCode = Keys.Enter Then
+            If _pageIndex < _pages.Count - 1 Then
+                _pageIndex += 1
+                Render()
+            Else
+                ' Stay on last page until ESC (DOS-like).
+            End If
+            e.Handled = True
+            Return
+        End If
+    End Sub
+
+    Private Sub Render()
+        If _pages Is Nothing OrElse _pages.Count = 0 Then
+            _txt.Text = ""
+            Return
+        End If
+
+        _txt.Text = _pages(_pageIndex)
+        _txt.SelectionStart = 0
+        _txt.SelectionLength = 0
+    End Sub
+End Class
+```
+
+### Why this helps your specific symptom
+Even if some other part of the app is still doing â€œincremental search on digit keysâ€, this viewer will now **eat** those digit keys while itâ€™s open, so typing `7` then `2` shouldnâ€™t cause *another* â€œLOG BOOKâ€ viewer to pop.
+
+### Important note
+This likely **reduces** the symptom, but the *real* root cause is still that another component is listening to keystrokes globally and launching `FrmDosPagedViewer`. If the popup still appears (even after this), flip:
+
+```vbnet
+Private Const DebugBreakOnOpen As Boolean = True
+```
+
+Run with **F5**, reproduce, then paste the **Call Stack**â€”and Iâ€™ll give you the exact permanent fix in the file thatâ€™s actually launching the viewer.
+
+## @testsubject117
+
+it does still happen.
+
+## Copilot
+
+Then `FrmDosPagedViewer` is only the *symptom* (itâ€™s being opened by some other code), and we need to identify the caller. The quickest reliable way now is to force a debugger break **whenever that unwanted viewer is created**, then read the call stack.
+
+## Do this (2 minutes, definitive)
+
+### 1) Turn on the break in `FrmDosPagedViewer`
+In `FrmDosPagedViewer.vb`, set:
+
+```vbnet
+Private Const DebugBreakOnOpen As Boolean = True
+```
+
+(Leave the `If DebugBreakOnOpen AndAlso Debugger.IsAttached Then Debugger.Break()` line as-is.)
+
+### 2) Run with the debugger attached
+Start with **F5** (not Ctrl+F5).
+
+### 3) Reproduce the issue
+Log Book â†’ press (3) â†’ type `7` then `2`.
+
+When the unwanted â€œLOG BOOKâ€ window is about to open, Visual Studio should **pause** on `Debugger.Break()`.
+
+### 4) Paste the call stack
+Open **Debug â†’ Windows â†’ Call Stack** and paste the top ~30 lines here.
+
+That call stack will show the exact method in *your* code that is opening the viewer on the 2nd digit. Once I see it, Iâ€™ll regenerate the full file for that specific class with the proper guard (usually: â€œif a modal dialog/prompt is active, ignore digitsâ€).
+
+---
+
+## If it does NOT break
+That means youâ€™re not attached to the debugger. Double-check:
+
+- you clicked the green **Start** button (or pressed **F5**)
+- the title bar shows â€œ(Running)â€
+- breakpoints in general work
+
+If you want, tell me your VS version (e.g., VS 2022) and whether this is .NET Framework WinForms or .NET (Core) WinForms.
+
+---
+
+## While youâ€™re at it (optional but fast)
+Search the solution for likely â€œtype-to-searchâ€ hooks:
+
+- `AddMessageFilter`
+- `PreFilterMessage`
+- `WM_CHAR`
+- `WM_KEYDOWN`
+- `KeyPressEventArgs`
+- `StartsWith(`
+- `Like`
+
+But the **call stack** is the fastest path. Paste it and Iâ€™ll give you the exact whole-file replacement that fixes it permanently.
+
+## @testsubject117
+
+ok, when I did that, as soon as I typed 2, the entire windows disappeared (the entire running app) but I can see it's still running in the back ground. it switched to the main windows for VB and highlighted lines in yellow: 
+
+## Copilot
+
+Thatâ€™s exactly what was supposed to happen: `Debugger.Break()` **pauses the app** and Visual Studio brings itself to the front. Your WinForms UI â€œdisappearsâ€ because itâ€™s frozen in the debugger.
+
+Now we just need the **Call Stack** from that paused state.
+
+## What to do right now (while itâ€™s paused on `Debugger.Break()`)
+1) In Visual Studio, go to **Debug â†’ Windows â†’ Call Stack**  
+   (or click the **Call Stack** tab at the bottom where itâ€™s visible in your screenshot).
+
+2) Copy the call stack lines (rightâ€‘click inside â†’ **Copy Call Stack**) and paste them here.
+
+What Iâ€™m looking for is the first line thatâ€™s *your code* (not `System.Windows.Forms...`). It will show something like:
+
+- `AMiOffice.SomeClass.SomeMethod(...)`
+- `FormLogBookMenu.RunInvoiceLookup(...)` (unlikely given your symptoms)
+- `FrmZipKeyPopup...` / `RolodexPromptEngine...` / etc.
+
+That line tells us **who is opening the viewer on the 2nd digit**.
+
+## If the Call Stack window is empty
+Sometimes itâ€™s not shown by default. Do:
+- **Debug â†’ Windows â†’ Call Stack**
+If it still looks empty, click **Show External Code** off/on, or expand the frames.
+
+## After you paste the call stack
+Iâ€™ll regenerate the correct â€œentire file replacementâ€ for the *actual caller* (likely a â€œZipKeyPopupâ€/â€œRolodexPromptEngineâ€/message filter) with a guard such as:
+
+- â€œif a modal prompt textbox is active, ignore digit keypressesâ€
+- and/or â€œonly run incremental search when the popup is the active formâ€
+
+## Important: turn the break back off afterward
+Once we fix it, set:
+
+```vbnet
+Private Const DebugBreakOnOpen As Boolean = False
+```
+
+so it wonâ€™t keep pausing.
+
+Paste the call stack and weâ€™ll finish this.
+
+## @testsubject117
+
+>	AMiOffice.dll!AMiOffice.FrmDosPagedViewer.New() Line 24	Basic
+ 	AMiOffice.dll!AMiOffice.FormLogBookMenu.RunViewAllCustomers() Line 367	Basic
+ 	AMiOffice.dll!AMiOffice.FormLogBookMenu.ProcessCmdKey(System.Windows.Forms.Message msg, System.Windows.Forms.Keys keyData) Line 121	Basic
+ 	[External Code]	
+ 	AMiOffice.dll!AMiOffice.FormMainMenu.AcceptLogBookYearPrompt() Line 475	Basic
+ 	AMiOffice.dll!AMiOffice.FormMainMenu.ProcessCmdKey(System.Windows.Forms.Message msg, System.Windows.Forms.Keys keyData) Line 72	Basic
+ 	[External Code]	
+
+
+## Copilot
+
+The call stack shows the popup is being opened by **your LogBook menu itself**:
+
+- `FormLogBookMenu.ProcessCmdKey(...) Line 121`
+- calling `FormLogBookMenu.RunViewAllCustomers() Line 367`
+
+So when you type `2` at the invoice prompt, `FormLogBookMenu.ProcessCmdKey` is still firing and treating that `2` as â€œmenu option 2â€ (View all customers) â€” thatâ€™s why it opens a â€œLOG BOOKâ€ viewer immediately and it looks like a â€œsearchâ€.
+
+### Why that happens
+`ProcessCmdKey` currently only checks:
+
+```vbnet
+If _mode = InputMode.Menu Then
+   ...
+End If
+```
+
+But **your `_mode` is getting reset back to `Menu` as soon as you show the prompt**, because both `BeginInvoiceLookupPrompt()` and `BeginCustomerPrompt()` call `RenderMenu()`, and `RenderMenu()` sets:
+
+```vbnet
+_mode = InputMode.Menu
+```
+
+So you *think* youâ€™re in invoice prompt mode, but `_mode` is actually `Menu`, and pressing `2` triggers â€œView all customersâ€.
+
+## Fix
+Do **not** set `_mode = Menu` inside `RenderMenu`. Only set it when you truly return to menu mode (ESC / after viewer closes).
+
+Iâ€™m going to regenerate the entire `FormLogBookMenu.vb` with these changes:
+
+1) `RenderMenu()` no longer changes `_mode`.
+2) Add a new `ShowMenu()` method that *does* set `_mode = Menu` and calls `RenderMenu()`.
+3) `BeginCustomerPrompt` / `BeginInvoiceLookupPrompt` set `_mode` first, then call `RenderMenu(promptLine:=...)` safely.
+4) ESC and â€œafter actionsâ€ call `ShowMenu()` (not `RenderMenu()`).
+
+---
+
+## Replace entire file: `FormLogBookMenu.vb`
+
+```vbnet name=FormLogBookMenu.vb
+Option Strict On
+Option Explicit On
+
+Imports System
+Imports System.Collections.Generic
+Imports System.Drawing
+Imports System.Windows.Forms
+
+Public Class FormLogBookMenu
+    Inherits Form
+
+    Private Const DataDir As String = "\\invoice\mainmenu\data"
